@@ -1,0 +1,270 @@
+using System.Collections.Generic;
+using UnityEngine;
+using Units.UnitDatas;
+
+
+namespace Units
+{
+    public class Unit_Core : MonoBehaviour
+    {
+        // ============================================================
+        // Components
+        // ============================================================
+
+        [SerializeField]
+        private Unit_RuntimeStatus _runtimeStatus;
+
+        [SerializeField]
+        private Unit_Life _life;
+
+        [SerializeField]
+        private Unit_Combat _combat;
+
+        [SerializeField]
+        private Unit_Animation _animation;
+
+        [SerializeField]
+        private Unit_Detection _detection;
+
+
+        // ============================================================
+        // Team
+        // ============================================================
+
+        [SerializeField]
+        private UnitTeam _team;
+
+
+        // ============================================================
+        // Properties
+        // ============================================================
+
+        public UnitTeam Team
+            => _team;
+
+        public Unit_RuntimeStatus RuntimeStatus
+            => _runtimeStatus;
+
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+
+        public void Initialize(
+            IEnumerable<UnitStatModifier> spawnModifiers = null)
+        {
+            InitComponents();
+
+            _runtimeStatus.Initialize(
+                spawnModifiers
+            );
+
+            if (_runtimeStatus.UnitData != null)
+            {
+                _team = _runtimeStatus.UnitData.Team;
+            }
+
+            if (_life != null)
+            {
+                _life.Initialize(
+                    this
+                );
+            }
+
+            if (_combat != null)
+            {
+                _combat.Initialize(
+                    this
+                );
+            }
+
+            if (_animation != null)
+            {
+                _animation.Initialize(
+                    this
+                );
+            }
+
+            if (_detection != null)
+            {
+                _detection.Initialize(
+                    this
+                );
+            }
+        }
+
+        private void InitComponents()
+        {
+            if (_runtimeStatus == null)
+            {
+                _runtimeStatus = GetComponent<Unit_RuntimeStatus>();
+            }
+
+            if (_life == null)
+            {
+                _life = GetComponent<Unit_Life>();
+            }
+
+            if (_combat == null)
+            {
+                _combat = GetComponent<Unit_Combat>();
+            }
+
+            if ( _animation == null)
+            {
+                _animation = GetComponent<Unit_Animation>();
+            }
+
+            if ( _detection == null)
+            {
+                _detection = GetComponent<Unit_Detection>();
+            }
+        }
+
+
+        // ============================================================
+        // Combat
+        // ============================================================
+
+        public bool TryBasicAttack(
+            GameObject target)
+        {
+            if (_combat == null)
+                return false;
+
+            return _combat.TryBasicAttack(
+                target
+            );
+        }
+
+
+        public bool TryActiveSkill(
+            GameObject target)
+        {
+            if (_combat == null)
+                return false;
+
+            return _combat.TryActiveSkill(
+                target
+            );
+        }
+
+
+        // ============================================================
+        // Life
+        // ============================================================
+
+        public void TakeDamage(
+            float damage)
+        {
+            if (_life == null)
+                return;
+
+            _life.TakeDamage(
+                damage
+            );
+        }
+
+
+        public void Heal(
+            float amount)
+        {
+            if (_life == null)
+                return;
+
+            _life.Heal(
+                amount
+            );
+        }
+
+
+        public void AddShield(
+            float amount)
+        {
+            if (_life == null)
+                return;
+
+            _life.AddShield(
+                amount
+            );
+        }
+
+
+        // ============================================================
+        // Animation
+        // ============================================================
+
+
+        public void PlayAnimation_Move()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Move();
+        }
+
+
+        public void PlayAnimation_Attack()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Attack();
+        }
+
+
+        public void PlayAnimation_Skill()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Skill();
+        }
+
+
+        public void PlayAnimation_Hit()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Hit();
+        }
+
+
+        public void PlayAnimation_Death()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Death();
+        }
+
+
+        // ============================================================
+        // Detection
+        // ============================================================
+
+        public float GetDistanceToTarget(
+            GameObject target)
+        {
+            if (_detection == null)
+                return float.MaxValue;
+
+            return _detection.GetDistanceToTarget(
+                target
+            );
+        }
+
+
+        public bool CanMoveStraightToTarget(
+            GameObject target)
+        {
+            if (_detection == null)
+                return false;
+
+            return _detection.CanMoveStraightToTarget(
+                target
+            );
+        }
+    }
+}
