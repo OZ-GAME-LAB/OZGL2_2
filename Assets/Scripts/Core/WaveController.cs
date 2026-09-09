@@ -17,6 +17,9 @@ namespace Game.Core
         public const int MAX_WAVE = 3; // 분기당 웨이브 수
         public const int MAIN_QUARTERS = 3;
 
+        [SerializeField] private WaveSODictionary _waveCatalog;
+        public WaveSO CurrentPreset { get; private set; }
+        public EnemyFaction CurrentFaction { get; private set; }
         public event Action<int> WaveChanged;
         //스폰 매니저 참조필요
         private ISpawner _spawner;
@@ -52,6 +55,7 @@ namespace Game.Core
             _curWave = 1;
             if (_spawner is TestSpawner testSpawner)
                 testSpawner.ResetUnits();
+            SelectCurrentPreset();
             WaveChanged?.Invoke(_curWave);
         }
         /// <summary>
@@ -61,6 +65,7 @@ namespace Game.Core
         {
             if (IsLastWave) return;
             _curWave++;
+            SelectCurrentPreset();
             WaveChanged?.Invoke(_curWave);
         }
         /// <summary>
@@ -94,7 +99,26 @@ namespace Game.Core
             if (!IsLastWave) return;
             CurQuarter++;
             _curWave = 1;
+            SelectCurrentPreset();
             WaveChanged?.Invoke(_curWave);
+        }
+
+        private void SelectCurrentPreset()
+        {
+            CurrentPreset = null;
+            CurrentFaction = default;
+            WaveBattleType type = _curWave == MAX_WAVE ? WaveBattleType.Boss :
+                _curWave == 2 ? WaveBattleType.Elite : WaveBattleType.Normal;
+            // 테스트 무한 진행은 5분기의 출현 규칙을 재사용한다.
+            if (_waveCatalog == null ||
+                !_waveCatalog.TryGetRandomWaveSO(Math.Min(CurQuarter, 5), type,
+                    out var preset, out var faction))
+            {
+                Debug.LogError($"[WaveController] 프리셋 목록 참조 또는 후보 누락: 분기 {CurQuarter}, 타입 {type}", this);
+                return;
+            }
+            CurrentPreset = preset;
+            CurrentFaction = faction;
         }
 
         public void CleanupTestBattle()

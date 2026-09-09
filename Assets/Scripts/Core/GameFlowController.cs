@@ -108,6 +108,7 @@ namespace Game.Core
         public async UniTask<bool> TryStartWave()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
+            if (_waveController.CurrentPreset == null) return false;
             _isTransitioning = true;
             var token = _cts.Token;
             ChangePhase(GamePhase.BattlePreparing);
