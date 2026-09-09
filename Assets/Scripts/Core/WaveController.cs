@@ -103,6 +103,29 @@ namespace Game.Core
             WaveChanged?.Invoke(_curWave);
         }
 
+        public bool CanJumpToLastWave => _controller != null &&
+            _controller.CanEnterBuildMode() && !IsLastWave;
+        public bool CanJumpToLastQuarter => _controller != null &&
+            _controller.CanEnterBuildMode() && CurQuarter < MAIN_QUARTERS;
+
+        // 테스트용 이동은 클리어·보상을 발생시키지 않고 준비 중인 위치만 변경한다.
+        public void JumpToLastWaveForTest()
+        {
+            if (!CanJumpToLastWave) return;
+            _curWave = MAX_WAVE;
+            SelectCurrentPreset();
+            WaveChanged?.Invoke(_curWave);
+        }
+
+        public void JumpToLastQuarterForTest()
+        {
+            if (!CanJumpToLastQuarter) return;
+            CurQuarter = MAIN_QUARTERS;
+            _curWave = 1;
+            SelectCurrentPreset();
+            WaveChanged?.Invoke(_curWave);
+        }
+
         private void SelectCurrentPreset()
         {
             CurrentPreset = null;
