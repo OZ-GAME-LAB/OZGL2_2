@@ -11,8 +11,6 @@ public class TestWaitingScript : MonoBehaviour
     private GameFlowController _gameFlowController;
     private WaveController _waveController;
     private bool _toggle;
-
-
     public void Initialize(GameFlowController gameFlowController, WaveController waveController)
     {
         _gameFlowController = gameFlowController;
@@ -40,12 +38,13 @@ public class TestWaitingScript : MonoBehaviour
     public void ChooseResultBtn()
     {
         Debug.Log($"[TestWaitingScript] 보상 선택 테스트");
-        if (_gameFlowController.CurPhase != GamePhase.Reward) return;
+        if (_gameFlowController.CurPhase != GamePhase.Reward &&
+            !_gameFlowController.IsWaitingForArtifactSelection) return;
         _toggle = true;
     }
-    public async UniTask WaitForSeconds(CancellationToken cts)
+    public async UniTask WaitForSeconds(float time, CancellationToken cts)
     {
-        await UniTask.Delay(TimeSpan.FromSeconds(2), cancellationToken: cts);
+        await UniTask.Delay(TimeSpan.FromSeconds(time), cancellationToken: cts);
     }
 
     public async UniTask WaitToggle(CancellationToken cts)

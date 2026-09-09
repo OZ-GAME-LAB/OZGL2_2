@@ -8,22 +8,27 @@ namespace Game.Core
     public interface ISpawner
     {
         public event Action MonsterKilled;
-        public UniTask SpawnAllUnits(CancellationToken cts);
+        public UniTask SpawnAllUnits(float time, CancellationToken cts);
         public bool GetRemain(out int enemy,out int  allies);
         public bool GetRemainBoss(out int enemy, out int allies);
     }
     public class WaveController : MonoBehaviour
     {
-        public const int MAX_WAVE = 3;
+        public const int MAX_WAVE = 3; // 분기당 웨이브 수
+        public const int MAIN_QUARTERS = 3;
 
         public event Action<int> WaveChanged;
         //스폰 매니저 참조필요
         private ISpawner _spawner;
         private GameFlowController _controller;
 
-        private int _curWave;
         public int CurWave => _curWave;
+        private int _curWave;
+        public int CurQuarter { get; private set; }
         public bool IsLastWave => _curWave >= MAX_WAVE;
+        /// <summary>
+        /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
+        /// </summary>
         public void Initialize(GameFlowController controller, ISpawner spawner)
         {
             if (_spawner != null)
@@ -38,48 +43,74 @@ namespace Game.Core
             if (_spawner != null)
                 _spawner.MonsterKilled -= HandleMonsterDead;
         }
-
+        /// <summary>
+        /// 게임 시작 시 실제 초기화 및 기초세팅 시작
+        /// </summary>
         public void BeginRun()
         {
+            CurQuarter = 1;
             _curWave = 1;
             if (_spawner is TestSpawner testSpawner)
                 testSpawner.ResetUnits();
             WaveChanged?.Invoke(_curWave);
         }
+        /// <summary>
+        /// 스테이지 진행
+        /// </summary>
         public void ProgressStage()
         {
             if (IsLastWave) return;
             _curWave++;
             WaveChanged?.Invoke(_curWave);
         }
+        /// <summary>
+        /// 유닛 파트에서 발행하는 몬스터 사망 이벤트와 연결해 클리어 조건을 확인
+        /// </summary>
         private void HandleMonsterDead()
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
             //스폰 매니저에게 남은 적 / 아군 수 요청
             EvaluateBattleResult();
         }
-        
+        /// <summary>
+        /// 전투 결과를 확인하고 승/패를 판정한다.
+        /// </summary>
         private void EvaluateBattleResult()
         {
             if (!_spawner.GetRemain(out int enemy, out int allies)) return;
 
             if (enemy == 0)
             {
-
                 Debug.Log("전투 승리");
-                _controller.CompleteWave().Forget();
+                _controller.ResolveBattleAsync(ResultType.Victory).Forget();
                 return;
             }
             if (allies != 0) return;
             Debug.Log("전투 패배");
-            _controller.FinishedGame(ResultType.Defeat).Forget();
-
+            _controller.ResolveBattleAsync(ResultType.Defeat).Forget();
         }
-        public UniTask PrepareEnemy(CancellationToken token)
+        public void ProgressQuarter()
         {
-            return _spawner.SpawnAllUnits(token);
+            if (!IsLastWave) return;
+            CurQuarter++;
+            _curWave = 1;
+            WaveChanged?.Invoke(_curWave);
         }
 
+        public void CleanupTestBattle()
+        {
+            if (_spawner is TestSpawner testSpawner)
+                testSpawner.ClearUnits();
+        }
+
+        public UniTask PrepareEnemy(float time, CancellationToken token)
+        {
+            return _spawner.SpawnAllUnits(time, token);
+        }
+        /// <summary>
+        /// 스테이지 성공 판정을 위해 임시로 만든 메서드.
+        /// <br/> 강제로 승리 설정으로 바꾼다.
+        /// </summary>
         public void SetSuccess()
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
@@ -89,6 +120,10 @@ namespace Game.Core
                 spawner.invokeMonsterKilled();
             }
         }
+        /// <summary>
+        /// 스테이지 성공 판정을 위해 임시로 만든 메서드.
+        /// <br/> 강제로 승리 설정으로 바꾼다.
+        /// </summary>
         public void SetFail()
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
@@ -99,20 +134,22 @@ namespace Game.Core
             }
         }
     }
-
+    /// <summary>
+    /// 스테이지 내 몬스터 구현을 위해 임시로 만든 테스트클래스
+    /// </summary>
     public class TestSpawner : ISpawner
     {
         public event Action MonsterKilled;
-        
+
         private int _enemyCount = 5;
         private int _alliesCount = 5;
 
-        public async UniTask SpawnAllUnits(CancellationToken cts)
+        public async UniTask SpawnAllUnits(float time,CancellationToken cts)
         {
             cts.ThrowIfCancellationRequested();
             ResetUnits();
             Debug.Log("[Test] 유닛 생성중....");
-            await UniTask.WaitForSeconds(3, cancellationToken: cts);
+            await UniTask.WaitForSeconds(time, cancellationToken: cts);
             Debug.Log("[Test] 유닛 생성완료!");
         }
 
@@ -132,6 +169,12 @@ namespace Game.Core
             if(_enemyCount == 0 || _alliesCount == 0)
                 return true;
             return false;
+        }
+
+        public void ClearUnits()
+        {
+            _enemyCount = 0;
+            _alliesCount = 0;
         }
 
         public void ResetUnits()
