@@ -74,6 +74,16 @@ namespace Game.UI
             SetTextIfAssigned(_goldText, $"{gold:N0}");
         }
 
+        public void ClearGold()
+        {
+            SetTextIfAssigned(_goldText, "--");
+        }
+
+        public void ClearWaveProgress()
+        {
+            SetTextIfAssigned(_waveText, "-- / --");
+        }
+
         public void SetWaveProgress(int currentWave, int totalWaves)
         {
             if (totalWaves < 1) throw new ArgumentOutOfRangeException(nameof(totalWaves));

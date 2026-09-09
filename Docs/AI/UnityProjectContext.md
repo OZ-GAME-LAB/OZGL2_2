@@ -4,10 +4,11 @@
 
 ## Project Summary
 
-- Project root: `D:/Documents/GitHub/OZGL2_2`
-- Last analyzed: 2026-09-08 (local HUD/building/unit UI work; latest evidence in `Docs/UI/UnitInfoUiValidation.md`)
-- Last analyzed commit: `e472459fc88d5d8970cce00734c1834d504273bc`
-- Current feature branch: `feature/ui-common-hud`
+- Project root for today's integration: `D:/Documents/GitHub/OZGL2_2-ui-integration`
+- Original UI checkout: `D:/Documents/GitHub/OZGL2_2` (`feature/ui-common-hud`, PR #9)
+- Last analyzed: 2026-09-09. Current integration details: `Docs/UI/RuntimeHudIntegration.md`.
+- Integration baseline: `38c37e7`, combining dev `1a3ce52`, UI `1b8d2a5`, and core `dbc33b0` feature changes.
+- Current feature branch: `feature/ui-runtime-integration` (local integration; no remote upstream).
 
 ## Confirmed Environment
 
@@ -48,12 +49,13 @@
 - UI-only demo: `Assets/Scenes/Test/MvpHudTest.unity`. Not added to shared Build Settings.
 - Building info demo: `Assets/Scenes/Test/MvpBuildingInfoTest.unity`; display-only snapshots, no real building/economy logic. See `Docs/UI/BuildingInfoUiSpec.md` and `Docs/UI/BuildingInfoUiValidation.md`.
 - Unit info demo: `Assets/Scenes/Test/MvpUnitInfoTest.unity`; instance-keyed selection/health snapshots, no real unit/combat logic. Not added to shared Build Settings.
+- Runtime HUD integration: `Assets/Scenes/Test/MvpRuntimeHudTest.unity`; real currency/core managers with core's test spawner and sample-only reward input. Not added to shared Build Settings.
 
 ## Architecture
 
 | Pattern | Finding | Confidence | Evidence |
 | --- | --- | --- | --- |
-| Runtime architecture | Core teammate branch has `Game.Core.GameFlowController`; not integrated into this branch | Confirmed | `origin/feature/core-game-test` at `17f404f` |
+| Runtime architecture | `Game.Core.GameFlowController`/`WaveController` and `RunCurrencyManager` are integrated locally; HUD binds their public events and methods | Confirmed | Integration baseline `38c37e7`, `Docs/UI/RuntimeHudIntegration.md` |
 | UI architecture | `Game.UI.GameUIController` displays authoritative values and emits intent events; demo-only data is isolated | Confirmed | `Assets/Scripts/UI`, `Docs/UI/MvpCommonHudSpec.md` |
 | Folder organization | Feature/system folders are prepared under `Assets/Scripts`, `Assets/Data`, and `Assets/Prefabs` | Confirmed | Repository structure |
 
@@ -83,7 +85,7 @@
 ## Important Constraints
 
 - Work on a feature branch and open a PR when it compiles, runs, preserves scenes/prefabs, and has a clear description.
-- PR target is documented as `TutorialMap`, but that branch does not currently exist on the remote.
+- PR target is `dev`, as explicitly confirmed by the user. Do not target `main` or merge PRs.
 - Unity assets and their `.meta` files must be committed together.
 - Do not modify shared scenes or prefabs until ownership and integration flow are agreed.
 - `ProjectSettings/ProjectSettings.asset` contains a credential-like platform setting; do not reproduce its value in documentation or output.
@@ -91,11 +93,12 @@
 ## Unknowns And Confidence
 
 - Current common HUD uses uGUI/TMP. Do not introduce a second UI framework for this feature.
-- Actual core/economy linkage remains a separate integration task; the sample is not production gameplay.
+- Real gold/phase/wave/start bindings are now connected in the local integration scene. Final outcome/reward APIs and building/unit object bindings remain separate tasks; the sample is not production gameplay.
 - Building selection/info presentation: 113 Editor checks and actual mouse Play smoke passed (four categories, refresh, close/clear). Building action UI: 150 Editor checks, plus 113 info and 98 HUD regression checks, and actual mouse Play request/response smoke passed. See `Docs/UI/BuildingActionUiSpec.md` and `BuildingActionUiValidation.md`. Test scene: `Assets/Scenes/Test/MvpBuildingActionTest.unity`; no actual building/economy changes. Contracts remain UI-side proposals, not finalized team APIs.
 - Unit info UI: 157 Editor checks plus 361 existing UI regression checks passed; actual Play selection, health/zero, stale callbacks, removal, close/reselect, wheel scrolling and reading-position retention passed. `UnitInfoData` / `UnitInfoPanel` are UI-side contracts; use spawn-lifetime unique IDs, not unit type IDs. Actual unit selection/stats/death and building-panel switching remain unconnected. See `Docs/UI/UnitInfoUiSpec.md` and `Docs/UI/UnitInfoUiValidation.md`.
 - MVP loss condition conflicts across documents and must be resolved before result UI integration.
-- `TutorialMap` branch creation and the exact feature-branch base/PR flow are unresolved.
+- Earlier `TutorialMap` guidance is superseded by the user's explicit `dev` target.
+- Today's worktree includes the real economy manager from dev and the core's UniTask dependency and feature commits. See `RuntimeHudIntegration.md` for binding APIs and `RuntimeHudValidation.md` for current validation evidence.
 
 ## Source Files Inspected
 
