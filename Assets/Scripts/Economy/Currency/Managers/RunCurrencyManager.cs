@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Game.Core;
 using UnityEngine;
 
 public class RunCurrencyManager : MonoBehaviour
 {
-    public static RunCurrencyManager Instance { get; private set; }
-
     public event Action<CurrencyData, int, int> BalanceChanged;
 
     public IReadOnlyDictionary<CurrencyData, int> Balances => _wallet?.Balances;
@@ -13,51 +12,28 @@ public class RunCurrencyManager : MonoBehaviour
     public bool IsInitialized => _wallet != null;
 
     [SerializeField] private CurrencyCatalog _currencyCatalog;
+    [SerializeField] private WaveRewardTable _waveRewardTable;
     [SerializeField] private List<CurrencyAmount> _baseStartingCurrencies =
         new List<CurrencyAmount>();
 
     private CurrencyWallet _wallet;
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-    }
+    private WaveController _waveController;
+    private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
 
     private void OnDestroy()
     {
         _wallet = null;
-
-        if (Instance == this)
-        {
-            Instance = null;
-        }
+        _waveController = null;
     }
 
     public int GetBalance(CurrencyType type)
-    {
-        if (_wallet == null || _currencyCatalog == null ||
-            !_currencyCatalog.TryGetByType(type, out CurrencyData currency))
-        {
-            return 0;
-        }
-
-        return GetBalance(currency);
-    }
-
-    public int GetBalance(CurrencyData currency)
     {
         if (!IsInitialized)
         {
             return 0;
         }
 
-        if (!CanUseCurrency(currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return 0;
         }
@@ -65,22 +41,33 @@ public class RunCurrencyManager : MonoBehaviour
         return _wallet.GetBalance(currency);
     }
 
-    public bool CanSpend(CurrencyAmount currencyAmount)
+    public bool CanSpend(CurrencyType type, int amount)
     {
         if (!IsInitialized)
         {
             return false;
         }
 
-        if (!CanUseCurrency(currencyAmount.Currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return false;
         }
 
-        return _wallet.CanSpend(currencyAmount);
+        return _wallet.CanSpend(new CurrencyAmount(currency, amount));
     }
 
-    public bool TryAdd(CurrencyAmount currencyAmount)
+    public bool TryAdd(CurrencyType type, int amount)
+    {
+        if (!TryGetCurrency(type, out CurrencyData currency))
+        {
+            return false;
+        }
+
+        return TryAddInternal(new CurrencyAmount(currency, amount));
+    }
+
+    // 실질적으로 Wallet에 추가하고 이벤트를 발생시키는 내부 메서드
+    private bool TryAddInternal(CurrencyAmount currencyAmount)
     {
         if (!IsInitialized)
         {
@@ -109,7 +96,7 @@ public class RunCurrencyManager : MonoBehaviour
         return true;
     }
 
-    public bool TrySpend(CurrencyAmount currencyAmount)
+    public bool TrySpend(CurrencyType type, int amount)
     {
         if (!IsInitialized)
         {
@@ -121,15 +108,14 @@ public class RunCurrencyManager : MonoBehaviour
             return false;
         }
 
-        if (!CanUseCurrency(currencyAmount.Currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return false;
         }
 
-        CurrencyData currency = currencyAmount.Currency;
         int previousBalance = _wallet.GetBalance(currency);
 
-        if (!_wallet.TrySpend(currencyAmount))
+        if (!_wallet.TrySpend(new CurrencyAmount(currency, amount)))
         {
             return false;
         }
@@ -138,45 +124,114 @@ public class RunCurrencyManager : MonoBehaviour
         return true;
     }
 
-    // 웨이브 클리어 시 지급되는 보상 (웨이브 자체 보상)
-    public bool TryApplyWaveReward(CurrencyAmount waveReward)
+    // 웨이브 클리어 시 호출 : 웨이브 클리어로 지급되는 보상 (웨이브 자체 보상)
+    public bool TryApplyWaveReward()
     {
-        // 베이스 캠프 레벨에 비례한 보상 계산 로직을 추가해야 함
-        // 도현님의 건물 관련 스크립트에서 베이스 캠프 레벨을 가져와서 보상 계산에 활용 예정
-        // 계산 C# 스크립트를 생성해서 해당 스크립트 내에서 제단, 토템, 아티팩트를 가져와서 보상 계산에 활용하도록 구현 예정
+        if (!IsInitialized)
+        {
+            Debug.LogWarning("[Economy/RunCurrencyManager] Run 재화가 초기화되지 않았습니다.", this);
+            return false;
+        }
 
-        // 현재는 임시로 해둔 상태
-        CurrencyAmount calculatedReward = waveReward;
+        if (_waveRewardTable == null)
+        {
+            Debug.LogError("[Economy/RunCurrencyManager] WaveRewardTable이 연결되지 않았습니다.", this);
+            return false;
+        }
 
-        return TryAdd(calculatedReward);
+        if (_waveController == null)
+        {
+            Debug.LogError("[Economy/RunCurrencyManager] WaveController 참조가 없습니다.", this);
+            return false;
+        }
+
+        int quarterNumber = _waveController.CurQuarter;
+        int waveNumber = _waveController.CurWave;
+
+        //건물 스크립트에서 실제 베이스캠프 레벨 프로퍼티를 읽어와야 함. 현재는 임시로 1 고정
+        int baseCampLevel = 1;
+
+        // 4분기 이후에는 3분기의 같은 웨이브 보상을 사용하도록 설정(임시)
+        int rewardQuarterNumber = Mathf.Min(quarterNumber, WaveController.MAIN_QUARTERS);
+
+        if (!_waveRewardTable.TryGetRewards(rewardQuarterNumber, waveNumber, out IReadOnlyList<CurrencyAmount> rewards))
+        {
+            Debug.LogError($"[Economy/RunCurrencyManager] 웨이브 보상 설정을 확인하세요. Quarter: {rewardQuarterNumber}, Wave: {waveNumber}", this);
+            return false;
+        }
+
+        CurrencyAmount[] calculatedRewards = new CurrencyAmount[rewards.Count];
+        int[] previousBalances = new int[rewards.Count];
+
+        // 보상 테이블은 중복 재화를 거부하도록 구성
+        for (int i = 0; i < rewards.Count; i++)
+        {
+            CurrencyAmount reward = _rewardCalculator.CalculateWaveReward(rewards[i], baseCampLevel);
+
+            if (!CanUseCurrency(reward.Currency) || reward.Currency != rewards[i].Currency ||
+                !_wallet.Balances.ContainsKey(reward.Currency) || reward.Amount < 0)
+                return false;
+
+            int balance = _wallet.GetBalance(reward.Currency);
+
+            if (balance > int.MaxValue - reward.Amount)
+            {
+                return false;
+            }
+
+            calculatedRewards[i] = reward;
+            previousBalances[i] = balance;
+        }
+
+        // RunCurrencyManager.TryAdd는 즉시 이벤트를 보내므로 여기서는 wallet.TryAdd 이후 아래에서 이벤트 발생
+        foreach (CurrencyAmount reward in calculatedRewards)
+        {
+            _wallet.TryAdd(reward);
+        }
+
+        for (int i = 0; i < calculatedRewards.Length; i++)
+        {
+            CurrencyAmount reward = calculatedRewards[i];
+            if (reward.Amount > 0)
+            {
+                BalanceChanged?.Invoke(reward.Currency, previousBalances[i], previousBalances[i] + reward.Amount);
+            }
+        }
+
+        return true;
     }
 
-    // 웨이브 종료 시 생산 건물에서 생산한 재화 지급
-    public bool TryApplyProductionReward(CurrencyAmount productionReward)
+    // 새로운 웨이브 준비 페이즈 돌입 시 호출 : 생산 건물에서 생산한 재화 지급
+    public bool TryApplyProductionReward(CurrencyType type, int amount)
     {
-        // 계산 스크립트에서 제단, 토템, 아티팩트의 생산량 증가 효과를 적용할 예정
-        // 웨이브 자체 보상과 구분하여 생산에 해당하는 효과만 계산해야 함
-        // 도현님의 건물 관련 스크립트에서 생산 건물의 재화 생산량을 가져와서 계산 예정
-        // 현재는 임시로 해둔 상태
-        CurrencyAmount calculatedReward = productionReward;
+        if (!TryGetCurrency(type, out CurrencyData currency))
+        {
+            return false;
+        }
 
-        return TryAdd(calculatedReward);
+        CurrencyAmount calculatedReward =
+            _rewardCalculator.CalculateProductionReward(new CurrencyAmount(currency, amount));
+
+        return TryAddInternal(calculatedReward);
     }
 
     // 적 유닛 사망 시 드랍하는 재화 지급
-    public bool TryApplyEnemyDropReward(CurrencyAmount dropReward)
+    public bool TryApplyEnemyDropReward(CurrencyType type, int amount)
     {
-        // 계산 스크립트에서 제단, 토템, 아티팩트의 적 드랍 보상 관련 효과를 적용할 예정
+        if (!TryGetCurrency(type, out CurrencyData currency))
+        {
+            return false;
+        }
+
         // 적 유닛 실제 사망 확정 시 기본 드랍 재화와 수량을 전달
+        CurrencyAmount calculatedReward =
+            _rewardCalculator.CalculateEnemyDropReward(new CurrencyAmount(currency, amount));
 
-        // 현재는 임시로 해둔 상태
-        CurrencyAmount calculatedReward = dropReward;
-
-        return TryAdd(calculatedReward);
+        return TryAddInternal(calculatedReward);
     }
 
     // 게임 시작 시에 Run 재화 초기화
-    public bool TryInitialize()
+    public void Initialize(WaveController waveController)
     {
         if (IsInitialized)
         {
@@ -185,12 +240,18 @@ public class RunCurrencyManager : MonoBehaviour
                 this
             );
 
-            return false;
+            return;
+        }
+
+        if (waveController == null)
+        {
+            Debug.LogError("[Economy/RunCurrencyManager] WaveController 참조가 없습니다.", this);
+            return;
         }
 
         if (!ValidateSettings())
         {
-            return false;
+            return;
         }
 
         CurrencyWallet newWallet =
@@ -198,7 +259,7 @@ public class RunCurrencyManager : MonoBehaviour
 
         if (!TryRegisterRunCurrencies(newWallet))
         {
-            return false;
+            return;
         }
 
         if (_baseStartingCurrencies != null)
@@ -210,30 +271,27 @@ public class RunCurrencyManager : MonoBehaviour
 
                 if (!CanUseCurrency(startingCurrency.Currency))
                 {
-                    return false;
+                    return;
                 }
 
-                // 계산 스크립트에 기본 시작 재화를 전달해 제단,토템 등의 효과를 적용 예정
-                // 현재는 임의로 Inspector에 설정한 수량을 그대로 사용
-                CurrencyAmount calculatedReward = startingCurrency;
+                CurrencyAmount calculatedReward =
+                    _rewardCalculator.CalculateStartingReward(startingCurrency);
 
                 if (!newWallet.TryAdd(calculatedReward))
                 {
-                    return false;
+                    return;
                 }
             }
         }
 
+        _waveController = waveController;
         _wallet = newWallet;
 
         Debug.Log(
             "[Economy/RunCurrencyManager] Run 재화를 초기화했습니다.",
             this
         );
-
-        return true;
     }
-
 
     // 게임 종료 시에 Run 재화를 제거 (혈석 정산 메서드와 같이 호출)
     public bool TryEndRun()
@@ -305,6 +363,24 @@ public class RunCurrencyManager : MonoBehaviour
         );
 
         return false;
+    }
+
+    private bool TryGetCurrency(CurrencyType type, out CurrencyData currency)
+    {
+        currency = null;
+
+        if (!ValidateSettings())
+        {
+            return false;
+        }
+
+        if (!_currencyCatalog.TryGetByType(type, out currency))
+        {
+            Debug.LogError($"[Economy/RunCurrencyManager] Catalog에서 재화를 찾을 수 없습니다. Type: {type}", this);
+            return false;
+        }
+
+        return true;
     }
 
     private bool CanUseCurrency(CurrencyData currency)
