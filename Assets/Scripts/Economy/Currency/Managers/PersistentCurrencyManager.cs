@@ -47,18 +47,12 @@ public class PersistentCurrencyManager : MonoBehaviour
 
     public int GetBalance(CurrencyType type)
     {
-        if (_wallet == null || _currencyCatalog == null ||
-            !_currencyCatalog.TryGetByType(type, out CurrencyData currency))
+        if (_wallet == null)
         {
             return 0;
         }
 
-        return GetBalance(currency);
-    }
-
-    public int GetBalance(CurrencyData currency)
-    {
-        if (!CanUseCurrency(currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return 0;
         }
@@ -66,27 +60,26 @@ public class PersistentCurrencyManager : MonoBehaviour
         return _wallet.GetBalance(currency);
     }
 
-    public bool CanSpend(CurrencyAmount currencyAmount)
+    public bool CanSpend(CurrencyType type, int amount)
     {
-        if (!CanUseCurrency(currencyAmount.Currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return false;
         }
 
-        return _wallet.CanSpend(currencyAmount);
+        return _wallet.CanSpend(new CurrencyAmount(currency, amount));
     }
 
-    public bool TrySpend(CurrencyAmount currencyAmount)
+    public bool TrySpend(CurrencyType type, int amount)
     {
-        if (!CanUseCurrency(currencyAmount.Currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return false;
         }
 
-        CurrencyData currency = currencyAmount.Currency;
         int previousBalance = _wallet.GetBalance(currency);
 
-        if (!_wallet.TrySpend(currencyAmount))
+        if (!_wallet.TrySpend(new CurrencyAmount(currency, amount)))
         {
             return false;
         }
@@ -95,7 +88,17 @@ public class PersistentCurrencyManager : MonoBehaviour
         return true;
     }
 
-    public bool TryAdd(CurrencyAmount currencyAmount)
+    public bool TryAdd(CurrencyType type, int amount)
+    {
+        if (!TryGetCurrency(type, out CurrencyData currency))
+        {
+            return false;
+        }
+
+        return TryAddInternal(new CurrencyAmount(currency, amount));
+    }
+
+    private bool TryAddInternal(CurrencyAmount currencyAmount)
     {
         if (!CanUseCurrency(currencyAmount.Currency))
         {
@@ -134,7 +137,7 @@ public class PersistentCurrencyManager : MonoBehaviour
         CurrencyAmount reward = _rewardCalculator.CalculateRunSettlementReward(
             currency, totalWaveCleared, totalUnitsKilled, totalBossesKilled);
 
-        return TryAdd(reward);
+        return TryAddInternal(reward);
     }
 
     private void NotifyBalanceChanged(CurrencyData currency, int previousBalance)
@@ -186,6 +189,24 @@ public class PersistentCurrencyManager : MonoBehaviour
         );
 
         return false;
+    }
+
+    private bool TryGetCurrency(CurrencyType type, out CurrencyData currency)
+    {
+        currency = null;
+
+        if (!ValidateSettings())
+        {
+            return false;
+        }
+
+        if (!_currencyCatalog.TryGetByType(type, out currency))
+        {
+            Debug.LogError($"[Economy/PersistentCurrencyManager] Catalog에서 재화를 찾을 수 없습니다. Type: {type}", this);
+            return false;
+        }
+
+        return true;
     }
 
     private bool CanUseCurrency(CurrencyData currency)
