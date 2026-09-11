@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -119,7 +118,7 @@ namespace Units
         // ============================================================
 
         public void Initialize(
-            IEnumerable<UnitStatModifier> spawnModifiers = null)
+            FinalStatModifier spawnModifier)
         {
             InitComponents();
 
@@ -131,7 +130,7 @@ namespace Units
             }
 
             _runtimeStatus.Initialize(
-                spawnModifiers
+                spawnModifier
             );
 
             if (_runtimeStatus.UnitData != null)
@@ -227,7 +226,7 @@ namespace Units
                     GetComponent<Unit_Detection>();
             }
 
-            if ( _ai == null)
+            if (_ai == null)
             {
                 _ai =
                     GetComponent<Unit_AI>();
@@ -257,6 +256,28 @@ namespace Units
                 return;
 
             _movement.Stop();
+        }
+
+        public void HoldMovementPosition(
+            Vector2 position)
+        {
+            if (_movement == null)
+                return;
+
+
+            _movement.HoldPosition(
+                position
+            );
+        }
+
+
+        public void ReleaseMovementPosition()
+        {
+            if (_movement == null)
+                return;
+
+
+            _movement.ReleasePosition();
         }
 
 

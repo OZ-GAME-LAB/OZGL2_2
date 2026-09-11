@@ -15,7 +15,12 @@ MonoBehaviour:
   _unitId: Ally_TestUnit_1
   _unitName: TestUnit1
   _team: 0
-  _unitType: 1
+  _allyIdentity:
+    _unitClass: 1
+    _unitType: 1
+  _enemyIdentity:
+    _unitClass: 0
+    _unitType: 0
   _stats:
   - _statType: 0
     _value: 200

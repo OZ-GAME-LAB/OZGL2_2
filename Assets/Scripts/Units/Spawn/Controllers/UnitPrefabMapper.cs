@@ -25,10 +25,10 @@ namespace Units
         // Mapper는 전달받은 Dictionary에 데이터만 작성한다.
         // ============================================================
 
-        private readonly Dictionary<UnitType, GameObject>
+        private readonly Dictionary<AllyUnitType, GameObject>
             _allyUnitPrefabs;
 
-        private readonly Dictionary<UnitType, GameObject>
+        private readonly Dictionary<EnemyUnitType, GameObject>
             _enemyUnitPrefabs;
 
 
@@ -39,8 +39,8 @@ namespace Units
         internal UnitPrefabMapper(
             AllyUnitSpawnDatabaseSO allyUnitDatabase,
             EnemyUnitSpawnDatabaseSO enemyUnitDatabase,
-            Dictionary<UnitType, GameObject> allyUnitPrefabs,
-            Dictionary<UnitType, GameObject> enemyUnitPrefabs)
+            Dictionary<AllyUnitType, GameObject> allyUnitPrefabs,
+            Dictionary<EnemyUnitType, GameObject> enemyUnitPrefabs)
         {
             _allyUnitDatabase =
                 allyUnitDatabase;
@@ -114,9 +114,8 @@ namespace Units
                     continue;
 
 
-                RegisterPrefabs(
-                    classData.UnitPrefabs,
-                    UnitTeam.Ally
+                RegisterAllyPrefabs(
+                    classData.UnitPrefabs
                 );
             }
         }
@@ -154,21 +153,19 @@ namespace Units
                     continue;
 
 
-                RegisterPrefabs(
-                    factionData.UnitPrefabs,
-                    UnitTeam.Enemy
+                RegisterEnemyPrefabs(
+                    factionData.UnitPrefabs
                 );
             }
         }
 
 
         // ============================================================
-        // Register
+        // Register - Ally
         // ============================================================
 
-        private void RegisterPrefabs(
-            IReadOnlyList<GameObject> prefabs,
-            UnitTeam expectedTeam)
+        private void RegisterAllyPrefabs(
+            IReadOnlyList<GameObject> prefabs)
         {
             if (prefabs == null)
                 return;
@@ -186,17 +183,15 @@ namespace Units
                     continue;
 
 
-                RegisterPrefab(
-                    prefab,
-                    expectedTeam
+                RegisterAllyPrefab(
+                    prefab
                 );
             }
         }
 
 
-        private void RegisterPrefab(
-            GameObject prefab,
-            UnitTeam expectedTeam)
+        private void RegisterAllyPrefab(
+            GameObject prefab)
         {
             if (!TryGetUnitData(
                 prefab,
@@ -207,12 +202,12 @@ namespace Units
 
 
             if (unitData.Team !=
-                expectedTeam)
+                UnitTeam.Ally)
             {
                 Debug.LogError(
                     $"[PrefabMapper] {prefab.name}의 Team이 " +
                     $"Database와 일치하지 않습니다. " +
-                    $"Database : {expectedTeam}, " +
+                    $"Database : {UnitTeam.Ally}, " +
                     $"UnitData : {unitData.Team}"
                 );
 
@@ -220,18 +215,16 @@ namespace Units
             }
 
 
-            Dictionary<UnitType, GameObject> prefabMap =
-                GetPrefabMap(
-                    expectedTeam
-                );
+            AllyUnitType unitType =
+                unitData.GetAllyType();
 
 
-            if (prefabMap.ContainsKey(
-                unitData.UnitType))
+            if (_allyUnitPrefabs.ContainsKey(
+                unitType))
             {
                 Debug.LogError(
                     $"[PrefabMapper] " +
-                    $"{expectedTeam} / {unitData.UnitType} " +
+                    $"{UnitTeam.Ally} / {unitType} " +
                     $"Prefab이 중복 등록되어 있습니다."
                 );
 
@@ -239,8 +232,87 @@ namespace Units
             }
 
 
-            prefabMap.Add(
-                unitData.UnitType,
+            _allyUnitPrefabs.Add(
+                unitType,
+                prefab
+            );
+        }
+
+
+        // ============================================================
+        // Register - Enemy
+        // ============================================================
+
+        private void RegisterEnemyPrefabs(
+            IReadOnlyList<GameObject> prefabs)
+        {
+            if (prefabs == null)
+                return;
+
+
+            for (int i = 0;
+                 i < prefabs.Count;
+                 i++)
+            {
+                GameObject prefab =
+                    prefabs[i];
+
+
+                if (prefab == null)
+                    continue;
+
+
+                RegisterEnemyPrefab(
+                    prefab
+                );
+            }
+        }
+
+
+        private void RegisterEnemyPrefab(
+            GameObject prefab)
+        {
+            if (!TryGetUnitData(
+                prefab,
+                out UnitData unitData))
+            {
+                return;
+            }
+
+
+            if (unitData.Team !=
+                UnitTeam.Enemy)
+            {
+                Debug.LogError(
+                    $"[PrefabMapper] {prefab.name}의 Team이 " +
+                    $"Database와 일치하지 않습니다. " +
+                    $"Database : {UnitTeam.Enemy}, " +
+                    $"UnitData : {unitData.Team}"
+                );
+
+                return;
+            }
+
+
+            EnemyUnitType unitType =
+                unitData.GetEnemyType();
+
+
+            if (_enemyUnitPrefabs.ContainsKey(
+                unitType))
+            {
+                Debug.LogError(
+                    $"[PrefabMapper] " +
+                    $"{UnitTeam.Enemy} / {unitType} " +
+                    $"Prefab이 중복 등록되어 있습니다."
+                );
+
+                return;
+            }
+
+
+            _enemyUnitPrefabs.Add(
+                unitType,
                 prefab
             );
         }
@@ -249,17 +321,6 @@ namespace Units
         // ============================================================
         // Utility
         // ============================================================
-
-        private Dictionary<UnitType, GameObject>
-            GetPrefabMap(
-                UnitTeam team)
-        {
-            return team ==
-                UnitTeam.Ally
-                ? _allyUnitPrefabs
-                : _enemyUnitPrefabs;
-        }
-
 
         private bool TryGetUnitData(
             GameObject prefab,

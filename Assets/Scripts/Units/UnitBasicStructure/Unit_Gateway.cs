@@ -20,6 +20,15 @@ namespace Units
 
 
         // ============================================================
+        // Runtime State
+        // ============================================================
+
+        private bool _isRallyMoving;
+
+        private Vector2 _rallyPosition;
+
+
+        // ============================================================
         // Events
         // ============================================================
 
@@ -28,6 +37,8 @@ namespace Units
         public event Action<Unit_Gateway> RequestFullAssignmentEvent;
 
         public event Action<Unit_Gateway> RequestPositionAssignmentEvent;
+
+        public event Action<Unit_Gateway> RallyCompleted;
 
 
         // ============================================================
@@ -85,8 +96,98 @@ namespace Units
             }
 
 
+            UnbindEvents();
+
+
             _core =
                 core;
+
+
+            _isRallyMoving =
+                false;
+
+
+            BindEvents();
+        }
+
+
+        // ============================================================
+        // Unity Lifecycle
+        // ============================================================
+
+        private void OnDestroy()
+        {
+            UnbindEvents();
+        }
+
+
+        // ============================================================
+        // Events
+        // ============================================================
+
+        private void BindEvents()
+        {
+            if (_core == null)
+                return;
+
+
+            _core.MovementCompleted +=
+                OnMovementCompleted;
+
+            _core.MovementFailed +=
+                OnMovementFailed;
+        }
+
+
+        private void UnbindEvents()
+        {
+            if (_core == null)
+                return;
+
+
+            _core.MovementCompleted -=
+                OnMovementCompleted;
+
+            _core.MovementFailed -=
+                OnMovementFailed;
+        }
+
+
+        private void OnMovementCompleted()
+        {
+            if (!_isRallyMoving)
+                return;
+
+
+            _isRallyMoving =
+                false;
+
+
+            _core?.HoldMovementPosition(
+                _rallyPosition
+            );
+
+
+            RallyCompleted?.Invoke(
+                this
+            );
+        }
+
+
+        private void OnMovementFailed()
+        {
+            if (!_isRallyMoving)
+                return;
+
+
+            _isRallyMoving =
+                false;
+
+            RallyCompleted?.Invoke(
+                this
+            );
+
+            Debug.LogError($"[Unit_Gateway] {gameObject.name} Rally movement failed.");
         }
 
 
@@ -135,10 +236,12 @@ namespace Units
             _core.ClearUnitAssignment();
         }
 
+
         public void RequestFullAssignment()
         {
             RequestFullAssignmentEvent?.Invoke(this);
         }
+
 
         public void RequestPositionAssignment()
         {
@@ -152,8 +255,15 @@ namespace Units
 
         public void StartAI()
         {
-            _core?.StartAI();
+            if (_core == null)
+                return;
+
+
+            _core.ReleaseMovementPosition();
+
+            _core.StartAI();
         }
+
 
         public void PauseAI()
         {
@@ -185,6 +295,7 @@ namespace Units
         // ============================================================
         // Advance
         // ============================================================
+
         public void MoveTo(
             Vector2 destination)
         {
@@ -193,9 +304,34 @@ namespace Units
             );
         }
 
+
         public void StopMovement()
         {
             _core?.StopMovement();
+        }
+
+
+        // ============================================================
+        // Rally
+        // ============================================================
+
+        public void MoveToRally(
+            Vector2 destination)
+        {
+            if (_core == null)
+                return;
+
+
+            _rallyPosition =
+                destination;
+
+            _isRallyMoving =
+                true;
+
+
+            _core.MoveTo(
+                destination
+            );
         }
     }
 }

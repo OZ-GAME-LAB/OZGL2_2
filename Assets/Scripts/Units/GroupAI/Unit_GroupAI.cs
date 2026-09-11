@@ -24,7 +24,7 @@ namespace Units
 
         [SerializeField]
         private float _advanceDistance =
-            5f;
+            15f;
 
         [SerializeField]
         private float _advanceThreshold =
@@ -52,6 +52,17 @@ namespace Units
 
         private GroupAIState _state =
             GroupAIState.Idle;
+
+
+        // =========================
+        // Spawn
+        // =========================
+
+        private bool _isSpawnCompleted;
+
+        private readonly HashSet<Unit_Gateway>
+            _rallyCompletedMembers =
+            new();
 
 
         // =========================
@@ -106,6 +117,9 @@ namespace Units
 
         public event Action<Unit_GroupAI>
             AdvanceReferenceRequested;
+
+        public event Action<Unit_GroupAI>
+            PreparationCompleted;
 
 
         // =========================
@@ -232,6 +246,17 @@ namespace Units
                 team;
 
 
+            _isSpawnCompleted =
+                false;
+
+            _rallyCompletedMembers.Clear();
+
+
+            SetState(
+                GroupAIState.Spawning
+            );
+
+
             InitializeControllers();
         }
 
@@ -324,6 +349,9 @@ namespace Units
             unit.RequestPositionAssignmentEvent +=
                 HandlePositionAssignmentRequested;
 
+            unit.RallyCompleted +=
+                HandleRallyCompleted;
+
 
             if (_state == GroupAIState.Engaged)
             {
@@ -358,11 +386,25 @@ namespace Units
             unit.RequestPositionAssignmentEvent -=
                 HandlePositionAssignmentRequested;
 
+            unit.RallyCompleted -=
+                HandleRallyCompleted;
+
+
+            _rallyCompletedMembers.Remove(
+                unit
+            );
+
 
             unit.ClearGroupAI();
 
 
             CheckEliminated();
+
+
+            if (_state == GroupAIState.Spawning)
+            {
+                TryCompleteSpawning();
+            }
 
 
             return true;
@@ -388,6 +430,89 @@ namespace Units
             );
 
             Eliminated?.Invoke(
+                this
+            );
+        }
+
+
+        // =========================
+        // Spawn
+        // =========================
+
+        public void NotifySpawnCompleted()
+        {
+            if (_state != GroupAIState.Spawning)
+                return;
+
+
+            if (_isSpawnCompleted)
+                return;
+
+
+            _isSpawnCompleted =
+                true;
+
+
+            TryCompleteSpawning();
+        }
+
+
+        private void HandleRallyCompleted(
+            Unit_Gateway unit)
+        {
+            if (_state != GroupAIState.Spawning)
+                return;
+
+
+            if (unit == null)
+                return;
+
+
+            if (!_memberController.Contains(
+                unit))
+            {
+                return;
+            }
+
+
+            if (!_rallyCompletedMembers.Add(
+                unit))
+            {
+                return;
+            }
+
+
+            TryCompleteSpawning();
+        }
+
+
+        private void TryCompleteSpawning()
+        {
+            if (_state != GroupAIState.Spawning)
+                return;
+
+
+            if (!_isSpawnCompleted)
+                return;
+
+
+            if (_members.Count == 0)
+                return;
+
+
+            if (_rallyCompletedMembers.Count <
+                _members.Count)
+            {
+                return;
+            }
+
+
+            SetState(
+                GroupAIState.Idle
+            );
+
+
+            PreparationCompleted?.Invoke(
                 this
             );
         }

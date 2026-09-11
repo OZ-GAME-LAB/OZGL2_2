@@ -409,6 +409,9 @@ namespace Units
 
         private void OnMovementCompleted()
         {
+            if (!_isRunning)
+                return;
+
             if (!IsCurrentAction(
                 UnitAIActionType.Move))
             {
@@ -425,10 +428,15 @@ namespace Units
 
         private void OnMovementFailed()
         {
+            if (!_isRunning)
+                return;
+
             if (!IsCurrentAction(UnitAIActionType.Move))
                 return;
 
-            RequestPositionAssignment();
+            Debug.LogWarning($"Unit {name} failed to reach its destination. Requesting a new assignment.");
+
+            RequestFullAssignment();
         }
 
 
@@ -640,21 +648,23 @@ namespace Units
                 _currentAssignment.Value;
 
 
-            switch (_currentAction.ActionType)
+            if (_currentAction.ActionType ==
+                UnitAIActionType.Move)
             {
-                case UnitAIActionType.Move:
-                    DrawMoveGizmo(
-                        assignment
-                    );
-                    break;
+                DrawMoveGizmo(
+                    assignment
+                );
+
+                return;
+            }
 
 
-                case UnitAIActionType.BasicAttack:
-                case UnitAIActionType.ActiveSkill:
-                    DrawAttackGizmo(
-                        assignment.Target
-                    );
-                    break;
+            if (IsTargetValid(
+                assignment.Target))
+            {
+                DrawAttackGizmo(
+                    assignment.Target
+                );
             }
         }
 
