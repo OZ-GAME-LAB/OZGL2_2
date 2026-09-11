@@ -15,7 +15,7 @@ namespace Units
 
             private readonly AdjustedStatus _adjustedStatus;
 
-            private readonly List<UnitStatModifier> _modifiers =
+            private readonly List<CombatStatModifier> _modifiers =
                 new();
 
             private readonly Dictionary<UnitStatType, float> _finalValues =
@@ -50,15 +50,18 @@ namespace Units
 
 
             public void AddModifier(
-                UnitStatModifier modifier)
+                CombatStatModifier modifier)
             {
-                _modifiers.Add(modifier);
+                _modifiers.Add(
+                    modifier
+                );
 
                 Recalculate();
             }
 
 
-            public void RemoveModifiers(object source)
+            public void RemoveModifiers(
+                object source)
             {
                 _modifiers.RemoveAll(
                     modifier =>
@@ -86,7 +89,8 @@ namespace Units
                 Dictionary<UnitStatType, float> result =
                     new();
 
-                foreach (UnitStatModifier modifier in _modifiers)
+
+                foreach (CombatStatModifier modifier in _modifiers)
                 {
                     if (!ReferenceEquals(
                             modifier.Source,
@@ -95,17 +99,20 @@ namespace Units
                         continue;
                     }
 
+
                     if (result.ContainsKey(
                             modifier.StatType))
                     {
                         continue;
                     }
 
+
                     result.Add(
                         modifier.StatType,
                         Get(modifier.StatType)
                     );
                 }
+
 
                 return result;
             }
@@ -131,7 +138,8 @@ namespace Units
                 Dictionary<UnitStatType, float> percentValues =
                     new();
 
-                foreach (UnitStatModifier modifier in _modifiers)
+
+                foreach (CombatStatModifier modifier in _modifiers)
                 {
                     switch (modifier.ModifierType)
                     {
@@ -153,12 +161,15 @@ namespace Units
                     }
                 }
 
+
                 foreach (UnitStatType statType
                          in System.Enum.GetValues(
                              typeof(UnitStatType)))
                 {
                     float adjustedValue =
-                        _adjustedStatus.Get(statType);
+                        _adjustedStatus.Get(
+                            statType
+                        );
 
                     float flat =
                         GetValue(
@@ -171,6 +182,7 @@ namespace Units
                             percentValues,
                             statType
                         );
+
 
                     _finalValues[statType] =
                         CalculateValue(
@@ -213,6 +225,7 @@ namespace Units
 
                     return;
                 }
+
 
                 dictionary.Add(
                     statType,

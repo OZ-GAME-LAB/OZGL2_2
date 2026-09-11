@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
+using Units.UnitDatas;
 using UnityEngine;
 
 
@@ -13,19 +17,25 @@ namespace Units
         private readonly RuntimeUnitManager
             _runtimeUnitManager;
 
-        private readonly IReadOnlyDictionary<UnitType, GameObject>
+        private readonly UnitStatModifierManager
+            _unitStatModifierManager;
+
+        private readonly IReadOnlyDictionary<AllyUnitType, GameObject>
             _prefabMap;
 
         private readonly GameObject
             _groupPrefab;
+
+        private readonly RallyGridAllocator
+            _rallyGridAllocator;
 
 
         // ============================================================
         // Settings
         // ============================================================
 
-        private readonly Vector2
-            _unitSpacing;
+        private readonly float
+            _groupSpawnDuration;
 
 
         // ============================================================
@@ -34,12 +44,17 @@ namespace Units
 
         internal AllyGroupSpawner(
             RuntimeUnitManager runtimeUnitManager,
-            IReadOnlyDictionary<UnitType, GameObject> prefabMap,
+            UnitStatModifierManager unitStatModifierManager,
+            IReadOnlyDictionary<AllyUnitType, GameObject> prefabMap,
             GameObject groupPrefab,
-            Vector2 unitSpacing)
+            RallyGridAllocator rallyGridAllocator,
+            float groupSpawnDuration)
         {
             _runtimeUnitManager =
                 runtimeUnitManager;
+
+            _unitStatModifierManager =
+                unitStatModifierManager;
 
             _prefabMap =
                 prefabMap;
@@ -47,8 +62,11 @@ namespace Units
             _groupPrefab =
                 groupPrefab;
 
-            _unitSpacing =
-                unitSpacing;
+            _rallyGridAllocator =
+                rallyGridAllocator;
+
+            _groupSpawnDuration =
+                groupSpawnDuration;
         }
 
 
@@ -56,11 +74,12 @@ namespace Units
         // Spawn
         // ============================================================
 
-        internal Unit_GroupAI SpawnGroup(
-            UnitType unitType,
+        internal async UniTask<Unit_GroupAI> SpawnGroupAsync(
+            AllyUnitType unitType,
             Vector2 spawnPosition,
             int count,
-            Vector2 rallyPoint)
+            Vector2 rallyPoint,
+            CancellationToken cancellationToken)
         {
             if (!ValidateSpawnRequest(
                 unitType,
@@ -68,6 +87,9 @@ namespace Units
             {
                 return null;
             }
+
+
+            cancellationToken.ThrowIfCancellationRequested();
 
 
             Unit_GroupAI group =
@@ -81,16 +103,14 @@ namespace Units
                 return null;
 
 
-            int spawnedCount =
-                SpawnUnits(
-                    unitType,
+            IReadOnlyList<Vector2> rallyPositions =
+                AllocateRallyPositions(
                     count,
-                    spawnPosition,
-                    group
+                    rallyPoint
                 );
 
 
-            if (spawnedCount <= 0)
+            if (rallyPositions == null)
             {
                 DestroyGroup(
                     group
@@ -100,46 +120,88 @@ namespace Units
             }
 
 
-            ApplyRallyPoint(
-                group,
-                rallyPoint
-            );
-
-
-            // ========================================================
-            // Runtime Registration
-            //
-            // Group + Members가 완성된 다음
-            // 마지막에 RuntimeUnitManager에 전달한다.
-            // ========================================================
-
-            if (!_runtimeUnitManager.RegisterGroup(
-                group))
+            try
             {
-                Debug.LogError(
+                int spawnedCount =
+                    await SpawnUnitsAsync(
+                        unitType,
+                        count,
+                        spawnPosition,
+                        rallyPositions,
+                        group,
+                        cancellationToken
+                    );
+
+
+                if (spawnedCount <= 0)
+                {
+                    DestroyGroup(
+                        group
+                    );
+
+                    return null;
+                }
+
+
+                // ========================================================
+                // Runtime Registration
+                //
+                // Group + Members가 완성된 다음
+                // 마지막에 RuntimeUnitManager에 전달한다.
+                // ========================================================
+
+                if (!_runtimeUnitManager.RegisterGroup(
+                    group))
+                {
+                    Debug.LogError(
+                        $"[AllyGroupSpawner] " +
+                        $"Runtime Group 등록 실패 : " +
+                        $"{group.name}"
+                    );
+
+
+                    DestroyGroup(
+                        group
+                    );
+
+                    return null;
+                }
+
+
+                // ========================================================
+                // Spawn Complete
+                //
+                // 모든 Unit 생성이 끝나고
+                // Runtime 등록까지 완료된 시점에
+                // Group에 Spawn 완료를 전달한다.
+                //
+                // Rally 완료 여부는 GroupAI에서 별도로 집계하며,
+                // Spawn + Rally가 모두 완료되었을 때
+                // Spawning 상태를 종료한다.
+                // ========================================================
+
+                group.NotifySpawnCompleted();
+
+
+                Debug.Log(
                     $"[AllyGroupSpawner] " +
-                    $"Runtime Group 등록 실패 : " +
-                    $"{group.name}"
+                    $"아군 그룹 생성 완료 : " +
+                    $"{group.name} / " +
+                    $"{spawnedCount}명"
                 );
 
 
+                return group;
+            }
+            catch (OperationCanceledException)
+            {
                 DestroyGroup(
                     group
                 );
 
-                return null;
+
+                throw;
             }
-
-
-            Debug.Log(
-                $"[AllyGroupSpawner] " +
-                $"아군 그룹 생성 완료 : " +
-                $"{group.name} / " +
-                $"{spawnedCount}명"
-            );
-
-
-            return group;
         }
 
 
@@ -148,7 +210,7 @@ namespace Units
         // ============================================================
 
         private Unit_GroupAI CreateGroup(
-            UnitType unitType,
+            AllyUnitType unitType,
             Vector2 position)
         {
             int groupId =
@@ -169,7 +231,7 @@ namespace Units
 
 
             GameObject groupObject =
-                Object.Instantiate(
+                UnityEngine.Object.Instantiate(
                     _groupPrefab,
                     position,
                     Quaternion.identity
@@ -188,7 +250,7 @@ namespace Units
                 );
 
 
-                Object.Destroy(
+                UnityEngine.Object.Destroy(
                     groupObject
                 );
 
@@ -215,7 +277,7 @@ namespace Units
                 );
 
 
-                Object.Destroy(
+                UnityEngine.Object.Destroy(
                     groupObject
                 );
 
@@ -231,23 +293,29 @@ namespace Units
         // Units
         // ============================================================
 
-        private int SpawnUnits(
-            UnitType unitType,
+        private async UniTask<int> SpawnUnitsAsync(
+            AllyUnitType unitType,
             int count,
-            Vector2 startPosition,
-            Unit_GroupAI group)
+            Vector2 spawnPosition,
+            IReadOnlyList<Vector2> rallyPositions,
+            Unit_GroupAI group,
+            CancellationToken cancellationToken)
         {
             int spawnedCount =
                 0;
+
+
+            float spawnInterval =
+                CalculateSpawnInterval(
+                    count
+                );
 
 
             for (int i = 0;
                  i < count;
                  i++)
             {
-                Vector2 spawnPosition =
-                    startPosition +
-                    _unitSpacing * i;
+                cancellationToken.ThrowIfCancellationRequested();
 
 
                 Unit_Gateway unit =
@@ -258,29 +326,51 @@ namespace Units
                     );
 
 
-                if (unit == null)
-                    continue;
-
-
-                if (!group.AddMember(
-                    unit))
+                if (unit != null)
                 {
-                    Debug.LogError(
-                        $"[AllyGroupSpawner] " +
-                        $"Group Member 등록 실패 : " +
-                        $"{group.name} / {unit.name}"
-                    );
+                    if (!group.AddMember(
+                        unit))
+                    {
+                        Debug.LogError(
+                            $"[AllyGroupSpawner] " +
+                            $"Group Member 등록 실패 : " +
+                            $"{group.name} / {unit.name}"
+                        );
 
 
-                    Object.Destroy(
-                        unit.gameObject
-                    );
+                        UnityEngine.Object.Destroy(
+                            unit.gameObject
+                        );
+                    }
+                    else
+                    {
+                        spawnedCount++;
 
-                    continue;
+
+                        // Group 등록 후 Rally 이동을 시작한다.
+                        // AddMember 시점에 RallyCompleted 이벤트가
+                        // 먼저 구독되어 있어야 완료 이벤트를 놓치지 않는다.
+                        unit.MoveToRally(
+                            rallyPositions[i]
+                        );
+                    }
                 }
 
 
-                spawnedCount++;
+                if (i >= count - 1)
+                    continue;
+
+                if (spawnInterval <= 0f)
+                    continue;
+
+
+                await UniTask.Delay(
+                    TimeSpan.FromSeconds(
+                        spawnInterval
+                    ),
+                    cancellationToken:
+                        cancellationToken
+                );
             }
 
 
@@ -289,7 +379,7 @@ namespace Units
 
 
         private Unit_Gateway SpawnUnit(
-            UnitType unitType,
+            AllyUnitType unitType,
             Vector2 position,
             Transform parent)
         {
@@ -320,7 +410,7 @@ namespace Units
 
 
             GameObject unitObject =
-                Object.Instantiate(
+                UnityEngine.Object.Instantiate(
                     prefab,
                     position,
                     Quaternion.identity,
@@ -340,7 +430,7 @@ namespace Units
                 );
 
 
-                Object.Destroy(
+                UnityEngine.Object.Destroy(
                     unitObject
                 );
 
@@ -360,7 +450,7 @@ namespace Units
                 );
 
 
-                Object.Destroy(
+                UnityEngine.Object.Destroy(
                     unitObject
                 );
 
@@ -368,11 +458,62 @@ namespace Units
             }
 
 
+            Unit_RuntimeStatus runtimeStatus =
+                unitObject.GetComponent<Unit_RuntimeStatus>();
+
+
+            if (runtimeStatus == null)
+            {
+                Debug.LogError(
+                    $"[AllyGroupSpawner] " +
+                    $"RuntimeStatus가 없습니다 : " +
+                    $"{unitObject.name}"
+                );
+
+
+                UnityEngine.Object.Destroy(
+                    unitObject
+                );
+
+                return null;
+            }
+
+
+            UnitData unitData =
+                runtimeStatus.UnitData;
+
+
+            if (unitData == null)
+            {
+                Debug.LogError(
+                    $"[AllyGroupSpawner] " +
+                    $"UnitData가 없습니다 : " +
+                    $"{unitObject.name}"
+                );
+
+
+                UnityEngine.Object.Destroy(
+                    unitObject
+                );
+
+                return null;
+            }
+
+
+            FinalStatModifier finalModifier =
+                _unitStatModifierManager.GetAllyFinalModifier(
+                    unitData.GetAllyClass(),
+                    unitData.GetAllyType()
+                );
+
+
             // ========================================================
             // Initialize
             // ========================================================
 
-            core.Initialize();
+            core.Initialize(
+                finalModifier
+            );
 
 
             if (!ValidateInitializedUnit(
@@ -380,7 +521,7 @@ namespace Units
                 gateway,
                 unitObject))
             {
-                Object.Destroy(
+                UnityEngine.Object.Destroy(
                     unitObject
                 );
 
@@ -389,6 +530,26 @@ namespace Units
 
 
             return gateway;
+        }
+
+
+        // ============================================================
+        // Spawn Interval
+        // ============================================================
+
+        private float CalculateSpawnInterval(
+            int count)
+        {
+            if (count <= 1)
+                return 0f;
+
+
+            if (_groupSpawnDuration <= 0f)
+                return 0f;
+
+
+            return _groupSpawnDuration /
+                (count - 1);
         }
 
 
@@ -468,7 +629,7 @@ namespace Units
 
 
         private bool ValidateSpawnRequest(
-            UnitType unitType,
+            AllyUnitType unitType,
             int count)
         {
             if (_runtimeUnitManager == null)
@@ -476,6 +637,17 @@ namespace Units
                 Debug.LogError(
                     "[AllyGroupSpawner] " +
                     "RuntimeUnitManager가 없습니다."
+                );
+
+                return false;
+            }
+
+
+            if (_unitStatModifierManager == null)
+            {
+                Debug.LogError(
+                    "[AllyGroupSpawner] " +
+                    "UnitStatModifierManager가 없습니다."
                 );
 
                 return false;
@@ -504,7 +676,19 @@ namespace Units
             }
 
 
-            if (count <= 0)
+            if (_rallyGridAllocator == null)
+            {
+                Debug.LogError(
+                    "[AllyGroupSpawner] " +
+                    "RallyGridAllocator가 없습니다."
+                );
+
+                return false;
+            }
+
+
+            if (count <= 0 ||
+                count > 5)
             {
                 Debug.LogWarning(
                     $"[AllyGroupSpawner] " +
@@ -520,7 +704,7 @@ namespace Units
             {
                 Debug.LogError(
                     $"[AllyGroupSpawner] " +
-                    $"등록되지 않은 UnitType : " +
+                    $"등록되지 않은 AllyUnitType : " +
                     $"{unitType}"
                 );
 
@@ -536,18 +720,31 @@ namespace Units
         // Rally Point
         // ============================================================
 
-        private void ApplyRallyPoint(
-            Unit_GroupAI group,
+        private IReadOnlyList<Vector2> AllocateRallyPositions(
+            int count,
             Vector2 rallyPoint)
         {
-            if (group == null)
-                return;
+            IReadOnlyList<Vector2> rallyPositions =
+                _rallyGridAllocator.Allocate(
+                    count,
+                    rallyPoint
+                );
 
 
-            // TODO:
-            // 아군 배치 기능 구현 시 연결.
-            //
-            // group.SetRallyPoint(rallyPoint);
+            if (rallyPositions == null ||
+                rallyPositions.Count != count)
+            {
+                Debug.LogError(
+                    $"[AllyGroupSpawner] " +
+                    $"Rally Position 할당 실패 : " +
+                    $"Count={count}"
+                );
+
+                return null;
+            }
+
+
+            return rallyPositions;
         }
 
 
@@ -580,14 +777,14 @@ namespace Units
                         continue;
 
 
-                    Object.Destroy(
+                    UnityEngine.Object.Destroy(
                         member.gameObject
                     );
                 }
             }
 
 
-            Object.Destroy(
+            UnityEngine.Object.Destroy(
                 group.gameObject
             );
         }

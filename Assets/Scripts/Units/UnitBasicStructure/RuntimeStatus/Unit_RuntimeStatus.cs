@@ -90,7 +90,7 @@ namespace Units
         // ============================================================
 
         public void Initialize(
-            IEnumerable<UnitStatModifier> spawnModifiers = null)
+            FinalStatModifier spawnModifier)
         {
             if (_unitData == null)
             {
@@ -104,7 +104,7 @@ namespace Units
             _adjustedStatus =
                 new AdjustedStatus(
                     _unitData,
-                    spawnModifiers
+                    spawnModifier
                 );
 
             _finalStatus =
@@ -131,7 +131,7 @@ namespace Units
 
 
         public void AddCombatModifier(
-            UnitStatModifier modifier)
+            CombatStatModifier modifier)
         {
             if (_finalStatus == null)
                 return;

@@ -20,7 +20,7 @@ GameObject:
   - component: {fileID: 3234069343329841659}
   - component: {fileID: 1211390635130971422}
   - component: {fileID: 7651759109312810698}
-  - component: {fileID: 7825931140404137456}
+  - component: {fileID: 3985992954881247609}
   m_Layer: 13
   m_Name: Enemy_TestUnit_1
   m_TagString: Untagged
@@ -92,7 +92,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -9095717837082945937, guid: 207ee8102dd4143d288186ef0be518ee, type: 3}
+  m_Sprite: {fileID: -2413806693520163455, guid: ebe73ca9363db456bacf42c025bb4847, type: 3}
   m_Color: {r: 0.8627452, g: 0.1921569, b: 0.1960784, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -160,10 +160,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.Unit_Movement
   _rigidbody: {fileID: 7651759109312810698}
-  _arrivalDistance: 0.1
-  _stuckCheckInterval: 0.5
-  _stuckDistanceThreshold: 0.05
-  _stuckTimeLimit: 1.5
+  _collider: {fileID: 3985992954881247609}
+  _arrivalDistance: 0.15
+  _stuckDistanceThreshold: 1
+  _stuckTimeLimit: 1
+  _holdStartReturnDistance: 0.35
+  _holdStopReturnDistance: 0.15
+  _holdReturnSpeed: 5
+  _holdAcceleration: 10
+  _environmentMask:
+    serializedVersion: 2
+    m_Bits: 0
+  _environmentCheckDistance: 0.5
+  _unitMask:
+    serializedVersion: 2
+    m_Bits: 8192
+  _unitAvoidanceRadius: 0.2
+  _unitCheckDistance: 0.2
+  _avoidanceDirectionHoldTime: 0.2
 --- !u!114 &4184794282666438736
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -243,7 +257,7 @@ Rigidbody2D:
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
   m_Mass: 1
-  m_LinearDamping: 0
+  m_LinearDamping: 1.5
   m_AngularDamping: 0.05
   m_GravityScale: 0
   m_Material: {fileID: 0}
@@ -257,8 +271,8 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
---- !u!70 &7825931140404137456
-CapsuleCollider2D:
+--- !u!58 &3985992954881247609
+CircleCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -292,5 +306,4 @@ CapsuleCollider2D:
   m_CompositeOperation: 0
   m_CompositeOrder: 0
   m_Offset: {x: 0, y: 0}
-  m_Size: {x: 1, y: 2}
-  m_Direction: 0
+  m_Radius: 0.5

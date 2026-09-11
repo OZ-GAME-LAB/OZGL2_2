@@ -1,16 +1,23 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 
 namespace Units
 {
-    public class RuntimeUnitManager : MonoBehaviour
+    public class RuntimeUnitManager : MonoBehaviour, IRuntimeUnitManager
     {
         // =========================
         // Runtime States
         // =========================
 
         private bool _battleStarted;
+
+        private bool _isAllySpawnCompleted;
+
+        private bool _isEnemySpawnCompleted;
+
+        private int _pendingPreparationGroupCount;
 
 
         // =========================
@@ -22,6 +29,10 @@ namespace Units
 
         private readonly List<Unit_Gateway> _enemyUnits =
             new();
+
+        public int AllyUnitCount => _allyUnits.Count;
+
+        public int EnemyUnitCount => _enemyUnits.Count;
 
 
         // =========================
@@ -66,6 +77,17 @@ namespace Units
 
 
         // =========================
+        // Events
+        // =========================
+
+        public event Action<Unit_Gateway>
+            UnitDied;
+
+        public event Action
+            PreparationCompleted;
+
+
+        // =========================
         // Properties
         // =========================
 
@@ -83,6 +105,15 @@ namespace Units
 
         public IReadOnlyList<EngagementContext> Engagements
             => _engagements;
+
+        public int PendingPreparationGroupCount
+            => _pendingPreparationGroupCount;
+
+        public bool IsPreparationCompleted
+            =>
+                _isAllySpawnCompleted &&
+                _isEnemySpawnCompleted &&
+                _pendingPreparationGroupCount == 0;
 
 
         // =========================
@@ -196,18 +227,16 @@ namespace Units
             );
 
 
-            if (_battleStarted &&
-                group.Members.Count > 0)
-            {
-                group.StartAdvancing();
-            }
+            _pendingPreparationGroupCount++;
 
 
             Debug.Log(
                 $"[RuntimeUnitManager] " +
                 $"Group 등록 완료 : " +
                 $"{group.name} / " +
-                $"{group.Members.Count}명"
+                $"{group.Members.Count}명 / " +
+                $"준비 대기 그룹 : " +
+                $"{_pendingPreparationGroupCount}"
             );
 
 
@@ -220,6 +249,11 @@ namespace Units
         {
             if (group == null)
                 return false;
+
+
+            bool wasPreparing =
+                group.State ==
+                GroupAIState.Spawning;
 
 
             if (!_unitRegistrator.UnregisterGroup(
@@ -237,6 +271,12 @@ namespace Units
             _engagementController.RemoveGroup(
                 group
             );
+
+
+            if (wasPreparing)
+            {
+                DecreasePendingPreparationGroupCount();
+            }
 
 
             return true;
@@ -320,6 +360,9 @@ namespace Units
 
             group.AdvanceReferenceRequested +=
                 HandleAdvanceReferenceRequested;
+
+            group.PreparationCompleted +=
+                HandleGroupPreparationCompleted;
         }
 
 
@@ -338,6 +381,9 @@ namespace Units
 
             group.AdvanceReferenceRequested -=
                 HandleAdvanceReferenceRequested;
+
+            group.PreparationCompleted -=
+                HandleGroupPreparationCompleted;
         }
 
 
@@ -348,7 +394,14 @@ namespace Units
         private void HandleUnitDied(
             Unit_Gateway unit)
         {
-            UnregisterUnit(
+            if (!UnregisterUnit(
+                unit))
+            {
+                return;
+            }
+
+
+            UnitDied?.Invoke(
                 unit
             );
         }
@@ -360,6 +413,24 @@ namespace Units
             UnregisterGroup(
                 group
             );
+        }
+
+
+        private void HandleGroupPreparationCompleted(
+            Unit_GroupAI group)
+        {
+            if (group == null)
+                return;
+
+
+            Debug.Log(
+                $"[RuntimeUnitManager] " +
+                $"Group 준비 완료 : " +
+                $"{group.name}"
+            );
+
+
+            DecreasePendingPreparationGroupCount();
         }
 
 
@@ -424,6 +495,82 @@ namespace Units
 
 
         // =========================
+        // Preparation
+        // =========================
+
+        public void NotifyAllySpawnCompleted()
+        {
+            if (_isAllySpawnCompleted)
+                return;
+
+
+            _isAllySpawnCompleted =
+                true;
+
+
+            TryCompletePreparation();
+        }
+
+
+        public void NotifyEnemySpawnCompleted()
+        {
+            if (_isEnemySpawnCompleted)
+                return;
+
+
+            _isEnemySpawnCompleted =
+                true;
+
+
+            TryCompletePreparation();
+        }
+
+
+        private void DecreasePendingPreparationGroupCount()
+        {
+            if (_pendingPreparationGroupCount <= 0)
+                return;
+
+
+            _pendingPreparationGroupCount--;
+
+
+            Debug.Log(
+                $"[RuntimeUnitManager] " +
+                $"남은 준비 그룹 : " +
+                $"{_pendingPreparationGroupCount}"
+            );
+
+
+            TryCompletePreparation();
+        }
+
+
+        private void TryCompletePreparation()
+        {
+            if (!_isAllySpawnCompleted)
+                return;
+
+
+            if (!_isEnemySpawnCompleted)
+                return;
+
+
+            if (_pendingPreparationGroupCount > 0)
+                return;
+
+
+            Debug.Log(
+                "[RuntimeUnitManager] " +
+                "모든 Unit Spawn 및 Rally 준비 완료."
+            );
+
+
+            PreparationCompleted?.Invoke();
+        }
+
+
+        // =========================
         // Group ID
         // =========================
 
@@ -467,6 +614,17 @@ namespace Units
         {
             if (_battleStarted)
                 return;
+
+
+            if (!IsPreparationCompleted)
+            {
+                Debug.LogWarning(
+                    "[RuntimeUnitManager] " +
+                    "전투 준비가 아직 완료되지 않았습니다."
+                );
+
+                return;
+            }
 
 
             _battleStarted =
@@ -536,6 +694,15 @@ namespace Units
 
             _battleStarted =
                 false;
+
+            _isAllySpawnCompleted =
+                false;
+
+            _isEnemySpawnCompleted =
+                false;
+
+            _pendingPreparationGroupCount =
+                0;
 
 
             ResetGroupIds();

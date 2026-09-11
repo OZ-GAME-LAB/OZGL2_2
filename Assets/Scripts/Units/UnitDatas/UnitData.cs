@@ -17,8 +17,11 @@ namespace Units.UnitDatas
         // Identity
         // ============================================================
 
-        [SerializeField] private string _unitId;
-        [SerializeField] private string _unitName;
+        [SerializeField]
+        private string _unitId;
+
+        [SerializeField]
+        private string _unitName;
 
 
         // ============================================================
@@ -28,19 +31,24 @@ namespace Units.UnitDatas
         [SerializeField]
         private UnitTeam _team;
 
+
         // ============================================================
-        // Team
+        // Unit Identity
         // ============================================================
 
         [SerializeField]
-        private UnitType _unitType;
+        private AllyUnitIdentity _allyIdentity;
+
+        [SerializeField]
+        private EnemyUnitIdentity _enemyIdentity;
 
 
         // ============================================================
         // Stats
         // ============================================================
 
-        [SerializeField] private List<UnitStatEntry> _stats = new();
+        [SerializeField]
+        private List<UnitStatEntry> _stats = new();
 
 
         // ============================================================
@@ -52,6 +60,7 @@ namespace Units.UnitDatas
 
         [SerializeField]
         private ActiveSkillData _activeSkillData;
+
 
         // ============================================================
         // Properties
@@ -66,9 +75,6 @@ namespace Units.UnitDatas
         public UnitTeam Team =>
             _team;
 
-        public UnitType UnitType => 
-            _unitType;
-
         public IReadOnlyList<UnitStatEntry> Stats =>
             _stats;
 
@@ -80,7 +86,35 @@ namespace Units.UnitDatas
 
 
         // ============================================================
-        // Public Methods
+        // Public Methods - Identity
+        // ============================================================
+
+        public AllyUnitClass GetAllyClass()
+        {
+            return _allyIdentity.UnitClass;
+        }
+
+
+        public AllyUnitType GetAllyType()
+        {
+            return _allyIdentity.UnitType;
+        }
+
+
+        public EnemyUnitClass GetEnemyClass()
+        {
+            return _enemyIdentity.UnitClass;
+        }
+
+
+        public EnemyUnitType GetEnemyType()
+        {
+            return _enemyIdentity.UnitType;
+        }
+
+
+        // ============================================================
+        // Public Methods - Stats
         // ============================================================
 
         public float GetStat(
@@ -96,6 +130,66 @@ namespace Units.UnitDatas
 
             return 0f;
         }
+    }
+
+
+    // ============================================================
+    // Ally Unit Identity
+    // ============================================================
+
+    [Serializable]
+    public struct AllyUnitIdentity
+    {
+        // ============================================================
+        // Data
+        // ============================================================
+
+        [SerializeField]
+        private AllyUnitClass _unitClass;
+
+        [SerializeField]
+        private AllyUnitType _unitType;
+
+
+        // ============================================================
+        // Properties
+        // ============================================================
+
+        public AllyUnitClass UnitClass =>
+            _unitClass;
+
+        public AllyUnitType UnitType =>
+            _unitType;
+    }
+
+
+    // ============================================================
+    // Enemy Unit Identity
+    // ============================================================
+
+    [Serializable]
+    public struct EnemyUnitIdentity
+    {
+        // ============================================================
+        // Data
+        // ============================================================
+
+        [SerializeField]
+        private EnemyUnitClass _unitClass;
+
+        [SerializeField]
+        private EnemyUnitType _unitType;
+
+
+        // ============================================================
+        // Properties
+        // ============================================================
+
+        public EnemyUnitClass UnitClass =>
+            _unitClass;
+
+        public EnemyUnitType UnitType =>
+            _unitType;
     }
 
 
