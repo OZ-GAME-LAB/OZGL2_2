@@ -9,8 +9,9 @@ namespace Units
         // Events
         // =========================
 
-        event Action<Unit_Gateway>
-            UnitDied;
+        event Action PreparationCompleted;
+
+        event Action<Unit_Gateway> UnitDied;
 
 
         // =========================
@@ -26,6 +27,13 @@ namespace Units
         {
             get;
         }
+
+
+        // =========================
+        // Unit Count
+        // =========================
+
+        void StartBattlePhase();
 
 
         // =========================
