@@ -1,3 +1,4 @@
+using System;
 using Units.Skills;
 using UnityEngine;
 
@@ -28,8 +29,14 @@ namespace Units
 
         private BasicAttackExecutor _basicAttackExecutor;
 
+        private ActiveSkillExecutor _activeSkillExecutor;
 
-        private ActiveSkillExecutor _activeSkillExecutor; 
+
+        // ============================================================
+        // Resolver
+        // ============================================================
+
+        private HitTargetResolver _hitTargetResolver;
 
 
         // ============================================================
@@ -44,19 +51,85 @@ namespace Units
 
 
         // ============================================================
-        // Properties
+        // Properties & Conditions
         // ============================================================
 
-        public bool IsBusy =>
-            _isBusy;
+        public bool IsBusy
+            => _isBusy;
 
-        public bool IsBasicAttackReady =>
-            !_isBusy
+        public bool IsBasicAttackReady
+            => !_isBusy
             && _basicAttackDelayRemaining <= 0f;
 
-        public bool IsActiveSkillReady =>
-            !_isBusy
+        public bool IsActiveSkillReady
+            => !_isBusy
             && _skillCooldownRemaining <= 0f;
+
+
+        public bool CanUseActiveSkill
+        {
+            get
+            {
+                if (_core == null)
+                    return false;
+
+                if (_activeSkillData == null)
+                    return false;
+
+                if (_activeSkillExecutor == null)
+                    return false;
+
+                if (!IsActiveSkillReady)
+                    return false;
+
+                // TODO:
+                // 상태이상 등으로 인한 Skill 사용 불가 조건 추가
+                //
+                // if (_core.RuntimeStatus.IsSilenced)
+                //     return false;
+
+                return true;
+            }
+        }
+
+
+        public bool CanUseBasicAttack
+        {
+            get
+            {
+                if (_core == null)
+                    return false;
+
+                if (_basicAttackData == null)
+                    return false;
+
+                if (_basicAttackExecutor == null)
+                    return false;
+
+                if (!IsBasicAttackReady)
+                    return false;
+
+                return true;
+            }
+        }
+
+
+        public float PreferredCombatRange
+        {
+            get
+            {
+                if (_core == null)
+                    return 0f;
+
+                if (_core.RuntimeStatus == null)
+                    return 0f;
+
+                if (CanUseActiveSkill)
+                    return _core.RuntimeStatus.ActiveSkillData.SkillRange;
+
+                return _core.RuntimeStatus.BasicAttackData.BasicAttackRange;
+            }
+        }
 
 
         // ============================================================
@@ -85,8 +158,10 @@ namespace Units
                 return;
             }
 
+
             _core =
                 core;
+
 
             InitializeData();
 
@@ -140,11 +215,18 @@ namespace Units
 
         private void InitializeExecutors()
         {
+            _hitTargetResolver =
+                new HitTargetResolver(
+                    _core
+                );
+
+
             _basicAttackExecutor =
                 _basicAttackData != null
                     ? new BasicAttackExecutor(
                         _core,
-                        _basicAttackData
+                        _basicAttackData,
+                        _hitTargetResolver
                     )
                     : null;
 
@@ -153,7 +235,8 @@ namespace Units
                 _activeSkillData != null
                     ? new ActiveSkillExecutor(
                         _core,
-                        _activeSkillData
+                        _activeSkillData,
+                        _hitTargetResolver
                     )
                     : null;
         }
@@ -177,64 +260,42 @@ namespace Units
         // ============================================================
 
         public bool TryBasicAttack(
-            GameObject target)
+            ICombatTarget target)
         {
-            if (!CanBasicAttack())
+            if (!CanUseBasicAttack)
                 return false;
 
-            if (!IsValidTarget(target))
+
+            if (!IsValidTarget(
+                target))
+            {
                 return false;
+            }
 
 
             ExecuteBasicAttack(
                 target
             );
 
-            return true;
-        }
-
-
-        private bool CanBasicAttack()
-        {
-            if (_core == null)
-                return false;
-
-            if (_core.RuntimeStatus == null)
-                return false;
-
-            if (_basicAttackData == null)
-                return false;
-
-            if (_basicAttackExecutor == null)
-                return false;
-
-            if (_isBusy)
-                return false;
-
-            if (_basicAttackDelayRemaining > 0f)
-                return false;
 
             return true;
         }
 
 
         private void ExecuteBasicAttack(
-            GameObject target)
+            ICombatTarget target)
         {
             _isBusy =
                 true;
 
 
-            _basicAttackExecutor.Execute(
-                target
-            );
-
-
             StartBasicAttackDelay();
 
 
-            _isBusy =
-                false;
+            _basicAttackExecutor.Execute(
+                target,
+                CompleteBasicAttack
+            );
         }
 
 
@@ -263,18 +324,36 @@ namespace Units
         }
 
 
+        private void CompleteBasicAttack()
+        {
+            if (!_isBusy)
+                return;
+
+
+            _isBusy =
+                false;
+
+
+            _core?.NotifyBasicAttackCompleted();
+        }
+
+
         // ============================================================
         // Active Skill
         // ============================================================
 
         public bool TryActiveSkill(
-            GameObject target)
+            ICombatTarget target)
         {
-            if (!CanActiveSkill())
+            if (!CanUseActiveSkill)
                 return false;
 
-            if (!IsValidTarget(target))
+
+            if (!IsValidTarget(
+                target))
+            {
                 return false;
+            }
 
 
             ExecuteActiveSkill(
@@ -286,55 +365,31 @@ namespace Units
         }
 
 
-        private bool CanActiveSkill()
-        {
-            if (_core == null)
-                return false;
-
-            if (_core.RuntimeStatus == null)
-                return false;
-
-            if (_activeSkillData == null)
-                return false;
-
-            if (_activeSkillExecutor == null)
-                return false;
-
-            if (_isBusy)
-                return false;
-
-            if (_skillCooldownRemaining > 0f)
-                return false;
-
-
-            return true;
-        }
-
         private void ExecuteActiveSkill(
-            GameObject target)
+            ICombatTarget target)
         {
             _isBusy =
                 true;
 
 
-            _activeSkillExecutor.Execute(
-                target
-            );
-
-
             StartSkillCooldown();
 
 
-            // TODO:
-            // Cast / Dash / Skill Animation 실행 종료 시점에
-            // Busy 해제하도록 변경
-
-            _isBusy =
-                false;
+            _activeSkillExecutor.Execute(
+                target,
+                CompleteActiveSkill
+            );
         }
+
 
         private void StartSkillCooldown()
         {
+            if (_core == null)
+                return;
+
+            if (_core.RuntimeStatus == null)
+                return;
+
             if (_activeSkillData == null)
                 return;
 
@@ -351,15 +406,17 @@ namespace Units
         }
 
 
-        // ============================================================
-        // Runtime State
-        // ============================================================
-
-        public void SetBusy(
-            bool isBusy)
+        private void CompleteActiveSkill()
         {
+            if (!_isBusy)
+                return;
+
+
             _isBusy =
-                isBusy;
+                false;
+
+
+            _core?.NotifyActiveSkillCompleted();
         }
 
 
@@ -406,17 +463,44 @@ namespace Units
 
 
         // ============================================================
+        // Stop
+        // ============================================================
+
+        public void Stop()
+        {
+            _isBusy =
+                false;
+
+
+            // TODO:
+            // Cast / Dash / 공격 Animation 등
+            // 실제 진행 중인 Action이 추가되면
+            // Executor 쪽 Cancel 기능도 호출한다.
+        }
+
+
+        // ============================================================
         // Validation
         // ============================================================
 
         private bool IsValidTarget(
-            GameObject target)
+            ICombatTarget target)
         {
             if (target == null)
                 return false;
 
-            if (!target.activeInHierarchy)
+            if (!target.IsTargetable)
                 return false;
+
+            if (target.Transform == null)
+                return false;
+
+            if (_core != null
+                && target.Team == _core.Team)
+            {
+                return false;
+            }
+
 
             return true;
         }

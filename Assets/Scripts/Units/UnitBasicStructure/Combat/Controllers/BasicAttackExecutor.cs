@@ -1,6 +1,7 @@
-﻿using Units.Skills;
+﻿using System.Collections.Generic;
+using Units.Skills;
 using UnityEngine;
-
+using System;
 
 
 namespace Units
@@ -13,6 +14,8 @@ namespace Units
 
         private readonly Unit_Core _core;
 
+        private readonly HitTargetResolver _hitTargetResolver;
+
 
         // ============================================================
         // Data
@@ -22,18 +25,35 @@ namespace Units
 
 
         // ============================================================
+        // Runtime Buffer
+        // ============================================================
+
+        private readonly List<ICombatTarget> _singleTargetBuffer;
+
+
+        // ============================================================
         // Constructor
         // ============================================================
 
         public BasicAttackExecutor(
             Unit_Core core,
-            BasicAttackData data)
+            BasicAttackData data,
+            HitTargetResolver hitTargetResolver)
         {
             _core =
                 core;
 
             _data =
                 data;
+
+            _hitTargetResolver =
+                hitTargetResolver;
+
+
+            _singleTargetBuffer =
+                new List<ICombatTarget>(
+                    1
+                );
         }
 
 
@@ -42,7 +62,8 @@ namespace Units
         // ============================================================
 
         public void Execute(
-            GameObject target)
+            ICombatTarget target,
+            Action onCompleted)
         {
             if (_core == null)
                 return;
@@ -52,6 +73,10 @@ namespace Units
 
             if (target == null)
                 return;
+
+            if (!target.IsTargetable)
+                return;
+
 
             switch (_data.ExecutionType)
             {
@@ -72,6 +97,9 @@ namespace Units
 
                     break;
             }
+
+
+            onCompleted?.Invoke();
         }
 
 
@@ -80,7 +108,7 @@ namespace Units
         // ============================================================
 
         private void ExecuteDirect(
-            GameObject target)
+            ICombatTarget target)
         {
             switch (_data.AreaType)
             {
@@ -125,14 +153,20 @@ namespace Units
         // ============================================================
 
         private void ExecuteSingle(
-            GameObject target)
+            ICombatTarget target)
         {
-            float damage =
-                CalculateDamage();
+            _singleTargetBuffer.Clear();
 
-            // TODO:
-            // Damage 처리 Manager 구현 후
-            // target에게 damage 적용
+
+            _singleTargetBuffer.Add(
+                target
+            );
+
+
+            RequestDamage(
+                _singleTargetBuffer
+            );
+
 
             // TODO:
             // Attack FX 실행
@@ -147,26 +181,37 @@ namespace Units
         // ============================================================
 
         private void ExecuteTargetCircle(
-            GameObject target)
+            ICombatTarget target)
         {
-            float damage =
-                CalculateDamage();
+            if (_hitTargetResolver == null)
+                return;
 
-            Vector3 center =
-                target.transform.position;
 
-            float radius =
-                _data.AreaRadius;
+            Vector2 center =
+                target.Transform.position;
 
-            int maxTargetCount =
-                _data.MaxTargetCount;
 
-            // TODO:
-            // TargetSearch / Damage 관련 Manager 구현 후
-            //
-            // center 기준 radius 범위 탐색
-            // maxTargetCount만큼 대상 선정
-            // 각 대상에게 damage 적용
+            TargetHitRequest hitRequest =
+                new TargetHitRequest(
+                    center,
+                    Vector2.zero,
+                    _data.AreaRadius,
+                    0f,
+                    _data.MaxTargetCount,
+                    HitAreaType.Circle
+                );
+
+
+            IReadOnlyList<ICombatTarget> targets =
+                _hitTargetResolver.Resolve(
+                    hitRequest
+                );
+
+
+            RequestDamage(
+                targets
+            );
+
 
             // TODO:
             // Attack FX 실행
@@ -182,24 +227,35 @@ namespace Units
 
         private void ExecuteSelfCircle()
         {
-            float damage =
-                CalculateDamage();
+            if (_hitTargetResolver == null)
+                return;
 
-            Vector3 center =
+
+            Vector2 center =
                 _core.transform.position;
 
-            float radius =
-                _data.AreaRadius;
 
-            int maxTargetCount =
-                _data.MaxTargetCount;
+            TargetHitRequest hitRequest =
+                new TargetHitRequest(
+                    center,
+                    Vector2.zero,
+                    _data.AreaRadius,
+                    0f,
+                    _data.MaxTargetCount,
+                    HitAreaType.Circle
+                );
 
-            // TODO:
-            // TargetSearch / Damage 관련 Manager 구현 후
-            //
-            // Unit 위치 기준 radius 범위 탐색
-            // maxTargetCount만큼 대상 선정
-            // 각 대상에게 damage 적용
+
+            IReadOnlyList<ICombatTarget> targets =
+                _hitTargetResolver.Resolve(
+                    hitRequest
+                );
+
+
+            RequestDamage(
+                targets
+            );
+
 
             // TODO:
             // Attack FX 실행
@@ -214,37 +270,44 @@ namespace Units
         // ============================================================
 
         private void ExecuteSelfCone(
-            GameObject target)
+            ICombatTarget target)
         {
-            float damage =
-                CalculateDamage();
+            if (_hitTargetResolver == null)
+                return;
 
-            Vector3 origin =
+
+            Vector2 origin =
                 _core.transform.position;
 
-            Vector3 direction =
+
+            Vector2 direction =
                 (
-                    target.transform.position
+                    (Vector2)target.Transform.position
                     - origin
                 ).normalized;
 
-            float radius =
-                _data.AreaRadius;
 
-            float angle =
-                _data.AreaAngle;
+            TargetHitRequest hitRequest =
+                new TargetHitRequest(
+                    origin,
+                    direction,
+                    _data.AreaRadius,
+                    _data.AreaAngle,
+                    _data.MaxTargetCount,
+                    HitAreaType.Cone
+                );
 
-            int maxTargetCount =
-                _data.MaxTargetCount;
 
-            // TODO:
-            // TargetSearch / Damage 관련 Manager 구현 후
-            //
-            // origin 기준
-            // direction 방향으로
-            // radius / angle 범위의 대상 탐색
-            // maxTargetCount만큼 대상 선정
-            // 각 대상에게 damage 적용
+            IReadOnlyList<ICombatTarget> targets =
+                _hitTargetResolver.Resolve(
+                    hitRequest
+                );
+
+
+            RequestDamage(
+                targets
+            );
+
 
             // TODO:
             // Attack FX 실행
@@ -259,27 +322,34 @@ namespace Units
         // ============================================================
 
         private void ExecuteProjectile(
-            GameObject target)
+            ICombatTarget target)
         {
-            float damage =
-                CalculateDamage();
-
             float projectileSpeed =
                 _data.ProjectileSpeed;
+
 
             // TODO:
             // Projectile Manager 구현 후 실행 요청
             //
-            // 전달해야 할 정보 예시:
+            // Projectile 충돌 시:
             //
-            // 공격자
-            // target
-            // damage
-            // projectileSpeed
+            // Single
+            // → 충돌 대상 DamageRequest
+            //
+            // Area
+            // → 충돌 위치 기준 HitTargetResolver
+            // → DamageRequest
+            //
+            // 전달할 데이터:
+            // Attacker
+            // Target
+            // ProjectileSpeed
             // AreaType
             // AreaRadius
+            // AreaAngle
             // MaxTargetCount
             // HitFXType
+
 
             // TODO:
             // Attack FX 실행
@@ -290,11 +360,37 @@ namespace Units
         // Damage
         // ============================================================
 
-        private float CalculateDamage()
+        private void RequestDamage(
+            IReadOnlyList<ICombatTarget> targets)
         {
-            return
-                _core.RuntimeStatus.AttackPower
-                * _core.RuntimeStatus.BasicAttackMultiplier;
+            if (targets == null)
+                return;
+
+            if (targets.Count <= 0)
+                return;
+
+            if (DamageResolver.Instance == null)
+            {
+                Debug.LogError(
+                    "[BasicAttackExecutor] DamageResolver가 존재하지 않습니다."
+                );
+
+                return;
+            }
+
+
+            DamageRequest request =
+                new DamageRequest(
+                    _core,
+                    targets,
+                    DamageSourceType.BasicAttack,
+                    _core.RuntimeStatus.BasicAttackMultiplier
+                );
+
+
+            DamageResolver.Instance.Resolve(
+                request
+            );
         }
     }
 }

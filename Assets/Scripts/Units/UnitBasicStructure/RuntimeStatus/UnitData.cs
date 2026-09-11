@@ -28,6 +28,13 @@ namespace Units.UnitDatas
         [SerializeField]
         private UnitTeam _team;
 
+        // ============================================================
+        // Team
+        // ============================================================
+
+        [SerializeField]
+        private UnitType _unitType;
+
 
         // ============================================================
         // Stats
@@ -58,6 +65,9 @@ namespace Units.UnitDatas
 
         public UnitTeam Team =>
             _team;
+
+        public UnitType UnitType => 
+            _unitType;
 
         public IReadOnlyList<UnitStatEntry> Stats =>
             _stats;
