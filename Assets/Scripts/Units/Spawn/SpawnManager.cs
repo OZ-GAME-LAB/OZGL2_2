@@ -48,11 +48,11 @@ namespace Units
 
         [SerializeField]
         private Vector2 _rallySectorSize =
-            new Vector2(10f, 10f);
+            new Vector2(5f, 10f);
 
         [SerializeField]
         private float _rallyFormationSpacing =
-            1f;
+            2f;
 
 
         // ============================================================
