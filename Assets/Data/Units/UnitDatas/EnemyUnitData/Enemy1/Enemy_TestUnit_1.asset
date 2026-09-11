@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: Enemy_TestUnit_1
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: Enemy_TestUnit_1
+  _unitName: Enemy1
+  _team: 1
+  _unitType: 3
+  _stats:
+  - _statType: 0
+    _value: 100
+  - _statType: 1
+    _value: 30
+  - _statType: 2
+    _value: 1
+  - _statType: 3
+    _value: 3
+  - _statType: 4
+    _value: 0
+  - _statType: 5
+    _value: 1.5
+  - _statType: 6
+    _value: 0
+  - _statType: 7
+    _value: 15
+  - _statType: 8
+    _value: 150
+  - _statType: 9
+    _value: 5
+  - _statType: 10
+    _value: 10
+  _basicAttackData: {fileID: 11400000, guid: 93557e14d91e4804187cd1bbdb683a55, type: 2}
+  _activeSkillData: {fileID: 11400000, guid: 275d2a382853cd54c9bdf44cdc99c1a2, type: 2}

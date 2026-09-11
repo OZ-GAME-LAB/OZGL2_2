@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31ed5264931bc5e43999511ce80a2b51, type: 3}
+  m_Name: TestEnemyDB
+  m_EditorClassIdentifier: Assembly-CSharp::Units.EnemyUnitSpawnDatabaseSO
+  _factions:
+  - _faction: 0
+    _unitPrefabs:
+    - {fileID: 2073732415526928528, guid: fd2d3626d16a5454dade406dd22acf1d, type: 3}
+    - {fileID: 6763861316500151553, guid: 76da4ffc12146f041b25484a406d15ee, type: 3}

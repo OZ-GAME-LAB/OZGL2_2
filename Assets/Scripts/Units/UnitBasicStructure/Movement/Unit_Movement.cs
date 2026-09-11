@@ -1,70 +1,78 @@
 using UnityEngine;
 
 
-
 namespace Units
 {
     public class Unit_Movement : MonoBehaviour
     {
         // ============================================================
-        // References
+        // Reference
         // ============================================================
 
-        [SerializeField] private Unit_RuntimeStatus _runtimeStatus;
-        [SerializeField] private Rigidbody2D _rigidbody;
+        private Unit_Core _core;
+
+        [SerializeField]
+        private Rigidbody2D _rigidbody;
 
 
         // ============================================================
         // Settings
         // ============================================================
 
-        [SerializeField] private float _arrivalDistance = 0.1f;
+        [SerializeField]
+        private float _arrivalDistance = 0.1f;
+
+        [SerializeField]
+        private float _stuckCheckInterval = 0.5f;
+
+        [SerializeField]
+        private float _stuckDistanceThreshold = 0.05f;
+
+        [SerializeField]
+        private float _stuckTimeLimit = 1.5f;
 
 
         // ============================================================
-        // Data
+        // Runtime State
         // ============================================================
 
-        private Vector2 _destination;
+        private Vector2 _targetPosition;
+
+        private Vector2 _lastCheckPosition;
+
+        private float _nextStuckCheckTime;
+
+        private float _stuckTime;
 
         private bool _isMoving;
-        private bool _canMove;
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public Vector2 Destination => _destination;
+        public bool IsMoving
+            => _isMoving;
 
-        public bool IsMoving => _isMoving;
-        public bool CanMove => _canMove;
 
-        public float MoveSpeed =>
-            _runtimeStatus != null
-                ? _runtimeStatus.MoveSpeed
-                : 0f;
+        // ============================================================
+        // Initialize
+        // ============================================================
+
+        public void Initialize(
+            Unit_Core core)
+        {
+            _core = core;
+
+            _isMoving = false;
+
+            ResetMovementState();
+        }
 
 
         // ============================================================
         // Unity Lifecycle
         // ============================================================
-
-        private void Awake()
-        {
-            if (_runtimeStatus == null)
-            {
-                _runtimeStatus =
-                    GetComponent<Unit_RuntimeStatus>();
-            }
-
-            if (_rigidbody == null)
-            {
-                _rigidbody =
-                    GetComponent<Rigidbody2D>();
-            }
-        }
-
 
         private void FixedUpdate()
         {
@@ -73,94 +81,212 @@ namespace Units
 
 
         // ============================================================
-        // Initialize
+        // Movement
         // ============================================================
 
-        public void Initialize()
+        public void MoveTo(
+            Vector2 targetPosition)
         {
-            _destination = _rigidbody.position;
-
-            _isMoving = false;
-            _canMove = true;
-
-            _rigidbody.linearVelocity =
-                Vector2.zero;
-        }
-
-
-        // ============================================================
-        // Public Methods
-        // ============================================================
-
-        public void MoveTo(Vector2 destination)
-        {
-            if (!_canMove)
+            if (_rigidbody == null)
                 return;
 
-            _destination = destination;
-            _isMoving = true;
+
+            _targetPosition =
+                targetPosition;
+
+            _isMoving =
+                true;
+
+
+            ResetMovementState();
         }
 
 
         public void Stop()
         {
-            _isMoving = false;
+            _isMoving =
+                false;
 
-            if (_rigidbody != null)
-            {
-                _rigidbody.linearVelocity =
-                    Vector2.zero;
-            }
+            ResetMovementState();
+
+
+            if (_rigidbody == null)
+                return;
+
+
+            _rigidbody.linearVelocity =
+                Vector2.zero;
         }
 
-
-        public void SetCanMove(bool canMove)
-        {
-            _canMove = canMove;
-
-            if (!_canMove)
-            {
-                Stop();
-            }
-        }
-
-
-        // ============================================================
-        // Movement
-        // ============================================================
 
         private void UpdateMovement()
         {
-            if (!_canMove || !_isMoving)
+            if (!_isMoving)
                 return;
+
+            if (_core == null)
+                return;
+
+            if (_rigidbody == null)
+                return;
+
 
             Vector2 currentPosition =
                 _rigidbody.position;
 
-            Vector2 toDestination =
-                _destination - currentPosition;
 
-            if (toDestination.sqrMagnitude
-                <= _arrivalDistance * _arrivalDistance)
+            float distance =
+                Vector2.Distance(
+                    currentPosition,
+                    _targetPosition
+                );
+
+
+            if (distance <= _arrivalDistance)
             {
-                Arrive();
+                CompleteMovement();
+
                 return;
             }
 
-            Vector2 direction =
-                toDestination.normalized;
 
-            _rigidbody.linearVelocity =
-                direction * MoveSpeed;
+            UpdateVelocity(
+                currentPosition,
+                distance
+            );
+
+
+            CheckStuck(
+                currentPosition
+            );
         }
 
 
-        private void Arrive()
+        private void UpdateVelocity(
+            Vector2 currentPosition,
+            float distance)
         {
-            _rigidbody.linearVelocity =
-                Vector2.zero;
+            Vector2 direction =
+                (
+                    _targetPosition
+                    - currentPosition
+                ).normalized;
 
-            _isMoving = false;
+
+            float moveSpeed =
+                Mathf.Max(
+                    0f,
+                    _core.RuntimeStatus.MoveSpeed
+                );
+
+
+            float maxSpeedToTarget =
+                distance
+                / Time.fixedDeltaTime;
+
+
+            float currentSpeed =
+                Mathf.Min(
+                    moveSpeed,
+                    maxSpeedToTarget
+                );
+
+
+            _rigidbody.linearVelocity =
+                direction
+                * currentSpeed;
+        }
+
+
+        // ============================================================
+        // Stuck Detection
+        // ============================================================
+
+        private void CheckStuck(
+            Vector2 currentPosition)
+        {
+            if (Time.time
+                < _nextStuckCheckTime)
+            {
+                return;
+            }
+
+
+            _nextStuckCheckTime =
+                Time.time
+                + _stuckCheckInterval;
+
+
+            float movedDistance =
+                Vector2.Distance(
+                    currentPosition,
+                    _lastCheckPosition
+                );
+
+
+            if (movedDistance
+                <= _stuckDistanceThreshold)
+            {
+                _stuckTime +=
+                    _stuckCheckInterval;
+            }
+            else
+            {
+                _stuckTime =
+                    0f;
+            }
+
+
+            _lastCheckPosition =
+                currentPosition;
+
+
+            if (_stuckTime
+                < _stuckTimeLimit)
+            {
+                return;
+            }
+
+
+            FailMovement();
+        }
+
+
+        private void ResetMovementState()
+        {
+            _stuckTime =
+                0f;
+
+            _nextStuckCheckTime =
+                Time.time
+                + _stuckCheckInterval;
+
+
+            if (_rigidbody != null)
+            {
+                _lastCheckPosition =
+                    _rigidbody.position;
+            }
+        }
+
+
+        // ============================================================
+        // Complete / Fail
+        // ============================================================
+
+        private void CompleteMovement()
+        {
+            Stop();
+
+            _core?.NotifyMovementCompleted();
+        }
+
+
+        private void FailMovement()
+        {
+            Stop();
+
+            _core?.NotifyMovementFailed();
         }
     }
 }
