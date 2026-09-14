@@ -1,4 +1,4 @@
-﻿
+
 
 
 namespace Units
@@ -7,6 +7,8 @@ namespace Units
     {
         All,
         Class,
-        Type
+        Type,
+        Tier,
+        Faction
     }
 }

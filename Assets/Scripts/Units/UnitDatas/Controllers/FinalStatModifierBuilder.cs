@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 
 
@@ -36,7 +36,8 @@ namespace Units
 
         public FinalStatModifier BuildAlly(
             AllyUnitClass unitClass,
-            AllyUnitType unitType)
+            AllyUnitType unitType,
+            AllyUnitTier unitTier)
         {
             Dictionary<UnitStatType, StatModifierValue> result =
                 new();
@@ -56,13 +57,19 @@ namespace Units
                 _allyContainer.GetFromTypeModifiers(unitType)
             );
 
+            AddAllyModifiers(
+                result,
+                _allyContainer.GetFromTierModifiers(unitTier)
+            );
+
             return new FinalStatModifier(result);
         }
 
 
         public FinalStatModifier BuildEnemy(
             EnemyUnitClass unitClass,
-            EnemyUnitType unitType)
+            EnemyUnitType unitType,
+            EnemyUnitFaction unitFaction)
         {
             Dictionary<UnitStatType, StatModifierValue> result =
                 new();
@@ -80,6 +87,11 @@ namespace Units
             AddEnemyModifiers(
                 result,
                 _enemyContainer.GetFromTypeModifiers(unitType)
+            );
+
+            AddEnemyModifiers(
+                result,
+                _enemyContainer.GetFromFactionModifiers(unitFaction)
             );
 
             return new FinalStatModifier(result);

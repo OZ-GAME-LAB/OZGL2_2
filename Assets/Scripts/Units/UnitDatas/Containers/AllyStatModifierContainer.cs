@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace Units
 {
@@ -25,6 +25,25 @@ namespace Units
         // ============================================================
         // Public Methods
         // ============================================================
+
+        private readonly Dictionary<AllyUnitTier, List<AllyStatModifier>> _tierModifiers = new();
+
+        public void AddToTier(AllyUnitTier unitTier, AllyStatModifier modifier)
+        {
+            if (!_tierModifiers.TryGetValue(unitTier, out var modifiers))
+            {
+                modifiers = new List<AllyStatModifier>();
+                _tierModifiers.Add(unitTier, modifiers);
+            }
+            modifiers.Add(modifier);
+        }
+
+        public IReadOnlyList<AllyStatModifier> GetFromTierModifiers(AllyUnitTier unitTier)
+        {
+            if (_tierModifiers.TryGetValue(unitTier, out var modifiers))
+                return modifiers;
+            return System.Array.Empty<AllyStatModifier>();
+        }
 
         public void AddToAll(
             AllyStatModifier modifier)
@@ -112,6 +131,9 @@ namespace Units
         public void RemoveBySource(
             object source)
         {
+            foreach (var modifiers in _tierModifiers.Values)
+                modifiers.RemoveAll(modifier => Equals(modifier.Source, source));
+
             _allModifiers.RemoveAll(
                 modifier =>
                     Equals(

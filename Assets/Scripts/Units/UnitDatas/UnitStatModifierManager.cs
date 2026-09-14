@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 
 
@@ -62,22 +62,26 @@ namespace Units
 
         public FinalStatModifier GetAllyFinalModifier(
             AllyUnitClass unitClass,
-            AllyUnitType unitType)
+            AllyUnitType unitType,
+            AllyUnitTier unitTier)
         {
             return _builder.BuildAlly(
                 unitClass,
-                unitType
+                unitType,
+                unitTier
             );
         }
 
 
         public FinalStatModifier GetEnemyFinalModifier(
             EnemyUnitClass unitClass,
-            EnemyUnitType unitType)
+            EnemyUnitType unitType,
+            EnemyUnitFaction unitFaction)
         {
             return _builder.BuildEnemy(
                 unitClass,
-                unitType
+                unitType,
+                unitFaction
             );
         }
 

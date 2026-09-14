@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -503,7 +503,8 @@ namespace Units
             FinalStatModifier finalModifier =
                 _unitStatModifierManager.GetAllyFinalModifier(
                     unitData.GetAllyClass(),
-                    unitData.GetAllyType()
+                    unitData.GetAllyType(),
+                    unitData.GetAllyTier()
                 );
 
 
