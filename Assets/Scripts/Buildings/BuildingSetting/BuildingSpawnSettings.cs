@@ -1,7 +1,9 @@
-// Current date KDH 2026-09-11
-// BuildingData에 붙여 넣는 소환 설정. 살아있는 유닛 목록은 실물 모듈이 가집니다.
+// Current date KDH 2026-09-15
+// BuildingData에 붙여 넣는 소환 설정. 월드 좌표는 여기에 두지 않습니다.
+// 실제 소환은 unitType만 SpawnManager에 넘깁니다. 프리팹은 유닛 쪽이 고릅니다.
 using System;
 using UnityEngine;
+using Units;
 
 namespace OZGL.KDH
 {
@@ -9,8 +11,8 @@ namespace OZGL.KDH
     public class BuildingSpawnSettings
     {
         public bool enabled;
-        [Tooltip("유닛 담당 프리팹. 나중에 UnitData SO로 바꿔도 이 슬롯만 교체하면 됩니다.")]
-        public GameObject unitPrefab;
+        [Tooltip("SpawnManager가 프리팹을 고를 때 사용합니다.")]
+        public AllyUnitType unitType = AllyUnitType.Warrior;
         [Min(1)] public int countPerWave = 1;
         [Min(1)] public int maxAlive = 3;
     }

@@ -13,7 +13,7 @@ namespace OZGL.KDH
     public class BuildingBuildMenu : MonoBehaviour
     {
         private BuildingBuildController _owner;
-        private PlayerWallet _wallet;
+        private RunCurrencyManager _wallet;
         private BuildingSlot _slot;
         private readonly List<Row> _rows = new List<Row>(8);
         private readonly StringBuilder _costBuilder = new StringBuilder(64);
@@ -34,7 +34,7 @@ namespace OZGL.KDH
             Hide();
         }
 
-        public void Show(BuildingSlot slot, List<BuildingData> candidates, PlayerWallet wallet)
+        public void Show(BuildingSlot slot, List<BuildingData> candidates, RunCurrencyManager wallet)
         {
             if (slot == null)
             {
@@ -87,7 +87,7 @@ namespace OZGL.KDH
             UnsubscribeWallet();
         }
 
-        private void SubscribeWallet(PlayerWallet wallet)
+        private void SubscribeWallet(RunCurrencyManager wallet)
         {
             if (_wallet == wallet)
                 return;
@@ -95,7 +95,7 @@ namespace OZGL.KDH
             UnsubscribeWallet();
             _wallet = wallet;
             if (_wallet != null)
-                _wallet.Changed += OnWalletChanged;
+                _wallet.BalanceChanged += OnWalletChanged;
         }
 
         private void UnsubscribeWallet()
@@ -103,11 +103,11 @@ namespace OZGL.KDH
             if (_wallet == null)
                 return;
 
-            _wallet.Changed -= OnWalletChanged;
+            _wallet.BalanceChanged -= OnWalletChanged;
             _wallet = null;
         }
 
-        private void OnWalletChanged(BuildingResourceType type, int amount)
+        private void OnWalletChanged(CurrencyData currency, int previous, int current)
         {
             RefreshAffordability();
         }
@@ -268,18 +268,14 @@ namespace OZGL.KDH
 
             if (data.HasSpawn)
             {
+                // Current date KDH 2026-09-15
+                // 프리팹 이름 대신 unitType을 보여 줍니다. 소환은 이 타입만 씁니다.
                 BuildingSpawnSettings spawn = data.Spawn;
                 builder.Append("소환 ");
                 builder.Append(spawn.countPerWave);
-                builder.Append("기");
-                if (spawn.unitPrefab != null)
-                {
-                    builder.Append(" (");
-                    builder.Append(spawn.unitPrefab.name);
-                    builder.Append(')');
-                }
-
-                builder.Append('\n');
+                builder.Append("기 (");
+                builder.Append(spawn.unitType);
+                builder.Append(")\n");
             }
         }
 
@@ -288,7 +284,7 @@ namespace OZGL.KDH
             if (_walletText == null)
                 return;
 
-            if (_wallet == null)
+            if (_wallet == null || !_wallet.IsInitialized)
             {
                 _walletText.text = "지갑 없음";
                 return;
@@ -296,9 +292,9 @@ namespace OZGL.KDH
 
             _costBuilder.Length = 0;
             _costBuilder.Append("보유  Gold ");
-            _costBuilder.Append(_wallet.Get(BuildingResourceType.Gold));
+            _costBuilder.Append(_wallet.GetBalance(CurrencyType.Gold));
             _costBuilder.Append("  Gem ");
-            _costBuilder.Append(_wallet.Get(BuildingResourceType.Gem));
+            _costBuilder.Append(_wallet.GetBalance(CurrencyType.Gem));
             _walletText.text = _costBuilder.ToString();
         }
 

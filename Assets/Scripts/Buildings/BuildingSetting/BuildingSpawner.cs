@@ -1,15 +1,18 @@
-// Current date KDH 2026-09-11
-// 웨이브가 끝날 때 아군 유닛을 소환합니다. 죽은 유닛은 Unity 가짜 null로만 정리합니다.
-using System.Collections.Generic;
+// Current date KDH 2026-09-14
+// 병영 앞에서 소환하고, 집결 좌표만 SpawnManager에 넘깁니다. 이동은 유닛이 합니다.
+// 건설은 Preparation에서만 하고, 유닛은 BattlePreparing 진입 때 소환합니다.
+using Game.Core;
 using UnityEngine;
+using Units;
 
 namespace OZGL.KDH
 {
     public class BuildingSpawner : MonoBehaviour, IBuildingModule
     {
         private Building _owner;
-        private Transform _spawnPoint;
-        private readonly List<Transform> _alive = new List<Transform>(8);
+        private GameFlowController _gameFlow;
+        private SpawnManager _spawnManager;
+        private GamePhase _previousPhase = GamePhase.None;
         private bool _setup;
 
         public void Setup(Building owner)
@@ -26,26 +29,41 @@ namespace OZGL.KDH
             if (!_owner.Data.HasSpawn)
                 return;
 
-            if (_owner.Data.Spawn.unitPrefab == null)
+            if (_owner.Data.Spawn.unitType == AllyUnitType.Default)
             {
-                Debug.LogWarning("[BuildingSpawner] unitPrefab이 없어 소환할 수 없습니다.", this);
+                Debug.LogWarning("[BuildingSpawner] unitType이 Default라 소환할 수 없습니다.", this);
                 return;
             }
 
-            _spawnPoint = _owner.SpawnPoint != null ? _owner.SpawnPoint : _owner.transform;
-            WaveEvents.WaveCleared += OnWaveCleared;
+            _gameFlow = FindFirstObjectByType<GameFlowController>();
+            if (_gameFlow == null)
+            {
+                Debug.LogWarning("[BuildingSpawner] GameFlowController를 찾지 못해 소환 시점을 알 수 없습니다.", this);
+                return;
+            }
+
+            _spawnManager = FindFirstObjectByType<SpawnManager>();
+            if (_spawnManager == null)
+            {
+                Debug.LogWarning("[BuildingSpawner] SpawnManager를 찾지 못해 소환할 수 없습니다.", this);
+                return;
+            }
+
+            _previousPhase = _gameFlow.CurPhase;
+            _gameFlow.PhaseChanged += OnPhaseChanged;
             _setup = true;
         }
 
         public void Teardown()
         {
-            if (_setup)
-                WaveEvents.WaveCleared -= OnWaveCleared;
+            if (_setup && _gameFlow != null)
+                _gameFlow.PhaseChanged -= OnPhaseChanged;
 
             _setup = false;
             _owner = null;
-            _spawnPoint = null;
-            _alive.Clear();
+            _gameFlow = null;
+            _spawnManager = null;
+            _previousPhase = GamePhase.None;
         }
 
         private void OnDestroy()
@@ -53,49 +71,53 @@ namespace OZGL.KDH
             Teardown();
         }
 
-        private void OnWaveCleared(int waveIndex)
+        // Current date KDH 2026-09-14
+        // 준비 단계에서는 짓기만 하고, 전투준비로 넘어갈 때 한 번 소환합니다.
+        private void OnPhaseChanged(GamePhase phase)
+        {
+            bool enterBattlePrep = phase == GamePhase.BattlePreparing
+                && _previousPhase != GamePhase.BattlePreparing;
+
+            _previousPhase = phase;
+            if (!enterBattlePrep)
+                return;
+
+            SpawnUnits();
+        }
+
+        private void SpawnUnits()
         {
             if (_owner == null || _owner.Data == null || !_owner.Data.HasSpawn)
                 return;
 
             BuildingSpawnSettings settings = _owner.Data.Spawn;
-            if (settings.unitPrefab == null)
+            if (settings.unitType == AllyUnitType.Default)
             {
-                Debug.LogWarning("[BuildingSpawner] unitPrefab이 없어 소환을 건너뜁니다.", this);
+                Debug.LogWarning("[BuildingSpawner] unitType이 Default라 소환을 건너뜁니다.", this);
                 return;
             }
 
-            RemoveDead();
+            if (_spawnManager == null)
+            {
+                Debug.LogWarning("[BuildingSpawner] SpawnManager가 없어 소환을 건너뜁니다.", this);
+                return;
+            }
 
-            int toSpawn = settings.countPerWave;
-            int room = settings.maxAlive - _alive.Count;
-            if (room <= 0)
+            int count = settings.countPerWave;
+            if (count > settings.maxAlive)
+                count = settings.maxAlive;
+
+            if (count <= 0)
                 return;
 
-            if (toSpawn > room)
-                toSpawn = room;
+            Vector2 spawnPosition = _owner.SpawnWorldPosition;
+            Vector2 rallyPosition = _owner.RallyWorldPosition;
 
-            Vector3 pos = _spawnPoint != null ? _spawnPoint.position : transform.position;
-            for (int i = 0; i < toSpawn; i++)
-            {
-                GameObject unit = Instantiate(settings.unitPrefab, pos, Quaternion.identity);
-                if (unit == null)
-                {
-                    Debug.LogWarning("[BuildingSpawner] 유닛 Instantiate에 실패했습니다.", this);
-                    continue;
-                }
-
-                _alive.Add(unit.transform);
-            }
-        }
-
-        private void RemoveDead()
-        {
-            for (int i = _alive.Count - 1; i >= 0; i--)
-            {
-                if (_alive[i] == null)
-                    _alive.RemoveAt(i);
-            }
+            _spawnManager.SpawnAllyGroup(
+                settings.unitType,
+                spawnPosition,
+                count,
+                rallyPosition);
         }
     }
 }

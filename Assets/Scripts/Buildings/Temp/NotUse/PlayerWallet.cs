@@ -3,6 +3,7 @@
 // 건물 쪽은 CanAfford / TrySpend만 호출하고, 잔액을 직접 깎지 않습니다.
 // 배열 인덱스로 enum을 써서, 클릭 때마다 Dictionary를 만들지 않습니다.
 // 재화 담당자의 코드로 교체할 것임.
+// Current date KDH 2026-09-14 이제 이 cs는 더 이상 사용하지 않습니다.
 using System;
 using UnityEngine;
 
