@@ -63,15 +63,25 @@ public class WaveSODictionary : ScriptableObject
         WaveBattleType battleType,
         out WaveSO result)
     {
+        return TryGetRandomWaveSO(currentQuarter, battleType, out result, out _);
+    }
+
+    public bool TryGetRandomWaveSO(
+        int currentQuarter,
+        WaveBattleType battleType,
+        out WaveSO result,
+        out EnemyFaction faction)
+    {
         if (_waveDictionary == null)
             RebuildDictionary();
 
         var candidates = new List<WaveSO>();
         var seen = new HashSet<WaveSO>();
+        var factions = new List<EnemyFaction>();
 
-        foreach (var factionGroups in _waveDictionary.Values)
+        foreach (var entry in _waveDictionary)
         {
-            foreach (var group in factionGroups)
+            foreach (var group in entry.Value)
             {
                 if (!group.AvailableQuarters.Contains(currentQuarter) ||
                     group.Presets == null)
@@ -83,7 +93,10 @@ public class WaveSODictionary : ScriptableObject
                         continue;
 
                     if (seen.Add(preset))
+                    {
                         candidates.Add(preset);
+                        factions.Add(entry.Key);
+                    }
                 }
             }
         }
@@ -91,11 +104,14 @@ public class WaveSODictionary : ScriptableObject
         if (candidates.Count == 0)
         {
             result = null;
+            faction = default;
             return false;
         }
 
         // 허용된 모든 세력의 중복 없는 프리셋 후보를 균등 추첨한다.
-        result = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+        int index = UnityEngine.Random.Range(0, candidates.Count);
+        result = candidates[index];
+        faction = factions[index];
         return true;
     }
 }

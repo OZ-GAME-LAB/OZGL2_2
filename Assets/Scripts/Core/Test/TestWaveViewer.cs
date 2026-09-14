@@ -7,6 +7,7 @@ public class TestWaveViewer : MonoBehaviour
 {
     [SerializeField] private WaveController _waveController;
     [SerializeField] private GameFlowController _gameFlowController;
+    [SerializeField] private bool _showPresetInfo;
     private TextMeshProUGUI _text;
 
     private void Awake()
@@ -40,8 +41,29 @@ public class TestWaveViewer : MonoBehaviour
 
     private void Refresh()
     {
+            if (_showPresetInfo)
+            {
+                WaveSO preset = _waveController.CurrentPreset;
+                if (preset == null)
+                {
+                    _text.text = "웨이브 프리셋 없음";
+                    return;
+                }
+                string type = preset.BattleType == WaveBattleType.Normal ? "일반" :
+                    preset.BattleType == WaveBattleType.Elite ? "정예" : "보스";
+                string faction;
+                switch (_waveController.CurrentFaction)
+                {
+                    case EnemyFaction.Irregulars: faction = "비정규군"; break;
+                    case EnemyFaction.RegularArmy: faction = "정규군"; break;
+                    case EnemyFaction.EliteArmy: faction = "정규군(정예)"; break;
+                    default: faction = "성전군"; break;
+                }
+                _text.text = $"{type} | {faction} | {preset.WaveName}";
+                return;
+            }
         _text.text = _gameFlowController.CurPhase == GamePhase.Finished
             ? "gameFinished"
-            : $"Current Wave : {_waveController.CurWave}";
+            : $"Quarter : {_waveController.CurQuarter} / Wave : {_waveController.CurWave}";
     }
 }

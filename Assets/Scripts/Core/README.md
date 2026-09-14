@@ -23,11 +23,11 @@
 ```text
 시작 버튼 → TestWaitingScript.WaveStartBtn()
   → GameFlowController.TryStartWave()
-    → Preparation인지, 전환 중이 아닌지 검사
+    → Preparation인지, 전환 중이 아닌지, 선택된 프리셋이 있는지 검사
     → _isTransitioning = true
     → ChangePhase(BattlePreparing)
-    → await WaveController.PrepareEnemy(token)
-      → TestSpawner.SpawnAllUnits(token)   ← 현재는 생존 수 초기화 후 3초 대기
+    → await WaveController.PrepareEnemy(SpawnTime, token)
+      → TestSpawner.SpawnAllUnits(SpawnTime, token)   ← 생존 수 초기화 후 SpawnTime초 대기
     → 취소되었으면 false 반환
     → ChangePhase(Battle)
     → _isTransitioning = false, true 반환
@@ -36,11 +36,11 @@
 UI 담당은 시작 버튼에서 `TryStartWave()`를 호출한다. 결과가 필요하면 `await`로 받고,
 현재 테스트 버튼처럼 결과를 사용하지 않으면 `.Forget()`으로 실행한다.
 현재 `UniTask<bool>`의 true는 **시작 요청 접수가 아니라 Battle 진입 완료**를 뜻한다.
-false는 잘못된 상태에서의 요청 또는 대기 중 취소를 뜻한다.
+false는 잘못된 상태에서의 요청, 선택된 프리셋 누락 또는 대기 중 취소를 뜻한다. 현재 생성 대기는 `SpawnTime`을 사용하며 기본값과 저장된 Test 씬 값은 1초다.
 
 ### 팀원 코드가 들어갈 위치
 
-`TryStartWave()`는 현재 **`WaveController.PrepareEnemy(token)`으로 적 준비 완료를 기다린다.** 실제 연동 시 WaveController가 호출하는 스포너를 연결하고, 코어에 아군 준비 작업의 대기도 추가한다.
+`TryStartWave()`는 현재 **`WaveController.PrepareEnemy(SpawnTime, token)`으로 적 준비 완료를 기다린다.** 실제 연동 시 WaveController가 호출하는 스포너를 연결하고, 코어에 아군 준비 작업의 대기도 추가한다.
 `ChangePhase(BattlePreparing)` 이후 작업을 시작하고, `ChangePhase(Battle)` 이전에 모두 완료되어야 한다.
 
 - 김도현: 건물의 아군 생산 메서드(`ProduceAllies`) 제공. 필요한 아군 생성과 담당하는 등장 준비가 끝나야 완료 처리한다.
@@ -55,7 +55,7 @@ false는 잘못된 상태에서의 요청 또는 대기 중 취소를 뜻한다.
 var token = _cts.Token;
 bool canceled = await UniTask.WhenAll(
     _buildingSystem.ProduceAllies(token),
-    _waveController.PrepareEnemy(token)
+    _waveController.PrepareEnemy(SpawnTime, token)
 ).SuppressCancellationThrow();
 
 if (canceled || token.IsCancellationRequested) return false;
@@ -103,53 +103,81 @@ WaveController는 이벤트를 구독하고 `GetRemain(out enemy, out allies)`�
 ```text
 스포너의 MonsterKilled 이벤트
   → WaveController가 GetRemain으로 생존 수 조회 및 승패 판단
-  → 승리: GameFlowController.CompleteWave() → Reward
-  → 패배: GameFlowController.FinishedGame(Defeat) → Finished
+  → 승리: GameFlowController.ResolveBattleAsync(ResultType.Victory) → BattleResolving → 보상 또는 분기 완료
+  → 패배: GameFlowController.ResolveBattleAsync(ResultType.Defeat) → BattleResolving → 정리 → Finished
 ```
 
-원준 담당 유닛 코드가 사망할 때마다 `CompleteWave()`를 직접 호출하지 않는다.
+원준 담당 유닛 코드가 사망할 때마다 `ResolveBattleAsync()`를 직접 호출하지 않는다.
 웨이브 담당이 생성 완료 이후 전멸 여부를 판단하고, 전투 종료 결과를 한 번만 알리는 구조다.
-적 전멸은 승리, 아군 전원 사망은 패배이며, `CompleteWave()`는 승리 후 보상과 다음 웨이브 또는 최종 종료를 처리하므로 패배용으로 호출하지 않는다.
-마지막 웨이브의 승리도 보상 선택을 먼저 기다린다. 실제 유닛의 사망 알림과 생존 수 관리는 아직 TestSpawner를 사용하는 단계다.
+현재 판정은 적 전멸을 먼저 확인해 승리를 전달하고, 적이 남아 있으면서 아군 전원 사망이면 패배를 전달한다. 코어는 `ResolveBattleAsync(ResultType result)` 하나로 승리·패배를 받아 전투 중 한 번만 처리한다.
+분기의 마지막 웨이브는 QuarterComplete를 거쳐 필요한 경우 종료·계속을 선택하고, 계속 진행하는 경로에서는 Reward로 전환해 유물 선택을 기다린다. 실제 유닛의 사망 알림과 생존 수 관리는 아직 TestSpawner를 사용하는 단계다.
 
-## 5. 보상: 코어 → 보상 시스템 ↔ UI → 코어
+## 5. 전투 마무리·보상·분기 완료
 
 ### 현재 흐름
 
 ```text
-CompleteWave()
-  → Battle인지, 전환 중이 아닌지 검사
-  → _isTransitioning = true
-  → ChangePhase(Reward)
-  → await WaitToggle(token)           ← 현재는 테스트 버튼 대기
-       ChooseResultBtn()이 _toggle = true로 변경하면 대기 완료
-  → 취소되었으면 반환
-  → 일반 웨이브: ProgressStage()로 번호 증가·WaveChanged 발행
-                → ChangePhase(Preparation)
-  → 마지막 웨이브: FinishRun(Victory) → ChangePhase(Finished)
-  → _isTransitioning = false
+ResolveBattleAsync(result)
+  → Battle 상태·전환 잠금 검사
+  → BattleResolving → PlayBattleResultAsync(result, token)
+    ├─ 패배 → CleanupBattleAsync → Finished
+    └─ 승리
+        ├─ 분기 중간 웨이브 → Reward → ChooseResult 대기
+        │   → CleanupBattleAsync → 다음 웨이브 Preparation
+        └─ 분기 마지막 웨이브 → QuarterComplete
+            ├─ MAIN_QUARTERS 미만 → Reward → 유물 선택 대기
+            └─ MAIN_QUARTERS 이상
+                ├─ AutoContinue 켜짐 → Reward → 유물 선택 대기
+                └─ 꺼짐 → 종료 / 계속 선택 대기
+                    ├─ 종료 → CleanupBattleAsync → 승리 Finished
+                    └─ 계속 → Reward → 유물 선택 대기
+            유물 선택 완료 → CleanupBattleAsync → 다음 분기 1웨이브 Preparation
 ```
+
+현재 테스트 설정은 `MAX_WAVE = 3`, `MAIN_QUARTERS = 3`이다. 1~2분기의 마지막 웨이브 승리 후에는 유물 선택으로 이동하고, 3분기부터는 분기 마지막 웨이브 승리 시 종료·계속을 선택한다. 계속 선택하면 4분기 이상으로 진행한다. 기획의 5분기 기준과 구분하며, 종료 확인 기준은 `MAIN_QUARTERS`를 따른다.
+`HasClearedMainGame`은 현재 판의 기본 구간 클리어 기록으로, 계속 도전 후 패배해도 유지하며 새 판·리셋 시 초기화한다.
+영구 저장과 실제 결산창은 아직 연결하지 않았다.
+
+### 테스트 입력
+
+- Battle Start로 전투를 시작하고, Battle에서 Clear 또는 Fail로 승패를 입력한다. 결과 연출은 `StagingTime`초를 기다리며 기본값과 저장된 Test 씬 값은 0.5초다.
+- `SpawnTime`과 `StagingTime`은 코어 Inspector에서 Play 모드 중 조절한다. 테스트 중 시간 변경을 위해 씬 설정을 저장할 필요는 없다.
+- Reward에서는 기존 ChooseResult 버튼으로 보상 완료를 전달한다.
+- 분기 종료 후 유물 선택도 Reward에서 ChooseResult로 완료한다. `IsWaitingForArtifactSelection`으로 일반 보상과 구분하며 실제 유물 선택·적용은 미연동이다.
+- `MAIN_QUARTERS` 이상 종료 선택 대기에서는 씬의 Finish / Continue 버튼을 사용한다. 각각 `ChooseFinishRun()` / `ChooseContinueRun()`에 연결돼 있다. 코어 컨텍스트 메뉴의 `Test/Finish at quarter choice` / `Test/Continue at quarter choice`로도 입력할 수 있다.
+- LastWave는 현재 분기의 마지막 웨이브로, LastQuarter는 `MAIN_QUARTERS`의 1웨이브로 이동한다. 준비 중에만 사용할 수 있고 클리어·보상을 발생시키지 않는다. 이미 해당 마지막 위치 이상이면 이동하지 않는다.
+- 실행 가능한 테스트 버튼은 노란색으로 표시된다. 색상은 안내용이며 실제 요청 가능 여부는 각 메서드에서도 검사한다. Reset은 각 대기 중에도 새 판을 시작할 수 있다.
+- 현재 종료 선택 요청은 `QuarterDecisionRequested` 이벤트로 알린다. UI를 이 방식으로 연결한다면 이벤트로 창을 열고 버튼에서
+  `ChooseFinishRun()` / `ChooseContinueRun()`을 호출하면 된다.
+- `ArtifactSelectionRequested`는 유물 선택 요청이며, 대기 여부는
+  `IsWaitingForRunDecision`과 `IsWaitingForArtifactSelection`으로 구분한다.
+- Inspector의 Auto Continue 또는 `AutoContinue` 프로퍼티는 종료 선택창만 생략한다.
+  유물 선택 대기는 유지하며 설정 영구 저장은 미연동이다.
 
 ### 팀원 코드가 들어갈 위치
 
-`CompleteWave()`에서 **`WaitToggle` 호출을 보상 절차의 완료를 기다리는 코드로 교체**한다.
-그 뒤, 다음 웨이브 진행 또는 최종 종료를 결정하기 전에 필요한 유닛 정리를 연결한다.
-
-1. 코어가 보상 시스템의 메서드를 호출해 이번 웨이브의 보상 절차를 시작한다.
-2. UI 담당은 아이템 선택·포기 입력을 보상 시스템의 메서드에 전달한다.
-3. 재희 담당 보상 시스템은 선택한 보상을 적용하거나 포기를 처리한다.
-4. 실제 처리가 끝나면 UniTask를 완료하거나 합의한 완료 콜백·이벤트를 전달한다.
-5. 코어가 보상 완료를 확인하고, 원준 담당 유닛 정리 메서드를 호출한다. 정리가 비동기라면 완료까지 기다린다.
-6. 코어가 다음 상태로 변경한다.
-
-UI의 버튼 클릭만으로 코어의 보상 대기를 끝내지 않는다. **선택 결과가 실제로 적용된 시점**이 보상 완료다.
-포기도 정상적인 선택 종료이므로 완료를 전달하고, 리셋은 취소로 구분한다.
-현재 테스트는 ChooseResult 버튼으로 보상 대기를 완료한다. 일반 웨이브는 다음 번호의 Preparation으로 복귀하고, 마지막 웨이브는 번호를 증가시키지 않고 Finished로 전환한다.
+- `BattleResolving` 진입 시 유닛의 공격·이동·피해 처리를 중단한다. 현재는 코어의 결과 입력만 차단하며 실제 유닛 동작은 미연동이다.
+- `PlayBattleResultAsync`는 현재 `TestWaitingScript.WaitForSeconds(StagingTime, token)`으로 연출 시간을 기다린다.
+  실제 연출·통계창의 완료 신호를 기다리도록 교체한다.
+- `ResolveBattleCoreAsync`의 `WaitToggle` 호출을 보상 또는 유물 선택·적용 완료 대기로 교체한다.
+  버튼 클릭이 아니라 실제 적용 완료가 다음 단계의 기준이다.
+- `CleanupBattleAsync`는 현재 TestSpawner의 생존 수만 0으로 만든다.
+  실제 스포너의 유닛 제거·풀 반환이 끝날 때까지 기다리는 구현으로 교체한다.
+- 코어 하단의 `ShowContinueConfirmationAsync`와 `SelectAndApplyAsync`는 담당자에게 요청할 임시 메서드이며 현재 진행 흐름에서는 호출하지 않는다. 실제 구현을 연결할 때 기존 이벤트/버튼 대기 부분을 해당 비동기 호출로 교체한다. 종료 확인의 true는 계속, false는 승리 종료이고 취소는 선택 결과와 별도로 전달한다.
+- 종료·계속 어느 경로에서도 정리가 완료된 뒤 Finished 또는 다음 Preparation으로 이동한다.
+- 모든 대기에 동일한 실행의 취소 토큰을 전달한다. 리셋은 선택 결과가 아닌 취소이며,
+  취소된 이전 작업은 새 판의 상태·잠금·선택 대기 상태를 변경하지 않는다.
+  실제 생성물의 리셋 정리는 유닛 시스템 연결 시 함께 구현해야 한다.
 
 ## 6. 상태 표시와 건설 입력
 
 UI는 `CurPhase`로 최초 상태를 표시하고 `PhaseChanged` 이벤트로 이후 표시를 갱신한다.
-WaveText의 `TestWaveViewer`는 `WaveChanged`와 `PhaseChanged`를 구독해 현재 웨이브 번호를 표시하며, Finished에서는 `gameFinished`를 표시한다. 리셋하면 다시 1웨이브를 표시한다.
+WaveText의 `TestWaveViewer`는 `WaveChanged`와 `PhaseChanged`를 구독해 현재 분기와 웨이브 번호를 표시하며, Finished에서는 `gameFinished`를 표시한다. 리셋하면 다시 1웨이브를 표시한다.
+WaveSOText는 선택된 프리셋의 전투 타입·팩션·이름을 표시한다. 한글 표시는 `Assets/TextMesh Pro/Fonts/Pretendard`의 Dynamic TMP 폰트를 사용하며 원본 OTF도 함께 유지한다.
+
+`TestWaveCatalog`에는 4팩션별 5개씩 총 20개 프리셋이 등록돼 있다. 각 팩션은 일반 2개·정예 2개·보스 1개이며, 매 분기의 1/2/3웨이브에서 일반/정예/보스 타입 후보를 선택한다. 선택은 시작·리셋·진행·테스트 바로가기 시 갱신하고 보상 대기 중에는 유지한다. 카탈로그 참조나 후보가 없으면 오류를 표시하고 전투 시작을 막는다.
+비정규군은 1~3분기, 정규군은 2~5분기, 정예군은 3~5분기, 성전군은 4~5분기에 등장한다. 6분기 이후는 테스트용으로 5분기 출현 규칙을 재사용한다. 몬스터 ID는 비어 있으며 실제 편성 계산·유닛 스폰은 아직 연결하지 않았다.
+
 다음은 GameFlowController 참조가 준비된 UI 컴포넌트 내부의 연결 예시다.
 
 ```csharp
