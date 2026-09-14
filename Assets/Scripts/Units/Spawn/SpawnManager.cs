@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -48,7 +48,10 @@ namespace Units
 
         [SerializeField]
         private Vector2 _rallySectorSize =
-            new Vector2(5f, 10f);
+            new Vector2(
+                5f,
+                10f
+            );
 
         [SerializeField]
         private float _rallyFormationSpacing =
@@ -98,13 +101,13 @@ namespace Units
         // SpawnManager가 실제 Dictionary 원본을 소유한다.
         // ============================================================
 
-        private readonly Dictionary<AllyUnitType, GameObject>
-            _allyUnitPrefabs =
-                new Dictionary<AllyUnitType, GameObject>();
+        private readonly Dictionary<AllyUnitType, AllySpawnEntry>
+            _allySpawnEntries =
+                new Dictionary<AllyUnitType, AllySpawnEntry>();
 
-        private readonly Dictionary<EnemyUnitType, GameObject>
-            _enemyUnitPrefabs =
-                new Dictionary<EnemyUnitType, GameObject>();
+        private readonly Dictionary<EnemyUnitType, EnemySpawnEntry>
+            _enemySpawnEntries =
+                new Dictionary<EnemyUnitType, EnemySpawnEntry>();
 
 
         // ============================================================
@@ -172,8 +175,8 @@ namespace Units
                 new UnitPrefabMapper(
                     _allyUnitDatabase,
                     _enemyUnitDatabase,
-                    _allyUnitPrefabs,
-                    _enemyUnitPrefabs
+                    _allySpawnEntries,
+                    _enemySpawnEntries
                 );
 
 
@@ -208,7 +211,7 @@ namespace Units
                 new AllyGroupSpawner(
                     _runtimeUnitManager,
                     _unitStatModifierManager,
-                    _allyUnitPrefabs,
+                    _allySpawnEntries,
                     _groupPrefab,
                     _allyRallyGridAllocator,
                     _groupSpawnDuration
@@ -219,7 +222,7 @@ namespace Units
                 new EnemyWaveSpawner(
                     _runtimeUnitManager,
                     _unitStatModifierManager,
-                    _enemyUnitPrefabs,
+                    _enemySpawnEntries,
                     _groupPrefab,
                     _enemySpawnPoints,
                     _enemyRallyGridAllocator,
@@ -232,14 +235,41 @@ namespace Units
         // Prefab
         // ============================================================
 
+        public bool TryGetAllySpawnEntry(
+            AllyUnitType unitType,
+            out AllySpawnEntry entry)
+        {
+            return _allySpawnEntries.TryGetValue(
+                unitType,
+                out entry
+            );
+        }
+
+        public bool TryGetEnemySpawnEntry(
+            EnemyUnitType unitType,
+            out EnemySpawnEntry entry)
+        {
+            return _enemySpawnEntries.TryGetValue(
+                unitType,
+                out entry
+            );
+        }
+
         public bool TryGetAllyPrefab(
             AllyUnitType unitType,
             out GameObject prefab)
         {
-            return _allyUnitPrefabs.TryGetValue(
+            prefab = null;
+
+            if (!_allySpawnEntries.TryGetValue(
                 unitType,
-                out prefab
-            );
+                out var entry
+            ))
+                return false;
+
+            prefab = entry.Prefab;
+
+            return true;
         }
 
 
@@ -247,10 +277,17 @@ namespace Units
             EnemyUnitType unitType,
             out GameObject prefab)
         {
-            return _enemyUnitPrefabs.TryGetValue(
+            prefab = null;
+
+            if (!_enemySpawnEntries.TryGetValue(
                 unitType,
-                out prefab
-            );
+                out var entry
+            ))
+                return false;
+
+            prefab = entry.Prefab;
+
+            return true;
         }
 
 

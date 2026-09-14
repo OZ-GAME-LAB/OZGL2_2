@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 using System;
@@ -22,6 +22,13 @@ namespace Units
         // ============================================================
 
         private readonly BasicAttackData _data;
+
+
+        // ============================================================
+        // Runtime State
+        // ============================================================
+
+        private int _executionId;
 
 
         // ============================================================
@@ -65,43 +72,33 @@ namespace Units
             ICombatTarget target,
             Action onCompleted)
         {
-            if (_core == null)
-                return;
-
-            if (_data == null)
-                return;
-
-            if (target == null)
-                return;
-
-            if (!target.IsTargetable)
-                return;
-
-
-            switch (_data.ExecutionType)
+            int executionId = ++_executionId;
+            try
             {
-                case BasicAttackExecutionType.Direct:
+                if (_core == null || _core.RuntimeStatus == null || _data == null
+                    || !CombatTargetUtility.IsValid(target)) return;
 
-                    ExecuteDirect(
-                        target
-                    );
-
-                    break;
-
-
-                case BasicAttackExecutionType.Projectile:
-
-                    ExecuteProjectile(
-                        target
-                    );
-
-                    break;
+                switch (_data.ExecutionType)
+                {
+                    case BasicAttackExecutionType.Direct:
+                        ExecuteDirect(target);
+                        break;
+                    case BasicAttackExecutionType.Projectile:
+                        ExecuteProjectile(target);
+                        break;
+                }
             }
-
-
-            onCompleted?.Invoke();
+            finally
+            {
+                // 공격 행동은 투사체 명중을 기다리지 않고 발사 직후 완료한다.
+                if (executionId == _executionId) onCompleted?.Invoke();
+            }
         }
 
+        public void Cancel()
+        {
+            _executionId++;
+        }
 
         // ============================================================
         // Direct
@@ -197,7 +194,7 @@ namespace Units
                     Vector2.zero,
                     _data.AreaRadius,
                     0f,
-                    _data.MaxTargetCount,
+                    _data.MaxDamageableCount,
                     HitAreaType.Circle
                 );
 
@@ -241,7 +238,7 @@ namespace Units
                     Vector2.zero,
                     _data.AreaRadius,
                     0f,
-                    _data.MaxTargetCount,
+                    _data.MaxDamageableCount,
                     HitAreaType.Circle
                 );
 
@@ -293,7 +290,7 @@ namespace Units
                     direction,
                     _data.AreaRadius,
                     _data.AreaAngle,
-                    _data.MaxTargetCount,
+                    _data.MaxDamageableCount,
                     HitAreaType.Cone
                 );
 
@@ -324,9 +321,54 @@ namespace Units
         private void ExecuteProjectile(
             ICombatTarget target)
         {
-            float projectileSpeed =
-                _data.ProjectileSpeed;
+            if (_hitTargetResolver == null)
+                return;
 
+
+            ProjectileImpactType impactType =
+                _data.AreaType == BasicAttackAreaType.Single
+                    ? ProjectileImpactType.Single
+                    : _data.AreaType == BasicAttackAreaType.SelfCone
+                        ? ProjectileImpactType.Cone
+                        : ProjectileImpactType.Circle;
+
+            // Projectile의 SelfCircle / SelfCone도 충돌 위치에서 범위를 판정한다.
+
+            Vector2 origin =
+                _core.transform.position;
+
+            IReadOnlyList<ICombatTarget> targets =
+                _hitTargetResolver.ResolveAttackTargets(
+                    origin,
+                    _data.BasicAttackRange,
+                    _data.MaxTargetCount,
+                    target
+                );
+
+
+            // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
+            for (int i = 0; i < targets.Count; i++)
+            {
+                ProjectileRequest request =
+                    new ProjectileRequest(
+                        _core,
+                        targets[i],
+                        origin,
+                        _data.ProjectileSpeed,
+                        impactType,
+                        _data.AreaRadius,
+                        _data.AreaAngle,
+                        impactType == ProjectileImpactType.Single ? 1 : _data.MaxDamageableCount,
+                        DamageSourceType.BasicAttack,
+                        _core.RuntimeStatus.BasicAttackMultiplier
+                    );
+
+                ProjectileManager.GetOrCreate().Fire(
+                    request
+                );
+            }
+
+            // 아래 기존 TODO의 대상 수는 이제 MaxDamageableCount로 전달한다.
 
             // TODO:
             // Projectile Manager 구현 후 실행 요청

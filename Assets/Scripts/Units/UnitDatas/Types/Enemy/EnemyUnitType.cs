@@ -7,7 +7,11 @@ namespace Units
     {
         Default = 0,
 
-        Angel = 1,
-        Dragoon = 2
+        HolyKnight = 1,
+        Inquisitor = 2,
+        Valkyrie = 3,
+        Angel = 4,
+        Cleric = 5,
+        Dragoon = 6
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 using System;
@@ -26,6 +26,37 @@ namespace Units
 
 
         // ============================================================
+        // Action Controllers
+        // ============================================================
+
+        private readonly CastController _castController = new CastController();
+
+        private readonly DashController _dashController;
+
+
+        // ============================================================
+        // Runtime State
+        // ============================================================
+
+        private Action _onCompleted;
+
+        private ICombatTarget _target;
+
+        private int _executionId;
+
+        private bool _isExecuting;
+
+
+        // ============================================================
+        // Properties
+        // ============================================================
+
+        public bool IsCasting => _castController.IsCasting;
+
+        public bool IsDashing => _dashController.IsDashing;
+
+
+        // ============================================================
         // Runtime Buffer
         // ============================================================
 
@@ -43,6 +74,7 @@ namespace Units
         {
             _core =
                 core;
+            _dashController = new DashController(core);
 
             _data =
                 data;
@@ -66,28 +98,21 @@ namespace Units
             ICombatTarget target,
             Action onCompleted)
         {
-            if (_core == null)
+            Cancel();
+            if (_core == null || _core.RuntimeStatus == null || _data == null
+                || !CombatTargetUtility.IsValid(target))
+            {
+                onCompleted?.Invoke();
                 return;
-
-            if (_data == null)
-                return;
-
-            if (target == null)
-                return;
-
-            if (!target.IsTargetable)
-                return;
-
-
+            }
+            _target = target;
+            _onCompleted = onCompleted;
+            _isExecuting = true;
             switch (_data.ActionType)
             {
                 case ActiveSkillActionType.Instant:
 
-                    ExecuteAttack(
-                        target
-                    );
-
-                    onCompleted?.Invoke();
+                    FinishAttack(target);
 
                     break;
 
@@ -103,7 +128,7 @@ namespace Units
                     // ExecuteAttack(target)
                     // onCompleted.Invoke()
 
-                    onCompleted?.Invoke();
+                    // 실제 Action 완료 Callback에서 공격 실행 및 완료를 처리한다.
 
                     break;
 
@@ -119,8 +144,11 @@ namespace Units
                     // ExecuteAttack(target)
                     // onCompleted.Invoke()
 
-                    onCompleted?.Invoke();
+                    // 실제 Action 완료 Callback에서 공격 실행 및 완료를 처리한다.
 
+                    break;
+                default:
+                    CompleteExecution();
                     break;
             }
         }
@@ -130,6 +158,86 @@ namespace Units
         // Action
         // ============================================================
 
+        public void Tick(
+            float deltaTime)
+        {
+            if (ValidateExecution())
+                _castController.Tick(deltaTime);
+        }
+
+        public void FixedTick(
+            float deltaTime)
+        {
+            if (ValidateExecution())
+                _dashController.FixedTick(deltaTime);
+        }
+
+        public void Cancel()
+        {
+            _executionId++;
+
+            _isExecuting = false;
+
+            _onCompleted = null;
+
+            _target = null;
+
+            _castController.Cancel();
+
+            _dashController.Cancel();
+        }
+
+        private bool ValidateExecution()
+        {
+            if (!_isExecuting)
+                return false;
+
+            if (_core == null || !_core.isActiveAndEnabled || !_core.IsAlive)
+            {
+                CompleteExecution();
+
+                return false;
+            }
+
+            if (!CombatTargetUtility.IsValid(_target))
+            {
+                // Target이 무효화되면 지연 공격 없이 현재 행동을 완료한다.
+                CompleteExecution();
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private void FinishAttack(
+            ICombatTarget target)
+        {
+            if (!_isExecuting)
+                return;
+
+            int executionId = _executionId;
+
+            try
+            {
+                if (_core != null && _core.IsAlive && CombatTargetUtility.IsValid(target))
+                    ExecuteAttack(target);
+            }
+            finally
+            {
+                if (executionId == _executionId)
+                    CompleteExecution();
+            }
+        }
+
+        private void CompleteExecution()
+        {
+            var callback = _onCompleted;
+
+            Cancel();
+
+            callback?.Invoke();
+        }
         private void ExecuteCast(
             ICombatTarget target)
         {
@@ -143,6 +251,13 @@ namespace Units
             float finalCastTime =
                 _data.CastTime
                 / attackSpeed;
+            _core.StopMovement();
+            int executionId = _executionId;
+            _castController.StartCast(finalCastTime, () =>
+            {
+                if (executionId == _executionId) FinishAttack(target);
+            });
+            // 구현 완료: 아래 기존 TODO의 Cast 완료 후 공격 순서를 연결했다.
 
 
             // TODO:
@@ -161,6 +276,12 @@ namespace Units
 
             float dashSpeed =
                 _data.DashSpeed;
+            int executionId = _executionId;
+            _dashController.StartDash(target, dashDistance, dashSpeed, () =>
+            {
+                if (executionId == _executionId) FinishAttack(target);
+            });
+            // 구현 완료: 일반 이동과 분리된 Dash를 사용하며 MovementCompleted는 발생시키지 않는다.
 
 
             // TODO:
@@ -189,7 +310,8 @@ namespace Units
                     break;
 
 
-                case ActiveSkillAttackType.Projectile:
+                case ActiveSkillAttackType.ProjectileSingle:
+                case ActiveSkillAttackType.ProjectileArea:
 
                     ExecuteProjectile(
                         target
@@ -251,9 +373,52 @@ namespace Units
         private void ExecuteProjectile(
             ICombatTarget target)
         {
-            float projectileSpeed =
-                _data.ProjectileSpeed;
+            if (_hitTargetResolver == null)
+                return;
 
+
+            ProjectileImpactType impactType =
+                _data.AttackType == ActiveSkillAttackType.ProjectileArea
+                    ? ProjectileImpactType.Circle
+                    : ProjectileImpactType.Single;
+
+            // 범위 여부는 AttackType으로 구분하며, 반지름으로 추론하지 않는다.
+
+            Vector2 origin =
+                _core.transform.position;
+
+            IReadOnlyList<ICombatTarget> targets =
+                _hitTargetResolver.ResolveAttackTargets(
+                    origin,
+                    _data.SkillRange,
+                    _data.MaxTargetCount,
+                    target
+                );
+
+
+            // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
+            for (int i = 0; i < targets.Count; i++)
+            {
+                ProjectileRequest request =
+                    new ProjectileRequest(
+                        _core,
+                        targets[i],
+                        origin,
+                        _data.ProjectileSpeed,
+                        impactType,
+                        _data.AreaRadius,
+                        _data.AreaAngle,
+                        impactType == ProjectileImpactType.Single ? 1 : _data.MaxDamageableCount,
+                        DamageSourceType.Skill,
+                        _core.RuntimeStatus.SkillDamageMultiplier
+                    );
+
+                ProjectileManager.GetOrCreate().Fire(
+                    request
+                );
+            }
+
+            // 아래 기존 TODO의 대상 수는 이제 MaxDamageableCount로 전달한다.
 
             // TODO:
             // Projectile Manager 구현 후 실행 요청
@@ -298,7 +463,7 @@ namespace Units
                     Vector2.zero,
                     _data.AreaRadius,
                     0f,
-                    _data.MaxTargetCount,
+                    _data.MaxDamageableCount,
                     HitAreaType.Circle
                 );
 
@@ -342,7 +507,7 @@ namespace Units
                     Vector2.zero,
                     _data.AreaRadius,
                     0f,
-                    _data.MaxTargetCount,
+                    _data.MaxDamageableCount,
                     HitAreaType.Circle
                 );
 

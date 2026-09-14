@@ -49,7 +49,13 @@ namespace Units.Skills
             BasicAttackAreaType.Single;
 
         [SerializeField]
+        [Tooltip("Projectile을 발사할 최대 목표 수")]
         private int _maxTargetCount = 1;
+
+
+        [SerializeField]
+        [Tooltip("광역 판정 1회에 피해를 적용할 최대 인원")]
+        private int _maxDamageableCount = 1;
 
 
         // ============================================================
@@ -106,6 +112,12 @@ namespace Units.Skills
         public BasicAttackAreaType AreaType =>
             _areaType;
 
+        // 광역 판정 1회에 피해를 적용할 최대 인원이다.
+        public int MaxDamageableCount =>
+            _maxDamageableCount;
+
+
+        // Projectile을 발사할 최대 목표 수이다.
         public int MaxTargetCount =>
             _maxTargetCount;
 
@@ -133,6 +145,10 @@ namespace Units.Skills
 #if UNITY_EDITOR
         private void OnValidate()
         {
+            _maxDamageableCount =
+                Mathf.Max(1, _maxDamageableCount);
+
+
             _basicAttackRange =
                 Mathf.Max(0f, _basicAttackRange);
 
