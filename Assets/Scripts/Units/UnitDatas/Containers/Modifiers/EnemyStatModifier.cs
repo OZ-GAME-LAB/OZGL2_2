@@ -1,4 +1,4 @@
-﻿
+
 
 
 namespace Units
@@ -16,6 +16,8 @@ namespace Units
         public EnemyUnitClass TargetClass { get; }
 
         public EnemyUnitType TargetUnitType { get; }
+
+        public EnemyUnitFaction TargetFaction { get; }
 
         public UnitStatType StatType { get; }
 
@@ -35,7 +37,8 @@ namespace Units
             EnemyUnitType targetUnitType,
             UnitStatType statType,
             UnitStatModifierType modifierType,
-            float value)
+            float value,
+            EnemyUnitFaction targetFaction = default)
         {
             Source = source;
 
@@ -50,6 +53,7 @@ namespace Units
             ModifierType = modifierType;
 
             Value = value;
+            TargetFaction = targetFaction;
         }
     }
 }

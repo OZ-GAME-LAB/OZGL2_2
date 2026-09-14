@@ -89,6 +89,11 @@ namespace Units.UnitDatas
         // Public Methods - Identity
         // ============================================================
 
+        public AllyUnitTier GetAllyTier()
+        {
+            return _allyIdentity.UnitTier;
+        }
+
         public AllyUnitClass GetAllyClass()
         {
             return _allyIdentity.UnitClass;
@@ -100,6 +105,11 @@ namespace Units.UnitDatas
             return _allyIdentity.UnitType;
         }
 
+
+        public EnemyUnitFaction GetEnemyFaction()
+        {
+            return _enemyIdentity.UnitFaction;
+        }
 
         public EnemyUnitClass GetEnemyClass()
         {
@@ -148,12 +158,18 @@ namespace Units.UnitDatas
         private AllyUnitClass _unitClass;
 
         [SerializeField]
+        private AllyUnitTier _unitTier;
+
+        [SerializeField]
         private AllyUnitType _unitType;
 
 
         // ============================================================
         // Properties
         // ============================================================
+
+        public AllyUnitTier UnitTier =>
+            _unitTier;
 
         public AllyUnitClass UnitClass =>
             _unitClass;
@@ -178,12 +194,18 @@ namespace Units.UnitDatas
         private EnemyUnitClass _unitClass;
 
         [SerializeField]
+        private EnemyUnitFaction _unitFaction;
+
+        [SerializeField]
         private EnemyUnitType _unitType;
 
 
         // ============================================================
         // Properties
         // ============================================================
+
+        public EnemyUnitFaction UnitFaction =>
+            _unitFaction;
 
         public EnemyUnitClass UnitClass =>
             _unitClass;

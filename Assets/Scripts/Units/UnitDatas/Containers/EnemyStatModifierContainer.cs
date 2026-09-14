@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace Units
@@ -26,6 +26,25 @@ namespace Units
         // ============================================================
         // Public Methods
         // ============================================================
+
+        private readonly Dictionary<EnemyUnitFaction, List<EnemyStatModifier>> _factionModifiers = new();
+
+        public void AddToFaction(EnemyUnitFaction unitFaction, EnemyStatModifier modifier)
+        {
+            if (!_factionModifiers.TryGetValue(unitFaction, out var modifiers))
+            {
+                modifiers = new List<EnemyStatModifier>();
+                _factionModifiers.Add(unitFaction, modifiers);
+            }
+            modifiers.Add(modifier);
+        }
+
+        public IReadOnlyList<EnemyStatModifier> GetFromFactionModifiers(EnemyUnitFaction unitFaction)
+        {
+            if (_factionModifiers.TryGetValue(unitFaction, out var modifiers))
+                return modifiers;
+            return System.Array.Empty<EnemyStatModifier>();
+        }
 
         public void AddToAll(
             EnemyStatModifier modifier)
@@ -113,6 +132,9 @@ namespace Units
         public void RemoveBySource(
             object source)
         {
+            foreach (var modifiers in _factionModifiers.Values)
+                modifiers.RemoveAll(modifier => Equals(modifier.Source, source));
+
             _allModifiers.RemoveAll(
                 modifier =>
                     Equals(

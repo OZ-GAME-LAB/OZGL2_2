@@ -1,4 +1,4 @@
-﻿
+
 
 
 namespace Units
@@ -12,6 +12,8 @@ namespace Units
         public AllyUnitClass TargetClass { get; }
 
         public AllyUnitType TargetUnitType { get; }
+
+        public AllyUnitTier TargetTier { get; }
 
         public UnitStatType StatType { get; }
 
@@ -27,7 +29,8 @@ namespace Units
             AllyUnitType targetUnitType,
             UnitStatType statType,
             UnitStatModifierType modifierType,
-            float value)
+            float value,
+            AllyUnitTier targetTier = default)
         {
             Source = source;
             ApplyType = applyType;
@@ -36,6 +39,7 @@ namespace Units
             StatType = statType;
             ModifierType = modifierType;
             Value = value;
+            TargetTier = targetTier;
         }
     }
 }

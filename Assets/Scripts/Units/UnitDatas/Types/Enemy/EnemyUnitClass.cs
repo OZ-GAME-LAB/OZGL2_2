@@ -7,6 +7,12 @@ namespace Units
     {
         Default = 0,
 
-        // 적 분류
+        // Classes
+        Tanker,
+        Bruiser,
+        Assassin,
+        RangedPhysical,
+        RangedMagic,
+        Supporter
     }
 }

@@ -38,6 +38,10 @@ namespace Units
         {
             switch (modifier.ApplyType)
             {
+                case UnitModifierApplyType.Tier:
+                    _allyContainer.AddToTier(modifier.TargetTier, modifier);
+                    break;
+
                 case UnitModifierApplyType.All:
                     _allyContainer.AddToAll(
                         modifier
@@ -66,6 +70,10 @@ namespace Units
         {
             switch (modifier.ApplyType)
             {
+                case UnitModifierApplyType.Faction:
+                    _enemyContainer.AddToFaction(modifier.TargetFaction, modifier);
+                    break;
+
                 case UnitModifierApplyType.All:
                     _enemyContainer.AddToAll(
                         modifier
