@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Core;
+using TMPro;
 using UnityEngine;
 
 namespace Game.UI
@@ -14,6 +15,7 @@ namespace Game.UI
         [SerializeField] private GameUIController _ui;
         [SerializeField] private GameFlowController _flow;
         [SerializeField] private WaveController _waves;
+        [SerializeField] private TMP_Text _quarterText;
 
         private CancellationTokenSource _bindingLifetime;
         private bool _isSubscribed;
@@ -49,11 +51,14 @@ namespace Game.UI
             {
                 _ui.SetPhaseLabel("연결 대기");
                 _ui.ClearWaveProgress();
+                SetQuarterLabel("분기 -- · 웨이브");
                 _ui.SetWaveStartInteractable(false);
                 return;
             }
 
             _ui.SetPhaseLabel(GetPhaseLabel(_flow.CurPhase));
+            SetQuarterLabel(_flow.CurPhase != GamePhase.None && _waves.CurQuarter >= 1
+                ? $"분기 {_waves.CurQuarter} · 웨이브" : "분기 -- · 웨이브");
             if (_flow.CurPhase != GamePhase.None && _waves.CurWave >= 1 &&
                 _waves.CurWave <= WaveController.MAX_WAVE)
                 _ui.SetWaveProgress(_waves.CurWave, WaveController.MAX_WAVE);
@@ -63,7 +68,7 @@ namespace Game.UI
             // PhaseChanged는 코어의 전환 잠금 해제 전 발생한다. 여기서는 단계만 표시하고
             // 실제 실행 조건은 클릭 시 TryStartWave가 다시 검사한다.
             _ui.SetWaveStartInteractable(_isSubscribed && !_isStartPending &&
-                _flow.CurPhase == GamePhase.Preparation);
+                _flow.CurPhase == GamePhase.Preparation && _waves.CurrentPreset != null);
         }
 
         private void HandlePhaseChanged(GamePhase phase)
@@ -176,10 +181,17 @@ namespace Game.UI
                 case GamePhase.Preparation: return "건설";
                 case GamePhase.BattlePreparing: return "전투 준비";
                 case GamePhase.Battle: return "전투";
+                case GamePhase.BattleResolving: return "전투 정산";
+                case GamePhase.QuarterComplete: return "분기 완료";
                 case GamePhase.Reward: return "보상";
                 case GamePhase.Finished: return "결과";
                 default: return "연결 대기";
             }
+        }
+
+        private void SetQuarterLabel(string text)
+        {
+            if (_quarterText != null && _quarterText.text != text) _quarterText.text = text;
         }
     }
 }

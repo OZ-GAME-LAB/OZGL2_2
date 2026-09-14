@@ -18,6 +18,11 @@ namespace Game.UI.Editor
         private const string ActiveKey = "Game.UI.RuntimeValidation.Active";
         private const string ResultKey = "Game.UI.RuntimeValidation.Result";
         private const string PreviousSceneKey = "Game.UI.RuntimeValidation.PreviousScene";
+        private const string SelectionKey = "Game.UI.RuntimeValidation.UnitSelection";
+        private const string CountKey = "Game.UI.RuntimeValidation.UnitCount";
+        private const string ArtifactKey = "Game.UI.RuntimeValidation.ArtifactReward";
+        private const string BuildingPhaseKey = "Game.UI.RuntimeValidation.BuildingPhase";
+        private const string LifecycleErrorKey = "Game.UI.RuntimeValidation.LifecycleError";
         private static int _checks;
         private static int _errors;
         private static bool _isQueued;
@@ -39,6 +44,7 @@ namespace Game.UI.Editor
         static MvpRuntimeHudValidation()
         {
             EditorApplication.playModeStateChanged += HandlePlayModeStateChanged;
+            Application.logMessageReceived += HandleValidationLifecycleLog;
         }
 
         [MenuItem("Game/UI/Validate Runtime HUD In Play Mode")]
@@ -46,8 +52,64 @@ namespace Game.UI.Editor
         {
             if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
             EnsureReady();
+            SessionState.SetBool(SelectionKey, false);
+            SessionState.SetBool(BuildingPhaseKey, false);
+            SessionState.SetBool(CountKey, false);
+            SessionState.SetBool(ArtifactKey, false);
             // Let Editor startup callbacks create their resources before requesting Play.
             // Search's first-use index creation is skipped once Play is already pending.
+            _isQueued = true;
+            EditorApplication.delayCall += BeginValidation;
+        }
+
+        [MenuItem("Game/UI/Validate Runtime Unit Selection In Play Mode")]
+        public static void RunUnitSelection()
+        {
+            if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
+            EnsureReady();
+            SessionState.SetBool(BuildingPhaseKey, false);
+            SessionState.SetBool(SelectionKey, true);
+            SessionState.SetBool(CountKey, false);
+            SessionState.SetBool(ArtifactKey, false);
+            _isQueued = true;
+            EditorApplication.delayCall += BeginValidation;
+        }
+
+        [MenuItem("Game/UI/Validate Runtime Unit Counts In Play Mode")]
+        public static void RunUnitCounts()
+        {
+            if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
+            EnsureReady();
+            SessionState.SetBool(BuildingPhaseKey, false);
+            SessionState.SetBool(SelectionKey, true);
+            SessionState.SetBool(CountKey, true);
+            SessionState.SetBool(ArtifactKey, false);
+            _isQueued = true;
+            EditorApplication.delayCall += BeginValidation;
+        }
+
+        [MenuItem("Game/UI/Validate Artifact Reward In Play Mode")]
+        public static void RunArtifacts()
+        {
+            if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
+            EnsureReady();
+            SessionState.SetBool(BuildingPhaseKey, false);
+            SessionState.SetBool(SelectionKey, true);
+            SessionState.SetBool(CountKey, false);
+            SessionState.SetBool(ArtifactKey, true);
+            _isQueued = true;
+            EditorApplication.delayCall += BeginValidation;
+        }
+
+        [MenuItem("Game/UI/Validate Building Phase In Play Mode")]
+        public static void RunBuildingPhase()
+        {
+            if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
+            EnsureReady();
+            SessionState.SetBool(SelectionKey, true);
+            SessionState.SetBool(CountKey, false);
+            SessionState.SetBool(ArtifactKey, false);
+            SessionState.SetBool(BuildingPhaseKey, true);
             _isQueued = true;
             EditorApplication.delayCall += BeginValidation;
         }
@@ -61,9 +123,33 @@ namespace Game.UI.Editor
                 EnsureReady();
                 SaveSceneSetup();
                 savedSetup = true;
-                MvpRuntimeHudBuilder.Build();
-                EditorSceneManager.OpenScene(MvpRuntimeHudBuilder.ScenePath, OpenSceneMode.Single);
+                if (SessionState.GetBool(BuildingPhaseKey, false))
+                {
+                    MvpBuildingPhaseBuilder.Build();
+                    EditorSceneManager.OpenScene(MvpBuildingPhaseBuilder.ScenePath, OpenSceneMode.Single);
+                }
+                else if (SessionState.GetBool(ArtifactKey, false))
+                {
+                    MvpArtifactRewardBuilder.Build();
+                    EditorSceneManager.OpenScene(MvpArtifactRewardBuilder.ScenePath, OpenSceneMode.Single);
+                }
+                else if (SessionState.GetBool(CountKey, false))
+                {
+                    MvpRuntimeUnitCountBuilder.Build();
+                    EditorSceneManager.OpenScene(MvpRuntimeUnitCountBuilder.ScenePath, OpenSceneMode.Single);
+                }
+                else if (SessionState.GetBool(SelectionKey, false))
+                {
+                    MvpRuntimeUnitSelectionBuilder.Build();
+                    EditorSceneManager.OpenScene(MvpRuntimeUnitSelectionBuilder.ScenePath, OpenSceneMode.Single);
+                }
+                else
+                {
+                    MvpRuntimeHudBuilder.Build();
+                    EditorSceneManager.OpenScene(MvpRuntimeHudBuilder.ScenePath, OpenSceneMode.Single);
+                }
                 SessionState.SetInt(ResultKey, 1);
+                SessionState.SetBool(LifecycleErrorKey, false);
                 SessionState.SetBool(ActiveKey, true);
                 EditorApplication.isPlaying = true;
             }
@@ -97,13 +183,25 @@ namespace Game.UI.Editor
         private static void HandlePlayModeStateChanged(PlayModeStateChange state)
         {
             if (!SessionState.GetBool(ActiveKey, false)) return;
-            if (state == PlayModeStateChange.EnteredPlayMode) RunChecksAsync().Forget();
+            if (state == PlayModeStateChange.EnteredPlayMode)
+            {
+                if (SessionState.GetBool(SelectionKey, false)) RunSelectionChecksAsync().Forget();
+                else RunChecksAsync().Forget();
+            }
             if (state != PlayModeStateChange.EnteredEditMode) return;
             SessionState.SetBool(ActiveKey, false);
-            int result = SessionState.GetInt(ResultKey, 1);
+            int result = SessionState.GetBool(LifecycleErrorKey, false) ? 1 : SessionState.GetInt(ResultKey, 1);
             if (Application.isBatchMode)
                 EditorApplication.Exit(result);
             else RestoreSceneSetup();
+        }
+
+        private static void HandleValidationLifecycleLog(string message, string stackTrace, LogType type)
+        {
+            // 마지막 검사 이후 Play Mode 종료 과정의 파괴 시점 예외도 실패로 기록한다.
+            if (SessionState.GetBool(ActiveKey, false) &&
+                (type == LogType.Error || type == LogType.Exception || type == LogType.Assert))
+                SessionState.SetBool(LifecycleErrorKey, true);
         }
 
         private static async UniTask RunChecksAsync()
@@ -183,6 +281,8 @@ namespace Game.UI.Editor
                 Check(!message.activeSelf && phaseText.text == "전투", "old cancellation does not show stale message");
                 flow.PhaseChanged -= countPreparing;
                 lose.onClick.Invoke();
+                Check(flow.CurPhase == GamePhase.BattleResolving && phaseText.text == "전투 정산", "defeat waits for core staging");
+                await WaitForPhase(flow, GamePhase.Finished);
                 Check(flow.CurPhase == GamePhase.Finished && phaseText.text == "결과", "actual core defeat changes phase");
                 Check(!start.interactable && !Field<GameObject>(uiFields, "_runResultPanel").activeSelf,
                     "no guessed win/loss result when core has no result payload");
@@ -203,25 +303,57 @@ namespace Game.UI.Editor
                     await WaitForPhase(flow, GamePhase.Battle);
                     Check(phaseText.text == "전투" && !start.interactable, "wave " + wave + " battle");
                     win.onClick.Invoke();
+                    Check(flow.CurPhase == GamePhase.BattleResolving && !start.interactable, "wave " + wave + " staging locks start");
+                    await WaitForPhase(flow, GamePhase.Reward);
                     Check(flow.CurPhase == GamePhase.Reward && phaseText.text == "보상", "wave " + wave + " reward phase");
                     int beforeReward = wallet.GetBalance(CurrencyType.Gold);
                     reward.onClick.Invoke();
                     reward.onClick.Invoke();
                     Check(wallet.GetBalance(CurrencyType.Gold) == beforeReward + 30 &&
                         goldText.text == (beforeReward + 30).ToString("N0"), "wave " + wave + " test reward applied once by real manager");
-                    await WaitForPhase(flow, wave == 3 ? GamePhase.Finished : GamePhase.Preparation);
+                    await WaitForPhase(flow, GamePhase.Preparation);
                 }
-                Check(waves.CurWave == 3 && waveText.text == "3 / 3" && phaseText.text == "결과", "last wave stops at three");
+                Check(waves.CurQuarter == 2 && waves.CurWave == 1 && waveText.text == "1 / 3" && phaseText.text == "건설", "first quarter continues to next quarter");
                 Check(wallet.GetBalance(CurrencyType.Gold) == 190 && goldText.text == "190", "three actual reward transactions reflected");
                 reset.onClick.Invoke();
                 Check(waveText.text == "1 / 3" && goldText.text == "100" && start.interactable, "restart resets core/economy/view");
+                await MvpCoreQuarterValidation.RunChecksAsync();
                 // Let only the button color transition settle before visual capture.
                 await UniTask.Delay(TimeSpan.FromSeconds(0.2), DelayType.Realtime);
                 Capture(ui, sample, 1280, 720);
                 Capture(ui, sample, 1920, 1080);
+                await MvpRuntimeUnitInfoValidation.RunChecksAsync();
                 Check(_errors == 0, "no new engine errors during Play checks");
                 Debug.Log("[UI/MvpRuntimeHudValidation] PASS: " + _checks +
                     " checks in actual Play Mode. Real RunCurrencyManager/GameFlowController/WaveController; test spawner and reward inputs.");
+                SessionState.SetInt(ResultKey, 0);
+            }
+            catch (Exception exception)
+            {
+                SessionState.SetInt(ResultKey, 1);
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                Application.logMessageReceived -= HandleLog;
+                EditorApplication.isPlaying = false;
+            }
+        }
+
+        private static async UniTask RunSelectionChecksAsync()
+        {
+            _errors = 0;
+            Application.logMessageReceived += HandleLog;
+            try
+            {
+                if (SessionState.GetBool(BuildingPhaseKey, false)) await MvpBuildingPhaseValidation.RunChecksAsync();
+                else if (SessionState.GetBool(ArtifactKey, false)) await MvpArtifactRewardValidation.RunChecksAsync();
+                else
+                {
+                    await MvpRuntimeUnitSelectionValidation.RunChecksAsync();
+                    if (SessionState.GetBool(CountKey, false)) await MvpRuntimeUnitCountValidation.RunChecksAsync();
+                }
+                if (_errors != 0) throw new InvalidOperationException("Engine errors occurred during selection checks.");
                 SessionState.SetInt(ResultKey, 0);
             }
             catch (Exception exception)
@@ -305,7 +437,7 @@ namespace Game.UI.Editor
             EditorSceneManager.RestoreSceneManagerSetup(setup);
         }
 
-        private static void Capture(GameUIController ui, MvpRuntimeHudSample sample, int width, int height)
+        internal static void Capture(GameUIController ui, MvpRuntimeHudSample sample, int width, int height, string suffix = "")
         {
             if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return;
             var camera = Camera.main;
@@ -341,7 +473,7 @@ namespace Game.UI.Editor
                 pixels.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 pixels.Apply();
                 Directory.CreateDirectory("Logs/RuntimeHudValidation");
-                File.WriteAllBytes("Logs/RuntimeHudValidation/hud-" + width + "x" + height + ".png", pixels.EncodeToPNG());
+                File.WriteAllBytes("Logs/RuntimeHudValidation/hud-" + width + "x" + height + suffix + ".png", pixels.EncodeToPNG());
             }
             finally
             {

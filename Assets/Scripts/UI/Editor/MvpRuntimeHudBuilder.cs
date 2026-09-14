@@ -20,7 +20,11 @@ namespace Game.UI.Editor
         public static void Build()
         {
             if (EditorApplication.isPlaying) throw new InvalidOperationException("Exit Play Mode first.");
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) != null) return;
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) != null)
+            {
+                MvpCoreIntegrationBuilder.Upgrade();
+                return;
+            }
             var previous = SceneManager.GetActiveScene();
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
                 Application.isBatchMode ? NewSceneMode.Single : NewSceneMode.Additive);
@@ -100,6 +104,7 @@ namespace Game.UI.Editor
                     if (previous.IsValid()) SceneManager.SetActiveScene(previous);
                 }
             }
+            MvpCoreIntegrationBuilder.Upgrade();
         }
 
         private static Button MakeButton(Transform parent, string name, string label, float x, float y)

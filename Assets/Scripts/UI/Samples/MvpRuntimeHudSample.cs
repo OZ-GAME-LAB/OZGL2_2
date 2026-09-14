@@ -27,8 +27,12 @@ namespace Game.UI.Samples
         [SerializeField] private Button _loseButton;
         [SerializeField] private Button _resetButton;
         [SerializeField] private Button _toggleHudButton;
+        [SerializeField] private Button _lastWaveButton;
+        [SerializeField] private Button _lastQuarterButton;
+        [SerializeField] private CoreRunDecisionBinding _runDecisionBinding;
 
         private int _rewardedWave;
+        private int _rewardedQuarter;
 
         private void OnEnable()
         {
@@ -40,6 +44,8 @@ namespace Game.UI.Samples
             _loseButton.onClick.AddListener(HandleLose);
             _resetButton.onClick.AddListener(HandleReset);
             _toggleHudButton.onClick.AddListener(HandleToggleHud);
+            if (_lastWaveButton != null) _lastWaveButton.onClick.AddListener(HandleLastWave);
+            if (_lastQuarterButton != null) _lastQuarterButton.onClick.AddListener(HandleLastQuarter);
         }
 
         private void Start()
@@ -50,6 +56,7 @@ namespace Game.UI.Samples
             _waves.Initialize(_flow, new TestSpawner());
             _goldBinding.Initialize(_ui, _currencyManager);
             _coreBinding.Initialize(_ui, _flow, _waves);
+            if (_runDecisionBinding != null) _runDecisionBinding.Initialize(_flow, _waves);
             IsReady = _currencyManager.TryInitialize();
             _goldBinding.Refresh();
             if (!IsReady)
@@ -71,6 +78,8 @@ namespace Game.UI.Samples
             _loseButton.onClick.RemoveListener(HandleLose);
             _resetButton.onClick.RemoveListener(HandleReset);
             _toggleHudButton.onClick.RemoveListener(HandleToggleHud);
+            if (_lastWaveButton != null) _lastWaveButton.onClick.RemoveListener(HandleLastWave);
+            if (_lastQuarterButton != null) _lastQuarterButton.onClick.RemoveListener(HandleLastQuarter);
         }
 
         private void HandleAddGold()
@@ -99,13 +108,15 @@ namespace Game.UI.Samples
 
         private void HandleReward()
         {
-            if (_flow.CurPhase != GamePhase.Reward || _rewardedWave == _waves.CurWave) return;
+            if (_flow.CurPhase != GamePhase.Reward ||
+                (_rewardedQuarter == _waves.CurQuarter && _rewardedWave == _waves.CurWave)) return;
             if (!_currencyManager.TryApplyWaveReward(new CurrencyAmount(_gold, 30)))
             {
                 _statusText.text = "테스트 보상 지급 실패 / 재시도 가능";
                 return;
             }
             _rewardedWave = _waves.CurWave;
+            _rewardedQuarter = _waves.CurQuarter;
             // 테스트 보상이 실제 매니저에 반영된 뒤에만 코어의 테스트 대기를 완료한다.
             _rewardGate.ChooseResultBtn();
             _statusText.text = "테스트 보상 +30 처리 완료 / 다음 코어 상태 대기";
@@ -124,6 +135,7 @@ namespace Game.UI.Samples
             _goldBinding.Refresh();
             if (!IsReady) return;
             _rewardedWave = 0;
+            _rewardedQuarter = 0;
             _flow.ResetRun();
             _statusText.text = "실제 재화·코어 리셋 완료";
         }
@@ -133,6 +145,16 @@ namespace Game.UI.Samples
             _ui.gameObject.SetActive(!_ui.gameObject.activeSelf);
             _statusText.text = _ui.gameObject.activeSelf
                 ? "HUD 다시 표시 / 최신 잔액·단계 동기화" : "HUD 숨김 / 코어·재화는 계속 유지";
+        }
+
+        private void HandleLastWave()
+        {
+            _waves.JumpToLastWaveForTest();
+        }
+
+        private void HandleLastQuarter()
+        {
+            _waves.JumpToLastQuarterForTest();
         }
     }
 }
