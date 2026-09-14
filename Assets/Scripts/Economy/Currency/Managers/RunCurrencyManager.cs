@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Game.Core;
 using UnityEngine;
 
-public class RunCurrencyManager : MonoBehaviour
+public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunCurrencyRewards
 {
     public event Action<CurrencyData, int, int> BalanceChanged;
 
@@ -13,6 +13,7 @@ public class RunCurrencyManager : MonoBehaviour
 
     [SerializeField] private CurrencyCatalog _currencyCatalog;
     [SerializeField] private WaveRewardTable _waveRewardTable;
+    private EffectManager _effectManager;
     [SerializeField] private List<CurrencyAmount> _baseStartingCurrencies =
         new List<CurrencyAmount>();
 
@@ -166,7 +167,8 @@ public class RunCurrencyManager : MonoBehaviour
         // 보상 테이블은 중복 재화를 거부하도록 구성
         for (int i = 0; i < rewards.Count; i++)
         {
-            CurrencyAmount reward = _rewardCalculator.CalculateWaveReward(rewards[i], baseCampLevel);
+            CurrencyAmount reward = _rewardCalculator.CalculateWaveReward(rewards[i], baseCampLevel,
+                _effectManager != null ? _effectManager.CurrencyModifiers : null);
 
             if (!CanUseCurrency(reward.Currency) || reward.Currency != rewards[i].Currency ||
                 !_wallet.Balances.ContainsKey(reward.Currency) || reward.Amount < 0)
@@ -210,7 +212,8 @@ public class RunCurrencyManager : MonoBehaviour
         }
 
         CurrencyAmount calculatedReward =
-            _rewardCalculator.CalculateProductionReward(new CurrencyAmount(currency, amount));
+            _rewardCalculator.CalculateProductionReward(new CurrencyAmount(currency, amount),
+                _effectManager != null ? _effectManager.CurrencyModifiers : null);
 
         return TryAddInternal(calculatedReward);
     }
@@ -231,7 +234,8 @@ public class RunCurrencyManager : MonoBehaviour
     }
 
     // 게임 시작 시에 Run 재화 초기화
-    public void Initialize(WaveController waveController)
+    // effectManager가 null이면 효과 보정 없이 기본 보상을 사용합니다.
+    public void Initialize(WaveController waveController, EffectManager effectManager)
     {
         if (IsInitialized)
         {
@@ -285,6 +289,7 @@ public class RunCurrencyManager : MonoBehaviour
         }
 
         _waveController = waveController;
+        _effectManager = effectManager;
         _wallet = newWallet;
 
         Debug.Log(
