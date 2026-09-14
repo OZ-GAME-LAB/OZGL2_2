@@ -20,8 +20,8 @@ namespace Units
         private readonly UnitStatModifierManager
             _unitStatModifierManager;
 
-        private readonly IReadOnlyDictionary<AllyUnitType, GameObject>
-            _prefabMap;
+        private readonly IReadOnlyDictionary<AllyUnitType, AllySpawnEntry>
+            _spawnEntries;
 
         private readonly GameObject
             _groupPrefab;
@@ -45,7 +45,7 @@ namespace Units
         internal AllyGroupSpawner(
             RuntimeUnitManager runtimeUnitManager,
             UnitStatModifierManager unitStatModifierManager,
-            IReadOnlyDictionary<AllyUnitType, GameObject> prefabMap,
+            IReadOnlyDictionary<AllyUnitType, AllySpawnEntry> spawnEntries,
             GameObject groupPrefab,
             RallyGridAllocator rallyGridAllocator,
             float groupSpawnDuration)
@@ -56,8 +56,8 @@ namespace Units
             _unitStatModifierManager =
                 unitStatModifierManager;
 
-            _prefabMap =
-                prefabMap;
+            _spawnEntries =
+                spawnEntries;
 
             _groupPrefab =
                 groupPrefab;
@@ -383,9 +383,9 @@ namespace Units
             Vector2 position,
             Transform parent)
         {
-            if (!_prefabMap.TryGetValue(
+            if (!_spawnEntries.TryGetValue(
                 unitType,
-                out GameObject prefab))
+                out AllySpawnEntry entry))
             {
                 Debug.LogError(
                     $"[AllyGroupSpawner] " +
@@ -396,6 +396,8 @@ namespace Units
                 return null;
             }
 
+
+            GameObject prefab = entry.Prefab;
 
             if (prefab == null)
             {
@@ -655,7 +657,7 @@ namespace Units
             }
 
 
-            if (_prefabMap == null)
+            if (_spawnEntries == null)
             {
                 Debug.LogError(
                     "[AllyGroupSpawner] " +
@@ -700,7 +702,7 @@ namespace Units
             }
 
 
-            if (!_prefabMap.ContainsKey(
+            if (!_spawnEntries.ContainsKey(
                 unitType))
             {
                 Debug.LogError(

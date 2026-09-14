@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -29,7 +29,7 @@ namespace Units
         // Runtime Buffer
         // ============================================================
 
-        private readonly Collider2D[] _colliderBuffer;
+        private Collider2D[] _colliderBuffer;
 
         private readonly List<ICombatTarget> _targets;
 
@@ -125,6 +125,83 @@ namespace Units
 
 
         // ============================================================
+        // Projectile Target Selection
+        // ============================================================
+
+        public IReadOnlyList<ICombatTarget> ResolveAttackTargets(
+            Vector2 origin,
+            float range,
+            int maxTargetCount,
+            ICombatTarget preferredTarget)
+        {
+            Resolve(
+                new TargetHitRequest(
+                    origin,
+                    Vector2.zero,
+                    range,
+                    0f,
+                    int.MaxValue,
+                    HitAreaType.Circle
+                )
+            );
+
+            if (_core == null || range < 0f || maxTargetCount <= 0)
+            {
+                _targets.Clear();
+                return _targets;
+            }
+
+            float rangeSquared = range * range;
+
+            // Collider 일부만 사거리에 걸친 대상은 위치 기준으로 다시 검사한다.
+            _targets.RemoveAll(
+                target => !IsValidTarget(target)
+                    || ((Vector2)target.Transform.position - origin).sqrMagnitude > rangeSquared
+            );
+
+            // 현재 목표도 동일한 사거리 검사를 통과해야 우선 선택된다.
+            if (IsValidTarget(preferredTarget)
+                && ((Vector2)preferredTarget.Transform.position - origin).sqrMagnitude <= rangeSquared)
+            {
+                _targets.Remove(preferredTarget);
+                _targets.Insert(0, preferredTarget);
+            }
+
+            TrimTargetCount(maxTargetCount);
+
+            return _targets;
+        }
+
+
+        // ============================================================
+        // Physics Buffer
+        // ============================================================
+
+        private int CollectColliders(
+            Vector2 origin,
+            float radius)
+        {
+            while (true)
+            {
+                int count = Physics2D.OverlapCircle(
+                    origin,
+                    radius,
+                    _contactFilter,
+                    _colliderBuffer
+                );
+
+                if (count < _colliderBuffer.Length)
+                    return count;
+
+                // 밀집된 전장에서도 고정 버퍼 크기로 후보가 누락되지 않도록 확장한다.
+                System.Array.Resize(
+                    ref _colliderBuffer,
+                    _colliderBuffer.Length * 2
+                );
+            }
+        }
+
+        // ============================================================
         // Circle
         // ============================================================
 
@@ -132,11 +209,9 @@ namespace Units
             TargetHitRequest request)
         {
             int hitCount =
-                Physics2D.OverlapCircle(
+                CollectColliders(
                     request.Origin,
-                    request.Radius,
-                    _contactFilter,
-                    _colliderBuffer
+                    request.Radius
                 );
 
 
@@ -167,11 +242,9 @@ namespace Units
 
 
             int hitCount =
-                Physics2D.OverlapCircle(
+                CollectColliders(
                     request.Origin,
-                    request.Radius,
-                    _contactFilter,
-                    _colliderBuffer
+                    request.Radius
                 );
 
 
@@ -284,7 +357,7 @@ namespace Units
         private bool IsValidTarget(
             ICombatTarget target)
         {
-            if (target == null)
+            if (!CombatTargetUtility.IsValid(target))
                 return false;
 
 

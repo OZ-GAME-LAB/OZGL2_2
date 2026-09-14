@@ -76,6 +76,25 @@ namespace Units
 
 
         // ============================================================
+        // Ally Group 4
+        // ============================================================
+
+        [Header("Ally Group 4")]
+
+        [SerializeField]
+        private AllyUnitType _allyUnitType4;
+
+        [SerializeField]
+        private int _allyCount4 = 5;
+
+        [SerializeField]
+        private Transform _allySpawnPosition4;
+
+        [SerializeField]
+        private Vector2 _allyRallyPoint4;
+
+
+        // ============================================================
         // Enemy Groups
         // ============================================================
 
@@ -97,6 +116,13 @@ namespace Units
 
         [SerializeField]
         private EnemySpawnRequest _enemyGroup3 =
+            new EnemySpawnRequest();
+        
+
+        [Header("Enemy Group 4")]
+
+        [SerializeField]
+        private EnemySpawnRequest _enemyGroup4 =
             new EnemySpawnRequest();
 
 
@@ -194,6 +220,13 @@ namespace Units
                 _allyRallyPoint3
             );
 
+            _spawnManager.SpawnAllyGroup(
+                _allyUnitType4,
+                _allySpawnPosition4.position,
+                _allyCount4,
+                _allyRallyPoint4
+            );
+
 
             Debug.Log(
                 "[UnitSpawnTest] " +
@@ -224,7 +257,8 @@ namespace Units
                 {
                     _enemyGroup1,
                     _enemyGroup2,
-                    _enemyGroup3
+                    _enemyGroup3,
+                    _enemyGroup4
                 };
 
 
@@ -365,6 +399,14 @@ namespace Units
                 return false;
             }
 
+            if (_allySpawnPosition4 == null)
+            {
+                Debug.LogError(
+                    "[UnitSpawnTest] Ally Group 4 Spawn Position이 없습니다."
+                );
+                return false;
+            }
+
 
             if (_allyCount1 <= 0)
             {
@@ -395,6 +437,14 @@ namespace Units
                 return false;
             }
 
+            if (_allyCount4 <= 0)
+            {
+                Debug.LogError(
+                    "[UnitSpawnTest] Ally Group 4 Count가 올바르지 않습니다."
+                );
+                return false;
+            }
+
 
             if (_enemyGroup1 == null)
             {
@@ -422,6 +472,14 @@ namespace Units
                     "[UnitSpawnTest] Enemy Group 3 설정이 없습니다."
                 );
 
+                return false;
+            }
+
+            if (_enemyGroup4 == null)
+            {
+                Debug.LogError(
+                    "[UnitSpawnTest] Enemy Group 4 설정이 없습니다."
+                );
                 return false;
             }
 

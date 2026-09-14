@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.UnitDatas;
 using UnityEngine;
 
@@ -25,11 +25,11 @@ namespace Units
         // Mapper는 전달받은 Dictionary에 데이터만 작성한다.
         // ============================================================
 
-        private readonly Dictionary<AllyUnitType, GameObject>
-            _allyUnitPrefabs;
+        private readonly Dictionary<AllyUnitType, AllySpawnEntry>
+            _allySpawnEntries;
 
-        private readonly Dictionary<EnemyUnitType, GameObject>
-            _enemyUnitPrefabs;
+        private readonly Dictionary<EnemyUnitType, EnemySpawnEntry>
+            _enemySpawnEntries;
 
 
         // ============================================================
@@ -39,8 +39,8 @@ namespace Units
         internal UnitPrefabMapper(
             AllyUnitSpawnDatabaseSO allyUnitDatabase,
             EnemyUnitSpawnDatabaseSO enemyUnitDatabase,
-            Dictionary<AllyUnitType, GameObject> allyUnitPrefabs,
-            Dictionary<EnemyUnitType, GameObject> enemyUnitPrefabs)
+            Dictionary<AllyUnitType, AllySpawnEntry> allySpawnEntries,
+            Dictionary<EnemyUnitType, EnemySpawnEntry> enemySpawnEntries)
         {
             _allyUnitDatabase =
                 allyUnitDatabase;
@@ -48,11 +48,11 @@ namespace Units
             _enemyUnitDatabase =
                 enemyUnitDatabase;
 
-            _allyUnitPrefabs =
-                allyUnitPrefabs;
+            _allySpawnEntries =
+                allySpawnEntries;
 
-            _enemyUnitPrefabs =
-                enemyUnitPrefabs;
+            _enemySpawnEntries =
+                enemySpawnEntries;
         }
 
 
@@ -62,8 +62,8 @@ namespace Units
 
         internal void Initialize()
         {
-            if (_allyUnitPrefabs == null ||
-                _enemyUnitPrefabs == null)
+            if (_allySpawnEntries == null ||
+                _enemySpawnEntries == null)
             {
                 Debug.LogError(
                     "[PrefabMapper] Prefab Map이 없습니다."
@@ -73,8 +73,8 @@ namespace Units
             }
 
 
-            _allyUnitPrefabs.Clear();
-            _enemyUnitPrefabs.Clear();
+            _allySpawnEntries.Clear();
+            _enemySpawnEntries.Clear();
 
 
             InitializeAllyPrefabs();
@@ -219,7 +219,7 @@ namespace Units
                 unitData.GetAllyType();
 
 
-            if (_allyUnitPrefabs.ContainsKey(
+            if (_allySpawnEntries.ContainsKey(
                 unitType))
             {
                 Debug.LogError(
@@ -232,9 +232,13 @@ namespace Units
             }
 
 
-            _allyUnitPrefabs.Add(
+            _allySpawnEntries.Add(
                 unitType,
-                prefab
+                new AllySpawnEntry(
+                    unitData.GetAllyTier(),
+                    unitData.GetAllyClass(),
+                    prefab
+                )
             );
         }
 
@@ -298,7 +302,7 @@ namespace Units
                 unitData.GetEnemyType();
 
 
-            if (_enemyUnitPrefabs.ContainsKey(
+            if (_enemySpawnEntries.ContainsKey(
                 unitType))
             {
                 Debug.LogError(
@@ -311,9 +315,13 @@ namespace Units
             }
 
 
-            _enemyUnitPrefabs.Add(
+            _enemySpawnEntries.Add(
                 unitType,
-                prefab
+                new EnemySpawnEntry(
+                    unitData.GetEnemyFaction(),
+                    unitData.GetEnemyClass(),
+                    prefab
+                )
             );
         }
 

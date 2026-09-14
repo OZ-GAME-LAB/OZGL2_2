@@ -70,7 +70,7 @@ namespace Units
         {
             get
             {
-                if (_core == null)
+                if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
                     return false;
 
                 if (_activeSkillData == null)
@@ -97,7 +97,7 @@ namespace Units
         {
             get
             {
-                if (_core == null)
+                if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
                     return false;
 
                 if (_basicAttackData == null)
@@ -136,9 +136,25 @@ namespace Units
         // Unity Lifecycle
         // ============================================================
 
+        private void FixedUpdate()
+        {
+            _activeSkillExecutor?.FixedTick(Time.fixedDeltaTime);
+        }
+
+        private void OnDisable()
+        {
+            Stop();
+        }
+
+        private void OnDestroy()
+        {
+            Stop();
+        }
+
         private void Update()
         {
             UpdateTimers();
+            _activeSkillExecutor?.Tick(Time.deltaTime);
         }
 
 
@@ -158,6 +174,8 @@ namespace Units
                 return;
             }
 
+
+            Stop();
 
             _core =
                 core;
@@ -468,6 +486,9 @@ namespace Units
 
         public void Stop()
         {
+            _basicAttackExecutor?.Cancel();
+            _activeSkillExecutor?.Cancel();
+            // 진행 중인 Cast / Dash만 취소하고, 이미 발사된 투사체는 Manager에서 유지한다.
             _isBusy =
                 false;
 
@@ -486,7 +507,7 @@ namespace Units
         private bool IsValidTarget(
             ICombatTarget target)
         {
-            if (target == null)
+            if (!CombatTargetUtility.IsValid(target))
                 return false;
 
             if (!target.IsTargetable)
