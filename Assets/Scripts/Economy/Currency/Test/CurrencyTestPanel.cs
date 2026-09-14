@@ -8,12 +8,15 @@ public class CurrencyTestPanel : MonoBehaviour
 {
     [SerializeField] private RunCurrencyManager _run;
     [SerializeField] private WaveController _waveController;
+    [SerializeField] private EffectManager _effectManager;
+    [SerializeField] private ArtifactTestPanel _artifactTestPanel;
     [SerializeField] private PersistentCurrencyManager _persistent;
     [SerializeField] private CurrencyData _gold;
     [SerializeField] private CurrencyData _gem;
     [SerializeField] private CurrencyData _bloodstone;
 
     private bool _subscribed;
+    private bool _showArtifacts;
     private int _eventCount;
     private CurrencyData _lastCurrency;
     private int _lastBefore;
@@ -25,6 +28,9 @@ public class CurrencyTestPanel : MonoBehaviour
     private Vector2 _scrollPosition;
     private int _passed;
     private int _failed;
+    private int _testWavesCleared;
+    private int _testBossesCleared;
+    private const int UnitsPerWave = 2;
 
     private void Start() => Subscribe();
 
@@ -90,16 +96,39 @@ public class CurrencyTestPanel : MonoBehaviour
     public void StartRun()
     {
         if (!Ready()) return;
-        _run.Initialize(_waveController);
+        bool newRun = !_run.IsInitialized;
+        _persistent.Initialize(_effectManager);
+        _run.Initialize(_waveController, _effectManager);
         if (_run.IsInitialized)
+        {
+            if (newRun)
+            {
+                _testWavesCleared = 0;
+                _testBossesCleared = 0;
+                _waveController.BeginRun();
+                _lastWaveReward = "마지막 웨이브 지급: 없음";
+            }
             EnsureWaveStarted();
+            if (_artifactTestPanel != null)
+            {
+                _artifactTestPanel.Initialize();
+            }
+        }
         Report("Run 시작", _run.IsInitialized);
     }
 
     [ContextMenu("Test/End Run")]
     public void EndRun()
     {
-        if (Ready()) Report("Run 종료", _run.TryEndRun());
+        if (!Ready())
+        {
+            return;
+        }
+        if (_artifactTestPanel != null)
+        {
+            _artifactTestPanel.EndRun();
+        }
+        Report("Run 종료", _run.TryEndRun());
     }
 
     private void Report(string action, bool succeeded)
@@ -119,7 +148,26 @@ public class CurrencyTestPanel : MonoBehaviour
             return;
         }
 
+        if (_artifactTestPanel != null)
+        {
+            _showArtifacts = GUILayout.Toggle(_showArtifacts, "아티팩트 테스트 탭 (해제하면 재화 테스트)");
+        }
         _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
+        if (_showArtifacts && _artifactTestPanel != null)
+        {
+            if (GUILayout.Button("Run 시작 / 아티팩트 참조 연결"))
+            {
+                StartRun();
+            }
+            if (GUILayout.Button("Run 종료 (정산은 재화 탭에서 먼저 실행)"))
+            {
+                EndRun();
+            }
+            _artifactTestPanel.DrawPanel(_run.IsInitialized);
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+            return;
+        }
         GUILayout.Label($"Run: {(_run.IsInitialized ? "활성" : "비활성")}");
         if (_waveController.CurQuarter > 0 && _waveController.CurWave > 0)
         {
@@ -154,8 +202,14 @@ public class CurrencyTestPanel : MonoBehaviour
         if (GUILayout.Button("적 드랍 보석 +1"))
             Report("적 보석 드랍", _run.TryApplyEnemyDropReward(_gem.Type, 1));
         GUILayout.EndHorizontal();
-        if (GUILayout.Button("혈석 정산 (웨이브 5, 처치 10, 보스 2 → +30)"))
-            Report("혈석 정산 보상", _persistent.TryApplyReward(5, 10, 2));
+        int testUnitsKilled = _testWavesCleared * UnitsPerWave;
+        GUILayout.Label($"정산 기록: 클리어 {_testWavesCleared} / 처치 {testUnitsKilled} / 보스 {_testBossesCleared} (배수 {1L + _testBossesCleared})");
+        if (GUILayout.Button("현재 기록으로 혈석 정산 지급 테스트"))
+        {
+            Report("혈석 정산 보상", _persistent.TryApplyReward(
+                _testWavesCleared, testUnitsKilled, _testBossesCleared));
+        }
+        GUILayout.Label("웨이브 보상 지급·진행 성공 시 처치 2마리 집계. 정산 버튼은 누를 때마다 지급");
         if (GUILayout.Button("골드 501 소비 가능 여부 확인"))
             Report("CanSpend 골드 501", _run.CanSpend(_gold.Type, 501));
         GUILayout.Space(8);
@@ -197,8 +251,16 @@ public class CurrencyTestPanel : MonoBehaviour
     public void RunChecks()
     {
         if (!Ready()) return;
+        if (_effectManager != null && _effectManager.CurrencyModifiers.Count > 0)
+        {
+            _result = "기본 검증은 효과 없는 수량 기준입니다. 아티팩트 탭에서 아티팩트를 초기화하고 다른 재화 효과도 제거하세요.";
+            Debug.LogWarning($"[Economy/Test] {_result}", this);
+            return;
+        }
         _passed = 0;
         _failed = 0;
+        _testWavesCleared = 0;
+        _testBossesCleared = 0;
         int savedBloodstone = _persistent.GetBalance(_bloodstone.Type);
 
         try
@@ -209,7 +271,8 @@ public class CurrencyTestPanel : MonoBehaviour
             Check(_run.Balances == null && _run.GetBalance(CurrencyType.Gold) == 0 &&
                 _run.GetBalance(CurrencyType.Gem) == 0, "초기화 전 Balances null 및 Type 조회 0");
             Check(!_run.CanSpend(_gold.Type, 0), "Run 시작 전 소비 불가");
-            _run.Initialize(_waveController);
+            _persistent.Initialize(_effectManager);
+            _run.Initialize(_waveController, _effectManager);
             Check(_run.IsInitialized, "Run 초기화");
             if (!_run.IsInitialized)
                 throw new InvalidOperationException("Run 초기화 실패: 카탈로그 및 기본 시작 재화 설정을 확인하세요.");
@@ -218,7 +281,7 @@ public class CurrencyTestPanel : MonoBehaviour
             int startingGem = _run.GetBalance(_gem.Type);
             Check(_eventCount == events, "초기화 중 변경 이벤트 없음");
             var initializedBalances = _run.Balances;
-            _run.Initialize(_waveController);
+            _run.Initialize(_waveController, _effectManager);
             Check(_run.IsInitialized && ReferenceEquals(initializedBalances, _run.Balances) &&
                 _run.GetBalance(_gold.Type) == startingGold &&
                 _run.GetBalance(_gem.Type) == startingGem && _eventCount == events, "중복 초기화 시 잔액 및 이벤트 유지");
@@ -267,7 +330,7 @@ public class CurrencyTestPanel : MonoBehaviour
                 _persistent.Balances.TryGetValue(_bloodstone, out int remainingBloodstone) && remainingBloodstone == 20,
                 "종료 후 Run 목록 null, Persistent 목록 유지");
             Check(!_run.CanSpend(_gold.Type, 1), "종료 후 소비 불가");
-            _run.Initialize(_waveController);
+            _run.Initialize(_waveController, _effectManager);
             Check(_run.IsInitialized && _run.GetBalance(_gold.Type) == startingGold &&
                 _run.GetBalance(_gem.Type) == startingGem && _eventCount == events,
                 "다음 Run은 최초 시작 잔액으로 초기화하고 이벤트 없음");
@@ -316,10 +379,16 @@ public class CurrencyTestPanel : MonoBehaviour
 
         if (advanceAfterReward)
         {
+            _testWavesCleared++;
             if (_waveController.IsLastWave)
+            {
+                _testBossesCleared++;
                 _waveController.ProgressQuarter();
+            }
             else
+            {
                 _waveController.ProgressStage();
+            }
         }
 
         return true;
@@ -328,15 +397,17 @@ public class CurrencyTestPanel : MonoBehaviour
     private void CheckSettlementReward()
     {
         int before = _persistent.GetBalance(_bloodstone.Type);
-        // 현재 정산식: (웨이브 클리어 수 + 유닛 처치 수) * 보스 처치 수
-        CheckChange("혈석 정산 (5 + 10) * 2", _bloodstone,
-            () => _persistent.TryApplyReward(5, 10, 2), true, before + 30);
+        // 정산식: (웨이브 클리어 수 + 유닛 처치 수) * (1 + 보스 처치 수)
+        CheckChange("혈석 정산 (5 + 10) * 3", _bloodstone,
+            () => _persistent.TryApplyReward(5, 10, 2), true, before + 45);
         CheckChange("보스 처치 없는 정산", _bloodstone,
-            () => _persistent.TryApplyReward(5, 10, 0), true, before + 30);
+            () => _persistent.TryApplyReward(5, 10, 0), true, before + 60);
+        CheckChange("보스 1회 처치 배수 2", _bloodstone,
+            () => _persistent.TryApplyReward(3, 6, 1), true, before + 78);
         CheckChange("기록 없는 정산", _bloodstone,
-            () => _persistent.TryApplyReward(0, 0, 0), true, before + 30);
+            () => _persistent.TryApplyReward(0, 0, 0), true, before + 78);
         CheckChange("혈석 잔액 오버플로 거부", _bloodstone,
-            () => _persistent.TryApplyReward(int.MaxValue, 0, 1), false, before + 30);
+            () => _persistent.TryApplyReward(int.MaxValue, 0, 1), false, before + 78);
 
         int balance = _persistent.GetBalance(_bloodstone.Type);
         if (balance < before || !_persistent.TrySpend(_bloodstone.Type, balance - before))

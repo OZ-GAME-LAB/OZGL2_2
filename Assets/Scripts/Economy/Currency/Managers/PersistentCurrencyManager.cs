@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PersistentCurrencyManager : MonoBehaviour
+public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunSettlementRewards
 {
     public static PersistentCurrencyManager Instance { get; private set; }
 
@@ -11,9 +11,17 @@ public class PersistentCurrencyManager : MonoBehaviour
     public IReadOnlyDictionary<CurrencyData, int> Balances => _wallet?.Balances;
 
     [SerializeField] private CurrencyCatalog _currencyCatalog;
+    private EffectManager _effectManager;
 
     private CurrencyWallet _wallet;
     private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
+
+    // 영구 지갑을 초기화하지 않고 현재 Run의 효과 창구만 교체합니다.
+    // 새 Run/씬 진입 시 다시 연결하고, 정산 완료 후 null로 해제할 수 있습니다.
+    public void Initialize(EffectManager effectManager)
+    {
+        _effectManager = effectManager;
+    }
 
     private void Awake()
     {
@@ -135,7 +143,8 @@ public class PersistentCurrencyManager : MonoBehaviour
         }
 
         CurrencyAmount reward = _rewardCalculator.CalculateRunSettlementReward(
-            currency, totalWaveCleared, totalUnitsKilled, totalBossesKilled);
+            currency, totalWaveCleared, totalUnitsKilled, totalBossesKilled,
+            _effectManager != null ? _effectManager.CurrencyModifiers : null);
 
         return TryAddInternal(reward);
     }
