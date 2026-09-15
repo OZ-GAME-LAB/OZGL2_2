@@ -8,5 +8,5 @@ public interface IRunCurrencyRewards
     bool TryApplyProductionReward(CurrencyType type, int amount);
 
     /// <summary>드랍 재화 종류와 보정 전 수량을 받아 보상을 계산하고 지급</summary>
-    bool TryApplyEnemyDropReward(CurrencyType type, int amount);
+    // bool TryApplyEnemyDropReward(CurrencyType type, int amount);
 }
