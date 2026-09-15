@@ -1,40 +1,32 @@
 using System;
 using System.Collections.Generic;
+using Game.Core;
 using UnityEngine;
 
 public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunSettlementRewards
 {
-    public static PersistentCurrencyManager Instance { get; private set; }
-
     public event Action<CurrencyData, int, int> BalanceChanged;
 
     public IReadOnlyDictionary<CurrencyData, int> Balances => _wallet?.Balances;
 
     [SerializeField] private CurrencyCatalog _currencyCatalog;
     private EffectManager _effectManager;
+    private WaveController _waveController;
+    private GameFlowController _gameFlowController;
 
     private CurrencyWallet _wallet;
     private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
 
-    // 영구 지갑을 초기화하지 않고 현재 Run의 효과 창구만 교체합니다.
-    // 새 Run/씬 진입 시 다시 연결하고, 정산 완료 후 null로 해제할 수 있습니다.
-    public void Initialize(EffectManager effectManager)
+    // 현재 Run의 웨이브·게임 플로우·효과 매니저 참조 연결 (기존 지갑과 잔액 유지)
+    public void Initialize(WaveController waveController, GameFlowController gameFlowController, EffectManager effectManager)
     {
+        _waveController = waveController;
+        _gameFlowController = gameFlowController;
         _effectManager = effectManager;
     }
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-
-        DontDestroyOnLoad(gameObject);
-
         if (!ValidateSettings())
         {
             return;
@@ -47,10 +39,9 @@ public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurren
     {
         _wallet = null;
 
-        if (Instance == this)
-        {
-            Instance = null;
-        }
+        _effectManager = null;
+        _waveController = null;
+        _gameFlowController = null;
     }
 
     public int GetBalance(CurrencyType type)
@@ -130,11 +121,35 @@ public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurren
         return true;
     }
 
-    // Run 기록으로 혈석 정산 보상을 계산하고 지급합니다.
-    // 임시로 파라마터로 웨이브 클리어 수, 유닛 처치 수, 보스 처치 수를 받습니다.
-    // 협의 이후 어떤 방식으로 받을지 논의 필요
-    public bool TryApplyReward(int totalWaveCleared, int totalUnitsKilled, int totalBossesKilled)
+    // 종료한 전투의 웨이브·분기 번호를 변경하기 전에 호출
+    public bool TryApplyReward(ResultType result)
     {
+        if (_waveController == null || _waveController.CurQuarter < 1 ||
+            _waveController.CurWave < 1 || _waveController.CurWave > WaveController.MAX_WAVE)
+        {
+            Debug.LogError("[Economy/PersistentCurrencyManager] 정산할 웨이브 위치를 확인하세요.", this);
+            return false;
+        }
+
+        if (result != ResultType.Victory && result != ResultType.Defeat)
+        {
+            return false;
+        }
+
+        long clearedWaves = ((long)_waveController.CurQuarter - 1) * WaveController.MAX_WAVE
+            + _waveController.CurWave;
+        if (result == ResultType.Defeat)
+        {
+            clearedWaves--;
+        }
+        if (clearedWaves > int.MaxValue)
+        {
+            return false;
+        }
+
+        int totalWaveCleared = (int)clearedWaves;
+        int totalBossesCleared = totalWaveCleared / WaveController.MAX_WAVE;
+
         if (_currencyCatalog == null ||
             !_currencyCatalog.TryGetByType(CurrencyType.Bloodstone, out CurrencyData currency))
         {
@@ -143,7 +158,7 @@ public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurren
         }
 
         CurrencyAmount reward = _rewardCalculator.CalculateRunSettlementReward(
-            currency, totalWaveCleared, totalUnitsKilled, totalBossesKilled,
+            currency, totalWaveCleared, totalBossesCleared,
             _effectManager != null ? _effectManager.CurrencyModifiers : null);
 
         return TryAddInternal(reward);

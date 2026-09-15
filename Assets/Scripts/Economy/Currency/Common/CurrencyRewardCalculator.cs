@@ -59,15 +59,18 @@ public class CurrencyRewardCalculator
     }
 
     public CurrencyAmount CalculateRunSettlementReward(
-        CurrencyData currency, int totalWaveCleared, int totalUnitsKilled, int totalBossesKilled,
+        CurrencyData currency, int totalWaveCleared, int totalBossesCleared,
         IReadOnlyList<CurrencyModifier> modifiers)
     {
 
-        if (totalWaveCleared < 0 || totalUnitsKilled < 0 || totalBossesKilled < 0)
+        if (totalWaveCleared < 0 || totalBossesCleared < 0)
+        {
             return new CurrencyAmount(currency, -1);
+        }
 
         // 기본 배수 1, 보스 처치 1회당 배수 1 증가
-        double baseReward = ((double)totalWaveCleared + totalUnitsKilled) * (1d + totalBossesKilled);
+        // TODO: 실제 유닛 처치 수 집계 연결 후 정산식에 추가
+        double baseReward = (double)totalWaveCleared * (1d + totalBossesCleared);
         return CalculateModifiedReward(currency, baseReward, CurrencyRewardType.RunSettlement, modifiers);
     }
 

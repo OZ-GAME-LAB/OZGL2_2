@@ -11,6 +11,10 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
 
     public bool IsInitialized => _wallet != null;
 
+    // 보상 UI 표시용 : BattlePreparing에서 확정한 현재 웨이브의 지급 예정 재화량
+    public int CurrentGoldReward { get; private set; }
+    public int CurrentGemReward { get; private set; }
+
     [SerializeField] private CurrencyCatalog _currencyCatalog;
     [SerializeField] private WaveRewardTable _waveRewardTable;
     private EffectManager _effectManager;
@@ -19,10 +23,17 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
 
     private CurrencyWallet _wallet;
     private WaveController _waveController;
+    private GameFlowController _gameFlowController;
+    private CurrencyAmount[] _preparedRewards;
+    private int _preparedQuarter;
+    private int _preparedWave;
+    private bool _waveRewardApplied;
     private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
 
     private void OnDestroy()
     {
+        UnsubscribeGameFlow();
+        ClearWaveReward();
         _wallet = null;
         _waveController = null;
     }
@@ -125,8 +136,8 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         return true;
     }
 
-    // 웨이브 클리어 시 호출 : 웨이브 클리어로 지급되는 보상 (웨이브 자체 보상)
-    public bool TryApplyWaveReward()
+    // BattlePreparing 시 호출 : 현재 효과로 웨이브 보상을 계산하고 고정
+    public bool TryPrepareWaveReward()
     {
         if (!IsInitialized)
         {
@@ -146,8 +157,19 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
             return false;
         }
 
+        if (_preparedRewards != null && _preparedQuarter == _waveController.CurQuarter &&
+            _preparedWave == _waveController.CurWave)
+        {
+            return true;
+        }
+
+        ClearWaveReward();
         int quarterNumber = _waveController.CurQuarter;
         int waveNumber = _waveController.CurWave;
+        if (quarterNumber < 1 || waveNumber < 1)
+        {
+            return false;
+        }
 
         //건물 스크립트에서 실제 베이스캠프 레벨 프로퍼티를 읽어와야 함. 현재는 임시로 1 고정
         int baseCampLevel = 1;
@@ -162,7 +184,9 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         }
 
         CurrencyAmount[] calculatedRewards = new CurrencyAmount[rewards.Count];
-        int[] previousBalances = new int[rewards.Count];
+
+        int goldReward = 0;
+        int gemReward = 0;
 
         // 보상 테이블은 중복 재화를 거부하도록 구성
         for (int i = 0; i < rewards.Count; i++)
@@ -174,33 +198,120 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
                 !_wallet.Balances.ContainsKey(reward.Currency) || reward.Amount < 0)
                 return false;
 
-            int balance = _wallet.GetBalance(reward.Currency);
+            calculatedRewards[i] = reward;
 
+            if (reward.Currency.Type == CurrencyType.Gold)
+            {
+                goldReward = reward.Amount;
+            }
+            else if (reward.Currency.Type == CurrencyType.Gem)
+            {
+                gemReward = reward.Amount;
+            }
+        }
+
+        _preparedRewards = calculatedRewards;
+        _preparedQuarter = quarterNumber;
+        _preparedWave = waveNumber;
+        CurrentGoldReward = goldReward;
+        CurrentGemReward = gemReward;
+        return true;
+    }
+
+    // 웨이브 클리어 시 호출 : 미리 확정한 보상을 재계산 없이 한 번만 지급
+    public bool TryApplyWaveReward()
+    {
+        if (!IsInitialized || _waveController == null || _preparedRewards == null ||
+            _waveRewardApplied || _preparedQuarter != _waveController.CurQuarter ||
+            _preparedWave != _waveController.CurWave)
+        {
+            return false;
+        }
+
+        CurrencyAmount[] rewards = _preparedRewards;
+        int[] previousBalances = new int[rewards.Length];
+        // 전투 중 잔액이 바뀔 수 있으므로 실제 지급 직전에 전체 검증
+        for (int i = 0; i < rewards.Length; i++)
+        {
+            CurrencyAmount reward = rewards[i];
+            if (!CanUseCurrency(reward.Currency) || !_wallet.Balances.ContainsKey(reward.Currency) || reward.Amount < 0)
+            {
+                return false;
+            }
+            int balance = _wallet.GetBalance(reward.Currency);
             if (balance > int.MaxValue - reward.Amount)
             {
                 return false;
             }
-
-            calculatedRewards[i] = reward;
             previousBalances[i] = balance;
         }
 
-        // RunCurrencyManager.TryAdd는 즉시 이벤트를 보내므로 여기서는 wallet.TryAdd 이후 아래에서 이벤트 발생
-        foreach (CurrencyAmount reward in calculatedRewards)
+        foreach (CurrencyAmount reward in rewards)
         {
             _wallet.TryAdd(reward);
         }
 
-        for (int i = 0; i < calculatedRewards.Length; i++)
+        // 이벤트에서 다시 지급을 요청해도 중복 지급되지 않도록 먼저 완료 처리
+        _waveRewardApplied = true;
+        for (int i = 0; i < rewards.Length; i++)
         {
-            CurrencyAmount reward = calculatedRewards[i];
+            CurrencyAmount reward = rewards[i];
             if (reward.Amount > 0)
             {
                 BalanceChanged?.Invoke(reward.Currency, previousBalances[i], previousBalances[i] + reward.Amount);
             }
         }
-
         return true;
+    }
+
+    private void HandlePhaseChanged(GamePhase phase)
+    {
+        switch (phase)
+        {
+            case GamePhase.BattlePreparing:
+                if (!TryPrepareWaveReward())
+                {
+                    Debug.LogError("[Economy/RunCurrencyManager] 웨이브 보상 준비에 실패했습니다.", this);
+                }
+                break;
+
+            case GamePhase.Reward:
+                // 같은 웨이브의 Reward 재진입 시 중복 지급 방지
+                if (_waveRewardApplied)
+                {
+                    return;
+                }
+
+                if (!TryApplyWaveReward())
+                {
+                    Debug.LogError("[Economy/RunCurrencyManager] 준비된 웨이브 보상 지급에 실패했습니다.", this);
+                }
+                break;
+
+            case GamePhase.None:
+            case GamePhase.Finished:
+                ClearWaveReward();
+                break;
+        }
+    }
+
+    private void ClearWaveReward()
+    {
+        _preparedRewards = null;
+        _preparedQuarter = 0;
+        _preparedWave = 0;
+        _waveRewardApplied = false;
+        CurrentGoldReward = 0;
+        CurrentGemReward = 0;
+    }
+
+    private void UnsubscribeGameFlow()
+    {
+        if (_gameFlowController != null)
+        {
+            _gameFlowController.PhaseChanged -= HandlePhaseChanged;
+        }
+        _gameFlowController = null;
     }
 
     // 새로운 웨이브 준비 페이즈 돌입 시 호출 : 생산 건물에서 생산한 재화 지급
@@ -219,23 +330,23 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     }
 
     // 적 유닛 사망 시 드랍하는 재화 지급
-    public bool TryApplyEnemyDropReward(CurrencyType type, int amount)
-    {
-        if (!TryGetCurrency(type, out CurrencyData currency))
-        {
-            return false;
-        }
+    // public bool TryApplyEnemyDropReward(CurrencyType type, int amount)
+    // {
+    //     if (!TryGetCurrency(type, out CurrencyData currency))
+    //     {
+    //         return false;
+    //     }
 
-        // 적 유닛 실제 사망 확정 시 기본 드랍 재화와 수량을 전달
-        CurrencyAmount calculatedReward =
-            _rewardCalculator.CalculateEnemyDropReward(new CurrencyAmount(currency, amount));
+    //     // 적 유닛 실제 사망 확정 시 기본 드랍 재화와 수량을 전달
+    //     CurrencyAmount calculatedReward =
+    //         _rewardCalculator.CalculateEnemyDropReward(new CurrencyAmount(currency, amount));
 
-        return TryAddInternal(calculatedReward);
-    }
+    //     return TryAddInternal(calculatedReward);
+    // }
 
     // 게임 시작 시에 Run 재화 초기화
     // effectManager가 null이면 효과 보정 없이 기본 보상을 사용합니다.
-    public void Initialize(WaveController waveController, EffectManager effectManager)
+    public void Initialize(WaveController waveController, GameFlowController gameFlowController, EffectManager effectManager)
     {
         if (IsInitialized)
         {
@@ -288,9 +399,18 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
             }
         }
 
+        UnsubscribeGameFlow();
+        _gameFlowController = gameFlowController;
+        if (_gameFlowController != null)
+        {
+            _gameFlowController.PhaseChanged += HandlePhaseChanged;
+        }
+        ClearWaveReward();
         _waveController = waveController;
         _effectManager = effectManager;
         _wallet = newWallet;
+        CurrentGoldReward = 0;
+        CurrentGemReward = 0;
 
         Debug.Log(
             "[Economy/RunCurrencyManager] Run 재화를 초기화했습니다.",
@@ -306,7 +426,11 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
             return false;
         }
 
+        UnsubscribeGameFlow();
+        ClearWaveReward();
         _wallet = null;
+        CurrentGoldReward = 0;
+        CurrentGemReward = 0;
 
         Debug.Log(
             "[Economy/RunCurrencyManager] 모든 Run 재화를 제거했습니다.",
