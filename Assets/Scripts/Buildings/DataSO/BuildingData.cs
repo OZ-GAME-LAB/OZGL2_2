@@ -3,6 +3,7 @@
 // 현재 HP·슬롯 점유 같은 플레이 중 값은 여기에 두지 않습니다.
 // SO를 여러 실물이 공유하므로, 여기서 HP를 깎으면 같은 종류가 전부 같이 깎입니다.
 using UnityEngine;
+using Units;
 
 namespace OZGL.KDH
 {
@@ -134,9 +135,11 @@ namespace OZGL.KDH
                 Debug.LogWarning($"[BuildingData] Production.amount가 0 이하입니다. 에셋: {name}", this);
             }
 
-            if (HasSpawn && spawn.unitPrefab == null)
+            // Current date KDH 2026-09-15
+            // 소환은 unitType만 있으면 됩니다. Default면 SpawnManager가 고를 프리팹이 없습니다.
+            if (HasSpawn && spawn.unitType == AllyUnitType.Default)
             {
-                Debug.LogWarning($"[BuildingData] Spawn.unitPrefab이 없습니다. 에셋: {name}", this);
+                Debug.LogWarning($"[BuildingData] Spawn.unitType이 Default라 소환할 수 없습니다. 에셋: {name}", this);
             }
 
             if (HasSpawn && spawn.countPerWave > spawn.maxAlive)

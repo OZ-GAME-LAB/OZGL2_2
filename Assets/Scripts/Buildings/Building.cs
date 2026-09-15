@@ -1,6 +1,5 @@
-// Current date KDH 2026-09-11
-// 씬에 올라간 건물 실물. SO는 읽기만 하고, 점유/상태는 이 인스턴스가 가집니다.
-// 생산/소환은 모듈이 웨이브 이벤트를 구독하므로 Update에서 폴링하지 않습니다.
+// Current date KDH 2026-09-14
+// 씬에 올라간 건물 실물. SO는 읽기만 하고, 점유/소환 위치/집결지는 이 인스턴스가 가집니다.
 using UnityEngine;
 
 namespace OZGL.KDH
@@ -9,13 +8,47 @@ namespace OZGL.KDH
     {
         [SerializeField] private BuildingData data;
         [SerializeField] private SpriteRenderer spriteRenderer;
+        [Tooltip("비우면 Front Offset으로 병영 앞을 계산합니다.")]
         [SerializeField] private Transform spawnPoint;
+        [Tooltip("spawnPoint가 없을 때 로컬 기준 앞 방향. 2D에서 적이 오는 쪽.")]
+        [SerializeField] private Vector2 frontOffset = new Vector2(0f, -1f);
+        [Tooltip("개발자가 맵/프리팹에 둔 기본 집결지. 플레이어 지정이 있으면 이쪽은 쓰지 않습니다.")]
+        [SerializeField] private Transform defaultRally;
 
         private IBuildingModule[] _modules;
         private bool _initialized;
+        private bool _hasPlayerRally;
+        private Vector2 _playerRally;
 
         public BuildingData Data => data;
         public Transform SpawnPoint => spawnPoint;
+
+        public Vector2 SpawnWorldPosition
+        {
+            get
+            {
+                if (spawnPoint != null)
+                    return spawnPoint.position;
+
+                return transform.TransformPoint(frontOffset);
+            }
+        }
+
+        public Vector2 RallyWorldPosition
+        {
+            get
+            {
+                if (_hasPlayerRally)
+                    return _playerRally;
+
+                if (defaultRally != null)
+                    return defaultRally.position;
+
+                return SpawnWorldPosition;
+            }
+        }
+
+        public bool HasPlayerRally => _hasPlayerRally;
 
         private void Awake()
         {
@@ -47,6 +80,19 @@ namespace OZGL.KDH
             EnsureFeatureModules();
             SetupModules();
             _initialized = true;
+        }
+
+        // Current date KDH 2026-09-14
+        // 플레이어가 찍은 집결지. 이동은 유닛이 하고, 여기엔 좌표만 둡니다.
+        public void SetPlayerRally(Vector2 worldPosition)
+        {
+            _playerRally = worldPosition;
+            _hasPlayerRally = true;
+        }
+
+        public void ClearPlayerRally()
+        {
+            _hasPlayerRally = false;
         }
 
         private void CacheRefs()
