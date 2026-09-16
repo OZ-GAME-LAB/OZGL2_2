@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -7,19 +8,26 @@ namespace Game.Core
 {
     public enum GamePhase
     {
+        // 선언은 진행 순서로 정렬한다.
         None = 0,
-        Preparation = 1,
-        BattlePreparing = 2,
-        Battle = 3,
-        Reward = 4,
-        Finished = 5,
-        BattleResolving = 6,
-        QuarterComplete = 7
+        Preparation, //건물 건설 및 준비(건물 건설 / 삭제)
+        BattlePreparing, //전투 준비(유닛 스폰)
+        Battle, //전투상태
+        BattleResolving, //전투 결과 창 출력
+        QuarterComplete, //보스 승리 시 유물 보상으로 진행, 부착 처리 후 종료 선택
+        Reward, //보상 획득상태
+        Event, //이벤트·저주 완료 대기
+        Store, //상점 나가기 대기 (Event와 선택적 분기)
+        Finished, //게임 종료 상태
     }
 
     public enum ResultType { Victory, Defeat }
     public enum RunDecision { Finish, Continue }
 
+    /// <summary>
+    /// 게임 전체 페이즈, 전투·보상 처리 순서, 완료 대기, 종료·리셋을 관리한다.
+    /// <br/>언제 다음 노드로 이동할지 결정
+    /// </summary>
     public class GameFlowController : MonoBehaviour
     {
         [Header("테스트용 생성 대기 시간입니다. Play 모드에서 조절하세요.")]
@@ -29,6 +37,15 @@ namespace Game.Core
         [Header("테스트용 종료 연출 시간입니다. Play 모드에서 조절하세요.")]
         [Min(0)]
         public float StagingTime = 0.5f;
+
+        [Header("다음 분기 생성 시 적용되는 정예 2개 등장 확률")]
+        [SerializeField, Range(0f, 1f)] private float _twoEliteChance = 0.5f;
+        private NodeController _nodeController;
+        public Node CurrentNode => _nodeController?.CurrentNode;
+        public IReadOnlyList<Node> CurrentNodes => _nodeController?.Nodes ?? Array.Empty<Node>();
+        public int CurrentQuarter => _nodeController?.CurrentQuarter ?? 0;
+        public int CurrentWave => CurrentNode?.WaveNumber ?? 0;
+        public bool IsLastNode => _nodeController != null && _nodeController.IsLastNode;
 
         public event Action<GamePhase> PhaseChanged;
         public event Action QuarterDecisionRequested;
@@ -44,10 +61,28 @@ namespace Game.Core
 
         private TestWaitingScript _testScript;
         private WaveController _waveController;
+        private ArtifactManager _artifactManager;
         private GamePhase _curPhase;
         private bool _isTransitioning;
         private CancellationTokenSource _cts;
         private RunDecision? _runDecision;
+
+        public bool CanJumpToLastWave => CanEnterBuildMode() && CurrentNode != null && !IsLastNode;
+        public bool CanJumpToLastQuarter => CanEnterBuildMode() && CurrentQuarter < NodeController.MainQuarters;
+
+        // 초기화 및 수명 관리
+        /// <summary>참조를 연결하고 기존 실행을 취소한다.</summary>
+        public void Initialize(WaveController waveController, TestWaitingScript testScript, ArtifactManager artifactManager)
+        {
+            _testScript = testScript;
+            _waveController = waveController;
+            _artifactManager = artifactManager;
+            _nodeController = new NodeController(waveController.WaveCatalog);
+            ClearToken();
+            ResetDecisionState();
+            _isTransitioning = false;
+            ChangePhase(GamePhase.None);
+        }
 
         private void OnDestroy()
         {
@@ -55,17 +90,7 @@ namespace Game.Core
             _cts?.Dispose();
         }
 
-        /// <summary>참조를 연결하고 기존 실행을 취소한다.</summary>
-        public void Initialize(WaveController waveController, TestWaitingScript testScript)
-        {
-            _testScript = testScript;
-            _waveController = waveController;
-            ClearToken();
-            ResetDecisionState();
-            _isTransitioning = false;
-            ChangePhase(GamePhase.None);
-        }
-
+        // 게임 시작·리셋 및 행동 가능 여부
         /// <summary>새 판은 1분기 1웨이브부터 시작한다.</summary>
         public void BeginRun()
         {
@@ -74,7 +99,13 @@ namespace Game.Core
             _isTransitioning = true;
             HasClearedMainGame = false;
             ResetDecisionState();
-            _waveController.BeginRun();
+            _nodeController.Reset();
+            _waveController.ResetTestBattle();
+            if (!StartQuarter(1))
+            {
+                _isTransitioning = false;
+                return;
+            }
             ChangePhase(GamePhase.Preparation);
             _isTransitioning = false;
         }
@@ -96,6 +127,7 @@ namespace Game.Core
         {
             return !_isTransitioning && _curPhase == GamePhase.Preparation;
         }
+
         /// <summary>
         /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
         /// 사용처 : 유닛시스템
@@ -104,7 +136,8 @@ namespace Game.Core
         {
             return !_isTransitioning && _curPhase == GamePhase.Battle;
         }
-        
+
+        // 전투 시작 및 결과 처리
         public async UniTask<bool> TryStartWave()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
@@ -120,10 +153,10 @@ namespace Game.Core
             _isTransitioning = false;
             return true;
         }
+
         /// <summary>
         /// 전투 결과를 받는 외부노출 메서드
         /// </summary>
-        /// <param name="result"></param>
         public async UniTask ResolveBattleAsync(ResultType result)
         {
             if (_isTransitioning || _curPhase != GamePhase.Battle) return;
@@ -135,13 +168,13 @@ namespace Game.Core
             if (canceled || token.IsCancellationRequested) return;
             _isTransitioning = false;
         }
+
         /// <summary>
         /// 전투 종료 후 연출·보상·분기 진행 순서 처리 등 실제 기능 구현
         /// </summary>
-        /// <param name="result"></param>
-        /// <param name="token"></param>
         private async UniTask ResolveBattleCoreAsync(ResultType result, CancellationToken token)
         {
+            Node completedNode = CurrentNode;
             ChangePhase(GamePhase.BattleResolving);
             // 실제 유닛 파트는 이 페이즈 진입 시 공격·이동·피해 처리를 중단해야 한다.
             await PlayBattleResultAsync(result, token);
@@ -158,25 +191,49 @@ namespace Game.Core
                 return;
             }
             //분기 마지막 웨이브가 아닐경우 그대로 보상처리 후 진행
-            if (!_waveController.IsLastWave)
+            if (!IsLastNode)
             {
-                ChangePhase(GamePhase.Reward);
                 //보상 선택
-                await _testScript.WaitToggle(token);
+                IsWaitingForArtifactSelection = true;
+                bool success = await _artifactManager.SelectAndApplyAsync(
+                    completedNode.BattleType, token);
+                ChangePhase(GamePhase.Reward);
+                await _testScript.WaitForSeconds(StagingTime,token); //임시 대기 시간
                 token.ThrowIfCancellationRequested();
-                //전장 정리
+                ArtifactSelectionRequested?.Invoke();
+                IsWaitingForArtifactSelection = false;
+                //전장정리
                 await CleanupBattleAsync(token);
                 token.ThrowIfCancellationRequested();
-                //웨이브 진행
-                _waveController.ProgressStage();
+                //이벤트 확인
+                await ProcessEventAsync(completedNode, token);
+                token.ThrowIfCancellationRequested();
+                AdvanceNode();
             }
             //분기 마지막웨이브일 때 처리
             else
             {
                 // 기본 구간 클리어 기록은 계속 도전하거나 이후 패배해도 유지한다.
-                if (_waveController.CurQuarter >= WaveController.MAIN_QUARTERS)
+                if (CurrentQuarter >= NodeController.MainQuarters)
                     HasClearedMainGame = true;
 
+                ChangePhase(GamePhase.QuarterComplete);
+                token.ThrowIfCancellationRequested();
+                //아티팩트 + 재화 획득
+                IsWaitingForArtifactSelection = true;
+                bool success = await _artifactManager.SelectAndApplyAsync(
+                    completedNode.BattleType, token);
+                ChangePhase(GamePhase.Reward);
+                await _testScript.WaitForSeconds(StagingTime,token); //임시 대기 시간
+                token.ThrowIfCancellationRequested();
+                ArtifactSelectionRequested?.Invoke();
+                IsWaitingForArtifactSelection = false;
+                
+                //전장정리
+                await CleanupBattleAsync(token);
+                token.ThrowIfCancellationRequested();
+                await ProcessEventAsync(completedNode, token);
+                token.ThrowIfCancellationRequested();
                 ChangePhase(GamePhase.QuarterComplete);
                 token.ThrowIfCancellationRequested();
                 //분기 종료후 계속 진행할지 확인하는 부분
@@ -193,60 +250,59 @@ namespace Game.Core
 
                     if (_runDecision.Value == RunDecision.Finish)
                     {
-                        await CleanupBattleAsync(token);
-                        token.ThrowIfCancellationRequested();
                         FinishRun(ResultType.Victory);
                         return;
                     }
                 }
 
-                // 요청 이벤트 전에 선택 값을 초기화한다.
-                // 이벤트 구독자가 즉시 선택을 완료해도 그 결과가 초기화로 지워지지 않게 한다.
-                // 아티팩트 선택
-                ChangePhase(GamePhase.Reward);
-                var artifactWait = _testScript.WaitToggle(token);
-                IsWaitingForArtifactSelection = true;
-                ArtifactSelectionRequested?.Invoke();
-                
-                await artifactWait;
-                token.ThrowIfCancellationRequested();
-                IsWaitingForArtifactSelection = false;
-                
-                //IsWaitingForArtifactSelection = true;
-                //차후에는 아티펙트 시스템에 아티팩트 선택 요청을 보내면 선택 완료 적용까지 마무리된 후 종료
-                //await _artifactRewardSystem.SelectAndApplyAsync(token);
-                //token.ThrowIfCancellationRequested();
-                //IsWaitingForArtifactSelection = false;
-                
-                //전장정리
-                await CleanupBattleAsync(token);
-                token.ThrowIfCancellationRequested();
-                _waveController.ProgressQuarter();
+                if (!StartQuarter(CurrentQuarter + 1)) return;
             }
             token.ThrowIfCancellationRequested();
             ChangePhase(GamePhase.Preparation);
         }
 
-        [ContextMenu("Test/Finish at quarter choice")]
-        public void ChooseFinishRun()
+        /// <summary>
+        /// 돌발 이벤트 완료까지만 담당하고 이후 진행은 승리 처리 경로에서 결정한다.
+        /// </summary>
+        private async UniTask ProcessEventAsync(Node completedNode, CancellationToken token)
         {
-            if (CanChooseRunDecision)
-                _runDecision = RunDecision.Finish;
+            token.ThrowIfCancellationRequested();
+            if (completedNode.PostBattleEvent == PostBattleEventType.None) return;
+
+            GamePhase phase = completedNode.PostBattleEvent == PostBattleEventType.Shop
+                ? GamePhase.Store : GamePhase.Event;
+            // 페이즈 구독자가 즉시 완료할 수 있도록 대기를 먼저 준비한다.
+            var contentWait = _testScript.WaitPostBattleContentAsync(completedNode, token);
+            ChangePhase(phase);
+            await contentWait;
+            token.ThrowIfCancellationRequested();
         }
 
-        [ContextMenu("Test/Continue at quarter choice")]
-        public void ChooseContinueRun()
+        // 분기·노드 진행
+        private bool StartQuarter(int quarter)
         {
-            if (CanChooseRunDecision)
-                _runDecision = RunDecision.Continue;
+            if (!_nodeController.TryStartQuarter(quarter, _twoEliteChance, out string error))
+            {
+                Debug.LogError($"[GameFlowController] 노드 생성 실패: {error}", this);
+                ChangePhase(GamePhase.None);
+                NotifyNodeChanged();
+                return false;
+            }
+            NotifyNodeChanged();
+            return true;
         }
 
-        /// <summary>임시 연출 대기. 실제 컷씬·통계창 완료를 기다리는 구현으로 교체한다.</summary>
-        private UniTask PlayBattleResultAsync(ResultType result, CancellationToken token)
+        private void AdvanceNode()
         {
-            return _testScript.WaitForSeconds(StagingTime, token);
+            if (_nodeController.MoveNext()) NotifyNodeChanged();
         }
 
+        private void NotifyNodeChanged()
+        {
+            _waveController.NotifyNodeChanged();
+        }
+
+        // 게임 종료 및 내부 상태 관리
         private void FinishRun(ResultType type)
         {
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
@@ -265,25 +321,17 @@ namespace Game.Core
             _cts?.Cancel();
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
-        }        
+        }
+
         private void ResetDecisionState()
         {
             _runDecision = null;
             IsWaitingForRunDecision = false;
             IsWaitingForArtifactSelection = false;
         }
-        // 메서드 요청 파트
-        
-        /// <summary>현재는 더미 생존 수만 정리한다. 실제 스포너의 정리 완료 대기로 교체한다.
-        /// 담당 요청 파트 : 유닛
-        /// </summary>
-        private UniTask CleanupBattleAsync(CancellationToken token)
-        {
-            token.ThrowIfCancellationRequested();
-            _waveController.CleanupTestBattle();
-            return UniTask.CompletedTask;
-        }
 
+        #region Debug
+        // 외부 시스템 연동 예정 메서드
         /// <summary>
         /// 게임을 계속 할지 확인하는 창을 띄우고 결과를 반환하는 메서드
         /// true: 계속 진행 / false: 승리 종료, 담당 요청 파트 : UI
@@ -306,5 +354,58 @@ namespace Game.Core
         {
             
         }
+
+        // 테스트·호환용 진행 입력 및 임시 처리
+        // 기존 테스트/외부 호출의 호환 경로. 전투·보상 처리 중에는 이동하지 않는다.
+        public void RequestProgressStage()
+        {
+            if (CanEnterBuildMode()) AdvanceNode();
+        }
+
+        public void RequestProgressQuarter()
+        {
+            if (CanEnterBuildMode() && IsLastNode) StartQuarter(CurrentQuarter + 1);
+        }
+
+        public void JumpToLastWaveForTest()
+        {
+            if (CanJumpToLastWave && _nodeController.JumpToLastNode()) NotifyNodeChanged();
+        }
+
+        public void JumpToLastQuarterForTest()
+        {
+            if (CanJumpToLastQuarter) StartQuarter(NodeController.MainQuarters);
+        }
+
+        [ContextMenu("Test/Finish at quarter choice")]
+        public void ChooseFinishRun()
+        {
+            if (CanChooseRunDecision)
+                _runDecision = RunDecision.Finish;
+        }
+
+        [ContextMenu("Test/Continue at quarter choice")]
+        public void ChooseContinueRun()
+        {
+            if (CanChooseRunDecision)
+                _runDecision = RunDecision.Continue;
+        }
+
+        /// <summary>임시 연출 대기. 실제 컷씬·통계창 완료를 기다리는 구현으로 교체한다.</summary>
+        private UniTask PlayBattleResultAsync(ResultType result, CancellationToken token)
+        {
+            return _testScript.WaitForSeconds(StagingTime, token);
+        }
+
+        /// <summary>현재는 더미 생존 수만 정리한다. 실제 스포너의 정리 완료 대기로 교체한다.
+        /// 담당 요청 파트 : 유닛
+        /// </summary>
+        private UniTask CleanupBattleAsync(CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            _waveController.CleanupTestBattle();
+            return UniTask.CompletedTask;
+        }
+    #endregion
     }
 }

@@ -110,7 +110,7 @@ WaveController는 이벤트를 구독하고 `GetRemain(out enemy, out allies)`�
 원준 담당 유닛 코드가 사망할 때마다 `ResolveBattleAsync()`를 직접 호출하지 않는다.
 웨이브 담당이 생성 완료 이후 전멸 여부를 판단하고, 전투 종료 결과를 한 번만 알리는 구조다.
 현재 판정은 적 전멸을 먼저 확인해 승리를 전달하고, 적이 남아 있으면서 아군 전원 사망이면 패배를 전달한다. 코어는 `ResolveBattleAsync(ResultType result)` 하나로 승리·패배를 받아 전투 중 한 번만 처리한다.
-분기의 마지막 웨이브는 QuarterComplete를 거쳐 필요한 경우 종료·계속을 선택하고, 계속 진행하는 경로에서는 Reward로 전환해 유물 선택을 기다린다. 실제 유닛의 사망 알림과 생존 수 관리는 아직 TestSpawner를 사용하는 단계다.
+분기의 마지막 웨이브는 QuarterComplete → Reward에서 유물 선택 → 전장 정리 → 부착 저주 처리 순서로 진행한다. 그 후 필요한 경우 종료·계속을 선택한다. 실제 유닛의 사망 알림과 생존 수 관리는 아직 TestSpawner를 사용하는 단계다.
 
 ## 5. 전투 마무리·보상·분기 완료
 
@@ -118,23 +118,20 @@ WaveController는 이벤트를 구독하고 `GetRemain(out enemy, out allies)`�
 
 ```text
 ResolveBattleAsync(result)
-  → Battle 상태·전환 잠금 검사
-  → BattleResolving → PlayBattleResultAsync(result, token)
-    ├─ 패배 → CleanupBattleAsync → Finished
+  → BattleResolving → 결과 연출
+    ├─ 패배 → 전장 정리 → Finished
     └─ 승리
-        ├─ 분기 중간 웨이브 → Reward → ChooseResult 대기
-        │   → CleanupBattleAsync → 다음 웨이브 Preparation
-        └─ 분기 마지막 웨이브 → QuarterComplete
-            ├─ MAIN_QUARTERS 미만 → Reward → 유물 선택 대기
-            └─ MAIN_QUARTERS 이상
-                ├─ AutoContinue 켜짐 → Reward → 유물 선택 대기
-                └─ 꺼짐 → 종료 / 계속 선택 대기
-                    ├─ 종료 → CleanupBattleAsync → 승리 Finished
-                    └─ 계속 → Reward → 유물 선택 대기
-            유물 선택 완료 → CleanupBattleAsync → 다음 분기 1웨이브 Preparation
+        ├─ 일반 웨이브 → Reward → ChooseResult 대기 → 전장 정리
+        │   → 부착 Event / Store가 있으면 별도 ChooseResult 대기
+        │   → 다음 노드 → Preparation
+        └─ 마지막 웨이브 → QuarterComplete → Reward → 유물 선택 대기
+            → 전장 정리 → 무한분기면 Event(Curse) → ChooseResult 대기
+            → QuarterComplete → 필요 시 종료 / 계속 선택
+                ├─ 종료 → Finished
+                └─ 계속 또는 선택 생략 → 다음 분기 → Preparation
 ```
 
-현재 테스트 설정은 `MAX_WAVE = 3`, `MAIN_QUARTERS = 3`이다. 1~2분기의 마지막 웨이브 승리 후에는 유물 선택으로 이동하고, 3분기부터는 분기 마지막 웨이브 승리 시 종료·계속을 선택한다. 계속 선택하면 4분기 이상으로 진행한다. 기획의 5분기 기준과 구분하며, 종료 확인 기준은 `MAIN_QUARTERS`를 따른다.
+현재 테스트 설정은 `MAX_WAVE = 5`, `MAIN_QUARTERS = 3`이다. 1~2분기의 마지막 웨이브 승리 후에는 유물 선택으로 이동하고, 3분기부터는 분기 마지막 웨이브 승리 시 종료·계속을 선택한다. 계속 선택하면 4분기 이상으로 진행한다. 기획의 5분기 기준과 구분하며, 종료 확인 기준은 `MAIN_QUARTERS`를 따른다.
 `HasClearedMainGame`은 현재 판의 기본 구간 클리어 기록으로, 계속 도전 후 패배해도 유지하며 새 판·리셋 시 초기화한다.
 영구 저장과 실제 결산창은 아직 연결하지 않았다.
 
@@ -215,3 +212,32 @@ GameFlowController에 가격 계산이나 건물 내부 처리를 추가하지 �
 
 연결 전 담당자와 확정할 항목은 **호출 메서드와 인자, 완료 시점, UniTask 또는 콜백·이벤트 방식,
 취소 시 중단·정리할 대상, 오류 전달 방식**이다.
+
+## 분기 노드 생성 및 진행 정보 (2026-09-15)
+
+GameFlowController.Initialize가 기존 WaveController의 카탈로그 참조를 받아 일반 C# NodeController를 생성한다. 카탈로그의 Inspector 연결과 BootStrap 호출 순서는 유지한다. NodeController는 외부에 공개하지 않고 GameFlowController의 CurrentNodes / CurrentNode / CurrentQuarter / CurrentWave / IsLastNode와 NodeChanged로 조회·알림을 제공한다.
+
+분기마다 노드 5개를 한 번 생성한다. 첫 일반·마지막 보스, 중간 정예 1~2개를 배치하고 각 노드에 선택된 WaveSO와 세력을 보관한다. GameFlow Inspector의 Two Elite Chance는 다음 분기 생성부터 적용되며 기본값은 0.5이다. 3/4웨이브 중 상점 한 개, 남은 비보스 세 자리 중 이벤트 한 개, 나머지 두 자리에 각각 10% 이벤트 판정을 수행한다. 4분기부터 보스에 Curse가 붙는다. 실제 분기 번호는 증가하며 편성 조회만 5분기로 제한한다.
+
+부착 이벤트는 None / Event / Shop / Curse로 구분하며 테스트 완료 대기까지 연결했다. Event·Curse는 Event 페이즈, Shop은 Store 페이즈에서 기존 ChooseResult 버튼으로 완료한다. 실제 이벤트 UI·구매·효과·저주 적용은 미구현이다.
+
+WaveController에서 분기·웨이브 카운터, 현재 편성 저장, SelectCurrentPreset의 추첨 로직을 제거하고 NodeController로 이관했다. BeginRun의 노드 초기화와 ProgressStage / ProgressQuarter / 테스트 점프의 진행 요청은 GameFlowController가 담당한다. 스폰·승패·테스트 유닛 정리는 WaveController에 유지한다.
+
+기존 WaveController의 CurWave / CurQuarter / CurrentPreset / CurrentFaction / IsLastWave와 WaveChanged는 호환 API로 유지한다. 값은 GameFlow의 노드 정보에 위임하며 별도 상태를 저장하지 않는다. BeginRun은 GameFlow.BeginRun으로 위임하며 실행 중 초기화는 ResetRun을 사용한다. 외부 ProgressStage / ProgressQuarter와 점프 요청은 Preparation이고 전환 중이 아닐 때만 허용된다. GameFlow의 정상 보상 완료 경로는 내부 진행 메서드를 사용한다.
+
+프리셋 누락 시 분기 계획을 부분 적용하지 않고 오류를 출력하며 None 상태로 전환해 전투 시작을 막는다. 리셋으로 새 판을 시작할 수 있다. 같은 분기에서 마지막 웨이브로 점프할 때 계획은 재추첨하지 않는다.
+
+주의: 현재 WaveRewardTable.asset에는 각 분기의 1~3웨이브 보상만 있다. 4·5웨이브 지급 데이터를 추가하고 기존 3웨이브 보스 보상의 배치를 별도로 검토해야 한다. 이번 작업에서는 보상 데이터를 변경하지 않았다.
+
+
+## 부착 콘텐츠 완료 입력
+
+GameFlowController.ProcessPostBattleContentAsync는 클리어한 Node를 받아 부착 콘텐츠 완료까지만 기다린다. AdvanceNode와 NodeController는 그대로 위치 변경만 담당한다. None은 즉시 반환하며 패배 시 이 처리 경로를 실행하지 않는다.
+
+TestWaitingScript.WaitPostBattleContentAsync(Node, CancellationToken)는 요청별 UniTaskCompletionSource를 만들고, CompletePostBattleContent(long requestId)로 완료한다. PostBattleRequestId, PendingPostBattleContent, IsWaitingForPostBattleContent로 현재 요청을 조회한다. 지연 콜백은 요청 시작 때 받은 ID를 보관하여 전달해야 한다. 완료 직전에 현재 ID를 다시 읽어 전달하면 이전 요청인지 구분할 수 없다.
+
+기존 ChooseResultBtn은 Reward에서는 보상, Event / Store에서는 현재 부착 콘텐츠만 완료한다. 한 번의 버튼 호출이 두 단계를 함께 끝내지 않는다. 보상 완료 후 이벤트가 나타나면 버튼을 다시 눌러야 한다. 대기 중 버튼은 노란색으로 표시되며 실제 종류는 기존 웨이브 표시와 Console 요청 로그에서 확인한다.
+
+페이즈 변경 알림 전에 대기를 준비하므로 즉시 완료 입력도 유실되지 않는다. 요청 ID는 리셋 시 재사용하지 않으며, 취소 토큰·ID로 오래된 입력과 중복 완료를 거부한다. GameFlow 리셋/파괴 및 TestWaitingScript 파괴 시 대기를 취소한다. 전투 시작·테스트 점프는 결과 처리 잠금이 유지되는 동안 차단한다.
+
+보스의 종료 선택은 유물 보상과 저주 처리 뒤로 이동했다. AutoContinue는 종료 선택만 생략한다. 스토리 마지막 보스에는 저주가 없으며 4분기부터 적용한다. 기존 재화 보상 테이블은 변경하지 않았다.
