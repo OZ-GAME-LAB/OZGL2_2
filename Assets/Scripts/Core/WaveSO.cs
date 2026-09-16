@@ -37,7 +37,7 @@ public class WaveSO : ScriptableObject
     public string WaveName;
     public WaveBattleType BattleType;
     public ClassWeights Weights;
-    public List<EnemyUnitFaction> MonsterIDs = new List<Units.EnemyUnitFaction>(); //몬스터 id 리스트
+    public List<EnemyUnitType> MonsterIDs = new(); //몬스터 id 리스트
 
     //MonsterIDs를 뭘로할까? enum?
 }
