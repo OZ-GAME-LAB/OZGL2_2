@@ -88,6 +88,49 @@ public class ArtifactInventory
         return true;
     }
 
+    // 보유한 Instance의 중첩 1개 차감. 마지막 중첩이면 목록에서도 제거
+    public bool TryRemove(ArtifactInstance instance)
+    {
+        if (instance == null || instance.Data == null ||
+            !TryGetById(instance.Data.Id, out ArtifactInstance registered) || registered != instance)
+        {
+            return false;
+        }
+
+        if (!instance.TryDecreaseStack())
+        {
+            return false;
+        }
+
+        if (instance.StackCount == 0)
+        {
+            _instanceById.Remove(instance.Data.Id);
+            _instances.Remove(instance);
+        }
+
+        return true;
+    }
+
+    // 교환 조건을 모두 확인한 뒤 지급·차감. 처리 중 이벤트 발생 X
+    public bool TryExchange(ArtifactInstance owned, ArtifactInstance reward)
+    {
+        if (owned == null || reward == null || owned.Data == null || reward.Data == null ||
+            owned.Data == reward.Data || owned.Data.Rarity != reward.Data.Rarity || owned.StackCount < 1 ||
+            !TryGetById(owned.Data.Id, out ArtifactInstance registered) || registered != owned)
+        {
+            return false;
+        }
+
+        // 지급 실패 시 보유 아티팩트 차감 X. 성공 후에는 위에서 확인한 Instance만 차감
+        if (!TryAdd(reward))
+        {
+            return false;
+        }
+
+        TryRemove(owned);
+        return true;
+    }
+
     // Run 종료 시 호출 : 보유 목록 제거 (이미 비어 있으면 이벤트 발생 X)
     public void Clear()
     {

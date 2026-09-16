@@ -8,13 +8,24 @@ using UnityEngine;
 // 아티팩트 후보 생성·보유 상태를 관리하고 공통 창구에 효과를 등록
 public class ArtifactManager : MonoBehaviour
 {
+     // 보유 상태 변경 전에 준비한 중첩 수량과 효과
+    private struct PreparedChange
+    {
+        public ArtifactInstance Instance;
+        public int PreviousStacks;
+        public int CurrentStacks;
+        public ConvertedEffects Effects;
+    }
+
     public bool IsInitialized => _inventory != null;
     // 현재 웨이브가 분기의 마지막 웨이브인 경우 보스전으로 판단
     public bool IsBossWave => IsInitialized && _waveController != null && _waveController.IsLastWave;
     public IReadOnlyList<ArtifactInstance> Instances =>
         _inventory != null ? _inventory.Instances : new List<ArtifactInstance>();
 
-    // 획득·중첩 완료 후 Instance, 이전 중첩, 현재 중첩을 알림
+    public ArtifactCatalog ArtifactCatalog => _artifactCatalog;
+
+    // 획득·차감 완료 후 Instance, 이전 중첩, 현재 중첩을 알림 (0이면 제거)
     public event Action<ArtifactInstance, int, int> StackChanged;
 
     // 보유 목록 제거 후 제거된 Instance 전달 (효과 해제에 사용)
@@ -27,7 +38,9 @@ public class ArtifactManager : MonoBehaviour
     private WaveController _waveController;
     private ArtifactCandidateSelector _candidateSelector;
     private EffectManager _effectManager;
-    private bool _isAdding;
+    private bool _isChanging;
+
+   
 
     // 웨이브와 공통 효과 매니저를 주입받아 새로운 Run의 보유 목록을 준비
     public void Initialize(WaveController waveController, EffectManager effectManager)
@@ -88,7 +101,7 @@ public class ArtifactManager : MonoBehaviour
     {
         token.ThrowIfCancellationRequested();
 
-        if (!IsInitialized || _isAdding)
+        if (!IsInitialized || _isChanging)
         {
             Debug.LogWarning("[Artifacts/ArtifactManager] 초기화 및 획득 처리 완료 후 보상을 요청해주세요.", this);
             return UniTask.FromResult(false);
@@ -140,10 +153,111 @@ public class ArtifactManager : MonoBehaviour
             return false;
         }
 
-        if (_isAdding || _effectManager == null || !_inventory.CanAdd(artifact))
+        if (_isChanging || _effectManager == null)
         {
             return false;
-            
+        }
+
+        if (!TryPrepareAdd(artifact, out PreparedChange change) || !_inventory.TryAdd(change.Instance))
+        {
+            return false;
+        }
+
+        // 이벤트 처리 중 중복 획득·차감·종료 요청을 방지
+        _isChanging = true;
+        _effectManager.RegisterEffects(change.Instance, change.Effects);
+        StackChanged?.Invoke(change.Instance, change.PreviousStacks, change.CurrentStacks);
+        _isChanging = false;
+        return true;
+    }
+
+    // 아티팩트 중첩 1개 차감. 효과 변환 실패 시 기존 보유 상태 유지
+    public bool TryRemove(ArtifactData artifact)
+    {
+        if (!IsInitialized || _isChanging || _effectManager == null)
+        {
+            return false;
+        }
+
+        if (!TryPrepareRemove(artifact, out PreparedChange change) || !_inventory.TryRemove(change.Instance))
+        {
+            return false;
+        }
+
+        _isChanging = true;
+        if (change.CurrentStacks == 0)
+        {
+            _effectManager.RemoveEffects(change.Instance);
+        }
+        else
+        {
+            _effectManager.RegisterEffects(change.Instance, change.Effects);
+        }
+
+        StackChanged?.Invoke(change.Instance, change.PreviousStacks, change.CurrentStacks);
+        _isChanging = false;
+        return true;
+    }
+
+    // UI에 표시할 동일 등급의 보유 목록. 조회만 수행하며 동일 품목은 제외
+    public List<ArtifactInstance> GetExchangeCandidates(ArtifactData rewardArtifact)
+    {
+        List<ArtifactInstance> candidates = new List<ArtifactInstance>();
+        if (!IsInitialized || _isChanging || !_inventory.CanAdd(rewardArtifact))
+        {
+            return candidates;
+        }
+
+        foreach (ArtifactInstance instance in _inventory.Instances)
+        {
+            if (instance.StackCount > 0 && instance.Data != rewardArtifact &&
+                instance.Data.Rarity == rewardArtifact.Rarity)
+            {
+                candidates.Add(instance);
+            }
+        }
+
+        return candidates;
+    }
+
+    // 선택한 보유 아티팩트 1개를 같은 등급의 아티팩트 1개로 교환
+    public bool TryExchange(ArtifactData ownedArtifact, ArtifactData rewardArtifact)
+    {
+        if (!IsInitialized || _isChanging || _effectManager == null ||
+            ownedArtifact == null || rewardArtifact == null || ownedArtifact == rewardArtifact ||
+            ownedArtifact.Rarity != rewardArtifact.Rarity)
+        {
+            return false;
+        }
+
+        // 양쪽 준비가 모두 성공해야 실제 보유 상태 변경
+        if (!TryPrepareRemove(ownedArtifact, out PreparedChange remove) ||
+            !TryPrepareAdd(rewardArtifact, out PreparedChange add))
+        {
+            return false;
+        }
+
+        if (!_inventory.TryExchange(remove.Instance, add.Instance))
+        {
+            return false;
+        }
+
+        // 보유 상태와 효과가 모두 갱신된 후 알림. 이벤트 중 추가 변경 요청 차단
+        _isChanging = true;
+        _effectManager.RegisterExchangeEffects(remove.Instance, remove.Effects, add.Instance, add.Effects);
+        StackChanged?.Invoke(remove.Instance, remove.PreviousStacks, remove.CurrentStacks);
+        StackChanged?.Invoke(add.Instance, add.PreviousStacks, add.CurrentStacks);
+        _isChanging = false;
+        return true;
+    }
+
+    // 획득 가능 여부와 증가 후 효과만 준비. 보유 상태 변경 X
+    private bool TryPrepareAdd(ArtifactData artifact, out PreparedChange change)
+    {
+        change = default;
+        if (!_inventory.CanAdd(artifact))
+        {
+            return false;
         }
 
         int previousStacks = 0;
@@ -158,29 +272,54 @@ public class ArtifactManager : MonoBehaviour
 
         int currentStacks = previousStacks + 1;
         if (!_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects,
-            artifact.CurrencyEffects, currentStacks, out ConvertedEffects converted))
+            artifact.CurrencyEffects, currentStacks, out ConvertedEffects effects))
         {
             return false;
         }
 
-        // 변환 성공 후 보유 상태 변경 (아직 이벤트 발생 X)
-        if (!_inventory.TryAdd(instance))
+        change = new PreparedChange
+        {
+            Instance = instance,
+            PreviousStacks = previousStacks,
+            CurrentStacks = currentStacks,
+            Effects = effects
+        };
+        return true;
+    }
+
+    // 보유 여부와 감소 후 효과만 준비. 마지막 중첩은 효과 제거를 위해 null 유지
+    private bool TryPrepareRemove(ArtifactData artifact, out PreparedChange change)
+    {
+        change = default;
+        if (artifact == null ||
+            !_inventory.TryGetById(artifact.Id, out ArtifactInstance instance) ||
+            instance.Data != artifact || instance.StackCount < 1)
         {
             return false;
         }
 
-        // 이벤트 처리 중 중복 획득·종료 요청을 방지
-        _isAdding = true;
-        _effectManager.RegisterEffects(instance, converted);
-        StackChanged?.Invoke(instance, previousStacks, currentStacks);
-        _isAdding = false;
+        int currentStacks = instance.StackCount - 1;
+        ConvertedEffects effects = null;
+        if (currentStacks > 0 && !_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects,
+            artifact.CurrencyEffects, currentStacks, out effects))
+        {
+            return false;
+        }
+
+        change = new PreparedChange
+        {
+            Instance = instance,
+            PreviousStacks = instance.StackCount,
+            CurrentStacks = currentStacks,
+            Effects = effects
+        };
         return true;
     }
 
     // 정산 완료 후 호출 : 보유 목록 제거 및 Inventory 구독 해제
     public bool TryEndRun()
     {
-        if (!IsInitialized || _isAdding)
+        if (!IsInitialized || _isChanging)
         {
             return false;
         }

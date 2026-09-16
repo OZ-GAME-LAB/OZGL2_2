@@ -17,7 +17,8 @@ public class CurrencyTestPanel : MonoBehaviour
     [SerializeField] private CurrencyData _bloodstone;
 
     private bool _subscribed;
-    private bool _showArtifacts;
+    [SerializeField] private ShopTestPanel _shopTestPanel;
+    private bool _waitingForContent;
     private int _eventCount;
     private CurrencyData _lastCurrency;
     private int _lastBefore;
@@ -29,6 +30,7 @@ public class CurrencyTestPanel : MonoBehaviour
     private Vector2 _scrollPosition;
     private int _passed;
     private int _failed;
+    private GameFlowController _testFlow;
 
     private void Start() => Subscribe();
 
@@ -94,17 +96,30 @@ public class CurrencyTestPanel : MonoBehaviour
     public void StartRun()
     {
         if (!Ready()) return;
+        if (_waitingForContent) return;
         bool newRun = !_run.IsInitialized;
+        if (newRun && _shopTestPanel != null) { _shopTestPanel.ResetPanel(); }
         _persistent.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
         _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
         if (_run.IsInitialized)
         {
             if (newRun)
             {
-                _waveController.BeginRun();
+                if (_testFlow != null)
+                {
+                    _testFlow.ResetRun();
+                }
+                else
+                {
+                    _waveController.BeginRun();
+                }
                 _lastWaveReward = "마지막 웨이브 지급: 없음";
             }
-            EnsureWaveStarted();
+            if (!EnsureWaveStarted())
+            {
+                Report("웨이브 시작 — Wave Catalog 설정 확인", false);
+                return;
+            }
             if (_artifactTestPanel != null)
             {
                 _artifactTestPanel.Initialize();
@@ -124,6 +139,8 @@ public class CurrencyTestPanel : MonoBehaviour
         {
             _artifactTestPanel.EndRun();
         }
+        _waitingForContent = false;
+        if (_shopTestPanel != null) { _shopTestPanel.ResetPanel(); }
         Report("Run 종료", _run.TryEndRun());
     }
 
@@ -133,83 +150,126 @@ public class CurrencyTestPanel : MonoBehaviour
         Debug.Log($"[Economy/Test] {_result}", this);
     }
 
+    // 세 패널을 한 화면에서 배치. 작은 화면은 전체 UI를 같은 비율로 축소
     private void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(12, 12, 480, Mathf.Max(100, Screen.height - 24)), GUI.skin.box);
-        GUILayout.Label("재화 테스트 — EconomyTestScene");
+        float scale = Mathf.Min(1f, Screen.width / 1200f);
+        Matrix4x4 previousMatrix = GUI.matrix;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
+        float height = Mathf.Max(150, Screen.height / scale - 24);
+        GUILayout.BeginArea(new Rect(12, 12, 376, height), GUI.skin.box);
+        DrawCurrencyPanel();
+        GUILayout.EndArea();
+        GUILayout.BeginArea(new Rect(400, 12, 376, height), GUI.skin.box);
+        if (_artifactTestPanel != null)
+        {
+            _artifactTestPanel.DrawPanel(_run != null && _run.IsInitialized);
+        }
+        GUILayout.EndArea();
+        GUILayout.BeginArea(new Rect(788, 12, 400, height), GUI.skin.box);
+        if (_shopTestPanel != null)
+        {
+            _shopTestPanel.DrawPanel();
+        }
+        GUILayout.EndArea();
+        GUI.matrix = previousMatrix;
+    }
+
+    private void DrawCurrencyPanel()
+    {
+        GUILayout.Label("재화 / 진행");
         if (!Ready())
         {
             GUILayout.Label(_result);
-            GUILayout.EndArea();
             return;
-        }
-
-        if (_artifactTestPanel != null)
-        {
-            _showArtifacts = GUILayout.Toggle(_showArtifacts, "아티팩트 테스트 탭 (해제하면 재화 테스트)");
         }
         _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
-        if (_showArtifacts && _artifactTestPanel != null)
+        GUILayout.Label($"현재: {_waveController.CurQuarter}분기 / {_waveController.CurWave}웨이브");
+        GUILayout.Label($"골드 {_run.GetBalance(CurrencyType.Gold)} / 보석 {_run.GetBalance(CurrencyType.Gem)}");
+        GUILayout.Label($"혈석 {_persistent.GetBalance(CurrencyType.Bloodstone)}");
+        GUILayout.Label(_result);
+        if (!_run.IsInitialized)
         {
-            if (GUILayout.Button("Run 시작 / 아티팩트 참조 연결"))
+            if (GUILayout.Button("Run 시작"))
             {
                 StartRun();
+                GUIUtility.ExitGUI();
             }
-            if (GUILayout.Button("Run 종료 (정산은 재화 탭에서 먼저 실행)"))
-            {
-                EndRun();
-            }
-            _artifactTestPanel.DrawPanel(_run.IsInitialized);
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
-            return;
-        }
-        GUILayout.Label($"Run: {(_run.IsInitialized ? "활성" : "비활성")}");
-        if (_waveController.CurQuarter > 0 && _waveController.CurWave > 0)
-        {
-            int rewardQuarter = Mathf.Min(_waveController.CurQuarter, WaveController.MAIN_QUARTERS);
-            GUILayout.Label($"다음 지급: {_waveController.CurQuarter}분기 / {_waveController.CurWave}웨이브 (보상 테이블: {rewardQuarter}분기)");
         }
         else
         {
-            GUILayout.Label("다음 지급: Run 시작 시 1분기 / 1웨이브 준비");
+            if (GUILayout.Button("Run 종료"))
+            {
+                EndRun();
+                GUIUtility.ExitGUI();
+            }
+            if (!_waitingForContent)
+            {
+                if (GUILayout.Button("웨이브 보상 지급"))
+                {
+                    BeginWaveReward();
+                    GUIUtility.ExitGUI();
+                }
+                if (GUILayout.Button("이번 웨이브 = 상점"))
+                {
+                    bool opened = _shopTestPanel != null && _shopTestPanel.TryOpen(CompleteContent);
+                    _waitingForContent = opened;
+                    Report("상점 열기", opened);
+                    GUIUtility.ExitGUI();
+                }
+            }
+            else
+            {
+                GUILayout.Label("아티팩트 선택 또는 상점 종료를 기다리는 중");
+            }
+            if (GUILayout.Button("테스트 골드 +1000"))
+            {
+                Report("골드 지급", _run.TryAdd(CurrencyType.Gold, 1000));
+                GUIUtility.ExitGUI();
+            }
         }
         GUILayout.Label(_lastWaveReward);
-        GUILayout.Label($"Type 조회 — 골드: {_run.GetBalance(CurrencyType.Gold)} / 보석: {_run.GetBalance(CurrencyType.Gem)} / 혈석: {_persistent.GetBalance(CurrencyType.Bloodstone)}");
-        DrawBalances("Run", _run.Balances);
-        DrawBalances("Persistent", _persistent.Balances);
-        GUILayout.Label($"이벤트 수: {_eventCount}");
-        GUILayout.Label(_lastEvent);
-        GUILayout.Space(8);
-        if (GUILayout.Button("Run 시작 — 매니저 Inspector 설정 사용")) StartRun();
-        if (GUILayout.Button("Run 종료")) EndRun();
-        DrawCurrencyButtons(_gold, 100, false);
-        DrawCurrencyButtons(_gem, 1, false);
-        DrawCurrencyButtons(_bloodstone, 10, true);
-        GUILayout.BeginHorizontal();
-        if (GUILayout.Button("웨이브 보상 지급 → 다음 웨이브"))
-            Report("웨이브 보상", TryApplyCurrentWaveReward(advanceAfterReward: true));
-        if (GUILayout.Button("생산 골드 +50"))
-            Report("생산 보상", _run.TryApplyProductionReward(_gold.Type, 50));
-        GUILayout.EndHorizontal();
-        GUILayout.Label($"정산 기준: 현재 {_waveController.CurQuarter}분기 / {_waveController.CurWave}웨이브");
-        GUILayout.Label("현재 웨이브까지 포함한 임시 정산. 승패 구분은 정산 구조체 연결 시 반영");
-        if (GUILayout.Button("혈석 정산 지급 테스트"))
-        {
-            ApplySettlementAsync().Forget();
-        }
-        if (GUILayout.Button("골드 501 소비 가능 여부 확인"))
-            Report("CanSpend 골드 501", _run.CanSpend(_gold.Type, 501));
-        GUILayout.Space(8);
-        GUILayout.Label("시작 재화는 Inspector 설정을 사용하고, 지급·소비 검사용 잔액은 자동 준비합니다.");
-        GUILayout.Label("웨이브 보상은 지급 성공 시에만 진행합니다. Wave Catalog와 보상 테이블을 연결하세요.");
-        GUILayout.Label("기본 검증은 현재 Run을 초기화합니다. 혈석은 검증 후 복원합니다.");
-        if (GUILayout.Button("기본 시나리오 전체 검증")) RunChecks();
-        GUILayout.Label(_result);
         GUILayout.EndScrollView();
-        GUILayout.EndArea();
     }
 
+    private void BeginWaveReward()
+    {
+        if (_waitingForContent || _artifactTestPanel == null || !EnsureWaveStarted() ||
+            !_artifactTestPanel.TryPrepareReward())
+        {
+            Report("보상 후보 준비", false);
+            return;
+        }
+        if (!TryApplyCurrentWaveReward())
+        {
+            _artifactTestPanel.CancelReward();
+            Report("웨이브 보상 지급", false);
+            return;
+        }
+        _waitingForContent = true;
+        _artifactTestPanel.ShowReward(_run.CurrentGoldReward, _run.CurrentGemReward, CompleteContent);
+        Report("웨이브 보상 지급 — 아티팩트를 선택하세요", true);
+    }
+
+    private void CompleteContent()
+    {
+        if (!_waitingForContent || !_run.IsInitialized)
+        {
+            return;
+        }
+        int quarter = _waveController.CurQuarter;
+        int wave = _waveController.CurWave;
+        if (_waveController.IsLastWave)
+        {
+            _waveController.ProgressQuarter();
+        }
+        else
+        {
+            _waveController.ProgressStage();
+        }
+        _waitingForContent = false;
+        Report("다음 웨이브 진행", quarter != _waveController.CurQuarter || wave != _waveController.CurWave);
+    }
     private void DrawBalances(string label, IReadOnlyDictionary<CurrencyData, int> balances)
     {
         if (balances == null)
@@ -343,12 +403,27 @@ public class CurrencyTestPanel : MonoBehaviour
         else Debug.LogError($"[Economy/Test] {_result}", this);
     }
 
-    private void EnsureWaveStarted()
+    private bool EnsureWaveStarted()
     {
         if (_waveController.CurQuarter < 1 || _waveController.CurWave < 1)
         {
+            // 실제 플로우가 연결된 경우 먼저 기존 BeginRun 사용
             _waveController.BeginRun();
+            if (_waveController.CurQuarter < 1 && _testFlow == null)
+            {
+                // 독립 테스트 씬도 현재 진행 상태를 소유하는 GameFlow 연결 필요
+                var host = new GameObject("EconomyTestFlow");
+                host.transform.SetParent(transform);
+                _testFlow = host.AddComponent<GameFlowController>();
+                var waiting = host.AddComponent<TestWaitingScript>();
+                waiting.Initialize(_testFlow, _waveController);
+                _testFlow.Initialize(_waveController, waiting,
+                    _artifactTestPanel != null ? _artifactTestPanel.Artifacts : null);
+                _waveController.Initialize(_testFlow, new TestSpawner());
+                _testFlow.BeginRun();
+            }
         }
+        return _waveController.CurQuarter > 0 && _waveController.CurWave > 0;
     }
 
     private bool TryApplyCurrentWaveReward(bool advanceAfterReward = false)
@@ -356,7 +431,10 @@ public class CurrencyTestPanel : MonoBehaviour
         if (!_run.IsInitialized)
             return false;
 
-        EnsureWaveStarted();
+        if (!EnsureWaveStarted())
+        {
+            return false;
+        }
         int quarter = _waveController.CurQuarter;
         int wave = _waveController.CurWave;
         // 게임 플로우 없는 테스트 씬에서는 준비 단계를 직접 실행
