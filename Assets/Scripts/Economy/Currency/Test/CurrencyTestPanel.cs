@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using Game.Core;
 using UnityEngine;
 
@@ -192,16 +193,11 @@ public class CurrencyTestPanel : MonoBehaviour
             Report("생산 보상", _run.TryApplyProductionReward(_gold.Type, 50));
         GUILayout.EndHorizontal();
         GUILayout.Label($"정산 기준: 현재 {_waveController.CurQuarter}분기 / {_waveController.CurWave}웨이브");
-        GUILayout.Label("승리는 현재 웨이브 포함, 패배는 제외. 진행 버튼을 눌렀다면 이미 다음 웨이브 위치입니다.");
-        if (GUILayout.Button("현재 웨이브 패배로 혈석 정산"))
+        GUILayout.Label("현재 웨이브까지 포함한 임시 정산. 승패 구분은 정산 구조체 연결 시 반영");
+        if (GUILayout.Button("혈석 정산 지급 테스트"))
         {
-            Report("패배 정산", _persistent.TryApplyReward(ResultType.Defeat));
+            ApplySettlementAsync().Forget();
         }
-        if (GUILayout.Button("현재 웨이브 승리로 혈석 정산"))
-        {
-            Report("승리 정산", _persistent.TryApplyReward(ResultType.Victory));
-        }
-        GUILayout.Label("정산식: 클리어 웨이브 × (1 + 클리어 보스). 테스트 버튼은 누를 때마다 지급");
         if (GUILayout.Button("골드 501 소비 가능 여부 확인"))
             Report("CanSpend 골드 501", _run.CanSpend(_gold.Type, 501));
         GUILayout.Space(8);
@@ -241,6 +237,11 @@ public class CurrencyTestPanel : MonoBehaviour
 
     [ContextMenu("Test/Run Basic Checks (Resets Run)")]
     public void RunChecks()
+    {
+        RunChecksAsync().Forget();
+    }
+
+    private async UniTask RunChecksAsync()
     {
         if (!Ready()) return;
         if (_effectManager != null && _effectManager.CurrencyModifiers.Count > 0)
@@ -309,7 +310,7 @@ public class CurrencyTestPanel : MonoBehaviour
             PrepareRunBalance(_gold, 100);
             PrepareRunBalance(_gem, 0);
             CheckReward("생산 보상", _gold, _run.TryApplyProductionReward);
-            CheckSettlementReward();
+            await CheckSettlementReward();
             events = _eventCount;
             Check(_run.TryEndRun() && !_run.IsInitialized && _run.GetBalance(_gold.Type) == 0 &&
                 _run.GetBalance(_gem.Type) == 0 && _persistent.GetBalance(_bloodstone.Type) == 20 && _eventCount == events,
@@ -381,22 +382,35 @@ public class CurrencyTestPanel : MonoBehaviour
         return true;
     }
 
-    private void CheckSettlementReward()
+    private bool _settlementPending;
+
+    private async UniTask ApplySettlementAsync()
     {
+        if (!Ready() || _settlementPending)
+        {
+            return;
+        }
+        _settlementPending = true;
         int before = _persistent.GetBalance(_bloodstone.Type);
-        int victoryWaves = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE + _waveController.CurWave;
-        int defeatWaves = victoryWaves - 1;
-        int victoryReward = victoryWaves * (1 + victoryWaves / WaveController.MAX_WAVE);
-        int defeatReward = defeatWaves * (1 + defeatWaves / WaveController.MAX_WAVE);
-        CheckChange("현재 웨이브 제외 패배 정산", _bloodstone,
-            () => _persistent.TryApplyReward(ResultType.Defeat), true, before + defeatReward);
-        CheckChange("현재 웨이브 포함 승리 정산", _bloodstone,
-            () => _persistent.TryApplyReward(ResultType.Victory), true, before + defeatReward + victoryReward);
-        int balance = _persistent.GetBalance(_bloodstone.Type);
-        if (balance < before || !_persistent.TrySpend(_bloodstone.Type, balance - before))
-            throw new InvalidOperationException("혈석 정산 검사 후 잔액 복원 실패");
+        await _persistent.TryApplyReward();
+        int after = _persistent.GetBalance(_bloodstone.Type);
+        _result = $"정산 호출 완료: 혈석 {before} → {after} (실패 여부는 Console 확인)";
+        _settlementPending = false;
     }
 
+    private async UniTask CheckSettlementReward()
+    {
+        int before = _persistent.GetBalance(_bloodstone.Type);
+        int clearedWaves = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE + _waveController.CurWave;
+        int expectedReward = clearedWaves * (1 + clearedWaves / WaveController.MAX_WAVE);
+        await _persistent.TryApplyReward();
+        int balance = _persistent.GetBalance(_bloodstone.Type);
+        Check(balance == before + expectedReward, "현재 웨이브 포함 임시 정산 수량 확인");
+        if (balance < before || !_persistent.TrySpend(_bloodstone.Type, balance - before))
+        {
+            throw new InvalidOperationException("혈석 정산 검사 후 잔액 복원 실패");
+        }
+    }
     private void CheckBalanceAccess(CurrencyData currency, CurrencyType expectedType)
     {
         var balances = currency.Lifetime == CurrencyLifetime.Run ? _run.Balances : _persistent.Balances;
