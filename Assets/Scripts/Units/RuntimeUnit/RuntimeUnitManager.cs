@@ -13,6 +13,8 @@ namespace Units
 
         private bool _battleStarted;
 
+        private bool _battleEnded;
+
         private bool _isAllySpawnCompleted;
 
         private bool _isEnemySpawnCompleted;
@@ -82,6 +84,9 @@ namespace Units
 
         public event Action<Unit_Gateway>
             UnitDied;
+
+        public event Action<UnitTeam>
+            TeamWiped;
 
         public event Action
             PreparationCompleted;
@@ -406,12 +411,78 @@ namespace Units
             );
         }
 
-
         private void HandleGroupEliminated(
             Unit_GroupAI group)
         {
-            UnregisterGroup(
-                group
+            if (group == null)
+                return;
+
+
+            UnitTeam team =
+                group.Team;
+
+
+            if (!UnregisterGroup(
+                group))
+            {
+                return;
+            }
+
+
+            TryNotifyTeamWiped(
+                team
+            );
+        }
+
+        private void TryNotifyTeamWiped(
+            UnitTeam team)
+        {
+            if (!_battleStarted)
+                return;
+
+
+            if (_battleEnded)
+                return;
+
+
+            bool isWiped;
+
+
+            switch (team)
+            {
+                case UnitTeam.Ally:
+                    isWiped =
+                        _allyGroups.Count == 0;
+
+                    break;
+
+                case UnitTeam.Enemy:
+                    isWiped =
+                        _enemyGroups.Count == 0;
+
+                    break;
+
+                default:
+                    return;
+            }
+
+
+            if (!isWiped)
+                return;
+
+
+            _battleEnded =
+                true;
+
+
+            Debug.Log(
+                $"[RuntimeUnitManager] " +
+                $"{team} 진영 전멸."
+            );
+
+
+            TeamWiped?.Invoke(
+                team
             );
         }
 
@@ -665,6 +736,22 @@ namespace Units
         }
 
 
+        public bool GetRemain(
+            out int enemy,
+            out int allies)
+        {
+            enemy =
+                _enemyUnits.Count;
+
+            allies =
+                _allyUnits.Count;
+
+
+            return enemy == 0 ||
+                   allies == 0;
+        }
+
+
         // =========================
         // Runtime Clear
         // =========================
@@ -693,6 +780,9 @@ namespace Units
 
 
             _battleStarted =
+                false;
+
+            _battleEnded =
                 false;
 
             _isAllySpawnCompleted =

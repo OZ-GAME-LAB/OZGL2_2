@@ -4,6 +4,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using Units.UnitDatas;
 using UnityEngine;
+using Game.Core;
 
 
 namespace Units
@@ -90,11 +91,13 @@ namespace Units
         // ============================================================
 
         internal async UniTask SpawnWaveAsync(
-            IReadOnlyList<EnemySpawnRequest> requests,
+            int cost,
+            SpawnContext context,
             CancellationToken cancellationToken)
         {
             if (!ValidateWaveRequest(
-                requests))
+                cost,
+                context))
             {
                 return;
             }
@@ -106,7 +109,8 @@ namespace Units
             List<EnemyGroupSpawnData>
                 groupSpawnDataList =
                     BuildGroupSpawnData(
-                        requests
+                        cost,
+                        context
                     );
 
 
@@ -248,55 +252,423 @@ namespace Units
 
 
         // ============================================================
-        // Spawn Request
+        // Spawn Data Build
         // ============================================================
 
         private List<EnemyGroupSpawnData>
             BuildGroupSpawnData(
-                IReadOnlyList<EnemySpawnRequest> requests)
+                int cost,
+                SpawnContext context)
         {
             List<EnemyGroupSpawnData>
                 groupSpawnDataList =
                     new();
 
 
-            for (int i = 0;
-                 i < requests.Count;
-                 i++)
-            {
-                EnemySpawnRequest request =
-                    requests[i];
-
-
-                if (request == null)
-                {
-                    Debug.LogWarning(
-                        $"[EnemyWaveSpawner] " +
-                        $"EnemySpawnRequest가 null입니다. " +
-                        $"Index={i}"
+            List<ClassSpawnData>
+                classSpawnDataList =
+                    BuildClassSpawnData(
+                        context
                     );
 
-                    continue;
-                }
+
+            if (classSpawnDataList.Count == 0)
+            {
+                return groupSpawnDataList;
+            }
 
 
-                if (!ValidateSpawnRequest(
-                    request.UnitType,
-                    request.Count))
-                {
-                    continue;
-                }
+            if (!AllocateCostToClasses(
+                cost,
+                classSpawnDataList))
+            {
+                return groupSpawnDataList;
+            }
 
 
-                AddGroupSpawnData(
-                    request.UnitType,
-                    request.Count,
+            for (int i = 0;
+                 i < classSpawnDataList.Count;
+                 i++)
+            {
+                ClassSpawnData classSpawnData =
+                    classSpawnDataList[i];
+
+
+                AddClassGroupSpawnData(
+                    classSpawnData,
                     groupSpawnDataList
                 );
             }
 
 
             return groupSpawnDataList;
+        }
+
+
+        private List<ClassSpawnData>
+            BuildClassSpawnData(
+                SpawnContext context)
+        {
+            List<ClassSpawnData>
+                classSpawnDataList =
+                    new();
+
+
+            HashSet<EnemyUnitType>
+                registeredUnitTypes =
+                    new();
+
+
+            for (int i = 0;
+                 i < context.MonsterIDs.Count;
+                 i++)
+            {
+                EnemyUnitType unitType =
+                    context.MonsterIDs[i];
+
+
+                // SpawnContext에 같은 ID가 중복으로 들어와도
+                // 동일 UnitType은 한 번만 Spawn 후보에 등록한다.
+                if (!registeredUnitTypes.Add(
+                    unitType))
+                {
+                    continue;
+                }
+
+
+                if (!_spawnEntries.TryGetValue(
+                    unitType,
+                    out EnemySpawnEntry entry))
+                {
+                    Debug.LogWarning(
+                        $"[EnemyWaveSpawner] " +
+                        $"SpawnContext에 등록되지 않은 " +
+                        $"EnemyUnitType이 포함되어 있습니다 : " +
+                        $"{unitType}"
+                    );
+
+                    continue;
+                }
+
+
+                EnemyUnitClass unitClass =
+                    entry.UnitClass;
+
+
+                if (unitClass ==
+                    EnemyUnitClass.Default)
+                {
+                    Debug.LogWarning(
+                        $"[EnemyWaveSpawner] " +
+                        $"Default Class는 Wave Spawn 대상이 아닙니다 : " +
+                        $"{unitType}"
+                    );
+
+                    continue;
+                }
+
+
+                int weight =
+                    GetClassWeight(
+                        unitClass,
+                        context.Weights
+                    );
+
+
+                // Weight가 0인 Class는
+                // MonsterID가 존재해도 이번 Wave에서는 Spawn하지 않는다.
+                if (weight <= 0)
+                {
+                    continue;
+                }
+
+
+                ClassSpawnData classSpawnData =
+                    FindClassSpawnData(
+                        classSpawnDataList,
+                        unitClass
+                    );
+
+
+                if (classSpawnData == null)
+                {
+                    classSpawnData =
+                        new ClassSpawnData(
+                            unitClass,
+                            weight
+                        );
+
+
+                    classSpawnDataList.Add(
+                        classSpawnData
+                    );
+                }
+
+
+                classSpawnData.UnitTypes.Add(
+                    unitType
+                );
+            }
+
+
+            return classSpawnDataList;
+        }
+
+
+        private ClassSpawnData FindClassSpawnData(
+            IReadOnlyList<ClassSpawnData> classSpawnDataList,
+            EnemyUnitClass unitClass)
+        {
+            for (int i = 0;
+                 i < classSpawnDataList.Count;
+                 i++)
+            {
+                if (classSpawnDataList[i].UnitClass ==
+                    unitClass)
+                {
+                    return classSpawnDataList[i];
+                }
+            }
+
+
+            return null;
+        }
+
+
+        private int GetClassWeight(
+            EnemyUnitClass unitClass,
+            ClassWeights weights)
+        {
+            switch (unitClass)
+            {
+                case EnemyUnitClass.Tanker:
+                    return weights.Tanker;
+
+                case EnemyUnitClass.Bruiser:
+                    return weights.Bruiser;
+
+                case EnemyUnitClass.Assassin:
+                    return weights.Assassin;
+
+                case EnemyUnitClass.RangedPhysical:
+                    return weights.RangedPhysical;
+
+                case EnemyUnitClass.RangedMagic:
+                    return weights.RangedMagic;
+
+                case EnemyUnitClass.Supporter:
+                    return weights.Supporter;
+
+                default:
+                    return 0;
+            }
+        }
+
+
+        private bool AllocateCostToClasses(
+            int cost,
+            List<ClassSpawnData> classSpawnDataList)
+        {
+            int totalWeight =
+                0;
+
+
+            for (int i = 0;
+                 i < classSpawnDataList.Count;
+                 i++)
+            {
+                totalWeight +=
+                    classSpawnDataList[i].Weight;
+            }
+
+
+            if (totalWeight <= 0)
+            {
+                Debug.LogWarning(
+                    "[EnemyWaveSpawner] " +
+                    "Spawn 가능한 Class Weight의 합이 0입니다."
+                );
+
+                return false;
+            }
+
+
+            int allocatedCost =
+                0;
+
+
+            for (int i = 0;
+                 i < classSpawnDataList.Count;
+                 i++)
+            {
+                ClassSpawnData classSpawnData =
+                    classSpawnDataList[i];
+
+
+                float exactCost =
+                    cost *
+                    ((float)classSpawnData.Weight /
+                     totalWeight);
+
+
+                int baseCost =
+                    Mathf.FloorToInt(
+                        exactCost
+                    );
+
+
+                classSpawnData.AllocatedCost =
+                    baseCost;
+
+                classSpawnData.Remainder =
+                    exactCost -
+                    baseCost;
+
+
+                allocatedCost +=
+                    baseCost;
+            }
+
+
+            int remainingCost =
+                cost -
+                allocatedCost;
+
+
+            while (remainingCost > 0)
+            {
+                int targetIndex =
+                    FindHighestRemainderClassIndex(
+                        classSpawnDataList
+                    );
+
+
+                if (targetIndex < 0)
+                {
+                    Debug.LogError(
+                        "[EnemyWaveSpawner] " +
+                        "남은 Cost를 배분할 Class를 찾지 못했습니다."
+                    );
+
+                    return false;
+                }
+
+
+                classSpawnDataList[
+                    targetIndex
+                ].AllocatedCost++;
+
+
+                // 동일한 Class가 다시 선택되지 않도록 한다.
+                // 나머지 Cost는 최대 Class 수보다 작기 때문에
+                // Largest Remainder 방식에서는 한 번만 배정하면 된다.
+                classSpawnDataList[
+                    targetIndex
+                ].Remainder =
+                    -1f;
+
+
+                remainingCost--;
+            }
+
+
+            return true;
+        }
+
+
+        private int FindHighestRemainderClassIndex(
+            IReadOnlyList<ClassSpawnData> classSpawnDataList)
+        {
+            int targetIndex =
+                -1;
+
+            float highestRemainder =
+                -1f;
+
+
+            for (int i = 0;
+                 i < classSpawnDataList.Count;
+                 i++)
+            {
+                ClassSpawnData classSpawnData =
+                    classSpawnDataList[i];
+
+
+                if (classSpawnData.Remainder <=
+                    highestRemainder)
+                {
+                    continue;
+                }
+
+
+                highestRemainder =
+                    classSpawnData.Remainder;
+
+                targetIndex =
+                    i;
+            }
+
+
+            return targetIndex;
+        }
+
+
+        private void AddClassGroupSpawnData(
+            ClassSpawnData classSpawnData,
+            List<EnemyGroupSpawnData> groupSpawnDataList)
+        {
+            if (classSpawnData.AllocatedCost <= 0)
+                return;
+
+
+            if (classSpawnData.UnitTypes.Count == 0)
+                return;
+
+
+            int unitTypeCount =
+                classSpawnData.UnitTypes.Count;
+
+
+            int baseCount =
+                classSpawnData.AllocatedCost /
+                unitTypeCount;
+
+
+            int remainingCount =
+                classSpawnData.AllocatedCost %
+                unitTypeCount;
+
+
+            for (int i = 0;
+                 i < unitTypeCount;
+                 i++)
+            {
+                int spawnCount =
+                    baseCount;
+
+
+                // 동일 Class 안에서 나머지가 발생하면
+                // SpawnContext의 MonsterIDs 등록 순서대로 배분한다.
+                if (i < remainingCount)
+                {
+                    spawnCount++;
+                }
+
+
+                if (spawnCount <= 0)
+                    continue;
+
+
+                EnemyUnitType unitType =
+                    classSpawnData.UnitTypes[i];
+
+
+                AddGroupSpawnData(
+                    unitType,
+                    spawnCount,
+                    groupSpawnDataList
+                );
+            }
         }
 
 
@@ -893,7 +1265,8 @@ namespace Units
 
 
         private bool ValidateWaveRequest(
-            IReadOnlyList<EnemySpawnRequest> requests)
+            int cost,
+            SpawnContext context)
         {
             if (_runtimeUnitManager == null)
             {
@@ -962,45 +1335,23 @@ namespace Units
             }
 
 
-            if (requests == null ||
-                requests.Count == 0)
+            if (cost <= 0)
+            {
+                Debug.LogWarning(
+                    $"[EnemyWaveSpawner] " +
+                    $"잘못된 Spawn Cost : {cost}"
+                );
+
+                return false;
+            }
+
+
+            if (context.MonsterIDs == null ||
+                context.MonsterIDs.Count == 0)
             {
                 Debug.LogWarning(
                     "[EnemyWaveSpawner] " +
-                    "Enemy Spawn Request가 없습니다."
-                );
-
-                return false;
-            }
-
-
-            return true;
-        }
-
-
-        private bool ValidateSpawnRequest(
-            EnemyUnitType unitType,
-            int count)
-        {
-            if (count <= 0)
-            {
-                Debug.LogWarning(
-                    $"[EnemyWaveSpawner] " +
-                    $"잘못된 Spawn Count : " +
-                    $"{unitType} / {count}"
-                );
-
-                return false;
-            }
-
-
-            if (!_spawnEntries.ContainsKey(
-                unitType))
-            {
-                Debug.LogError(
-                    $"[EnemyWaveSpawner] " +
-                    $"등록되지 않은 EnemyUnitType : " +
-                    $"{unitType}"
+                    "Spawn 가능한 MonsterID가 없습니다."
                 );
 
                 return false;
@@ -1056,6 +1407,44 @@ namespace Units
         // ============================================================
         // Spawn Data
         // ============================================================
+
+        private sealed class ClassSpawnData
+        {
+            internal EnemyUnitClass
+                UnitClass
+            { get; }
+
+            internal int
+                Weight
+            { get; }
+
+            internal List<EnemyUnitType>
+                UnitTypes
+            { get; }
+
+            internal int
+                AllocatedCost
+            { get; set; }
+
+            internal float
+                Remainder
+            { get; set; }
+
+
+            internal ClassSpawnData(
+                EnemyUnitClass unitClass,
+                int weight)
+            {
+                UnitClass =
+                    unitClass;
+
+                Weight =
+                    weight;
+
+                UnitTypes =
+                    new List<EnemyUnitType>();
+            }
+        }
 
         private readonly struct EnemyGroupSpawnData
         {
