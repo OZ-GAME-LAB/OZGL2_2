@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Units;
 using UnityEngine;
 
 [Serializable]
@@ -12,7 +13,7 @@ public class WaveGroup
 [Serializable]
 public class FactionWaveGroup
 {
-    public EnemyFaction Faction;
+    public EnemyUnitFaction Faction;
     public List<WaveGroup> Groups = new List<WaveGroup>();
 }
 
@@ -21,7 +22,7 @@ public class WaveSODictionary : ScriptableObject
 {
     public List<FactionWaveGroup> Groups = new List<FactionWaveGroup>();
 
-    private Dictionary<EnemyFaction, List<WaveGroup>> _waveDictionary;
+    private Dictionary<EnemyUnitFaction, List<WaveGroup>> _waveDictionary;
 
     private void OnEnable()
     {
@@ -36,7 +37,7 @@ public class WaveSODictionary : ScriptableObject
     // 런타임에 원본 리스트 구성을 변경했다면 다시 호출한다.
     public void RebuildDictionary()
     {
-        _waveDictionary = new Dictionary<EnemyFaction, List<WaveGroup>>();
+        _waveDictionary = new Dictionary<EnemyUnitFaction, List<WaveGroup>>();
         if (Groups == null) return;
 
         foreach (var entry in Groups)
@@ -70,14 +71,14 @@ public class WaveSODictionary : ScriptableObject
         int currentQuarter,
         WaveBattleType battleType,
         out WaveSO result,
-        out EnemyFaction faction)
+        out EnemyUnitFaction faction)
     {
         if (_waveDictionary == null)
             RebuildDictionary();
 
         var candidates = new List<WaveSO>();
         var seen = new HashSet<WaveSO>();
-        var factions = new List<EnemyFaction>();
+        var factions = new List<EnemyUnitFaction>();
 
         foreach (var entry in _waveDictionary)
         {
