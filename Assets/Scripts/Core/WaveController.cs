@@ -73,8 +73,11 @@ namespace Game.Core
         // 전투 준비 및 승패 판정
         public UniTask PrepareEnemy(float time, CancellationToken token)
         {
+            SpawnContext context = new(
+                weights:CurrentPreset.Weights, 
+                monsterIDs:CurrentPreset.MonsterIDs);
             
-            return _spawner.SpawnAllEnemy(time,0, new SpawnContext(new ClassWeights(),new List<EnemyUnitType>()  ),token);
+            return _spawner.SpawnAllEnemy(time,0, context,token);
         }
 
         /// <summary>
