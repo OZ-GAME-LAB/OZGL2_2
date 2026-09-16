@@ -1,8 +1,7 @@
-using Game.Core;
+using Cysharp.Threading.Tasks;
 
-// Run 종료 결과와 현재 웨이브 위치로 혈석 정산
+// 혈석 정산 및 정산 UI 완료 대기 (UI 연결 예정)
 public interface IRunSettlementRewards
 {
-    // 승리는 현재 웨이브 포함, 패배는 현재 웨이브 제외
-    bool TryApplyReward(ResultType result);
+    UniTask TryApplyReward();
 }

@@ -75,6 +75,23 @@ public class EffectManager : MonoBehaviour
         return true;
     }
 
+    // 교환 양쪽의 효과를 함께 갱신한 뒤 한 번만 알림. 차감 효과가 null이면 Source 제거
+    public void RegisterExchangeEffects(object ownedSource, ConvertedEffects ownedEffects,
+        object rewardSource, ConvertedEffects rewardEffects)
+    {
+        if (ownedEffects == null)
+        {
+            _effectsBySource.Remove(ownedSource);
+        }
+        else
+        {
+            _effectsBySource[ownedSource] = ownedEffects;
+        }
+
+        _effectsBySource[rewardSource] = rewardEffects;
+        RefreshModifiers();
+    }
+
     private void RefreshModifiers()
     {
         _allyModifiers.Clear();

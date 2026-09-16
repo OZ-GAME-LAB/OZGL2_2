@@ -28,6 +28,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     private int _preparedQuarter;
     private int _preparedWave;
     private bool _waveRewardApplied;
+    private bool _isTrading;
     private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
 
     private void OnDestroy()
@@ -81,6 +82,11 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     // 실질적으로 Wallet에 추가하고 이벤트를 발생시키는 내부 메서드
     private bool TryAddInternal(CurrencyAmount currencyAmount)
     {
+        if (_isTrading)
+        {
+            return false;
+        }
+
         if (!IsInitialized)
         {
             Debug.LogWarning(
@@ -110,6 +116,11 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
 
     public bool TrySpend(CurrencyType type, int amount)
     {
+        if (_isTrading)
+        {
+            return false;
+        }
+
         if (!IsInitialized)
         {
             Debug.LogWarning(
@@ -133,6 +144,42 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         }
 
         NotifyBalanceChanged(currency, previousBalance);
+        return true;
+    }
+
+    // 상점 거래용. 양수는 지급, 음수는 소비. 품목 처리 실패 시 잔액 복원 후 알림 X
+    // applyItemChange는 실패 시 품목 상태를 유지하는 동기 함수만 전달
+    public bool TryApplyTrade(CurrencyType type, int balanceChange, Func<bool> applyItemChange)
+    {
+        if (!IsInitialized || _isTrading || applyItemChange == null ||
+            !TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency) ||
+            !_wallet.Balances.ContainsKey(currency))
+        {
+            return false;
+        }
+
+        CurrencyWallet wallet = _wallet;
+        int before = wallet.GetBalance(currency);
+        long after = (long)before + balanceChange;
+        if (after < 0 || after > int.MaxValue)
+        {
+            return false;
+        }
+
+        _isTrading = true;
+        wallet.TrySetBalance(currency, (int)after);
+        if (!applyItemChange())
+        {
+            wallet.TrySetBalance(currency, before);
+            _isTrading = false;
+            return false;
+        }
+
+        if (before != after)
+        {
+            BalanceChanged?.Invoke(currency, before, (int)after);
+        }
+        _isTrading = false;
         return true;
     }
 
@@ -221,7 +268,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     // 웨이브 클리어 시 호출 : 미리 확정한 보상을 재계산 없이 한 번만 지급
     public bool TryApplyWaveReward()
     {
-        if (!IsInitialized || _waveController == null || _preparedRewards == null ||
+        if (!IsInitialized || _isTrading || _waveController == null || _preparedRewards == null ||
             _waveRewardApplied || _preparedQuarter != _waveController.CurQuarter ||
             _preparedWave != _waveController.CurWave)
         {
@@ -421,7 +468,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     // 게임 종료 시에 Run 재화를 제거 (혈석 정산 메서드와 같이 호출)
     public bool TryEndRun()
     {
-        if (!IsInitialized)
+        if (!IsInitialized || _isTrading)
         {
             return false;
         }

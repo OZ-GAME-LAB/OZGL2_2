@@ -361,6 +361,8 @@ GameObject:
   - component: {fileID: 800002001}
   - component: {fileID: 800002002}
   - component: {fileID: 800002003}
+  - component: {fileID: 800002004}
+  - component: {fileID: 800002005}
   m_Layer: 0
   m_Name: TestPanel
   m_TagString: Untagged
@@ -399,6 +401,7 @@ MonoBehaviour:
   _waveController: {fileID: 1956588804}
   _effectManager: {fileID: 1281705165}
   _artifactTestPanel: {fileID: 800002003}
+  _shopTestPanel: {fileID: 800002005}
   _persistent: {fileID: 800001002}
   _gold: {fileID: 11400000, guid: 98b14e85a47180f4aaef28830f492355, type: 2}
   _gem: {fileID: 11400000, guid: ba91d5a429c5b244db782935e39a16a2, type: 2}
@@ -554,6 +557,35 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &800002004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 800002000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dd7d1c7d06144fea451b6ddbe9f55b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShopManager
+  _shopTable: {fileID: 11400000, guid: ab829f9dacc6e974c805df7aa357d9e0, type: 2}
+--- !u!114 &800002005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 800002000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e297bddd0c340ae8fa55ea81a9b50f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShopTestPanel
+  _shop: {fileID: 800002004}
+  _run: {fileID: 617020639}
+  _artifacts: {fileID: 971708448}
+  _window: {x: 510, y: 12, width: 460, height: 640}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

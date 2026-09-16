@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68e6a03d45af4b96a95633481e5658d7, type: 3}
+  m_Name: ShopArtifactExchangeTable
+  m_EditorClassIdentifier: Assembly-CSharp::ShopArtifactExchangeTable
+  _slotCount: 1
+  _onlyExchangeableRarities: 0
+  _raritySettings:
+  - _rarity: 0
+    _weight: 50
+  - _rarity: 1
+    _weight: 35
+  - _rarity: 2
+    _weight: 15
+  - _rarity: 3
+    _weight: 0

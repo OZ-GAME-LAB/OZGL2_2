@@ -20,4 +20,16 @@ public class ArtifactInstance
         StackCount++;
         return true;
     }
+
+    // 중첩 1개 차감. 0이 된 Instance는 Inventory에서 제거
+    public bool TryDecreaseStack()
+    {
+        if (StackCount <= 0)
+        {
+            return false;
+        }
+
+        StackCount--;
+        return true;
+    }
 }
