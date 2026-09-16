@@ -24,6 +24,14 @@ public class TestWaitingScript : MonoBehaviour
     private Button[] _phaseButtons;
     private ColorBlock[] _originalColors;
     private bool[] _highlighted;
+    private long _nextContentRequestId;
+    private UniTaskCompletionSource _contentCompletion;
+    private CancellationToken _contentToken;
+    public long PostBattleRequestId { get; private set; }
+    public PostBattleEventType PendingPostBattleContent { get; private set; }
+    public bool IsWaitingForPostBattleContent => _contentCompletion != null &&
+        !_contentToken.IsCancellationRequested &&
+        _contentCompletion.Task.Status == UniTaskStatus.Pending;
 
     private void Awake()
     {
@@ -49,7 +57,9 @@ public class TestWaitingScript : MonoBehaviour
         SetHighlight(0, ready && _waveController.CurrentPreset != null && _gameFlowController.CanEnterBuildMode());
         SetHighlight(1, battle);
         SetHighlight(2, battle);
-        SetHighlight(3, choice);
+        SetHighlight(3, choice || (ready && IsWaitingForPostBattleContent &&
+            (_gameFlowController.CurPhase == GamePhase.Event ||
+             _gameFlowController.CurPhase == GamePhase.Store)));
         SetHighlight(4, ready);
         bool runChoice = ready && _gameFlowController.CanChooseRunDecision;
         SetHighlight(5, runChoice);
@@ -128,6 +138,13 @@ public class TestWaitingScript : MonoBehaviour
 
     public void ChooseResultBtn()
     {
+        if (_gameFlowController == null) return;
+        if (_gameFlowController.CurPhase == GamePhase.Event ||
+            _gameFlowController.CurPhase == GamePhase.Store)
+        {
+            CompletePostBattleContent(PostBattleRequestId);
+            return;
+        }
         Debug.Log($"[TestWaitingScript] 보상 선택 테스트");
         if (_gameFlowController.CurPhase != GamePhase.Reward &&
             !_gameFlowController.IsWaitingForArtifactSelection) return;
@@ -145,5 +162,51 @@ public class TestWaitingScript : MonoBehaviour
         await UniTask.WaitUntil(
             () => _toggle,
             cancellationToken: cts);
+    }
+
+    // 테스트용 부착 콘텐츠 대기. 각 요청의 완료 대상과 취소 등록은 공유하지 않는다.
+    public async UniTask WaitPostBattleContentAsync(Node node, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (node == null) throw new ArgumentNullException(nameof(node));
+        if (node.PostBattleEvent == PostBattleEventType.None) return;
+        if (IsWaitingForPostBattleContent)
+            throw new InvalidOperationException("부착 콘텐츠가 이미 진행 중입니다.");
+
+        long requestId = checked(++_nextContentRequestId);
+        var completion = new UniTaskCompletionSource();
+        _contentCompletion = completion;
+        _contentToken = token;
+        PostBattleRequestId = requestId;
+        PendingPostBattleContent = node.PostBattleEvent;
+        Debug.Log($"[TestWaitingScript] {PendingPostBattleContent} 완료 대기 (요청 {requestId})");
+        try
+        {
+            using (token.Register(() => completion.TrySetCanceled(token)))
+                await completion.Task;
+            token.ThrowIfCancellationRequested();
+        }
+        finally
+        {
+            // 이전 판의 정리가 새 요청을 지우지 않게 한다.
+            if (PostBattleRequestId == requestId)
+            {
+                _contentCompletion = null;
+                _contentToken = default;
+                PostBattleRequestId = 0;
+                PendingPostBattleContent = PostBattleEventType.None;
+            }
+        }
+    }
+
+    public void CompletePostBattleContent(long requestId)
+    {
+        if (!IsWaitingForPostBattleContent || requestId != PostBattleRequestId) return;
+        _contentCompletion.TrySetResult();
+    }
+
+    private void OnDestroy()
+    {
+        _contentCompletion?.TrySetCanceled();
     }
 }

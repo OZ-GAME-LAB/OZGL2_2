@@ -1,34 +1,57 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Units;
 using UnityEngine;
 
 namespace Game.Core
 {
     public interface ISpawner
     {
+        
         public event Action MonsterKilled;
-        public UniTask SpawnAllUnits(float time, CancellationToken cts);
+        public UniTask SpawnAllEnemy(float time, int cost, SpawnContext context, CancellationToken cts); //실제 사용목적 메서드입니다
         public bool GetRemain(out int enemy,out int  allies);
         public bool GetRemainBoss(out int enemy, out int allies);
     }
+
+    public struct SpawnContext
+    {
+        public ClassWeights Weights;
+        public List<EnemyUnitType> MonsterIDs; //몬스터 id 리스트
+        
+        public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs)
+        {
+            Weights = weights;
+            MonsterIDs = monsterIDs;
+        }
+    }
+    //cost = 분기 * 10 + 웨이브 * 2 / 몬스터는 소환코스트 1로고정 (MVP)
+    /// <summary>
+    /// 현재 전투의 스폰 준비 요청, 생존 수 조회를 통한 승패 판정, 전투 정리 요청
+    /// </summary>
     public class WaveController : MonoBehaviour
     {
-        public const int MAX_WAVE = 3; // 분기당 웨이브 수
-        public const int MAIN_QUARTERS = 3;
-
+        // 기존 외부 참조를 위한 호환 API. 진행 상태는 GameFlow의 NodeController가 소유한다.
+        public const int MAX_WAVE = NodeController.WavesPerQuarter;
+        public const int MAIN_QUARTERS = NodeController.MainQuarters;
         [SerializeField] private WaveSODictionary _waveCatalog;
-        public WaveSO CurrentPreset { get; private set; }
-        public EnemyFaction CurrentFaction { get; private set; }
-        public event Action<int> WaveChanged;
-        //스폰 매니저 참조필요
+        internal WaveSODictionary WaveCatalog => _waveCatalog;
+        public WaveSO CurrentPreset => _controller?.CurrentNode?.Preset;
+        public EnemyUnitFaction CurrentFaction => _controller?.CurrentNode?.Faction ?? default;
+        public int CurWave => _controller?.CurrentWave ?? 0;
+        public int CurQuarter => _controller?.CurrentQuarter ?? 0;
+        public bool IsLastWave => _controller != null && _controller.IsLastNode;
+        public event Action<WaveChangedInfo> WaveChanged;
         private ISpawner _spawner;
         private GameFlowController _controller;
+        private IRuntimeUnitManager _runtimeUnitManager;
 
-        public int CurWave => _curWave;
-        private int _curWave;
-        public int CurQuarter { get; private set; }
-        public bool IsLastWave => _curWave >= MAX_WAVE;
+        public bool CanJumpToLastWave => _controller != null && _controller.CanJumpToLastWave;
+        public bool CanJumpToLastQuarter => _controller != null && _controller.CanJumpToLastQuarter;
+
+        // 초기화 및 수명 관리
         /// <summary>
         /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
         /// </summary>
@@ -46,28 +69,14 @@ namespace Game.Core
             if (_spawner != null)
                 _spawner.MonsterKilled -= HandleMonsterDead;
         }
-        /// <summary>
-        /// 게임 시작 시 실제 초기화 및 기초세팅 시작
-        /// </summary>
-        public void BeginRun()
+
+        // 전투 준비 및 승패 판정
+        public UniTask PrepareEnemy(float time, CancellationToken token)
         {
-            CurQuarter = 1;
-            _curWave = 1;
-            if (_spawner is TestSpawner testSpawner)
-                testSpawner.ResetUnits();
-            SelectCurrentPreset();
-            WaveChanged?.Invoke(_curWave);
+            
+            return _spawner.SpawnAllEnemy(time,0, new SpawnContext(new ClassWeights(),new List<EnemyUnitType>()  ),token);
         }
-        /// <summary>
-        /// 스테이지 진행
-        /// </summary>
-        public void ProgressStage()
-        {
-            if (IsLastWave) return;
-            _curWave++;
-            SelectCurrentPreset();
-            WaveChanged?.Invoke(_curWave);
-        }
+
         /// <summary>
         /// 유닛 파트에서 발행하는 몬스터 사망 이벤트와 연결해 클리어 조건을 확인
         /// </summary>
@@ -77,6 +86,7 @@ namespace Game.Core
             //스폰 매니저에게 남은 적 / 아군 수 요청
             EvaluateBattleResult();
         }
+
         /// <summary>
         /// 전투 결과를 확인하고 승/패를 판정한다.
         /// </summary>
@@ -94,54 +104,37 @@ namespace Game.Core
             Debug.Log("전투 패배");
             _controller.ResolveBattleAsync(ResultType.Defeat).Forget();
         }
-        public void ProgressQuarter()
+
+        // 진행 변경 알림
+        internal void NotifyNodeChanged()
         {
-            if (!IsLastWave) return;
-            CurQuarter++;
-            _curWave = 1;
-            SelectCurrentPreset();
-            WaveChanged?.Invoke(_curWave);
+            WaveChangedInfo info = new WaveChangedInfo(
+                quarterNumber:CurQuarter, 
+                waveNumber:CurWave, 
+                battleType:CurrentPreset.BattleType,
+                postBattleEvent:_controller.CurrentNode.PostBattleEvent);
+            
+            WaveChanged?.Invoke(info);
         }
 
-        public bool CanJumpToLastWave => _controller != null &&
-            _controller.CanEnterBuildMode() && !IsLastWave;
-        public bool CanJumpToLastQuarter => _controller != null &&
-            _controller.CanEnterBuildMode() && CurQuarter < MAIN_QUARTERS;
+        // 테스트·호환용 진행 입력 및 전투 조작
+        /// <summary>
+        /// 게임 시작 시 실제 초기화 및 기초세팅 시작
+        /// </summary>
+        public void BeginRun() => _controller?.BeginRun();
 
-        // 테스트용 이동은 클리어·보상을 발생시키지 않고 준비 중인 위치만 변경한다.
-        public void JumpToLastWaveForTest()
-        {
-            if (!CanJumpToLastWave) return;
-            _curWave = MAX_WAVE;
-            SelectCurrentPreset();
-            WaveChanged?.Invoke(_curWave);
-        }
+        public void ProgressStage() => _controller?.RequestProgressStage();
 
-        public void JumpToLastQuarterForTest()
-        {
-            if (!CanJumpToLastQuarter) return;
-            CurQuarter = MAIN_QUARTERS;
-            _curWave = 1;
-            SelectCurrentPreset();
-            WaveChanged?.Invoke(_curWave);
-        }
+        public void ProgressQuarter() => _controller?.RequestProgressQuarter();
 
-        private void SelectCurrentPreset()
+        public void JumpToLastWaveForTest() => _controller?.JumpToLastWaveForTest();
+
+        public void JumpToLastQuarterForTest() => _controller?.JumpToLastQuarterForTest();
+
+        internal void ResetTestBattle()
         {
-            CurrentPreset = null;
-            CurrentFaction = default;
-            WaveBattleType type = _curWave == MAX_WAVE ? WaveBattleType.Boss :
-                _curWave == 2 ? WaveBattleType.Elite : WaveBattleType.Normal;
-            // 테스트 무한 진행은 5분기의 출현 규칙을 재사용한다.
-            if (_waveCatalog == null ||
-                !_waveCatalog.TryGetRandomWaveSO(Math.Min(CurQuarter, 5), type,
-                    out var preset, out var faction))
-            {
-                Debug.LogError($"[WaveController] 프리셋 목록 참조 또는 후보 누락: 분기 {CurQuarter}, 타입 {type}", this);
-                return;
-            }
-            CurrentPreset = preset;
-            CurrentFaction = faction;
+            if (_spawner is TestSpawner testSpawner)
+                testSpawner.ResetUnits();
         }
 
         public void CleanupTestBattle()
@@ -150,10 +143,6 @@ namespace Game.Core
                 testSpawner.ClearUnits();
         }
 
-        public UniTask PrepareEnemy(float time, CancellationToken token)
-        {
-            return _spawner.SpawnAllUnits(time, token);
-        }
         /// <summary>
         /// 스테이지 성공 판정을 위해 임시로 만든 메서드.
         /// <br/> 강제로 승리 설정으로 바꾼다.
@@ -167,6 +156,7 @@ namespace Game.Core
                 spawner.invokeMonsterKilled();
             }
         }
+
         /// <summary>
         /// 스테이지 성공 판정을 위해 임시로 만든 메서드.
         /// <br/> 강제로 승리 설정으로 바꾼다.
@@ -191,7 +181,7 @@ namespace Game.Core
         private int _enemyCount = 5;
         private int _alliesCount = 5;
 
-        public async UniTask SpawnAllUnits(float time,CancellationToken cts)
+        public async UniTask SpawnAllEnemy(float time, int cost, SpawnContext context, CancellationToken cts)
         {
             cts.ThrowIfCancellationRequested();
             ResetUnits();
