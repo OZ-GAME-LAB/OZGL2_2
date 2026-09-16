@@ -36,8 +36,11 @@ namespace Game.UI
         [SerializeField] private string _productionFormat = "생산 유닛\n{0}";
         [SerializeField] private string _effectFormat = "건물 효과\n{0}";
 
+        [SerializeField] private PlayerPopup _playerPopup;
+
         private void OnEnable()
         {
+            if (_playerPopup != null) _playerPopup.Closed += HandlePopupClosed;
             if (_closeButton == null) return;
             _closeButton.onClick.RemoveListener(HandleCloseClicked);
             _closeButton.onClick.AddListener(HandleCloseClicked);
@@ -45,6 +48,7 @@ namespace Game.UI
 
         private void OnDisable()
         {
+            if (_playerPopup != null) _playerPopup.Closed -= HandlePopupClosed;
             if (_closeButton != null) _closeButton.onClick.RemoveListener(HandleCloseClicked);
         }
 
@@ -74,6 +78,7 @@ namespace Game.UI
             _iconPlaceholder.SetActive(data.Icon == null);
             _emptyState.SetActive(false);
             _contentPanel.SetActive(true);
+            if (_playerPopup != null) _playerPopup.Show();
 
             if (selectionChanged)
             {
@@ -102,7 +107,16 @@ namespace Game.UI
                 EventSystem.current.currentSelectedGameObject.transform.IsChildOf(_contentPanel.transform))
                 EventSystem.current.SetSelectedGameObject(null);
             _contentPanel.SetActive(false);
-            _emptyState.SetActive(true);
+            _emptyState.SetActive(_playerPopup == null);
+            if (_playerPopup != null) _playerPopup.Hide();
+        }
+
+        private void HandlePopupClosed(PlayerPopup popup)
+        {
+            if (!HasSelection) return;
+            var id = SelectionId;
+            HideBuildingInfo();
+            InfoPanelClosed?.Invoke(id);
         }
 
         private void HandleCloseClicked()

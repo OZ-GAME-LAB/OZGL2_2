@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: Support
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: ui-integration-support
+  displayName: "\uC9C0\uC6D0 \uAC74\uBB3C"
+  description: "\uC2E4\uC81C \uAC74\uBB3C API \uC5F0\uACB0 \uAC80\uC99D\uC6A9 \uB370\uC774\uD130\uC785\uB2C8\uB2E4.
+    \uC815\uC2DD \uBC38\uB7F0\uC2A4\uAC00 \uC544\uB2D9\uB2C8\uB2E4."
+  buildingType: 3
+  icon: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  worldSprite: {fileID: 0}
+  prefab: {fileID: 6730274665223176839, guid: 57c1c12d413420f479e4eede5d44d44f, type: 3}
+  buildCost:
+  - type: 0
+    amount: 20
+  - type: 1
+    amount: 2
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 0
+    unitType: 1
+    countPerWave: 1
+    maxAlive: 3
