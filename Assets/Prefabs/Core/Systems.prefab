@@ -111,6 +111,7 @@ Transform:
   m_Children:
   - {fileID: 7491240509371669391}
   - {fileID: 8759235363044728638}
+  - {fileID: 2163719976144278503}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &5345629947058837929
@@ -172,3 +173,94 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8ae2b5b399cf4016ba4015f017846b25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EffectManager
+--- !u!1 &6617043363993304553
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2163719976144278503}
+  - component: {fileID: 4862763983319444967}
+  - component: {fileID: 787833566096341221}
+  - component: {fileID: 7638948820840962376}
+  m_Layer: 0
+  m_Name: BuildingSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2163719976144278503
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6617043363993304553}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4207534559104598044}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4862763983319444967
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6617043363993304553}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5fc1848a0b787048b7573c8170b5220, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingBuildController
+  database: {fileID: 11400000, guid: ca81b6ab7625cac4cb786c0b9d9f501a, type: 2}
+  wallet: {fileID: 787833566096341221}
+  gameFlow: {fileID: 6313744980500616644}
+  worldCamera: {fileID: 0}
+  slotMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  refundRate: 1
+--- !u!114 &787833566096341221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6617043363993304553}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 421bf999e83b03a45bcf1b3d9ac3a0ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RunCurrencyManager
+  _currencyCatalog: {fileID: 11400000, guid: a4cd32c0eff3a644bb7f2801150031f2, type: 2}
+  _waveRewardTable: {fileID: 11400000, guid: aa01d1f655eab6b41a6ebedd6831163f, type: 2}
+  _baseStartingCurrencies:
+  - _currency: {fileID: 11400000, guid: 98b14e85a47180f4aaef28830f492355, type: 2}
+    _amount: 500000
+--- !u!114 &7638948820840962376
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6617043363993304553}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 934af356cb894102ac8f09022accbf00, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CurrencyTestPanel
+  _run: {fileID: 787833566096341221}
+  _waveController: {fileID: 9198925688243856620}
+  _effectManager: {fileID: 1112077273490239839}
+  _artifactTestPanel: {fileID: 0}
+  _persistent: {fileID: 0}
+  _gold: {fileID: 11400000, guid: 98b14e85a47180f4aaef28830f492355, type: 2}
+  _gem: {fileID: 11400000, guid: ba91d5a429c5b244db782935e39a16a2, type: 2}
+  _bloodstone: {fileID: 11400000, guid: 652b535a23e144b42a29a04a1d3c4409, type: 2}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Game.Cameras;
 using UnityEngine;
 
 namespace Game.Core
@@ -56,6 +57,7 @@ namespace Game.Core
         public bool CanChooseRunDecision => IsWaitingForRunDecision && !_runDecision.HasValue;
         public bool IsWaitingForArtifactSelection { get; private set; }
 
+        [SerializeField] private InGameCameraController _cameraController;
         [SerializeField] private bool _autoContinue;
         public bool AutoContinue { get => _autoContinue; set => _autoContinue = value; }
 
@@ -145,7 +147,10 @@ namespace Game.Core
             _isTransitioning = true;
             var token = _cts.Token;
             ChangePhase(GamePhase.BattlePreparing);
+            _cameraController.ShowBase();
             // 실제 아군 준비 연동 시 적 준비와 함께 완료를 기다린다.
+            
+            _cameraController.ShowBattleField();
             bool canceled = await _waveController.PrepareEnemy(SpawnTime, token).SuppressCancellationThrow();
             
             if (canceled || token.IsCancellationRequested) return false;
@@ -194,14 +199,7 @@ namespace Game.Core
             if (!IsLastNode)
             {
                 //보상 선택
-                IsWaitingForArtifactSelection = true;
-                bool success = await _artifactManager.SelectAndApplyAsync(
-                    completedNode.BattleType, token);
-                ChangePhase(GamePhase.Reward);
-                await _testScript.WaitForSeconds(StagingTime,token); //임시 대기 시간
-                token.ThrowIfCancellationRequested();
-                ArtifactSelectionRequested?.Invoke();
-                IsWaitingForArtifactSelection = false;
+                await WaitArtifactSelection(completedNode.BattleType, token);
                 //전장정리
                 await CleanupBattleAsync(token);
                 token.ThrowIfCancellationRequested();
@@ -220,14 +218,7 @@ namespace Game.Core
                 ChangePhase(GamePhase.QuarterComplete);
                 token.ThrowIfCancellationRequested();
                 //아티팩트 + 재화 획득
-                IsWaitingForArtifactSelection = true;
-                bool success = await _artifactManager.SelectAndApplyAsync(
-                    completedNode.BattleType, token);
-                ChangePhase(GamePhase.Reward);
-                await _testScript.WaitForSeconds(StagingTime,token); //임시 대기 시간
-                token.ThrowIfCancellationRequested();
-                ArtifactSelectionRequested?.Invoke();
-                IsWaitingForArtifactSelection = false;
+                await WaitArtifactSelection(completedNode.BattleType, token);
                 
                 //전장정리
                 await CleanupBattleAsync(token);
@@ -258,6 +249,7 @@ namespace Game.Core
                 if (!StartQuarter(CurrentQuarter + 1)) return;
             }
             token.ThrowIfCancellationRequested();
+            _cameraController.ShowBase();
             ChangePhase(GamePhase.Preparation);
         }
 
@@ -285,7 +277,6 @@ namespace Game.Core
             {
                 Debug.LogError($"[GameFlowController] 노드 생성 실패: {error}", this);
                 ChangePhase(GamePhase.None);
-                NotifyNodeChanged();
                 return false;
             }
             NotifyNodeChanged();
@@ -389,6 +380,28 @@ namespace Game.Core
         {
             if (CanChooseRunDecision)
                 _runDecision = RunDecision.Continue;
+        }
+
+        /// <summary>아티팩트 선택 UI 연동 전까지 기존 ChooseResult 버튼으로 보상 완료를 기다린다.</summary>
+        private async UniTask WaitArtifactSelection(WaveBattleType battleType, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            IsWaitingForArtifactSelection = true;
+            
+            // 페이즈/선택 요청 구독자가 즉시 버튼 입력을 보내도 초기화로 덮어쓰지 않는다.
+            var rewardWait = _testScript.WaitToggle(token);
+            ChangePhase(GamePhase.Reward);
+            token.ThrowIfCancellationRequested();
+            ArtifactSelectionRequested?.Invoke();
+            token.ThrowIfCancellationRequested();
+
+            // 현재 미완성 선택 UI의 false 반환은 허용하고 테스트 버튼으로 완료한다.
+            await _artifactManager.SelectAndApplyAsync(battleType, token);
+            token.ThrowIfCancellationRequested();
+            // TODO: 실제 아티팩트 선택·적용 완료가 연결되면 이 토글 대기를 제거한다.
+            await rewardWait;
+            token.ThrowIfCancellationRequested();
+            IsWaitingForArtifactSelection = false;
         }
 
         /// <summary>임시 연출 대기. 실제 컷씬·통계창 완료를 기다리는 구현으로 교체한다.</summary>

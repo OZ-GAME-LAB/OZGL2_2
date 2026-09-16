@@ -139,8 +139,8 @@ ResolveBattleAsync(result)
 
 - Battle Start로 전투를 시작하고, Battle에서 Clear 또는 Fail로 승패를 입력한다. 결과 연출은 `StagingTime`초를 기다리며 기본값과 저장된 Test 씬 값은 0.5초다.
 - `SpawnTime`과 `StagingTime`은 코어 Inspector에서 Play 모드 중 조절한다. 테스트 중 시간 변경을 위해 씬 설정을 저장할 필요는 없다.
-- Reward에서는 기존 ChooseResult 버튼으로 보상 완료를 전달한다.
-- 분기 종료 후 유물 선택도 Reward에서 ChooseResult로 완료한다. `IsWaitingForArtifactSelection`으로 일반 보상과 구분하며 실제 유물 선택·적용은 미연동이다.
+- 일반·보스 웨이브 모두 Reward에서 기존 ChooseResult 버튼으로 보상 완료를 전달한다. 버튼을 누르기 전까지 다음 단계로 진행하지 않으며, `IsWaitingForArtifactSelection`은 이 대기 동안 true다.
+- 아티팩트 선택 호출은 유지한다. 현재 선택 UI가 미완성이므로 false를 반환해도 테스트 토글로 완료하며, 실제 선택·적용이 완성되면 임시 토글 대기를 제거한다. 이어지는 Event / Store는 별도의 ChooseResult 입력이 필요하다.
 - `MAIN_QUARTERS` 이상 종료 선택 대기에서는 씬의 Finish / Continue 버튼을 사용한다. 각각 `ChooseFinishRun()` / `ChooseContinueRun()`에 연결돼 있다. 코어 컨텍스트 메뉴의 `Test/Finish at quarter choice` / `Test/Continue at quarter choice`로도 입력할 수 있다.
 - LastWave는 현재 분기의 마지막 웨이브로, LastQuarter는 `MAIN_QUARTERS`의 1웨이브로 이동한다. 준비 중에만 사용할 수 있고 클리어·보상을 발생시키지 않는다. 이미 해당 마지막 위치 이상이면 이동하지 않는다.
 - 실행 가능한 테스트 버튼은 노란색으로 표시된다. 색상은 안내용이며 실제 요청 가능 여부는 각 메서드에서도 검사한다. Reset은 각 대기 중에도 새 판을 시작할 수 있다.
@@ -156,8 +156,8 @@ ResolveBattleAsync(result)
 - `BattleResolving` 진입 시 유닛의 공격·이동·피해 처리를 중단한다. 현재는 코어의 결과 입력만 차단하며 실제 유닛 동작은 미연동이다.
 - `PlayBattleResultAsync`는 현재 `TestWaitingScript.WaitForSeconds(StagingTime, token)`으로 연출 시간을 기다린다.
   실제 연출·통계창의 완료 신호를 기다리도록 교체한다.
-- `ResolveBattleCoreAsync`의 `WaitToggle` 호출을 보상 또는 유물 선택·적용 완료 대기로 교체한다.
-  버튼 클릭이 아니라 실제 적용 완료가 다음 단계의 기준이다.
+- `WaitForArtifactSelectionForTestAsync`는 토글 대기를 먼저 준비하고 Reward 진입·선택 요청 알림 후 `ArtifactManager.SelectAndApplyAsync`와 ChooseResult 입력을 기다린다.
+  실제 선택 UI 연결 시 이 테스트 경로를 교체하고, 토글 대기 대신 선택·적용 성공을 다음 단계의 기준으로 삼는다.
 - `CleanupBattleAsync`는 현재 TestSpawner의 생존 수만 0으로 만든다.
   실제 스포너의 유닛 제거·풀 반환이 끝날 때까지 기다리는 구현으로 교체한다.
 - 코어 하단의 `ShowContinueConfirmationAsync`와 `SelectAndApplyAsync`는 담당자에게 요청할 임시 메서드이며 현재 진행 흐름에서는 호출하지 않는다. 실제 구현을 연결할 때 기존 이벤트/버튼 대기 부분을 해당 비동기 호출로 교체한다. 종료 확인의 true는 계속, false는 승리 종료이고 취소는 선택 결과와 별도로 전달한다.
