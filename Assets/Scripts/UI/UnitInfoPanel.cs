@@ -36,11 +36,14 @@ namespace Game.UI
         [SerializeField] private string _combatFormat = "전투 정보\n{0}";
         [SerializeField] private string _traitFormat = "특성 · 전직\n{0}";
 
+        [SerializeField] private PlayerPopup _playerPopup;
+
         private float _currentHealth;
         private float _maxHealth;
 
         private void OnEnable()
         {
+            if (_playerPopup != null) _playerPopup.Closed += HandlePopupClosed;
             if (_closeButton == null) return;
             _closeButton.onClick.RemoveListener(HandleCloseClicked);
             _closeButton.onClick.AddListener(HandleCloseClicked);
@@ -48,6 +51,7 @@ namespace Game.UI
 
         private void OnDisable()
         {
+            if (_playerPopup != null) _playerPopup.Closed -= HandlePopupClosed;
             if (_closeButton != null) _closeButton.onClick.RemoveListener(HandleCloseClicked);
         }
 
@@ -74,6 +78,7 @@ namespace Game.UI
             ApplyHealth(data.CurrentHealth, data.MaxHealth, health);
             _emptyState.SetActive(false);
             _contentPanel.SetActive(true);
+            if (_playerPopup != null) _playerPopup.Show();
             if (changed)
             {
                 _detailsScroll.StopMovement();
@@ -118,7 +123,16 @@ namespace Game.UI
                 EventSystem.current.currentSelectedGameObject.transform.IsChildOf(_contentPanel.transform))
                 EventSystem.current.SetSelectedGameObject(null);
             _contentPanel.SetActive(false);
-            _emptyState.SetActive(true);
+            _emptyState.SetActive(_playerPopup == null);
+            if (_playerPopup != null) _playerPopup.Hide();
+        }
+
+        private void HandlePopupClosed(PlayerPopup popup)
+        {
+            if (!HasSelection) return;
+            var id = SelectionId;
+            HideUnitInfo();
+            InfoPanelClosed?.Invoke(id);
         }
 
         private void HandleCloseClicked()
