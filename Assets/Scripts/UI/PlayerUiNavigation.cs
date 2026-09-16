@@ -13,6 +13,7 @@ namespace Game.UI
         [SerializeField] private PlayerPopup[] _popups;
         [SerializeField] private Button[] _catalogButtons;
         [SerializeField] private GameObject[] _blockingPanels;
+        [SerializeField] private ArtifactInventoryPanel _artifactInventory;
 
         private PlayerPopup _current;
 
@@ -54,6 +55,7 @@ namespace Game.UI
         public bool TryCloseActivePopup()
         {
             if (!isActiveAndEnabled || HasBlockingPanel() || _current == null || !_current.IsVisible) return false;
+            if (_artifactInventory != null && _artifactInventory.TryCloseDetail()) return true;
             _current.Hide();
             return true;
         }
