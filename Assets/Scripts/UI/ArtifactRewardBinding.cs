@@ -181,7 +181,7 @@ namespace Game.UI
             _listening = false;
         }
 
-        private static string RarityName(ArtifactRarity rarity) => rarity switch
+        internal static string RarityName(ArtifactRarity rarity) => rarity switch
         {
             ArtifactRarity.Common => "일반",
             ArtifactRarity.Rare => "희귀",
@@ -190,7 +190,7 @@ namespace Game.UI
             _ => rarity.ToString()
         };
 
-        private static Color RarityColor(ArtifactRarity rarity) => rarity switch
+        internal static Color RarityColor(ArtifactRarity rarity) => rarity switch
         {
             ArtifactRarity.Rare => new Color32(112, 186, 255, 255),
             ArtifactRarity.Legendary => new Color32(255, 205, 99, 255),

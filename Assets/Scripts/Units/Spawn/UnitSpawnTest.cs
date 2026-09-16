@@ -1,5 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
+using Game.Core;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 
@@ -95,35 +97,26 @@ namespace Units
 
 
         // ============================================================
-        // Enemy Groups
+        // Enemy Wave
         // ============================================================
 
-        [Header("Enemy Group 1")]
+        [Header("Enemy Wave")]
 
         [SerializeField]
-        private EnemySpawnRequest _enemyGroup1 =
-            new EnemySpawnRequest();
+        private int _enemyCost = 20;
 
 
-        [Header("Enemy Group 2")]
-
-        [SerializeField]
-        private EnemySpawnRequest _enemyGroup2 =
-            new EnemySpawnRequest();
-
-
-        [Header("Enemy Group 3")]
+        [Header("Enemy Class Weights")]
 
         [SerializeField]
-        private EnemySpawnRequest _enemyGroup3 =
-            new EnemySpawnRequest();
-        
+        private ClassWeights _enemyClassWeights;
 
-        [Header("Enemy Group 4")]
+
+        [Header("Enemy Unit Types")]
 
         [SerializeField]
-        private EnemySpawnRequest _enemyGroup4 =
-            new EnemySpawnRequest();
+        private List<EnemyUnitType> _enemyUnitTypes =
+            new List<EnemyUnitType>();
 
 
         // ============================================================
@@ -220,6 +213,7 @@ namespace Units
                 _allyRallyPoint3
             );
 
+
             _spawnManager.SpawnAllyGroup(
                 _allyUnitType4,
                 _allySpawnPosition4.position,
@@ -230,7 +224,7 @@ namespace Units
 
             Debug.Log(
                 "[UnitSpawnTest] " +
-                "아군 3개 그룹 Spawn 요청 완료."
+                "아군 4개 그룹 Spawn 요청 완료."
             );
         }
 
@@ -252,24 +246,28 @@ namespace Units
             }
 
 
-            List<EnemySpawnRequest> requests =
-                new List<EnemySpawnRequest>
-                {
-                    _enemyGroup1,
-                    _enemyGroup2,
-                    _enemyGroup3,
-                    _enemyGroup4
-                };
+            SpawnContext context =
+                new SpawnContext(
+                    _enemyClassWeights,
+                    _enemyUnitTypes
+                );
+
+
+            CancellationToken cancellationToken =
+                this.GetCancellationTokenOnDestroy();
 
 
             _spawnManager.SpawnEnemyWaveAsync(
-                requests
+                _enemyCost,
+                context,
+                cancellationToken
             ).Forget();
 
 
             Debug.Log(
                 "[UnitSpawnTest] " +
-                "적군 3개 그룹 Spawn 요청 완료."
+                $"적군 Wave Spawn 요청 완료. " +
+                $"Cost={_enemyCost}"
             );
         }
 
@@ -399,11 +397,13 @@ namespace Units
                 return false;
             }
 
+
             if (_allySpawnPosition4 == null)
             {
                 Debug.LogError(
                     "[UnitSpawnTest] Ally Group 4 Spawn Position이 없습니다."
                 );
+
                 return false;
             }
 
@@ -437,49 +437,34 @@ namespace Units
                 return false;
             }
 
+
             if (_allyCount4 <= 0)
             {
                 Debug.LogError(
                     "[UnitSpawnTest] Ally Group 4 Count가 올바르지 않습니다."
                 );
+
                 return false;
             }
 
 
-            if (_enemyGroup1 == null)
+            if (_enemyCost <= 0)
             {
                 Debug.LogError(
-                    "[UnitSpawnTest] Enemy Group 1 설정이 없습니다."
+                    "[UnitSpawnTest] Enemy Cost가 올바르지 않습니다."
                 );
 
                 return false;
             }
 
 
-            if (_enemyGroup2 == null)
+            if (_enemyUnitTypes == null ||
+                _enemyUnitTypes.Count == 0)
             {
                 Debug.LogError(
-                    "[UnitSpawnTest] Enemy Group 2 설정이 없습니다."
+                    "[UnitSpawnTest] Enemy Unit Type이 설정되지 않았습니다."
                 );
 
-                return false;
-            }
-
-
-            if (_enemyGroup3 == null)
-            {
-                Debug.LogError(
-                    "[UnitSpawnTest] Enemy Group 3 설정이 없습니다."
-                );
-
-                return false;
-            }
-
-            if (_enemyGroup4 == null)
-            {
-                Debug.LogError(
-                    "[UnitSpawnTest] Enemy Group 4 설정이 없습니다."
-                );
                 return false;
             }
 

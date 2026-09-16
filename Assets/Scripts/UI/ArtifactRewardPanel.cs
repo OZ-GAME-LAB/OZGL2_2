@@ -50,6 +50,7 @@ namespace Game.UI
         [SerializeField] private Button _nextPageButton;
 
         [SerializeField] private bool _compactPresentation;
+        [SerializeField] private bool _showCardEffects;
         [Serializable]
         private sealed class DisplayNameOverride
         {
@@ -272,7 +273,9 @@ namespace Game.UI
                 ? $"선택: {_data.Candidates[_selectedIndex].DisplayName} · 확정하면 이 아티팩트를 요청합니다."
                 : "아티팩트 1개를 선택하세요. 선택하지 않으면 모두 포기합니다.");
             if (_compactPresentation && !IsRequestPending && _message == null)
-                _statusText.text = _selectedIndex >= 0 ? _data.Candidates[_selectedIndex].EffectDescription : "";
+                _statusText.text = _choiceRequested == null ? "보상 시스템 연결 대기" : _showCardEffects
+                    ? (_selectedIndex >= 0 ? "선택한 유물을 확인하고 획득하세요" : "선택하지 않고 계속할 수도 있습니다")
+                    : _selectedIndex >= 0 ? _data.Candidates[_selectedIndex].EffectDescription : "";
             int focusIndex = _selectedIndex >= offset && _selectedIndex < offset + visibleCount ? _selectedIndex - offset : 0;
             if (opening && EventSystem.current != null)
                 EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
@@ -288,11 +291,16 @@ namespace Game.UI
 
         private string GetDisplayName(ArtifactRewardOffer offer)
         {
+            return ResolveDisplayName(offer.ArtifactId, offer.DisplayName);
+        }
+
+        internal string ResolveDisplayName(string artifactId, string fallback)
+        {
             if (_compactPresentation)
                 foreach (var item in _displayNames)
-                    if (item != null && item.ArtifactId == offer.ArtifactId && !string.IsNullOrWhiteSpace(item.DisplayName))
+                    if (item != null && item.ArtifactId == artifactId && !string.IsNullOrWhiteSpace(item.DisplayName))
                         return item.DisplayName;
-            return offer.DisplayName;
+            return fallback;
         }
 
         private void ConfigureNavigation(int visibleCount)

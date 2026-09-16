@@ -13,6 +13,8 @@ namespace Units
 
         event Action<Unit_Gateway> UnitDied;
 
+        event Action<UnitTeam> TeamWiped;
+
 
         // =========================
         // Unit Count
@@ -27,6 +29,11 @@ namespace Units
         {
             get;
         }
+
+        bool GetRemain(
+            out int enemy,
+            out int allies
+        );
 
 
         // =========================

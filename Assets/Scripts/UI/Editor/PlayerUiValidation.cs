@@ -15,7 +15,7 @@ namespace Game.UI.Editor
 {
     /// <summary>명시적으로 실행한 격리된 Editor에서만 프리뷰를 만들고 Play Mode 검사/촬영한다.</summary>
     [InitializeOnLoad]
-    public static class PlayerUiValidation
+    public static partial class PlayerUiValidation
     {
         private const string SessionKey = "Game.UI.PlayerValidation.Running";
         private static int _checks;
@@ -30,6 +30,15 @@ namespace Game.UI.Editor
             // Only the generated scene in this isolated validation copy is disposable.
             if (File.Exists(PlayerUiBuilder.ScenePath)) AssetDatabase.DeleteAsset(PlayerUiBuilder.ScenePath);
             PlayerUiBuilder.Build();
+            EditorSceneManager.OpenScene(PlayerUiBuilder.ScenePath, OpenSceneMode.Single);
+            SessionState.SetBool(SessionKey, true);
+            EditorApplication.EnterPlaymode();
+        }
+
+        public static void RunWireframeBatch()
+        {
+            PlayerUiBuilder.ApplyWireframeBatch();
+            // Open the migrated scene without regenerating it or replacing its GUID.
             EditorSceneManager.OpenScene(PlayerUiBuilder.ScenePath, OpenSceneMode.Single);
             SessionState.SetBool(SessionKey, true);
             EditorApplication.EnterPlaymode();
@@ -102,11 +111,18 @@ namespace Game.UI.Editor
                 PlayerUiBuilder.Ref<Button>(sample, "_winButton").onClick.Invoke();
                 await Wait(() => reward.IsVisible, "victory reward");
                 catalog.Show(); Check(!catalog.Popup.IsVisible, "required reward blocks optional catalog");
+                var owned = UnityEngine.Object.FindFirstObjectByType<ArtifactInventoryPanel>();
+                if (owned != null)
+                {
+                    owned.Show(); Check(!owned.Popup.IsVisible, "required reward blocks optional owned inventory");
+                }
                 var rewardCard = new SerializedObject(reward).FindProperty("_cards").GetArrayElementAtIndex(0).FindPropertyRelative("Button").objectReferenceValue as Button;
                 rewardCard.onClick.Invoke(); await Capture("07-victory-reward", 1920, 1080); await Capture("08-victory-reward-small", 1280, 720);
                 Check(reward.SelectedArtifactId != null && PlayerUiBuilder.Ref<TMP_Text>(reward, "_confirmText").text == "획득하기", "selected reward uses concise player copy");
                 PlayerUiBuilder.Ref<Button>(reward, "_confirmButton").onClick.Invoke();
                 await Wait(() => flow.CurPhase == GamePhase.Preparation, "next preparation");
+                if (UnityEngine.Object.FindFirstObjectByType<ArtifactInventoryPanel>() != null)
+                    await RunWireframeChecks(hud, wallet, reward, navigation);
                 hud.ShowRunResult(true, 100); await Capture("09-result-presentation", 1280, 720); hud.HideRunResult();
                 Check(_errors == 0, "no UI/gameplay error or exception logs during player UI checks");
                 var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(PlayerUiBuilder.FontPath);

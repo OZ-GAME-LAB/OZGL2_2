@@ -74,7 +74,7 @@ namespace Game.UI.Samples
         {
             _ui.Initialize();
             _rewardGate.Initialize(_flow, _waves);
-            _flow.Initialize(_waves, _rewardGate);
+            _flow.Initialize(_waves, _rewardGate, _artifactManager); //
             _waves.Initialize(_flow, new TestSpawner());
             _goldBinding.Initialize(_ui, _currencyManager);
             _coreBinding.Initialize(_ui, _flow, _waves);
