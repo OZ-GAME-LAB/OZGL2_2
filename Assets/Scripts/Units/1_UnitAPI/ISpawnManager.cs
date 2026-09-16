@@ -1,6 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
+using Game.Core;
+using System;
+using System.Threading;
 using UnityEngine;
 
 
@@ -34,7 +35,9 @@ namespace Units
         // ============================================================
 
         UniTask SpawnEnemyWaveAsync(
-            IReadOnlyList<EnemySpawnRequest> requests
+            int cost,
+            SpawnContext context,
+            CancellationToken cancellationToken
         );
 
 

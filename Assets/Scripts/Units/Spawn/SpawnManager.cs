@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using System.Threading;
+using Game.Core;
 
 
 
@@ -365,8 +367,14 @@ namespace Units
         // Enemy Spawn
         // ============================================================
 
+        // ============================================================
+        // Enemy Spawn
+        // ============================================================
+
         public async UniTask SpawnEnemyWaveAsync(
-            IReadOnlyList<EnemySpawnRequest> requests)
+            int cost,
+            SpawnContext context,
+            CancellationToken cancellationToken)
         {
             if (_enemyWaveSpawner == null)
             {
@@ -379,16 +387,24 @@ namespace Units
             }
 
 
+            cancellationToken.ThrowIfCancellationRequested();
+
+
             await _enemyWaveSpawner.SpawnWaveAsync(
-                requests,
-                this.GetCancellationTokenOnDestroy()
+                cost,
+                context,
+                cancellationToken
             );
+
+
+            cancellationToken.ThrowIfCancellationRequested();
 
 
             Debug.Log(
                 "[SpawnManager] " +
                 "모든 Enemy Spawn 완료."
             );
+
 
             _runtimeUnitManager.NotifyEnemySpawnCompleted();
 
