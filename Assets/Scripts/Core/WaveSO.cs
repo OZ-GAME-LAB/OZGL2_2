@@ -1,13 +1,7 @@
 using System.Collections.Generic;
+using Units;
 using UnityEngine;
 
-public enum EnemyFaction
-{
-    Irregulars,     // 비정규군
-    RegularArmy,   // 정규군
-    EliteArmy,     // 정예군
-    Crusaders      // 성전군
-}
 public enum WaveBattleType
 {
     Normal,
@@ -15,15 +9,6 @@ public enum WaveBattleType
     Boss
 }
 
-public enum EnemyClass
-{
-    Tanker,
-    Bruiser,
-    Assassin,
-    RangedPhysical,
-    RangedMagic,
-    Supporter
-}
 [System.Serializable]
 public struct ClassWeights
 {
@@ -48,9 +33,11 @@ public struct IntRange
 [CreateAssetMenu(fileName = "WaveSO", menuName = "Scriptable Objects/WaveSO")]
 public class WaveSO : ScriptableObject
 {
-    public int WaveID;
+    public int WaveID; //웨이브 식별자
     public string WaveName;
     public WaveBattleType BattleType;
     public ClassWeights Weights;
-    public List<int> MonsterIDs = new List<int>();
+    public List<EnemyUnitFaction> MonsterIDs = new List<Units.EnemyUnitFaction>(); //몬스터 id 리스트
+
+    //MonsterIDs를 뭘로할까? enum?
 }

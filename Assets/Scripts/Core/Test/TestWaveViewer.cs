@@ -1,5 +1,6 @@
 using Game.Core;
 using TMPro;
+using Units;
 using UnityEngine;
 
 [RequireComponent(typeof(TextMeshProUGUI))]
@@ -36,7 +37,7 @@ public class TestWaveViewer : MonoBehaviour
             _gameFlowController.PhaseChanged -= UpdatePhase;
     }
 
-    private void UpdateWave(int wave) => Refresh();
+    private void UpdateWave(WaveChangedInfo info) => Refresh();
     private void UpdatePhase(GamePhase phase) => Refresh();
 
     private void Refresh()
@@ -54,16 +55,16 @@ public class TestWaveViewer : MonoBehaviour
                 string faction;
                 switch (_waveController.CurrentFaction)
                 {
-                    case EnemyFaction.Irregulars: faction = "비정규군"; break;
-                    case EnemyFaction.RegularArmy: faction = "정규군"; break;
-                    case EnemyFaction.EliteArmy: faction = "정규군(정예)"; break;
+                    case EnemyUnitFaction.Irregulars: faction = "비정규군"; break;
+                    case EnemyUnitFaction.RegularArmy: faction = "정규군"; break;
+                    case EnemyUnitFaction.EliteArmy: faction = "정규군(정예)"; break;
                     default: faction = "성전군"; break;
                 }
-                _text.text = $"{type} | {faction} | {preset.WaveName}";
+                _text.text = $"{type} | {faction} | {preset.WaveName} | 부착: {_gameFlowController.CurrentNode.PostBattleEvent}";
                 return;
             }
         _text.text = _gameFlowController.CurPhase == GamePhase.Finished
             ? "gameFinished"
-            : $"Quarter : {_waveController.CurQuarter} / Wave : {_waveController.CurWave}";
+            : $"Quarter : {_waveController.CurQuarter} / Wave : {_waveController.CurWave} | 부착: {_gameFlowController.CurrentNode?.PostBattleEvent}";
     }
 }
