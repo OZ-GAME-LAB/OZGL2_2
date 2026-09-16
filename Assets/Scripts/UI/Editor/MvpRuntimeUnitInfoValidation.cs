@@ -46,7 +46,7 @@ namespace Game.UI.Editor
                 var enemyCore = enemy.GetComponent<Unit_Core>();
                 Check(!ally.TryGetInfo(out _) && !binding.TrySelect(ally), "UI cannot initialize unready unit");
                 Check(!panel.HasSelection && allyLife.MaxHp == 0, "failed selection leaves unit and panel unchanged");
-                allyCore.Initialize();
+                allyCore.Initialize(null);
                 Check(ally.TryGetInfo(out var allyInfo) && allyInfo.CurrentHealth == 100, "real core initializes life and data");
                 Check(binding.TrySelect(ally) && health.text == "체력 100 / 100", "initial current/max are read from properties");
                 string allyId = binding.SelectionId;
@@ -54,32 +54,32 @@ namespace Game.UI.Editor
                 Check(combat.text.Contains("공격력 12") && combat.text.Contains("방어력 5"), "real status displayed");
                 Check(!binding.TrySelect(null) && !binding.TrySelect(enemy) && binding.SelectionId == allyId,
                     "invalid selection preserves previous unit");
-                allyCore.TakeDamage(25);
+                allyCore.TakeDamage(new DamageResult(null, null, 25, DamageSourceType.BasicAttack));
                 Check(health.text == "체력 75 / 100" && fill.anchorMax.x == 0.75f, "damage old/new payload is not interpreted as current/max");
                 allyCore.Heal(10);
                 Check(health.text == "체력 85 / 100", "real heal event");
                 allyCore.AddShield(20);
                 Check(combat.text.Contains("보호막 20"), "real shield event");
-                allyCore.TakeDamage(10);
+                allyCore.TakeDamage(new DamageResult(null, null, 10, DamageSourceType.BasicAttack));
                 Check(health.text == "체력 85 / 100" && combat.text.Contains("보호막 10"), "shield-only damage updates without HP event");
-                allyCore.TakeDamage(15);
+                allyCore.TakeDamage(new DamageResult(null, null, 15, DamageSourceType.BasicAttack));
                 Check(health.text == "체력 80 / 100" && combat.text.Contains("보호막 0"), "shield overflow damage");
                 var hpBuff = new object();
-                allyStatus.AddCombatModifier(new UnitStatModifier(hpBuff, UnitStatType.MaxHp, UnitStatModifierType.Flat, 50));
+                allyStatus.AddCombatModifier(new CombatStatModifier(hpBuff, UnitStatType.MaxHp, UnitStatModifierType.Flat, 50));
                 Check(health.text == "체력 80 / 150", "max HP growth updates without current HP event");
                 allyCore.Heal(100);
                 Check(health.text == "체력 150 / 150", "healing uses modified max HP");
                 allyStatus.RemoveCombatModifiers(hpBuff);
                 Check(health.text == "체력 100 / 100", "max HP decrease follows actual life clamp");
                 var attackBuff = new object();
-                allyStatus.AddCombatModifier(new UnitStatModifier(attackBuff, UnitStatType.AttackPower, UnitStatModifierType.Flat, 8));
+                allyStatus.AddCombatModifier(new CombatStatModifier(attackBuff, UnitStatType.AttackPower, UnitStatModifierType.Flat, 8));
                 Check(combat.text.Contains("공격력 20"), "attack modifier updates detail");
                 allyStatus.RemoveCombatModifiers(attackBuff);
                 Check(combat.text.Contains("공격력 12"), "removed modifier updates detail");
 
                 // 실제 프레임/OnEnable/OnDisable로 검증한다. 생명주기 리플렉션 호출은 사용하지 않는다.
                 panelRoot.SetActive(false);
-                allyCore.TakeDamage(30);
+                allyCore.TakeDamage(new DamageResult(null, null, 30, DamageSourceType.BasicAttack));
                 Check(health.text == "체력 100 / 100" && allyLife.CurrentHp == 70, "hidden panel stops listening without stopping unit");
                 Check(!binding.TrySelect(ally), "hidden binding rejects input");
                 panelRoot.SetActive(true);
@@ -89,30 +89,30 @@ namespace Game.UI.Editor
                 Check(health.text == "체력 80 / 100", "repeated activation keeps data current");
                 close.onClick.Invoke();
                 Check(!panel.HasSelection && binding.SelectionId == null, "user close detaches current unit");
-                allyCore.TakeDamage(5);
+                allyCore.TakeDamage(new DamageResult(null, null, 5, DamageSourceType.BasicAttack));
                 Check(!panel.HasSelection, "late health change cannot reopen closed view");
 
-                enemyCore.Initialize();
+                enemyCore.Initialize(null);
                 Check(binding.TrySelect(enemy) && faction.text == "적군" && health.text == "체력 150 / 150", "switch to real enemy");
                 string enemyId = binding.SelectionId;
-                allyCore.TakeDamage(5);
+                allyCore.TakeDamage(new DamageResult(null, null, 5, DamageSourceType.BasicAttack));
                 ally.gameObject.SetActive(false);
                 Check(binding.SelectionId == enemyId && health.text == "체력 150 / 150", "old unit damage/despawn cannot affect new selection");
-                enemyCore.TakeDamage(999);
+                enemyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack));
                 Check(enemy.GetComponent<Unit_Life>().IsDead && panel.HasSelection && health.text == "체력 0 / 150",
                     "death stays visible until despawn");
                 enemy.gameObject.SetActive(false);
                 Check(!panel.HasSelection && binding.SelectionId == null, "despawn clears selected unit");
 
                 ally.gameObject.SetActive(true);
-                allyCore.Initialize();
+                allyCore.Initialize(null);
                 Check(binding.TrySelect(ally) && binding.SelectionId != allyId, "pooled object receives new selection identity");
                 string pooledId = binding.SelectionId;
                 Check(!panel.TryUpdateHealth(allyId, 0, 100), "previous spawn callback is rejected");
                 panelRoot.SetActive(false);
                 ally.gameObject.SetActive(false);
                 ally.gameObject.SetActive(true);
-                allyCore.Initialize();
+                allyCore.Initialize(null);
                 panelRoot.SetActive(true);
                 Check(ally.SelectionId != pooledId && !panel.HasSelection && binding.SelectionId == null,
                     "recycled while hidden does not restore stale selection");
@@ -120,10 +120,10 @@ namespace Game.UI.Editor
                 binding.Initialize(panel);
                 binding.Initialize(panel);
                 Check(!panel.HasSelection && binding.TrySelect(ally), "reinitialization safely clears old selection");
-                allyCore.TakeDamage(10);
+                allyCore.TakeDamage(new DamageResult(null, null, 10, DamageSourceType.BasicAttack));
                 Check(health.text == "체력 90 / 100", "reinitialized binding receives current health");
                 panel.HideUnitInfo();
-                allyCore.TakeDamage(10);
+                allyCore.TakeDamage(new DamageResult(null, null, 10, DamageSourceType.BasicAttack));
                 Check(!panel.HasSelection && binding.SelectionId == null, "externally hidden panel is not resurrected");
                 Check(binding.TrySelect(ally), "selection resumes after explicit hide");
                 await UniTask.NextFrame();
@@ -137,7 +137,7 @@ namespace Game.UI.Editor
                 LayoutRebuilder.ForceRebuildLayoutImmediate(scroll.content);
                 Check(scroll.content.rect.height > scroll.viewport.rect.height, "description is scrollable");
                 scroll.verticalNormalizedPosition = 0.4f;
-                allyCore.TakeDamage(5);
+                allyCore.TakeDamage(new DamageResult(null, null, 5, DamageSourceType.BasicAttack));
                 Check(Mathf.Abs(scroll.verticalNormalizedPosition - 0.4f) < 0.001f, "event refresh preserves reading position");
                 await UniTask.NextFrame();
                 UnityEngine.Object.Destroy(ally.gameObject);
@@ -147,7 +147,7 @@ namespace Game.UI.Editor
                 UnityEngine.Object.Destroy(binding);
                 await UniTask.NextFrame();
                 Check(!panel.HasSelection, "destroyed binding clears its own view");
-                enemyCore.TakeDamage(10);
+                enemyCore.TakeDamage(new DamageResult(null, null, 10, DamageSourceType.BasicAttack));
                 Check(!panel.HasSelection, "destroyed binding leaves no callbacks");
                 Debug.Log($"[UI/MvpRuntimeUnitInfoValidation] PASS: {_checks} checks in actual Play Mode with Unit_Core/Unit_Life/Unit_RuntimeStatus. No AI or combat scene integration claimed.");
             }
@@ -163,7 +163,7 @@ namespace Game.UI.Editor
         private static RuntimeUnitInfoSource ActivateUnit(RuntimeUnitInfoSource source)
         {
             source.gameObject.SetActive(true);
-            source.GetComponent<Unit_Core>().Initialize();
+            source.GetComponent<Unit_Core>().Initialize(null);
             return source;
         }
 

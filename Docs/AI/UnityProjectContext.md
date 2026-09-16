@@ -4,11 +4,12 @@
 
 ## Project Summary
 
-- Project root for today's integration: `D:/Documents/GitHub/OZGL2_2-ui-integration`
-- Original UI checkout: `D:/Documents/GitHub/OZGL2_2` (`feature/ui-common-hud`, PR #9)
-- Last analyzed: 2026-09-09. Current integration details: `Docs/UI/RuntimeHudIntegration.md`.
-- Integration baseline: `38c37e7`, combining dev `1a3ce52`, UI `1b8d2a5`, and core `dbc33b0` feature changes.
-- Current feature branch: `feature/ui-runtime-integration` (local integration; no remote upstream).
+- Active project root: `D:/Documents/GitHub/OZGL2_2`.
+- Current branch: `feature/ui-integration-readiness-20260916`; prior uncommitted UI work is preserved. PR target is dev, never main; no merge.
+- Latest compatibility inspection: 2026-09-16, dev `0ebde218b3b864fb7e91ed48bad8a06c81e1a795`. Team dependencies were copied unchanged, not merged as Git history.
+- Current team construction scene and safety constraints: `Docs/UI/TeamBuildingIntegration20260915.md`.
+- Current economy API/validation details: `Docs/UI/EconomyPhaseCompatibility20260916.md`. PR preparation: `Docs/UI/PrPreparation20260916.md`.
+- The architecture inventory below is the historical 2026-09-09 baseline, not a current completion report. Newer dated UI documents take precedence.
 
 ## Confirmed Environment
 

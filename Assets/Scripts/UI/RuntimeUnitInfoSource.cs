@@ -32,7 +32,6 @@ namespace Game.UI
             {
                 _life.HpChanged += HandleLifeChanged;
                 _life.ShieldChanged += HandleLifeChanged;
-                _life.Died += HandleDied;
             }
             if (_status != null)
             {
@@ -47,7 +46,6 @@ namespace Game.UI
             {
                 _life.HpChanged -= HandleLifeChanged;
                 _life.ShieldChanged -= HandleLifeChanged;
-                _life.Died -= HandleDied;
             }
             if (_status != null)
             {
@@ -90,10 +88,5 @@ namespace Game.UI
             if (stat != UnitStatType.MaxHp) InfoChanged?.Invoke(this);
         }
 
-        private void HandleDied()
-        {
-            // 사망과 디스폰은 다르다. 체력 0은 표시하고 오브젝트 비활성화 때 선택을 해제한다.
-            InfoChanged?.Invoke(this);
-        }
     }
 }

@@ -23,7 +23,7 @@ namespace Units
 
             public AdjustedStatus(
                 UnitData unitData,
-                IEnumerable<UnitStatModifier> modifiers)
+                FinalStatModifier modifier)
             {
                 _baseValues =
                     CreateBaseValues(unitData);
@@ -31,7 +31,7 @@ namespace Units
                 _adjustedValues =
                     CalculateAdjustedValues(
                         _baseValues,
-                        modifiers
+                        modifier
                     );
             }
 
@@ -55,41 +55,11 @@ namespace Units
 
             private Dictionary<UnitStatType, float> CalculateAdjustedValues(
                 Dictionary<UnitStatType, float> baseValues,
-                IEnumerable<UnitStatModifier> modifiers)
+                FinalStatModifier modifier)
             {
                 Dictionary<UnitStatType, float> result =
                     new(baseValues);
 
-                if (modifiers == null)
-                    return result;
-
-                Dictionary<UnitStatType, float> flatValues =
-                    new();
-
-                Dictionary<UnitStatType, float> percentValues =
-                    new();
-
-                foreach (UnitStatModifier modifier in modifiers)
-                {
-                    switch (modifier.ModifierType)
-                    {
-                        case UnitStatModifierType.Flat:
-                            AddValue(
-                                flatValues,
-                                modifier.StatType,
-                                modifier.Value
-                            );
-                            break;
-
-                        case UnitStatModifierType.Percent:
-                            AddValue(
-                                percentValues,
-                                modifier.StatType,
-                                modifier.Value
-                            );
-                            break;
-                    }
-                }
 
                 foreach (UnitStatType statType
                          in System.Enum.GetValues(
@@ -101,17 +71,26 @@ namespace Units
                             statType
                         );
 
+
                     float flat =
-                        GetValue(
-                            flatValues,
-                            statType
-                        );
+                        0f;
 
                     float percent =
-                        GetValue(
-                            percentValues,
-                            statType
-                        );
+                        0f;
+
+
+                    if (modifier != null &&
+                        modifier.TryGetStat(
+                            statType,
+                            out StatModifierValue modifierValue))
+                    {
+                        flat =
+                            modifierValue.Flat;
+
+                        percent =
+                            modifierValue.Percent;
+                    }
+
 
                     result[statType] =
                         CalculateValue(
@@ -120,6 +99,7 @@ namespace Units
                             percent
                         );
                 }
+
 
                 return result;
             }
@@ -135,11 +115,13 @@ namespace Units
                 Dictionary<UnitStatType, float> result =
                     new();
 
+
                 foreach (UnitStatEntry stat in unitData.Stats)
                 {
                     result[stat.StatType] =
                         stat.Value;
                 }
+
 
                 return result;
             }
@@ -158,28 +140,6 @@ namespace Units
                     0f,
                     (baseValue + flat)
                     * (1f + percent)
-                );
-            }
-
-
-            private static void AddValue(
-                Dictionary<UnitStatType, float> dictionary,
-                UnitStatType statType,
-                float value)
-            {
-                if (dictionary.TryGetValue(
-                        statType,
-                        out float currentValue))
-                {
-                    dictionary[statType] =
-                        currentValue + value;
-
-                    return;
-                }
-
-                dictionary.Add(
-                    statType,
-                    value
                 );
             }
 

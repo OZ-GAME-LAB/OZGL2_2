@@ -15,6 +15,7 @@ namespace Game.UI.Editor
     [InitializeOnLoad]
     public static class MvpRuntimeHudValidation
     {
+        private const string VictoryKey = "Game.UI.RuntimeValidation.VictoryReward";
         private const string ActiveKey = "Game.UI.RuntimeValidation.Active";
         private const string ResultKey = "Game.UI.RuntimeValidation.Result";
         private const string PreviousSceneKey = "Game.UI.RuntimeValidation.PreviousScene";
@@ -52,6 +53,7 @@ namespace Game.UI.Editor
         {
             if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
             EnsureReady();
+            SessionState.SetBool(VictoryKey, false);
             SessionState.SetBool(SelectionKey, false);
             SessionState.SetBool(BuildingPhaseKey, false);
             SessionState.SetBool(CountKey, false);
@@ -67,6 +69,7 @@ namespace Game.UI.Editor
         {
             if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
             EnsureReady();
+            SessionState.SetBool(VictoryKey, false);
             SessionState.SetBool(BuildingPhaseKey, false);
             SessionState.SetBool(SelectionKey, true);
             SessionState.SetBool(CountKey, false);
@@ -80,6 +83,7 @@ namespace Game.UI.Editor
         {
             if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
             EnsureReady();
+            SessionState.SetBool(VictoryKey, false);
             SessionState.SetBool(BuildingPhaseKey, false);
             SessionState.SetBool(SelectionKey, true);
             SessionState.SetBool(CountKey, true);
@@ -93,6 +97,7 @@ namespace Game.UI.Editor
         {
             if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
             EnsureReady();
+            SessionState.SetBool(VictoryKey, false);
             SessionState.SetBool(BuildingPhaseKey, false);
             SessionState.SetBool(SelectionKey, true);
             SessionState.SetBool(CountKey, false);
@@ -106,10 +111,25 @@ namespace Game.UI.Editor
         {
             if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
             EnsureReady();
+            SessionState.SetBool(VictoryKey, false);
             SessionState.SetBool(SelectionKey, true);
             SessionState.SetBool(CountKey, false);
             SessionState.SetBool(ArtifactKey, false);
             SessionState.SetBool(BuildingPhaseKey, true);
+            _isQueued = true;
+            EditorApplication.delayCall += BeginValidation;
+        }
+
+        [MenuItem("Game/UI/Validate Victory Reward Integration In Play Mode")]
+        public static void RunVictoryRewards()
+        {
+            if (_isQueued) throw new InvalidOperationException("Validation is already queued.");
+            EnsureReady();
+            SessionState.SetBool(VictoryKey, true);
+            SessionState.SetBool(SelectionKey, true);
+            SessionState.SetBool(CountKey, false);
+            SessionState.SetBool(ArtifactKey, false);
+            SessionState.SetBool(BuildingPhaseKey, false);
             _isQueued = true;
             EditorApplication.delayCall += BeginValidation;
         }
@@ -123,7 +143,12 @@ namespace Game.UI.Editor
                 EnsureReady();
                 SaveSceneSetup();
                 savedSetup = true;
-                if (SessionState.GetBool(BuildingPhaseKey, false))
+                if (SessionState.GetBool(VictoryKey, false))
+                {
+                    // 기존 씬/프리팹 원본을 생성하거나 저장하지 않고, 메모리상의 테스트 씬만 연결한다.
+                    EditorSceneManager.OpenScene(MvpRuntimeHudBuilder.ScenePath, OpenSceneMode.Single);
+                }
+                else if (SessionState.GetBool(BuildingPhaseKey, false))
                 {
                     MvpBuildingPhaseBuilder.Build();
                     EditorSceneManager.OpenScene(MvpBuildingPhaseBuilder.ScenePath, OpenSceneMode.Single);
@@ -148,6 +173,23 @@ namespace Game.UI.Editor
                     MvpRuntimeHudBuilder.Build();
                     EditorSceneManager.OpenScene(MvpRuntimeHudBuilder.ScenePath, OpenSceneMode.Single);
                 }
+                var testScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                if (SessionState.GetBool(VictoryKey, false))
+                    MvpVictoryRewardSetup.ConfigureScene(testScene, false);
+                else if (MvpEconomyUiSetup.IsSupportedScene(testScene.path))
+                    MvpEconomyUiSetup.ConfigureScene(testScene, false);
+                if (!SessionState.GetBool(VictoryKey, false))
+                {
+                    // 사용자가 승리 UI 연결을 저장한 씬도 기존 수동 지급 검사는 독립적으로 검사한다.
+                    // 테스트용 메모리 참조만 끊고, 원본 씬은 저장하지 않는다.
+                    foreach (var root in testScene.GetRootGameObjects())
+                        foreach (var sample in root.GetComponentsInChildren<MvpRuntimeHudSample>(true))
+                        {
+                            var fields = new SerializedObject(sample);
+                            fields.FindProperty("_artifactRewards").objectReferenceValue = null;
+                            fields.ApplyModifiedPropertiesWithoutUndo();
+                        }
+                }
                 SessionState.SetInt(ResultKey, 1);
                 SessionState.SetBool(LifecycleErrorKey, false);
                 SessionState.SetBool(ActiveKey, true);
@@ -166,6 +208,7 @@ namespace Game.UI.Editor
         public static void RunRegression()
         {
             EnsureReady();
+            SessionState.SetBool(VictoryKey, false);
             SaveSceneSetup();
             try
             {
@@ -246,7 +289,7 @@ namespace Game.UI.Editor
                 Check(wallet.GetBalance(CurrencyType.Gold) == 120 && goldText.text == "120", "insufficient spending is atomic");
                 var catalog = AssetDatabase.LoadAssetAtPath<CurrencyCatalog>("Assets/Data/Economy/S.O/CurrencyCatalog.asset");
                 Check(catalog.TryGetByType(CurrencyType.Gem, out var gem), "gem is registered");
-                Check(wallet.TryAdd(new CurrencyAmount(gem, 7)) && goldText.text == "120", "non-gold currency does not replace HUD gold");
+                Check(wallet.TryAdd(CurrencyType.Gem, 7) && goldText.text == "120", "non-gold currency does not replace HUD gold");
 
                 toggle.onClick.Invoke();
                 Check(!ui.gameObject.activeSelf, "HUD hides");
@@ -296,6 +339,7 @@ namespace Game.UI.Editor
                     "hide during async start keeps core running and restores current phase");
                 reset.onClick.Invoke();
 
+                int totalWaveGold = 100;
                 for (int wave = 1; wave <= 3; wave++)
                 {
                     Check(waveText.text == wave + " / 3" && start.interactable, "wave " + wave + " ready");
@@ -307,16 +351,22 @@ namespace Game.UI.Editor
                     await WaitForPhase(flow, GamePhase.Reward);
                     Check(flow.CurPhase == GamePhase.Reward && phaseText.text == "보상", "wave " + wave + " reward phase");
                     int beforeReward = wallet.GetBalance(CurrencyType.Gold);
+                    int expectedReward = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
+                    int expectedGem = wallet.GetBalance(CurrencyType.Gem) +
+                        MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gem);
+                    totalWaveGold += expectedReward;
                     reward.onClick.Invoke();
                     reward.onClick.Invoke();
-                    Check(wallet.GetBalance(CurrencyType.Gold) == beforeReward + 30 &&
-                        goldText.text == (beforeReward + 30).ToString("N0"), "wave " + wave + " test reward applied once by real manager");
+                    Check(wallet.GetBalance(CurrencyType.Gold) == beforeReward + expectedReward &&
+                        goldText.text == (beforeReward + expectedReward).ToString("N0"), "wave " + wave + " table reward applied once by real manager");
+                    Check(wallet.GetBalance(CurrencyType.Gem) == expectedGem, "wave " + wave + " table Gem reward");
                     await WaitForPhase(flow, GamePhase.Preparation);
                 }
                 Check(waves.CurQuarter == 2 && waves.CurWave == 1 && waveText.text == "1 / 3" && phaseText.text == "건설", "first quarter continues to next quarter");
-                Check(wallet.GetBalance(CurrencyType.Gold) == 190 && goldText.text == "190", "three actual reward transactions reflected");
+                Check(wallet.GetBalance(CurrencyType.Gold) == totalWaveGold && goldText.text == totalWaveGold.ToString("N0"), "three actual reward transactions reflected");
                 reset.onClick.Invoke();
                 Check(waveText.text == "1 / 3" && goldText.text == "100" && start.interactable, "restart resets core/economy/view");
+                await MvpEconomyUiValidation.RunChecksAsync();
                 await MvpCoreQuarterValidation.RunChecksAsync();
                 // Let only the button color transition settle before visual capture.
                 await UniTask.Delay(TimeSpan.FromSeconds(0.2), DelayType.Realtime);
@@ -325,7 +375,7 @@ namespace Game.UI.Editor
                 await MvpRuntimeUnitInfoValidation.RunChecksAsync();
                 Check(_errors == 0, "no new engine errors during Play checks");
                 Debug.Log("[UI/MvpRuntimeHudValidation] PASS: " + _checks +
-                    " checks in actual Play Mode. Real RunCurrencyManager/GameFlowController/WaveController; test spawner and reward inputs.");
+                    " checks in actual Play Mode. Real RunCurrencyManager/GameFlowController/WaveController; test spawner and team wave reward table.");
                 SessionState.SetInt(ResultKey, 0);
             }
             catch (Exception exception)
@@ -346,7 +396,8 @@ namespace Game.UI.Editor
             Application.logMessageReceived += HandleLog;
             try
             {
-                if (SessionState.GetBool(BuildingPhaseKey, false)) await MvpBuildingPhaseValidation.RunChecksAsync();
+                if (SessionState.GetBool(VictoryKey, false)) await MvpVictoryRewardValidation.RunChecksAsync();
+                else if (SessionState.GetBool(BuildingPhaseKey, false)) await MvpBuildingPhaseValidation.RunChecksAsync();
                 else if (SessionState.GetBool(ArtifactKey, false)) await MvpArtifactRewardValidation.RunChecksAsync();
                 else
                 {

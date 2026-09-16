@@ -1,31 +1,32 @@
 using System;
 using System.Collections.Generic;
+using Game.Core;
 using UnityEngine;
 
-public class PersistentCurrencyManager : MonoBehaviour
+public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunSettlementRewards
 {
-    public static PersistentCurrencyManager Instance { get; private set; }
-
     public event Action<CurrencyData, int, int> BalanceChanged;
 
     public IReadOnlyDictionary<CurrencyData, int> Balances => _wallet?.Balances;
 
     [SerializeField] private CurrencyCatalog _currencyCatalog;
+    private EffectManager _effectManager;
+    private WaveController _waveController;
+    private GameFlowController _gameFlowController;
 
     private CurrencyWallet _wallet;
+    private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
+
+    // 현재 Run의 웨이브·게임 플로우·효과 매니저 참조 연결 (기존 지갑과 잔액 유지)
+    public void Initialize(WaveController waveController, GameFlowController gameFlowController, EffectManager effectManager)
+    {
+        _waveController = waveController;
+        _gameFlowController = gameFlowController;
+        _effectManager = effectManager;
+    }
 
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-
-        DontDestroyOnLoad(gameObject);
-
         if (!ValidateSettings())
         {
             return;
@@ -38,26 +39,19 @@ public class PersistentCurrencyManager : MonoBehaviour
     {
         _wallet = null;
 
-        if (Instance == this)
-        {
-            Instance = null;
-        }
+        _effectManager = null;
+        _waveController = null;
+        _gameFlowController = null;
     }
 
     public int GetBalance(CurrencyType type)
     {
-        if (_wallet == null || _currencyCatalog == null ||
-            !_currencyCatalog.TryGetByType(type, out CurrencyData currency))
+        if (_wallet == null)
         {
             return 0;
         }
 
-        return GetBalance(currency);
-    }
-
-    public int GetBalance(CurrencyData currency)
-    {
-        if (!CanUseCurrency(currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return 0;
         }
@@ -65,27 +59,26 @@ public class PersistentCurrencyManager : MonoBehaviour
         return _wallet.GetBalance(currency);
     }
 
-    public bool CanSpend(CurrencyAmount currencyAmount)
+    public bool CanSpend(CurrencyType type, int amount)
     {
-        if (!CanUseCurrency(currencyAmount.Currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return false;
         }
 
-        return _wallet.CanSpend(currencyAmount);
+        return _wallet.CanSpend(new CurrencyAmount(currency, amount));
     }
 
-    public bool TrySpend(CurrencyAmount currencyAmount)
+    public bool TrySpend(CurrencyType type, int amount)
     {
-        if (!CanUseCurrency(currencyAmount.Currency))
+        if (!TryGetCurrency(type, out CurrencyData currency) || !CanUseCurrency(currency))
         {
             return false;
         }
 
-        CurrencyData currency = currencyAmount.Currency;
         int previousBalance = _wallet.GetBalance(currency);
 
-        if (!_wallet.TrySpend(currencyAmount))
+        if (!_wallet.TrySpend(new CurrencyAmount(currency, amount)))
         {
             return false;
         }
@@ -94,7 +87,17 @@ public class PersistentCurrencyManager : MonoBehaviour
         return true;
     }
 
-    public bool TryAdd(CurrencyAmount currencyAmount)
+    public bool TryAdd(CurrencyType type, int amount)
+    {
+        if (!TryGetCurrency(type, out CurrencyData currency))
+        {
+            return false;
+        }
+
+        return TryAddInternal(new CurrencyAmount(currency, amount));
+    }
+
+    private bool TryAddInternal(CurrencyAmount currencyAmount)
     {
         if (!CanUseCurrency(currencyAmount.Currency))
         {
@@ -118,17 +121,47 @@ public class PersistentCurrencyManager : MonoBehaviour
         return true;
     }
 
-    // 추가적으로 파라미터에 웨이브 클리어 수, 유닛 처치 수 등의 정보가 필요할 것 (+ 보스 처치 수?)
-    public bool TryApplyReward(CurrencyAmount settlementReward)
+    // 종료한 전투의 웨이브·분기 번호를 변경하기 전에 호출
+    public bool TryApplyReward(ResultType result)
     {
-        // 파라미터 수정 이후 계산식 적용 이후 calculatedReward를 TryAdd에 전달
-        // 계산식은 Figma 기준 (웨이브 + 유닛 처치) * 제약(토템) 배율로 예정
-        // 계산 C# 스크립트를 생성해서 해당 스크립트 내에서 제단, 토템, 아티팩트를 가져와서 보상 계산에 활용하도록 구현 예정
-        
-        // 현재는 임시로 해둔 상태
-        CurrencyAmount calculatedReward = settlementReward;
+        if (_waveController == null || _waveController.CurQuarter < 1 ||
+            _waveController.CurWave < 1 || _waveController.CurWave > WaveController.MAX_WAVE)
+        {
+            Debug.LogError("[Economy/PersistentCurrencyManager] 정산할 웨이브 위치를 확인하세요.", this);
+            return false;
+        }
 
-        return TryAdd(calculatedReward);
+        if (result != ResultType.Victory && result != ResultType.Defeat)
+        {
+            return false;
+        }
+
+        long clearedWaves = ((long)_waveController.CurQuarter - 1) * WaveController.MAX_WAVE
+            + _waveController.CurWave;
+        if (result == ResultType.Defeat)
+        {
+            clearedWaves--;
+        }
+        if (clearedWaves > int.MaxValue)
+        {
+            return false;
+        }
+
+        int totalWaveCleared = (int)clearedWaves;
+        int totalBossesCleared = totalWaveCleared / WaveController.MAX_WAVE;
+
+        if (_currencyCatalog == null ||
+            !_currencyCatalog.TryGetByType(CurrencyType.Bloodstone, out CurrencyData currency))
+        {
+            Debug.LogError("[Economy/PersistentCurrencyManager] 혈석 재화 설정을 확인하세요.", this);
+            return false;
+        }
+
+        CurrencyAmount reward = _rewardCalculator.CalculateRunSettlementReward(
+            currency, totalWaveCleared, totalBossesCleared,
+            _effectManager != null ? _effectManager.CurrencyModifiers : null);
+
+        return TryAddInternal(reward);
     }
 
     private void NotifyBalanceChanged(CurrencyData currency, int previousBalance)
@@ -180,6 +213,24 @@ public class PersistentCurrencyManager : MonoBehaviour
         );
 
         return false;
+    }
+
+    private bool TryGetCurrency(CurrencyType type, out CurrencyData currency)
+    {
+        currency = null;
+
+        if (!ValidateSettings())
+        {
+            return false;
+        }
+
+        if (!_currencyCatalog.TryGetByType(type, out currency))
+        {
+            Debug.LogError($"[Economy/PersistentCurrencyManager] Catalog에서 재화를 찾을 수 없습니다. Type: {type}", this);
+            return false;
+        }
+
+        return true;
     }
 
     private bool CanUseCurrency(CurrencyData currency)

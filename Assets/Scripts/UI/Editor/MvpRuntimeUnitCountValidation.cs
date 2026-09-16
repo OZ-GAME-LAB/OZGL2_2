@@ -37,17 +37,17 @@ namespace Game.UI.Editor
             Check(!hud.TryRegister(null), "null registration rejected");
             for (int i = 0; i < 3; i++) Check(hud.TryRegister(ally), "idempotent registration");
             Expect(hud, 1, 1, 2, "duplicate is counted once");
-            allyCore.TakeDamage(25);
+            allyCore.TakeDamage(new DamageResult(null, null, 25, DamageSourceType.BasicAttack));
             allyCore.Heal(10);
             allyCore.AddShield(20);
             Expect(hud, 1, 1, 2, "nonfatal life and shield notifications do not change counts");
-            allyCore.TakeDamage(999);
+            allyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack));
             Expect(hud, 0, 1, 2, "HP zero and Died notifications reduce once");
             Check(allyText.text == "아군 생존 0", "death immediately visible");
-            allyCore.TakeDamage(999);
+            allyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack));
             allyCore.Heal(999);
             Expect(hud, 0, 1, 2, "repeated death and failed healing cannot underflow or revive count");
-            allyCore.Initialize();
+            allyCore.Initialize(null);
             Expect(hud, 1, 1, 2, "real life initialization updates existing entry");
 
             string oldId = ally.SelectionId;
@@ -63,7 +63,7 @@ namespace Game.UI.Editor
             Check(hud.TryRegister(ally), "explicit re-registration");
 
             hud.gameObject.SetActive(false);
-            enemyCore.TakeDamage(999);
+            enemyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack));
             Check(enemyText.text == "적군 생존 1", "hidden HUD unsubscribes");
             hud.gameObject.SetActive(true);
             Expect(hud, 1, 0, 2, "show reconciles missed death");
@@ -71,11 +71,11 @@ namespace Game.UI.Editor
             hud.gameObject.SetActive(false);
             ally.gameObject.SetActive(false);
             ally.gameObject.SetActive(true);
-            allyCore.Initialize();
+            allyCore.Initialize(null);
             hud.gameObject.SetActive(true);
             Expect(hud, 0, 0, 1, "hidden stale lifetime pruned instead of counted automatically");
             Check(hud.TryRegister(ally), "new lifetime explicitly accepted");
-            enemyCore.Initialize();
+            enemyCore.Initialize(null);
             Expect(hud, 1, 1, 2, "current entries recover");
 
             // 팀 코드에 컴포넌트 단독 활성화 이벤트가 없으므로 명시적 재동기화를 검증한다.
@@ -96,7 +96,7 @@ namespace Game.UI.Editor
             hud.gameObject.SetActive(false);
             ally.gameObject.SetActive(false);
             ally.gameObject.SetActive(true);
-            allyCore.Initialize();
+            allyCore.Initialize(null);
             Check(hud.TryRegister(ally), "new lifetime can register while HUD is hidden");
             hud.gameObject.SetActive(true);
             Expect(hud, 1, 1, 2, "hidden explicit registration replaces stale lifetime without duplicate");
@@ -111,7 +111,7 @@ namespace Game.UI.Editor
                 var source = temporary.AddComponent<RuntimeUnitInfoSource>();
                 Check(!hud.TryRegister(source), "uninitialized registration rejected without initializing unit");
                 Check(temporary.GetComponent<Unit_Life>().MaxHp == 0, "HUD did not initialize gameplay");
-                core.Initialize();
+                core.Initialize(null);
                 Check(hud.TryRegister(source), "later spawned initialized unit registers");
                 Expect(hud, 2, 1, 3, "dynamic spawn contributes once");
                 hud.gameObject.SetActive(false);
@@ -133,13 +133,13 @@ namespace Game.UI.Editor
             Expect(hud, 0, 0, 0, "clear resets presentation registrations");
             Check(selection.SelectionId == selectionId && ally.GetComponent<Unit_Life>().CurrentHp == 100,
                 "clear does not change selection or gameplay life");
-            allyCore.TakeDamage(10);
+            allyCore.TakeDamage(new DamageResult(null, null, 10, DamageSourceType.BasicAttack));
             Expect(hud, 0, 0, 0, "removed sources no longer update HUD");
             for (int i = 0; i < 3; i++)
             {
                 reset.onClick.Invoke();
                 Expect(hud, 1, 1, 2, "sample respawn registers each lifetime once");
-                enemyCore.TakeDamage(999);
+                enemyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack));
                 Expect(hud, 1, 0, 2, "repeated respawn/death stays consistent");
             }
             reset.onClick.Invoke();

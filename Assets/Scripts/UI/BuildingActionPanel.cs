@@ -21,19 +21,23 @@ namespace Game.UI
         [Serializable]
         private sealed class ActionRow
         {
+            [SerializeField] private GameObject _rowRoot;
             [SerializeField] private Button _button;
             [SerializeField] private TMP_Text _quote;
             [SerializeField] private TMP_Text _reason;
 
             public Button Button => _button;
 
-            public void Render(BuildingActionOffer offer, string blockReason)
+            public void Render(BuildingActionOffer offer, string blockReason, bool compact)
             {
+                if (compact && _rowRoot != null) _rowRoot.SetActive(offer != null);
                 _button.interactable = offer != null && offer.CanExecute && blockReason == null;
-                _quote.text = offer == null ? "해당 없음" :
-                    $"{offer.DisplayName} · {(offer.Action == BuildingUiAction.Dismantle ? "환급" : "비용")} {offer.GoldAmount:N0} 골드";
+                string amount = offer == null ? null : BuildingCurrencyText.Format(offer.GoldAmount, offer.GemAmount);
+                _quote.text = offer == null ? "해당 없음" : compact ? amount :
+                    $"{offer.DisplayName} · {(offer.Action == BuildingUiAction.Dismantle ? "환급" : "비용")} {amount}";
                 _reason.text = offer == null ? "현재 선택에서는 사용할 수 없습니다." :
-                    blockReason ?? (offer.CanExecute ? "실행 가능" : offer.DisabledReason);
+                    blockReason ?? (offer.CanExecute ? (compact ? "" : "실행 가능") : offer.DisabledReason);
+                if (compact) _reason.gameObject.SetActive(offer != null && !string.IsNullOrWhiteSpace(_reason.text));
             }
         }
 
@@ -42,6 +46,9 @@ namespace Game.UI
         [SerializeField] private ActionRow _build = new ActionRow();
         [SerializeField] private ActionRow _upgrade = new ActionRow();
         [SerializeField] private ActionRow _dismantle = new ActionRow();
+
+        [SerializeField] private PlayerPopup _playerPopup;
+        [SerializeField] private bool _compactPresentation;
 
         private Action<BuildingActionRequest> _actionRequested;
         private BuildingActionViewData _data;
@@ -55,6 +62,7 @@ namespace Game.UI
 
         private void OnEnable()
         {
+            if (_playerPopup != null) _playerPopup.Closed += HandlePopupClosed;
             _build.Button.onClick.RemoveListener(HandleBuildClicked);
             _upgrade.Button.onClick.RemoveListener(HandleUpgradeClicked);
             _dismantle.Button.onClick.RemoveListener(HandleDismantleClicked);
@@ -66,6 +74,7 @@ namespace Game.UI
 
         private void OnDisable()
         {
+            if (_playerPopup != null) _playerPopup.Closed -= HandlePopupClosed;
             _build.Button.onClick.RemoveListener(HandleBuildClicked);
             _upgrade.Button.onClick.RemoveListener(HandleUpgradeClicked);
             _dismantle.Button.onClick.RemoveListener(HandleDismantleClicked);
@@ -80,6 +89,7 @@ namespace Game.UI
             _awaitingRefresh = false;
             _resultMessage = null;
             Refresh();
+            if (_playerPopup != null) _playerPopup.Show();
         }
 
         public void HideActions()
@@ -89,6 +99,7 @@ namespace Game.UI
             _awaitingRefresh = false;
             _resultMessage = null;
             Refresh();
+            if (_playerPopup != null) _playerPopup.Hide();
         }
 
         public void SetActionsAllowed(bool allowed, string reason = null)
@@ -115,6 +126,8 @@ namespace Game.UI
             return true;
         }
 
+        private void HandlePopupClosed(PlayerPopup popup) => HideActions();
+
         private void HandleBuildClicked() => RequestAction(_data?.Build);
         private void HandleUpgradeClicked() => RequestAction(_data?.Upgrade);
         private void HandleDismantleClicked() => RequestAction(_data?.Dismantle);
@@ -140,10 +153,13 @@ namespace Game.UI
             var blocked = _pending != null ? "요청 처리 중… 중복 실행을 막고 있습니다." :
                 !_actionsAllowed ? _phaseReason : _actionRequested == null ? "담당 시스템이 연결되지 않았습니다." :
                 _awaitingRefresh ? "최신 건물 정보를 기다립니다." : null;
-            _build.Render(_data?.Build, blocked);
-            _upgrade.Render(_data?.Upgrade, blocked);
-            _dismantle.Render(_data?.Dismantle, blocked);
-            _status.text = _resultMessage ?? blocked ?? (_data == null ? "선택 대기" : "표시된 비용과 조건을 확인한 뒤 선택하세요.");
+            _build.Render(_data?.Build, blocked, _compactPresentation);
+            _upgrade.Render(_data?.Upgrade, blocked, _compactPresentation);
+            _dismantle.Render(_data?.Dismantle, blocked, _compactPresentation);
+            _status.text = _resultMessage ?? (_compactPresentation &&
+                (_data == null || (_data.Build == null && _data.Upgrade == null && _data.Dismantle == null)) ? "" : blocked) ?? (_compactPresentation ? "" :
+                _data == null ? "선택 대기" : "표시된 비용과 조건을 확인한 뒤 선택하세요.");
+            if (_compactPresentation) _status.gameObject.SetActive(!string.IsNullOrWhiteSpace(_status.text));
         }
     }
 }

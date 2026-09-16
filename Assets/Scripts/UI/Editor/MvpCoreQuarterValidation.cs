@@ -78,6 +78,7 @@ namespace Game.UI.Editor
                 try { binding.Initialize(null, waves); Check(false, "null flow must reject"); }
                 catch (ArgumentNullException) { Check(true, "invalid initialization rejects before altering binding"); }
 
+                int totalWaveGold = 100;
                 for (int quarter = 1; quarter <= WaveController.MAIN_QUARTERS; quarter++)
                 {
                     for (int wave = 1; wave <= WaveController.MAX_WAVE; wave++)
@@ -127,15 +128,17 @@ namespace Game.UI.Editor
                         if (wave == WaveController.MAX_WAVE)
                             Check(flow.IsWaitingForArtifactSelection, "quarter reward keeps team artifact wait contract");
                         int before = wallet.GetBalance(CurrencyType.Gold);
+                        int expectedReward = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
+                        totalWaveGold += expectedReward;
                         reward.onClick.Invoke();
                         reward.onClick.Invoke();
-                        Check(wallet.GetBalance(CurrencyType.Gold) == before + 30, "one test reward per quarter/wave");
+                        Check(wallet.GetBalance(CurrencyType.Gold) == before + expectedReward, "one table reward per quarter/wave");
                         await WaitFor(flow, GamePhase.Preparation);
                     }
                 }
                 Check(waves.CurQuarter == WaveController.MAIN_QUARTERS + 1 && waves.CurWave == 1 && flow.HasClearedMainGame,
                     "continue enters next quarter and retains clear record");
-                Check(wallet.GetBalance(CurrencyType.Gold) == 100 + 30 * WaveController.MAIN_QUARTERS * WaveController.MAX_WAVE,
+                Check(wallet.GetBalance(CurrencyType.Gold) == totalWaveGold,
                     "all quarter rewards reflected exactly once");
                 start.onClick.Invoke();
                 await WaitFor(flow, GamePhase.Battle);
@@ -208,7 +211,7 @@ namespace Game.UI.Editor
                 Check(flow.CurPhase == GamePhase.Preparation && waves.CurWave == 1 && start.interactable && !hud.IsStartPending,
                     "reset during staging prevents stale completion");
                 Check(!Field<GameObject>(uiFields, "_messagePanel").activeSelf, "no stale cancellation message");
-                Debug.Log($"[UI/MvpCoreQuarterValidation] PASS: {_checks} Play Mode checks against unchanged team core; test spawner/rewards, no final result API inferred.");
+                Debug.Log($"[UI/MvpCoreQuarterValidation] PASS: {_checks} Play Mode checks against unchanged team core; test spawner/team reward table, no final result API inferred.");
             }
             finally
             {

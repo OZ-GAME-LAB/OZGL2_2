@@ -55,7 +55,8 @@ namespace Game.UI.Editor
                 var flow = systems.AddComponent<GameFlowController>();
                 var waves = systems.AddComponent<WaveController>();
                 var rewardGate = systems.AddComponent<TestWaitingScript>();
-                MvpHudBuilder.Assign(currency, "_currencyCatalog", catalog);
+                MvpHudBuilder.Assign(currency, "_currencyCatalog", catalog,
+                    "_waveRewardTable", MvpEconomyUiSetup.LoadRewardTable());
                 var currencyFields = new SerializedObject(currency);
                 var starting = currencyFields.FindProperty("_baseStartingCurrencies");
                 starting.arraySize = 1;
@@ -71,7 +72,7 @@ namespace Game.UI.Editor
                     new Vector2(.5f, .5f), new Vector2(-630, -215), new Vector2(630, 215),
                     new Color32(25, 36, 48, 250));
                 MvpHudBuilder.Label(card, "Title", "재화·코어 HUD 연동 테스트", 38, Color.white, 32, 350, 1196, 60);
-                MvpHudBuilder.Label(card, "Description", "실제 매니저 사용 · 전투 판정/보상 수치는 테스트 입력",
+                MvpHudBuilder.Label(card, "Description", "실제 매니저·보상 테이블 사용 · 전투 판정은 테스트 입력",
                     22, new Color32(145, 169, 182, 255), 32, 306, 1196, 38);
                 var status = MvpHudBuilder.Label(card, "Status", "초기화 대기", 22, Color.white, 32, 251, 1196, 45);
                 MvpHudBuilder.Label(card, "Help",
@@ -81,7 +82,7 @@ namespace Game.UI.Editor
                 var spend = MakeButton(card, "SpendGold", "골드 -30", 340, 122);
                 var reject = MakeButton(card, "RejectSpend", "부족한 비용 요청", 648, 122);
                 var win = MakeButton(card, "Win", "테스트 적 전멸", 956, 122);
-                var reward = MakeButton(card, "Reward", "테스트 보상 +30", 32, 36);
+                var reward = MakeButton(card, "Reward", "웨이브 보상 지급", 32, 36);
                 var lose = MakeButton(card, "Lose", "테스트 아군 전멸", 340, 36);
                 var reset = MakeButton(card, "Reset", "재화·코어 리셋", 648, 36);
                 var toggle = MakeButton(card, "ToggleHud", "HUD 표시/숨김", 956, 36);

@@ -28,6 +28,7 @@ namespace Game.UI
         [SerializeField] private TMP_Text _runResultTitleText;
         [SerializeField] private TMP_Text _runRewardText;
         [SerializeField] private Button _restartButton;
+        [SerializeField] private RunSettlementPanel _settlementPanel;
 
         [Header("Message")]
         [SerializeField] private GameObject _messagePanel;
@@ -139,6 +140,7 @@ namespace Game.UI
             SetTextIfAssigned(_runResultTitleText, isVictory ? _victoryTitle : _defeatTitle);
             SetTextIfAssigned(_runRewardText, string.Format(_runRewardFormat, goldReward));
             SetActiveIfAssigned(_runResultPanel, true);
+            if (_settlementPanel != null) _settlementPanel.ShowPending(isVictory);
             if (_restartButton != null)
             {
                 _restartButton.interactable = RestartRequested != null;
@@ -149,6 +151,7 @@ namespace Game.UI
         public void HideRunResult()
         {
             SetActiveIfAssigned(_runResultPanel, false);
+            if (_settlementPanel != null) _settlementPanel.Hide();
         }
 
         public void ShowMessage(string message)

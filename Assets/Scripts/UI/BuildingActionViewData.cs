@@ -11,15 +11,21 @@ namespace Game.UI
         public string OptionId { get; }
         public string DisplayName { get; }
         public int GoldAmount { get; }
+        public int GemAmount { get; }
         public bool CanExecute { get; }
         public string DisabledReason { get; }
 
         public BuildingActionOffer(BuildingUiAction action, string displayName, int goldAmount,
             bool canExecute, string disabledReason = null, string optionId = null)
+            : this(action, displayName, goldAmount, 0, canExecute, disabledReason, optionId) { }
+
+        public BuildingActionOffer(BuildingUiAction action, string displayName, int goldAmount, int gemAmount,
+            bool canExecute, string disabledReason = null, string optionId = null)
         {
             if (!Enum.IsDefined(typeof(BuildingUiAction), action)) throw new ArgumentOutOfRangeException(nameof(action));
             if (string.IsNullOrWhiteSpace(displayName)) throw new ArgumentException("A display name is required.", nameof(displayName));
             if (goldAmount < 0) throw new ArgumentOutOfRangeException(nameof(goldAmount));
+            if (gemAmount < 0) throw new ArgumentOutOfRangeException(nameof(gemAmount));
             if (!canExecute && string.IsNullOrWhiteSpace(disabledReason))
                 throw new ArgumentException("A disabled reason is required.", nameof(disabledReason));
             if (action == BuildingUiAction.Build && string.IsNullOrWhiteSpace(optionId))
@@ -27,9 +33,20 @@ namespace Game.UI
             Action = action;
             DisplayName = displayName;
             GoldAmount = goldAmount;
+            GemAmount = gemAmount;
             CanExecute = canExecute;
             DisabledReason = disabledReason;
             OptionId = optionId;
+        }
+    }
+
+    internal static class BuildingCurrencyText
+    {
+        public static string Format(int gold, int gems)
+        {
+            if (gems == 0) return $"{gold:N0} 골드";
+            if (gold == 0) return $"{gems:N0} 보석";
+            return $"{gold:N0} 골드 · {gems:N0} 보석";
         }
     }
 

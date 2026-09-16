@@ -33,7 +33,7 @@ namespace Game.UI.Samples
         {
             _panel.HideUnitInfo();
             _binding.Initialize(_panel);
-            foreach (var unit in _units) unit.Initialize();
+            foreach (var unit in _units) unit.Initialize(null);
             RegisterCounts();
             IsReady = true;
             _statusText.text = "유닛을 클릭해서 선택하세요. 수치와 전투 입력은 테스트용입니다.";
@@ -50,7 +50,7 @@ namespace Game.UI.Samples
         private void HandleDamage()
         {
             if (!TryGetSelectedUnit(out var unit)) return;
-            unit.TakeDamage(25);
+            unit.TakeDamage(new DamageResult(null, null, 25, DamageSourceType.BasicAttack));
             _statusText.text = "선택 유닛에 테스트 피해 25 적용 (보호막 우선).";
         }
 
@@ -74,7 +74,7 @@ namespace Game.UI.Samples
             {
                 unit.gameObject.SetActive(false);
                 unit.gameObject.SetActive(true);
-                unit.Initialize();
+                unit.Initialize(null);
             }
             RegisterCounts();
             _statusText.text = "두 유닛 재사용 완료. 이전 선택은 해제되며 다시 클릭할 수 있습니다.";

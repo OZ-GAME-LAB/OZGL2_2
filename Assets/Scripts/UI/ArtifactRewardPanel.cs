@@ -49,6 +49,16 @@ namespace Game.UI
         [SerializeField] private Button _previousPageButton;
         [SerializeField] private Button _nextPageButton;
 
+        [SerializeField] private bool _compactPresentation;
+        [SerializeField] private bool _showCardEffects;
+        [Serializable]
+        private sealed class DisplayNameOverride
+        {
+            public string ArtifactId;
+            public string DisplayName;
+        }
+        [SerializeField] private DisplayNameOverride[] _displayNames = Array.Empty<DisplayNameOverride>();
+
         private Action<ArtifactRewardRequest> _choiceRequested;
         private ArtifactRewardViewData _data;
         private ArtifactRewardRequest _pendingRequest;
@@ -218,8 +228,10 @@ namespace Game.UI
             if (opening && EventSystem.current != null)
                 _previousSelection = EventSystem.current.currentSelectedGameObject;
             _panelRoot.SetActive(true);
-            _rewardText.text = "획득 골드 " + FormatReward(_data.AwardedGold) + "\n획득 보석 " + FormatReward(_data.AwardedGems);
-            _instructionText.text = $"총 {_data.Candidates.Count}개 중 1개 선택 → 확정     /     미선택 시 모두 포기";
+            _rewardText.text = _compactPresentation
+                ? "골드 " + FormatReward(_data.AwardedGold) + "     ·     보석 " + FormatReward(_data.AwardedGems)
+                : "획득 골드 " + FormatReward(_data.AwardedGold) + "\n획득 보석 " + FormatReward(_data.AwardedGems);
+            _instructionText.text = _compactPresentation ? "유물 하나를 선택하세요" : $"총 {_data.Candidates.Count}개 중 1개 선택 → 확정     /     미선택 시 모두 포기";
             bool unlocked = !IsRequestPending;
             int offset = _pageIndex * CardsPerPage;
             int visibleCount = Math.Min(CardsPerPage, _data.Candidates.Count - offset);
@@ -234,7 +246,7 @@ namespace Game.UI
                     continue;
                 }
                 var offer = _data.Candidates[offset + i];
-                card.Name.text = offer.DisplayName;
+                card.Name.text = GetDisplayName(offer);
                 card.Rarity.text = offer.RarityName;
                 card.Rarity.color = offer.RarityColor;
                 card.Effect.text = offer.EffectDescription;
@@ -246,7 +258,8 @@ namespace Game.UI
             }
             _clearButton.interactable = unlocked && _selectedIndex >= 0;
             _confirmButton.interactable = unlocked && _choiceRequested != null;
-            _confirmText.text = _selectedIndex >= 0 ? "선택 확정" : "모두 포기하고 계속";
+            _confirmText.text = _compactPresentation ? (_selectedIndex >= 0 ? "획득하기" : "유물 없이 계속") :
+                _selectedIndex >= 0 ? "선택 확정" : "모두 포기하고 계속";
             bool hasPages = PageCount > 1;
             _previousPageButton.gameObject.SetActive(hasPages);
             _nextPageButton.gameObject.SetActive(hasPages);
@@ -259,6 +272,10 @@ namespace Game.UI
                 ? "보상 시스템 연결 대기" : _selectedIndex >= 0
                 ? $"선택: {_data.Candidates[_selectedIndex].DisplayName} · 확정하면 이 아티팩트를 요청합니다."
                 : "아티팩트 1개를 선택하세요. 선택하지 않으면 모두 포기합니다.");
+            if (_compactPresentation && !IsRequestPending && _message == null)
+                _statusText.text = _choiceRequested == null ? "보상 시스템 연결 대기" : _showCardEffects
+                    ? (_selectedIndex >= 0 ? "선택한 유물을 확인하고 획득하세요" : "선택하지 않고 계속할 수도 있습니다")
+                    : _selectedIndex >= 0 ? _data.Candidates[_selectedIndex].EffectDescription : "";
             int focusIndex = _selectedIndex >= offset && _selectedIndex < offset + visibleCount ? _selectedIndex - offset : 0;
             if (opening && EventSystem.current != null)
                 EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
@@ -270,6 +287,20 @@ namespace Game.UI
                     (selectable == null || !selectable.isActiveAndEnabled || !selectable.IsInteractable())))
                     EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
             }
+        }
+
+        private string GetDisplayName(ArtifactRewardOffer offer)
+        {
+            return ResolveDisplayName(offer.ArtifactId, offer.DisplayName);
+        }
+
+        internal string ResolveDisplayName(string artifactId, string fallback)
+        {
+            if (_compactPresentation)
+                foreach (var item in _displayNames)
+                    if (item != null && item.ArtifactId == artifactId && !string.IsNullOrWhiteSpace(item.DisplayName))
+                        return item.DisplayName;
+            return fallback;
         }
 
         private void ConfigureNavigation(int visibleCount)
