@@ -94,7 +94,7 @@ namespace Game.UI.Editor
                 Check(artifacts.Instances.Count == 0 && stackEvents == 0, "highlighting a card never grants effects");
                 confirm.onClick.Invoke();
                 confirm.onClick.Invoke();
-                await WaitUntil(() => flow.CurPhase == GamePhase.Preparation, "selection releases the gate");
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 Check(completions == 1 && stackEvents == 1 && artifacts.TryGetById(selected, out var owned) &&
                     owned.StackCount == 1 && waves.CurWave == 2, "one confirmed request creates one real stack");
                 artifacts.TryGetById(selected, out var instance);
@@ -109,7 +109,7 @@ namespace Game.UI.Editor
                 await WinAndWait(start, win, flow, panel);
                 Check(binding.CurrentReward.RewardId != first.RewardId, "different wave has a different reward ID");
                 confirm.onClick.Invoke(); // 기본 미선택 = 모두 포기.
-                await WaitUntil(() => flow.CurPhase == GamePhase.Preparation, "forfeit releases the gate");
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 Check(completions == 2 && artifacts.Instances.Count == 1 && stackEvents == 1,
                     "forfeit changes no inventory or artifact effects");
 
@@ -146,7 +146,7 @@ namespace Game.UI.Editor
                     wallet.GetBalance(CurrencyType.Gold) == beforeRetryGold, "failed grant retry does not reroll or repay");
                 Field<Button>(panelFields, "_clearButton").onClick.Invoke();
                 confirm.onClick.Invoke();
-                await WaitUntil(() => flow.CurPhase == GamePhase.Preparation, "forfeit after capped grant");
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
 
                 // 다른 Source는 리셋이 지우면 안 된다.
                 var foreignSource = new object();
@@ -165,7 +165,8 @@ namespace Game.UI.Editor
                 start.onClick.Invoke();
                 await WaitUntil(() => flow.CurPhase == GamePhase.Battle, "boss battle");
                 win.onClick.Invoke();
-                await WaitUntil(() => flow.CurPhase == GamePhase.Preparation && waves.CurQuarter == 2, "empty candidates release boss gate");
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
+                Check(waves.CurQuarter == 2, "empty candidates release boss gate");
                 Check(!panel.IsVisible && !binding.IsChoosing, "empty eligible pool completes without an empty panel");
 
                 reset.onClick.Invoke();

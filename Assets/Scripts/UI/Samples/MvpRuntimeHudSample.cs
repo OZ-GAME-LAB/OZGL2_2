@@ -233,12 +233,12 @@ namespace Game.UI.Samples
 
         private void InitializeRewardSystems()
         {
-            bool artifactsReady = !UsesArtifactRewards;
-            if (UsesArtifactRewards && _artifactManager != null && _effectManager != null)
-            {
-                if (!_artifactManager.IsInitialized) _artifactManager.Initialize(_waves, _effectManager);
+            bool artifactsReady = _artifactManager != null && _effectManager != null;
+            if (artifactsReady && !_artifactManager.IsInitialized)
+                _artifactManager.Initialize(_waves, _effectManager);
+            artifactsReady &= _artifactManager != null && _artifactManager.IsInitialized;
+            if (UsesArtifactRewards && artifactsReady)
                 artifactsReady = _artifactRewards.TryInitialize(_artifactManager);
-            }
             // 이 샘플은 지급 실패/재시도를 검사하는 유일한 지급 주체다.
             // flow=null로 자동 지급을 구독하지 않는다. 실제 팀 씬은 flow를 전달하고 UI에서 지급하지 않는다.
             _currencyManager.Initialize(_waves, null, _effectManager);

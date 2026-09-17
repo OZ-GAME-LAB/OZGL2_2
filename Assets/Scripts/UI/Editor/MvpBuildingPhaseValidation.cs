@@ -117,7 +117,7 @@ namespace Game.UI.Editor
                 await WaitForPhase(flow, GamePhase.Reward);
                 AssertLocked(panel, build, upgrade, dismantle, requests, "보상 처리");
                 gate.ChooseResultBtn();
-                await WaitForPhase(flow, GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 Check(preparationEvents == 1 && upgrade.interactable && dismantle.interactable,
                     "normal reward completion unlocks on next frame without polling");
 
@@ -165,7 +165,9 @@ namespace Game.UI.Editor
                 flow.TryStartWave().Forget();
                 await WaitForPhase(flow, GamePhase.Battle);
                 waves.SetSuccess();
-                await WaitForPhase(flow, GamePhase.QuarterComplete);
+                await WaitForPhase(flow, GamePhase.Reward);
+                gate.ChooseResultBtn();
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.QuarterComplete);
                 Check(flow.CanChooseRunDecision, "actual final-quarter decision is pending");
                 AssertLocked(panel, build, upgrade, dismantle, requests, "분기 완료");
                 flow.ChooseFinishRun();

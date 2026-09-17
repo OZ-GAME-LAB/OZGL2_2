@@ -119,6 +119,7 @@ namespace Game.UI.Editor
                 var effects = teamRoots.SelectMany(r => r.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
                 if (effects != null) Assign(startup, "_effects", effects);
                 owner.SetActive(true);
+                UiCoreCameraRigSetup.Ensure(scene, flow, camera);
                 if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException("UI integration scene save failed.");
                 Debug.Log($"[UI/TeamBuilding] Created {ScenePath}; slots={slots.Length}, original refund={controller.RefundRate}. Source assets unchanged.");
             }

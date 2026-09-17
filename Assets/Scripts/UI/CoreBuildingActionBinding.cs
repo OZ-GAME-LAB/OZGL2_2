@@ -114,6 +114,8 @@ namespace Game.UI
                 case GamePhase.BattleResolving: return "전투 정산 중에는 건물 조작을 할 수 없습니다.";
                 case GamePhase.Reward: return "보상 처리 중에는 건물 조작을 할 수 없습니다.";
                 case GamePhase.QuarterComplete: return "분기 완료 선택 중에는 건물 조작을 할 수 없습니다.";
+                case GamePhase.Event: return "이벤트 중에는 건물 조작을 할 수 없습니다.";
+                case GamePhase.Store: return "상점 이용 중에는 건물 조작을 할 수 없습니다.";
                 case GamePhase.Finished: return "플레이가 종료되어 건물 조작을 할 수 없습니다.";
                 default: return "코어 준비를 기다리고 있습니다.";
             }

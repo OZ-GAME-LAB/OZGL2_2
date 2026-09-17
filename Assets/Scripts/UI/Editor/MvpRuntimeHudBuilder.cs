@@ -76,7 +76,7 @@ namespace Game.UI.Editor
                     22, new Color32(145, 169, 182, 255), 32, 306, 1196, 38);
                 var status = MvpHudBuilder.Label(card, "Status", "초기화 대기", 22, Color.white, 32, 251, 1196, 45);
                 MvpHudBuilder.Label(card, "Help",
-                    "웨이브 시작 → 3초 준비 → 적 전멸 → 보상 처리 / 3웨이브 반복 후 결과 단계",
+                    $"웨이브 시작 → 3초 준비 → 적 전멸 → 보상 처리 / {WaveController.MAX_WAVE}웨이브 반복 후 결과 단계",
                     22, Color.white, 32, 205, 1196, 38);
                 var add = MakeButton(card, "AddGold", "골드 +50", 32, 122);
                 var spend = MakeButton(card, "SpendGold", "골드 -30", 340, 122);
@@ -94,6 +94,7 @@ namespace Game.UI.Editor
                     "_winButton", win, "_rewardButton", reward, "_loseButton", lose,
                     "_resetButton", reset, "_toggleHudButton", toggle);
                 controls.SetActive(true);
+                UiCoreCameraRigSetup.Ensure(scene, flow, camera);
                 EditorSceneManager.SaveScene(scene, ScenePath);
                 Debug.Log("[UI/MvpRuntimeHudBuilder] Created " + ScenePath);
             }

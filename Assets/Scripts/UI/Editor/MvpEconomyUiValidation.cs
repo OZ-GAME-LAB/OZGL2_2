@@ -127,7 +127,7 @@ namespace Game.UI.Editor
                 Check(wallet.GetBalance(CurrencyType.Gold) == expectedGold &&
                     wallet.GetBalance(CurrencyType.Gem) == expectedGem &&
                     goldText.text == expectedGold.ToString("N0"), "retry applies exactly the team Gold and Gem rewards");
-                await WaitFor(flow, GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 Check(waves.CurQuarter == 2 && waves.CurWave == 1, "successful reward releases the gate once");
 
                 reset.onClick.Invoke();
@@ -141,7 +141,7 @@ namespace Game.UI.Editor
                 win.onClick.Invoke();
                 await WaitFor(flow, GamePhase.Reward);
                 reward.onClick.Invoke();
-                await WaitFor(flow, GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 Check(waves.CurQuarter == WaveController.MAIN_QUARTERS + 1, "reach endless through public core actions");
                 int endlessBefore = wallet.GetBalance(CurrencyType.Gold);
                 int endlessReward = GetExpectedReward(waves, CurrencyType.Gold);
@@ -153,7 +153,7 @@ namespace Game.UI.Editor
                 reward.onClick.Invoke();
                 Check(wallet.GetBalance(CurrencyType.Gold) == endlessBefore + endlessReward,
                     "endless reward follows the team's clamped quarter table, once only");
-                await WaitFor(flow, GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 Debug.Log($"[UI/MvpEconomyUiValidation] PASS: {_checks} Play Mode checks against the team Economy API and table.");
             }
             finally
