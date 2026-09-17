@@ -40,14 +40,14 @@ namespace OZGL.KDH
 
         private void Awake()
         {
-            CacheRefs();
+            CacheRefs(); //내부적인 참조를 만드는 부분은 삭제할 필요 없습니다. GameFlowController 및 RunCurrencyManager 참조부분만 삭제하시면 됩니다. 
             SetupFilter();
 
             if (_menu == null)
                 _menu = gameObject.AddComponent<BuildingBuildMenu>();
 
             _menu.Bind(this);
-
+            //해당 이벤트 연결부분은 Initialize에 이관해서 삭제하시면 됩니다
             if (wallet != null)
                 wallet.BalanceChanged += OnWalletChanged;
 
@@ -73,6 +73,22 @@ namespace OZGL.KDH
             HandleClick();
         }
 
+        public void Initialize(RunCurrencyManager runCurrencyManager, GameFlowController gameFlowController)
+        {
+            if (wallet != null)
+            {
+                wallet.BalanceChanged -= OnWalletChanged;
+            }
+
+            if (gameFlow != null)
+            {
+                gameFlow.PhaseChanged -= OnPhaseChanged;
+            }
+            wallet = runCurrencyManager;
+            wallet.BalanceChanged += OnWalletChanged;
+            gameFlow = gameFlowController;
+            gameFlow.PhaseChanged += OnPhaseChanged;
+        }
         public bool TryBuild(BuildingSlot slot, BuildingData data)
         {
             if (slot == null)
@@ -623,7 +639,7 @@ namespace OZGL.KDH
                 _camera = worldCamera;
             else
                 _camera = Camera.main;
-
+            //참조부분 삭제
             if (wallet == null)
                 wallet = GetComponent<RunCurrencyManager>();
 
@@ -632,7 +648,7 @@ namespace OZGL.KDH
 
             if (gameFlow == null)
                 gameFlow = FindFirstObjectByType<GameFlowController>();
-
+            //여기까지
             if (_menu == null)
                 _menu = GetComponent<BuildingBuildMenu>();
 
@@ -644,13 +660,13 @@ namespace OZGL.KDH
 
             if (_coreProgress == null)
                 _coreProgress = gameObject.AddComponent<BuildingCoreProgress>();
-
+            //삭제
             if (gameFlow == null)
                 Debug.LogWarning("[BuildingBuildController] GameFlowController를 찾지 못했습니다. 준비 페이즈 검사를 할 수 없습니다.", this);
 
             if (database == null)
                 Debug.LogWarning("[BuildingBuildController] BuildingDatabase가 비어 있습니다. 인스펙터에 연결하세요.", this);
-
+            //삭제
             if (wallet == null)
                 Debug.LogWarning("[BuildingBuildController] RunCurrencyManager를 찾지 못했습니다. 인스펙터에 연결하세요.", this);
         }

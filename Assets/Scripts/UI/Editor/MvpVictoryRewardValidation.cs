@@ -40,7 +40,6 @@ namespace Game.UI.Editor
                 .FindPropertyRelative("Button").objectReferenceValue;
             var rewardText = Field<TMP_Text>(panelFields, "_rewardText");
             var catalog = AssetDatabase.LoadAssetAtPath<ArtifactCatalog>(MvpVictoryRewardSetup.CatalogPath);
-            float spawn = flow.SpawnTime;
             float staging = flow.StagingTime;
             bool auto = flow.AutoContinue;
             int completions = 0;
@@ -60,7 +59,6 @@ namespace Game.UI.Editor
             artifacts.StackChanged += stackChanged;
             try
             {
-                flow.SpawnTime = .02f;
                 flow.StagingTime = .02f;
                 flow.AutoContinue = false;
                 reset.onClick.Invoke();
@@ -183,7 +181,6 @@ namespace Game.UI.Editor
                 binding.Completed -= completed;
                 panel.ChoiceRequested -= requested;
                 artifacts.StackChanged -= stackChanged;
-                flow.SpawnTime = spawn;
                 flow.StagingTime = staging;
                 flow.AutoContinue = auto;
             }

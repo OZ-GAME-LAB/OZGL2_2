@@ -31,10 +31,6 @@ namespace Game.Core
     /// </summary>
     public class GameFlowController : MonoBehaviour
     {
-        [Header("테스트용 생성 대기 시간입니다. Play 모드에서 조절하세요.")]
-        [Min(0)]
-        public float SpawnTime = 1f;
-
         [Header("테스트용 종료 연출 시간입니다. Play 모드에서 조절하세요.")]
         [Min(0)]
         public float StagingTime = 0.5f;
@@ -105,7 +101,6 @@ namespace Game.Core
             ResetDecisionState();
             _nodeController.Reset();
             _waveController.CleanupBattle();
-            _waveController.ResetTestBattle();
             if (!StartQuarter(1))
             {
                 _isTransitioning = false;
@@ -176,12 +171,13 @@ namespace Game.Core
                 ChangePhase(GamePhase.BattlePreparing);
                 if (token.IsCancellationRequested) return false;
                 _cameraController.ShowBase();
-                // 실제 아군 준비 연동 시 적 준비와 함께 완료를 기다린다.
+                // 건물은 BattlePreparing 알림으로 아군을 생성한다.
+                // 아군·적 생성과 배치가 끝나면 RuntimeUnitManager의 준비 완료 알림으로 전투에 진입한다.
 
                 _cameraController.ShowBattleField();
                 // 리셋은 진행만 취소하고 적 생성은 완료까지 기다린다. 파괴 시에는 생성도 취소한다.
                 bool canceled = await _waveController.PrepareEnemy(
-                    SpawnTime, token, this.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
+                    token, this.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
 
                 if (canceled || token.IsCancellationRequested) return false;
                 return true;
@@ -274,7 +270,7 @@ namespace Game.Core
                 {
                     _runDecision = null;
                     IsWaitingForRunDecision = true;
-                    //차후 해당 파트를 ShowContinueConfirmationAsync 메서드 호출로 변경
+                    // UI는 요청을 받아 창을 열고 ChooseFinishRun / ChooseContinueRun으로 응답한다.
                     QuarterDecisionRequested?.Invoke();
                     await UniTask.WaitUntil(() => _runDecision.HasValue, cancellationToken: token);
                     token.ThrowIfCancellationRequested();
@@ -364,30 +360,6 @@ namespace Game.Core
         }
 
         #region Debug
-        // 외부 시스템 연동 예정 메서드
-        /// <summary>
-        /// 게임을 계속 할지 확인하는 창을 띄우고 결과를 반환하는 메서드
-        /// true: 계속 진행 / false: 승리 종료, 담당 요청 파트 : UI
-        /// </summary>
-        /// <param name="token"></param>
-        /// <returns></returns>
-        public async UniTask<bool> ShowContinueConfirmationAsync(CancellationToken token)
-        {
-            //팝업 띄워서 계속진행할지 버튼클릭 받은 수 결과를 반환해주시면 됩니다. 
-            await UniTask.Delay(1000, cancellationToken: token);
-            return default;
-        }
-
-        /// <summary>
-        /// 보상 유물을 선택해서 실제 적용까지 완료된 상태가 기준
-        /// 담당 요청 파트 : 재화
-        /// </summary>
-        /// <param name="token"></param>
-        public async UniTask SelectAndApplyAsync(WaveBattleType type,CancellationToken token)
-        {
-            
-        }
-
         // 테스트·호환용 진행 입력 및 임시 처리
         // 기존 테스트/외부 호출의 호환 경로. 전투·보상 처리 중에는 이동하지 않는다.
         public void RequestProgressStage()
@@ -449,7 +421,7 @@ namespace Game.Core
         /// <summary>임시 연출 대기. 실제 컷씬·통계창 완료를 기다리는 구현으로 교체한다.</summary>
         private UniTask PlayBattleResultAsync(ResultType result, CancellationToken token)
         {
-            return _testScript.WaitForSeconds(StagingTime, token);
+            return UniTask.Delay(TimeSpan.FromSeconds(StagingTime), cancellationToken: token);
         }
 
         /// <summary>현재 전투의 유닛·그룹과 준비 상태를 정리한다.</summary>

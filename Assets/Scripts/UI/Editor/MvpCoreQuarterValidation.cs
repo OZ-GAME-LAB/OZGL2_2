@@ -41,14 +41,12 @@ namespace Game.UI.Editor
             var decisionFields = new SerializedObject(binding);
             var finish = Field<Button>(decisionFields, "_finishButton");
             var next = Field<Button>(decisionFields, "_continueButton");
-            float previousSpawn = flow.SpawnTime;
             float previousStaging = flow.StagingTime;
             bool previousAuto = flow.AutoContinue;
             float previousScale = Time.timeScale;
             try
             {
                 Time.timeScale = 1;
-                flow.SpawnTime = .02f;
                 flow.StagingTime = .02f;
                 flow.AutoContinue = false;
                 reset.onClick.Invoke();
@@ -221,7 +219,6 @@ namespace Game.UI.Editor
             }
             finally
             {
-                flow.SpawnTime = previousSpawn;
                 flow.StagingTime = previousStaging;
                 flow.AutoContinue = previousAuto;
                 Time.timeScale = previousScale;

@@ -1,5 +1,6 @@
 using System;
 using Game.Core;
+using OZGL.KDH;
 using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -15,45 +16,63 @@ namespace Game.Cameras
         [SerializeField] private CinemachineCamera _battlefieldCamera;
         [SerializeField] private CinemachineCamera _focusCamera;
         [SerializeField] private GameFlowController _gameFlowController;
-
+        [SerializeField] private BuildingBuildController _buildController;
         [SerializeField] private Transform _focusTarget;
 
         private void Awake()
         {
             ShowBase();
         }
-
+        
         // 테스트용 입력
         private void Update()
         {
-            var mouse = Mouse.current;
-            if (mouse == null) return;
-            if (!_gameFlowController.CanEnterBuildMode()) return;
+            // var mouse = Mouse.current;
+            // if (mouse == null) return;
+            // if (!_gameFlowController.CanEnterBuildMode()) return;
+            //
+            // // 화면 전환 중인 위치를 클릭 대상으로 사용하지 않는다.
+            // if (_brain.IsBlending) return;
+            //
+            // // UI 버튼 클릭은 월드 확대에서 제외
+            // if (EventSystem.current != null &&
+            //     EventSystem.current.IsPointerOverGameObject())
+            //     return;
+            //
+            // if (mouse.rightButton.wasPressedThisFrame)
+            // {
+            //     ShowBase();
+            //     return;
+            // }
+            //
+            // if (!mouse.leftButton.wasPressedThisFrame) return;
+            //
+            // Ray ray = _worldCamera.ScreenPointToRay(
+            //     mouse.position.ReadValue());
+            //
+            // // 월드의 Z=0 평면과 클릭 광선의 교차점
+            // Plane ground = new Plane(Vector3.forward, Vector3.zero);
+            //
+            // if (ground.Raycast(ray, out float distance))
+            //     FocusAt(ray.GetPoint(distance));
+        }
 
-            // 화면 전환 중인 위치를 클릭 대상으로 사용하지 않는다.
-            if (_brain.IsBlending) return;
+        public void OnDestroy()
+        {
+            _buildController.SlotSelected -= FocusAt;
+            _buildController.SlotDeselected -= FocusOut;
+        }
 
-            // UI 버튼 클릭은 월드 확대에서 제외
-            if (EventSystem.current != null &&
-                EventSystem.current.IsPointerOverGameObject())
-                return;
-
-            if (mouse.rightButton.wasPressedThisFrame)
+        public void Initialize(BuildingBuildController buildController)
+        {
+            if (_buildController != null)
             {
-                ShowBase();
-                return;
+                _buildController.SlotSelected -= FocusAt;
+                _buildController.SlotDeselected -= FocusOut;
             }
-
-            if (!mouse.leftButton.wasPressedThisFrame) return;
-
-            Ray ray = _worldCamera.ScreenPointToRay(
-                mouse.position.ReadValue());
-
-            // 월드의 Z=0 평면과 클릭 광선의 교차점
-            Plane ground = new Plane(Vector3.forward, Vector3.zero);
-
-            if (ground.Raycast(ray, out float distance))
-                FocusAt(ray.GetPoint(distance));
+            _buildController = buildController;
+            _buildController.SlotSelected += FocusAt;
+            _buildController.SlotDeselected += FocusOut;
         }
         public void Toggle()
         {
@@ -79,6 +98,24 @@ namespace Game.Cameras
             _focusCamera.Priority = -1;
         }
 
+        public void FocusAt(BuildingSlot slot)
+        {
+            Debug.Log("포커스 이벤트 발행");
+            if (!_gameFlowController.CanEnterBuildMode()) return;
+
+            // 기지 화면에서만 확대 허용
+            if (_baseCamera.Priority <= _battlefieldCamera.Priority) return;
+            // 현재 프로젝트는 XY 평면에 배치된 2D 게임
+            _focusTarget.position = new Vector3(
+                slot.BuildPosition.x, slot.BuildPosition.y, 0f);
+            _focusCamera.Lens.OrthographicSize = 2f;
+            _focusCamera.Priority = 20;
+        }
+
+        public void FocusOut()
+        {
+            _focusCamera.Priority = -1;
+        }
         public void FocusAt(Vector3 worldPosition)
         {
             if (!_gameFlowController.CanEnterBuildMode()) return;

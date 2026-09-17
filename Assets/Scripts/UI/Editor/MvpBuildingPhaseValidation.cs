@@ -38,7 +38,6 @@ namespace Game.UI.Editor
             var status = Field<TMP_Text>(panel, "_status");
             var requests = new List<BuildingActionRequest>();
             Action<BuildingActionRequest> receive = requests.Add;
-            float spawnTime = flow.SpawnTime;
             float stagingTime = flow.StagingTime;
             bool autoContinue = flow.AutoContinue;
             int gold = wallet.GetBalance(CurrencyType.Gold);
@@ -46,7 +45,6 @@ namespace Game.UI.Editor
             GameObject replacement = null;
             try
             {
-                flow.SpawnTime = 0.02f;
                 flow.StagingTime = 0.04f;
                 mock.enabled = false;
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
@@ -236,7 +234,6 @@ namespace Game.UI.Editor
                 {
                     if (observePreparation != null) flow.PhaseChanged -= observePreparation;
                     flow.enabled = true;
-                    flow.SpawnTime = spawnTime;
                     flow.StagingTime = stagingTime;
                     flow.AutoContinue = autoContinue;
                 }

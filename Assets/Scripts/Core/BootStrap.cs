@@ -1,4 +1,6 @@
+using Game.Cameras;
 using Game.Core;
+using OZGL.KDH;
 using Units;
 using UnityEngine;
 /// 각 시스템의 참조 연결과 초기화 순서를 관리하고,
@@ -24,6 +26,8 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private SpawnManager _spawnManager;
     [SerializeField] private RuntimeUnitManager _runtimeUnitManager;
     [SerializeField] private RunCurrencyManager _runCurrencyManager;
+    [SerializeField] private InGameCameraController _cameraController;
+    [SerializeField] private BuildingBuildController _buildController;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
     void Start()
@@ -33,8 +37,10 @@ public class BootStrap : MonoBehaviour
         _testScript.Initialize(_gameFlowController, _waveController);
         _gameFlowController.Initialize(_waveController, _testScript, _artifactManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
+        _buildController.Initialize(_runCurrencyManager, _gameFlowController);
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager);
+        _cameraController.Initialize(_buildController);
         _gameFlowController.BeginRun();
     }
 
