@@ -267,7 +267,7 @@ namespace Game.UI.Editor
                     "Finished clears prepared reward and rejects late payout");
 
                 Check(wallet.TryEndRun(), "test owner ends wallet run");
-                wallet.Initialize(waves, flow, null);
+                //wallet.Initialize(waves, flow, null);
                 flow.ResetRun();
                 startup.Refresh();
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && wallet.GetBalance(CurrencyType.Gem) == 0 &&

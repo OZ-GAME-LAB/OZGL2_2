@@ -67,10 +67,10 @@ namespace Units
         [Header("Ally Rally")]
 
         [SerializeField]
-        private Vector2 _allyRallyAreaMin;
+        private Transform _allyRallyAreaPointA;
 
         [SerializeField]
-        private Vector2 _allyRallyAreaMax;
+        private Transform _allyRallyAreaPointB;
 
 
         // ============================================================
@@ -91,10 +91,10 @@ namespace Units
         [Header("Enemy Rally")]
 
         [SerializeField]
-        private Vector2 _enemyRallyAreaMin;
+        private Transform _enemyRallyAreaPointA;
 
         [SerializeField]
-        private Vector2 _enemyRallyAreaMax;
+        private Transform _enemyRallyAreaPointB;
 
 
         // ============================================================
@@ -190,17 +190,16 @@ namespace Units
         {
             _allyRallyGridAllocator =
                 new RallyGridAllocator(
-                    _allyRallyAreaMin,
-                    _allyRallyAreaMax,
+                    _allyRallyAreaPointA,
+                    _allyRallyAreaPointB,
                     _rallySectorSize,
                     _rallyFormationSpacing
                 );
 
-
             _enemyRallyGridAllocator =
                 new RallyGridAllocator(
-                    _enemyRallyAreaMin,
-                    _enemyRallyAreaMax,
+                    _enemyRallyAreaPointA,
+                    _enemyRallyAreaPointB,
                     _rallySectorSize,
                     _rallyFormationSpacing
                 );
@@ -524,33 +523,83 @@ namespace Units
             }
 
 
-            if (_allyRallyAreaMax.x <=
-                    _allyRallyAreaMin.x ||
-                _allyRallyAreaMax.y <=
-                    _allyRallyAreaMin.y)
+            if (_allyRallyAreaPointA == null ||
+    _allyRallyAreaPointB == null)
             {
                 Debug.LogError(
                     "[SpawnManager] " +
-                    "Ally Rally Area가 올바르지 않습니다."
+                    "Ally Rally Area Point가 없습니다."
                 );
 
                 isValid =
                     false;
             }
+            else
+            {
+                Vector2 pointA =
+                    _allyRallyAreaPointA.position;
+
+                Vector2 pointB =
+                    _allyRallyAreaPointB.position;
 
 
-            if (_enemyRallyAreaMax.x <=
-                    _enemyRallyAreaMin.x ||
-                _enemyRallyAreaMax.y <=
-                    _enemyRallyAreaMin.y)
+                if (Mathf.Approximately(
+                        pointA.x,
+                        pointB.x
+                    ) ||
+                    Mathf.Approximately(
+                        pointA.y,
+                        pointB.y
+                    ))
+                {
+                    Debug.LogError(
+                        "[SpawnManager] " +
+                        "Ally Rally Area의 크기가 올바르지 않습니다."
+                    );
+
+                    isValid =
+                        false;
+                }
+            }
+
+
+            if (_enemyRallyAreaPointA == null ||
+                _enemyRallyAreaPointB == null)
             {
                 Debug.LogError(
                     "[SpawnManager] " +
-                    "Enemy Rally Area가 올바르지 않습니다."
+                    "Enemy Rally Area Point가 없습니다."
                 );
 
                 isValid =
                     false;
+            }
+            else
+            {
+                Vector2 pointA =
+                    _enemyRallyAreaPointA.position;
+
+                Vector2 pointB =
+                    _enemyRallyAreaPointB.position;
+
+
+                if (Mathf.Approximately(
+                        pointA.x,
+                        pointB.x
+                    ) ||
+                    Mathf.Approximately(
+                        pointA.y,
+                        pointB.y
+                    ))
+                {
+                    Debug.LogError(
+                        "[SpawnManager] " +
+                        "Enemy Rally Area의 크기가 올바르지 않습니다."
+                    );
+
+                    isValid =
+                        false;
+                }
             }
 
 

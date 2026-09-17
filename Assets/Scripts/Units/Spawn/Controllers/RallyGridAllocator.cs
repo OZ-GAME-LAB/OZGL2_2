@@ -41,16 +41,43 @@ namespace Units
         // ============================================================
 
         public RallyGridAllocator(
-            Vector2 areaMin,
-            Vector2 areaMax,
+            Transform areaPointA,
+            Transform areaPointB,
             Vector2 sectorSize,
             float formationSpacing)
         {
+            Vector2 positionA =
+                areaPointA.position;
+
+            Vector2 positionB =
+                areaPointB.position;
+
+
             _areaMin =
-                areaMin;
+                new Vector2(
+                    Mathf.Min(
+                        positionA.x,
+                        positionB.x
+                    ),
+                    Mathf.Min(
+                        positionA.y,
+                        positionB.y
+                    )
+                );
+
 
             _areaMax =
-                areaMax;
+                new Vector2(
+                    Mathf.Max(
+                        positionA.x,
+                        positionB.x
+                    ),
+                    Mathf.Max(
+                        positionA.y,
+                        positionB.y
+                    )
+                );
+
 
             _sectorSize =
                 sectorSize;
