@@ -104,7 +104,7 @@ namespace Game.UI.Editor
                 await MvpVictoryRewardValidation.RunChecksAsync();
                 Check(true, "existing authoritative victory/economy regression suite passes on the compact scene");
                 PlayerUiBuilder.Ref<Button>(sample, "_resetButton").onClick.Invoke();
-                flow.SpawnTime = .02f; flow.StagingTime = .02f; flow.AutoContinue = false;
+                flow.StagingTime = .02f; flow.AutoContinue = false;
                 launch.onClick.Invoke(); PlayerUiBuilder.Ref<Button>(hud, "_waveStartButton").onClick.Invoke();
                 await Wait(() => flow.CurPhase == GamePhase.Battle, "battle");
                 Check(popups.All(p => !p.IsVisible) && !launch.interactable, "battle closes catalog and locks building controls");

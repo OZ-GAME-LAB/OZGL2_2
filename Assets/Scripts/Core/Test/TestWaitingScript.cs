@@ -5,7 +5,7 @@ using Game.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-//실제 연결전 보상대기 및 전투준비연출 -> 전투로 이어지는 대기 구현
+// 임시 보상·부착 콘텐츠 완료 대기와 테스트 버튼 입력을 담당한다.
 public class TestWaitingScript : MonoBehaviour
 {
     private GameFlowController _gameFlowController;
@@ -121,13 +121,7 @@ public class TestWaitingScript : MonoBehaviour
     public void WaveStartBtn()
     {
         Debug.Log($"[TestWaitingScript] 웨이브 시작 테스트");
-        _gameFlowController.TryStartWave().Forget();
-    }
-
-    public void ResultBtn()
-    {
-        Debug.Log($"[TestWaitingScript] 전투 종료 테스트");
-        _waveController.SetSuccess();
+        _gameFlowController.TrySpawnUnits().Forget();
     }
 
     public void ResetBtn()
@@ -150,11 +144,6 @@ public class TestWaitingScript : MonoBehaviour
             !_gameFlowController.IsWaitingForArtifactSelection) return;
         _toggle = true;
     }
-    public async UniTask WaitForSeconds(float time, CancellationToken cts)
-    {
-        await UniTask.Delay(TimeSpan.FromSeconds(time), cancellationToken: cts);
-    }
-
     public async UniTask WaitToggle(CancellationToken cts)
     {
         _toggle = false;

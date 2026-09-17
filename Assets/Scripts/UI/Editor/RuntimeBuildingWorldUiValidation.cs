@@ -149,7 +149,7 @@ namespace Game.UI.Editor
                 await UniTask.NextFrame();
 
                 held = Press(Point(slots[0]));
-                var starting = flow.TryStartWave();
+                var starting = flow.TrySpawnUnits();
                 Release(held);
                 Check(binding.SelectedSlot == null, "phase transition cancels press");
                 Check(await starting, "existing core starts test battle");

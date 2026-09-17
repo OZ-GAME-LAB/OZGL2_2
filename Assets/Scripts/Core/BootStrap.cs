@@ -1,4 +1,7 @@
+using Game.Cameras;
 using Game.Core;
+using OZGL.KDH;
+using Units;
 using UnityEngine;
 /// 각 시스템의 참조 연결과 초기화 순서를 관리하고,
 /// 준비가 완료되면 GameFlowController.BeginRun()을 호출한다.
@@ -20,7 +23,11 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private WaveController _waveController;
     [SerializeField] private ArtifactManager _artifactManager;
     [SerializeField] private EffectManager _effectManager;
-    [SerializeField] private ISpawner _spawner = new TestSpawner(); //테스트용으로 , 실제 구현시 스폰파트에서 만든 스크립트 넣기
+    [SerializeField] private SpawnManager _spawnManager;
+    [SerializeField] private RuntimeUnitManager _runtimeUnitManager;
+    [SerializeField] private RunCurrencyManager _runCurrencyManager;
+    [SerializeField] private InGameCameraController _cameraController;
+    [SerializeField] private BuildingBuildController _buildController;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
     void Start()
@@ -29,8 +36,11 @@ public class BootStrap : MonoBehaviour
 
         _testScript.Initialize(_gameFlowController, _waveController);
         _gameFlowController.Initialize(_waveController, _testScript, _artifactManager);
-        _waveController.Initialize(_gameFlowController, _spawner);
+        _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
+        _buildController.Initialize(_runCurrencyManager, _gameFlowController);
         _artifactManager.Initialize(_waveController, _effectManager);
+        _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager);
+        _cameraController.Initialize(_buildController);
         _gameFlowController.BeginRun();
     }
 
@@ -52,12 +62,16 @@ public class BootStrap : MonoBehaviour
             Debug.LogError("[BootStrap] _waveController 참조가 없습니다. Inspector에서 연결해주세요.", this);
             valid = false;
         }
-        if (_spawner == null)
+        if (_spawnManager == null)
         {
-            Debug.LogError("[BootStrap] _spawner가 없습니다. 생성·주입 코드를 확인해주세요.", this);
+            Debug.LogError("[BootStrap] _spawnManager가 없습니다. 생성·주입 코드를 확인해주세요.", this);
             valid = false;
         }
-
+        if (_runtimeUnitManager == null)
+        {
+            Debug.LogError("[BootStrap] _runtimeUnitManager가 없습니다. 생성·주입 코드를 확인해주세요.", this);
+            valid = false;
+        }
         if (_artifactManager == null)
         {
             Debug.LogError("[BootStrap] _artifactManager가 없습니다. 생성·주입 코드를 확인해주세요.", this);

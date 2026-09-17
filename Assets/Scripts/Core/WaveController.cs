@@ -7,15 +7,6 @@ using UnityEngine;
 
 namespace Game.Core
 {
-    public interface ISpawner
-    {
-        
-        public event Action MonsterKilled;
-        public UniTask SpawnAllEnemy(float time, int cost, SpawnContext context, CancellationToken cts); //실제 사용목적 메서드입니다
-        public bool GetRemain(out int enemy,out int  allies);
-        public bool GetRemainBoss(out int enemy, out int allies);
-    }
-
     public struct SpawnContext
     {
         public ClassWeights Weights;
@@ -44,9 +35,11 @@ namespace Game.Core
         public int CurQuarter => _controller?.CurrentQuarter ?? 0;
         public bool IsLastWave => _controller != null && _controller.IsLastNode;
         public event Action<WaveChangedInfo> WaveChanged;
-        private ISpawner _spawner;
-        private GameFlowController _controller;
+        private ISpawnManager _spawner;
         private IRuntimeUnitManager _runtimeUnitManager;
+        private GameFlowController _controller;
+        private bool _isWaitingForPreparation;
+        private CancellationToken _preparationToken;
 
         public bool CanJumpToLastWave => _controller != null && _controller.CanJumpToLastWave;
         public bool CanJumpToLastQuarter => _controller != null && _controller.CanJumpToLastQuarter;
@@ -55,47 +48,72 @@ namespace Game.Core
         /// <summary>
         /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
         /// </summary>
-        public void Initialize(GameFlowController controller, ISpawner spawner)
+        public void Initialize(GameFlowController controller, ISpawnManager spawner, IRuntimeUnitManager runtimeUnitManager)
         {
-            if (_spawner != null)
-                _spawner.MonsterKilled -= HandleMonsterDead;
+            _isWaitingForPreparation = false;
+            if (_runtimeUnitManager != null)
+            {
+                _runtimeUnitManager.UnitDied -= HandleMonsterDead;
+                _runtimeUnitManager.PreparationCompleted -= HandleMonsterSpawnCompleted;
+            }
             _controller = controller;
             _spawner = spawner;
-            _spawner.MonsterKilled += HandleMonsterDead;
+            _runtimeUnitManager = runtimeUnitManager;
+            _runtimeUnitManager.UnitDied += HandleMonsterDead;
+            _runtimeUnitManager.PreparationCompleted += HandleMonsterSpawnCompleted;
         }
 
         private void OnDestroy()
         {
-            if (_spawner != null)
-                _spawner.MonsterKilled -= HandleMonsterDead;
+            _isWaitingForPreparation = false;
+            if (_runtimeUnitManager != null)
+            {
+                _runtimeUnitManager.UnitDied -= HandleMonsterDead;
+                _runtimeUnitManager.PreparationCompleted -= HandleMonsterSpawnCompleted;
+            }
         }
 
         // 전투 준비 및 승패 판정
-        public UniTask PrepareEnemy(float time, CancellationToken token)
+        public UniTask PrepareEnemy(CancellationToken runToken, CancellationToken spawnToken)
         {
+            runToken.ThrowIfCancellationRequested();
+            _preparationToken = runToken;
+            _isWaitingForPreparation = true;
             SpawnContext context = new(
                 weights:CurrentPreset.Weights, 
                 monsterIDs:CurrentPreset.MonsterIDs);
             
-            return _spawner.SpawnAllEnemy(time,0, context,token);
+            return _spawner.SpawnEnemyWaveAsync(10, context, spawnToken);
         }
 
         /// <summary>
         /// 유닛 파트에서 발행하는 몬스터 사망 이벤트와 연결해 클리어 조건을 확인
         /// </summary>
-        private void HandleMonsterDead()
+        private void HandleMonsterDead(Unit_Gateway unit)
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
             //스폰 매니저에게 남은 적 / 아군 수 요청
             EvaluateBattleResult();
         }
 
+        private void HandleMonsterSpawnCompleted()
+        {
+            if (!_isWaitingForPreparation || _preparationToken.IsCancellationRequested ||
+                _controller == null || _controller.CurPhase != GamePhase.BattlePreparing) return;
+            _isWaitingForPreparation = false;
+            _controller.TryStartWave();
+        }
+
+        public void BattleStart()
+        {
+            _runtimeUnitManager.StartBattlePhase();
+        }
         /// <summary>
         /// 전투 결과를 확인하고 승/패를 판정한다.
         /// </summary>
         private void EvaluateBattleResult()
         {
-            if (!_spawner.GetRemain(out int enemy, out int allies)) return;
+            if (!_runtimeUnitManager.GetRemain(out int enemy, out int allies)) return;
 
             if (enemy == 0)
             {
@@ -106,6 +124,13 @@ namespace Game.Core
             if (allies != 0) return;
             Debug.Log("전투 패배");
             _controller.ResolveBattleAsync(ResultType.Defeat).Forget();
+        }
+
+        public void CleanupBattle()
+        {
+            // 그룹 제거 도중 발생하는 준비 완료 알림으로 전투에 재진입하지 않는다.
+            _isWaitingForPreparation = false;
+            _runtimeUnitManager.ClearRuntime();
         }
 
         // 진행 변경 알림
@@ -134,105 +159,22 @@ namespace Game.Core
 
         public void JumpToLastQuarterForTest() => _controller?.JumpToLastQuarterForTest();
 
-        internal void ResetTestBattle()
-        {
-            if (_spawner is TestSpawner testSpawner)
-                testSpawner.ResetUnits();
-        }
-
-        public void CleanupTestBattle()
-        {
-            if (_spawner is TestSpawner testSpawner)
-                testSpawner.ClearUnits();
-        }
-
         /// <summary>
-        /// 스테이지 성공 판정을 위해 임시로 만든 메서드.
-        /// <br/> 강제로 승리 설정으로 바꾼다.
+        /// 기존 테스트 버튼의 연결을 유지하며 실제 결과 처리 경로에 승리를 요청한다.
         /// </summary>
         public void SetSuccess()
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
-            if(_spawner is TestSpawner spawner)
-            {
-                spawner.setSuccess();
-                spawner.invokeMonsterKilled();
-            }
+            _controller.ResolveBattleAsync(ResultType.Victory).Forget();
         }
 
         /// <summary>
-        /// 스테이지 성공 판정을 위해 임시로 만든 메서드.
-        /// <br/> 강제로 승리 설정으로 바꾼다.
+        /// 기존 테스트 버튼의 연결을 유지하며 실제 결과 처리 경로에 패배를 요청한다.
         /// </summary>
         public void SetFail()
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
-            if(_spawner is TestSpawner spawner)
-            {
-                spawner.setFail();
-                spawner.invokeMonsterKilled();
-            }
+            _controller.ResolveBattleAsync(ResultType.Defeat).Forget();
         }
-    }
-    /// <summary>
-    /// 스테이지 내 몬스터 구현을 위해 임시로 만든 테스트클래스
-    /// </summary>
-    public class TestSpawner : ISpawner
-    {
-        public event Action MonsterKilled;
-
-        private int _enemyCount = 5;
-        private int _alliesCount = 5;
-
-        public async UniTask SpawnAllEnemy(float time, int cost, SpawnContext context, CancellationToken cts)
-        {
-            cts.ThrowIfCancellationRequested();
-            ResetUnits();
-            Debug.Log("[Test] 유닛 생성중....");
-            await UniTask.WaitForSeconds(time, cancellationToken: cts);
-            Debug.Log("[Test] 유닛 생성완료!");
-        }
-
-        public bool GetRemain(out int enemy, out int allies)
-        {
-            enemy = _enemyCount;
-            allies = _alliesCount;
-            if(_enemyCount == 0 || _alliesCount == 0)
-                return true;
-            return false;
-        }
-
-        public bool GetRemainBoss(out int enemy, out int allies)
-        {
-            enemy = _enemyCount;
-            allies = _alliesCount;
-            if(_enemyCount == 0 || _alliesCount == 0)
-                return true;
-            return false;
-        }
-
-        public void ClearUnits()
-        {
-            _enemyCount = 0;
-            _alliesCount = 0;
-        }
-
-        public void ResetUnits()
-        {
-            _enemyCount = 5;
-            _alliesCount = 5;
-        }
-
-        public void setFail()
-        {
-            _alliesCount = 0;
-        }
-
-        public void setSuccess()
-        {
-            _enemyCount = 0;
-        }
-
-        public void invokeMonsterKilled() => MonsterKilled?.Invoke();
     }
 }

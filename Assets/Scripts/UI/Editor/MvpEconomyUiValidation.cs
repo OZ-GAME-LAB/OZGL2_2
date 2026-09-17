@@ -43,7 +43,6 @@ namespace Game.UI.Editor
             var uiFields = new SerializedObject(ui);
             var goldText = Field<TMP_Text>(uiFields, "_goldText");
             var start = Field<Button>(uiFields, "_waveStartButton");
-            float previousSpawn = flow.SpawnTime;
             float previousStaging = flow.StagingTime;
             bool previousAuto = flow.AutoContinue;
             int events = 0;
@@ -66,7 +65,6 @@ namespace Game.UI.Editor
             wallet.BalanceChanged += changed;
             try
             {
-                flow.SpawnTime = .02f;
                 flow.StagingTime = .02f;
                 flow.AutoContinue = false;
                 reset.onClick.Invoke();
@@ -160,7 +158,6 @@ namespace Game.UI.Editor
             {
                 reenter = false;
                 wallet.BalanceChanged -= changed;
-                flow.SpawnTime = previousSpawn;
                 flow.StagingTime = previousStaging;
                 flow.AutoContinue = previousAuto;
                 reset.onClick.Invoke();

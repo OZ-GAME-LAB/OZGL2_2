@@ -122,7 +122,7 @@ namespace Game.UI.Editor
                 Check(wallet.GetBalance(CurrencyType.Gold) == initialGold - 30, "binding re-enable does not duplicate receiver");
                 dismantle.onClick.Invoke();
                 binding.SelectSlot(slots[0]); Select(catalog, 0);
-                var starting = flow.TryStartWave();
+                var starting = flow.TrySpawnUnits();
                 build.onClick.Invoke();
                 Check(!slots[0].IsOccupied && wallet.GetBalance(CurrencyType.Gold) == initialGold, "phase transition blocks stale click immediately");
                 Check(await starting, "real Core starts battle");
