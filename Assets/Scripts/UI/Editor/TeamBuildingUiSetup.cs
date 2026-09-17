@@ -49,7 +49,13 @@ namespace Game.UI.Editor
                 var database = Ref<BuildingDatabase>(controller, "database");
                 if (database == null) throw new InvalidOperationException("Team building database is missing.");
                 var camera = Team<Camera>();
-                var slots = teamRoots.SelectMany(r => r.GetComponentsInChildren<BuildingSlot>(true)).OrderBy(s => s.name).ToArray();
+                var slots = teamRoots.SelectMany(r => r.GetComponentsInChildren<BuildingSlot>(true))
+                    .Where(slot =>
+                    {
+                        var preplaced = slot.GetComponentInChildren<Building>(true);
+                        return preplaced == null || preplaced.Data == null || !preplaced.Data.IsCore;
+                    })
+                    .OrderBy(slot => slot.name).ToArray();
                 if (slots.Length == 0) throw new InvalidOperationException("No team slots.");
                 // 테스트 진행 로직은 보존한다. 복사본에서 테스트 화면/레이캐스트만 숨긴다.
                 foreach (var canvas in teamRoots.SelectMany(r => r.GetComponentsInChildren<Canvas>(true))) canvas.enabled = false;

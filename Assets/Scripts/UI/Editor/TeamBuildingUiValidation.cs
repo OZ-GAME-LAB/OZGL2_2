@@ -80,7 +80,10 @@ namespace Game.UI.Editor
                 var info = UnityEngine.Object.FindFirstObjectByType<BuildingInfoPanel>();
                 var actions = UnityEngine.Object.FindFirstObjectByType<BuildingActionPanel>();
                 var hud = UnityEngine.Object.FindFirstObjectByType<GameUIController>();
-                var slots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None).OrderBy(s => s.name).ToArray();
+                var allSlots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None);
+                var coreSlots = allSlots.Where(slot => slot.CurrentBuilding != null &&
+                    slot.CurrentBuilding.Data != null && slot.CurrentBuilding.Data.IsCore).ToArray();
+                var slots = allSlots.Except(coreSlots).OrderBy(slot => slot.name).ToArray();
                 var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Building/Test_BuildingDatabase.asset");
                 var progress = UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>();
                 var candidates = new List<BuildingData>();
@@ -88,7 +91,10 @@ namespace Game.UI.Editor
                 var build = Ref<Button>(actions, "_build._button");
                 var dismantle = Ref<Button>(actions, "_dismantle._button");
                 var goldText = Ref<TMP_Text>(hud, "_goldText");
-                Check(slots.Length > 0 && slots.All(s => s.GetComponent<RuntimeBuildingSelectionTarget>() != null), "all original slots have UI input: " + slots.Length);
+                Check(coreSlots.Length == 1 && coreSlots[0].GetComponent<RuntimeBuildingSelectionTarget>() == null,
+                    "preplaced core is not a normal building input target");
+                Check(slots.Length > 1 && slots.All(s => s.GetComponent<RuntimeBuildingSelectionTarget>() != null),
+                    "all buildable team slots have UI input: " + slots.Length);
                 Check(candidates.Count == 3, "three original team building candidates, no UI fixture database");
                 Check(Ref<BuildingDatabase>(binding, "_database") == data, "binding uses team database identity");
                 Check(Ref<RunCurrencyManager>(binding, "_wallet") == wallet && Ref<BuildingBuildController>(binding, "_controller") == controller, "UI and controller share team authority");
