@@ -205,6 +205,8 @@ namespace Game.UI.Editor
                     "team TryUpgrade replaces core, spends once, and updates core level");
                 Check(wallet.TryAdd(CurrencyType.Gold, 200), "test-only budget for unlocked barracks upgrade");
                 binding.ClearSelection(); binding.SelectSlot(slots[0]);
+                Check(binding.SelectedSlot == slots[0] && catalog.Popup.IsVisible,
+                    $"unlocked slot catalog opens after core upgrade; occupied={slots[0].IsOccupied}, phase={flow.CurPhase}, build={flow.CanEnterBuildMode()}");
                 Click(Point((Button)new SerializedObject(catalog).FindProperty("_cards").GetArrayElementAtIndex(0)
                     .FindPropertyRelative("Button").objectReferenceValue));
                 Click(Point(build)); await UniTask.NextFrame();
