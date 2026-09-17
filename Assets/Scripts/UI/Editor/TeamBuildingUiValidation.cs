@@ -252,7 +252,7 @@ namespace Game.UI.Editor
                     Check(events == stableEvents && wallet.GetBalance(CurrencyType.Gold) == expectedGold,
                         "UI re-enable cannot reinitialize or repay the wallet: " + round);
                     gate.ChooseResultBtn();
-                    await Wait(() => flow.CurPhase == GamePhase.Preparation);
+                    await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                     Check(waves.CurQuarter == (round == 0 ? 1 : 2) && waves.CurWave == (round == 0 ? 2 : 1),
                         "explicit test gate progresses the original Core once: " + round);
                 }
@@ -285,7 +285,7 @@ namespace Game.UI.Editor
                 Check(goldText.text == expectedGold.ToString("N0") && gemText.text == $"보석 {expectedGems:N0}",
                     "new-run reward is reflected in the visible HUD");
                 gate.ChooseResultBtn();
-                await Wait(() => flow.CurPhase == GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
             }
             finally
             {
