@@ -32,6 +32,7 @@ namespace Game.UI.Editor
             if (!Application.isBatchMode || !Path.GetFullPath(Application.dataPath).Replace('\\', '/').Contains("/UnityUIValidation/"))
                 throw new InvalidOperationException("Use an isolated UnityUIValidation project.");
             TeamBuildingUiSetup.CreateScene();
+            TeamBuildingUiSetup.ConnectExistingTeamApis();
             var scene = EditorSceneManager.OpenScene(TeamBuildingUiSetup.ScenePath);
             foreach (var root in scene.GetRootGameObjects())
                 foreach (var transform in root.GetComponentsInChildren<Transform>(true))
@@ -86,13 +87,15 @@ namespace Game.UI.Editor
                 var slots = allSlots.Except(coreSlots).OrderBy(slot => slot.name).ToArray();
                 var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Building/Test_BuildingDatabase.asset");
                 var progress = UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>();
+                Check(progress != null && Ref<BuildingCoreProgress>(startup, "_coreProgress") == progress,
+                    "UI startup uses the scene's original core level authority");
                 var candidates = new List<BuildingData>();
                 slots[0].CollectCandidates(candidates, data, progress != null ? progress.CurrentLevel : 0);
                 var build = Ref<Button>(actions, "_build._button");
                 var dismantle = Ref<Button>(actions, "_dismantle._button");
                 var goldText = Ref<TMP_Text>(hud, "_goldText");
-                Check(coreSlots.Length == 1 && coreSlots[0].GetComponent<RuntimeBuildingSelectionTarget>() == null,
-                    "preplaced core is not a normal building input target");
+                Check(coreSlots.Length == 1 && coreSlots[0].GetComponent<RuntimeBuildingSelectionTarget>() != null,
+                    "preplaced core has its own upgrade input target");
                 Check(slots.Length > 1 && slots.All(s => s.GetComponent<RuntimeBuildingSelectionTarget>() != null),
                     "all buildable team slots have UI input: " + slots.Length);
                 Check(candidates.Count == 3, "three original team building candidates, no UI fixture database");
@@ -133,7 +136,7 @@ namespace Game.UI.Editor
                     Check(((TMP_Text)card.FindPropertyRelative("Price").objectReferenceValue).text == $"{price:N0} 골드", "catalog price comes from original data: " + price);
                     Click(Point((Button)card.FindPropertyRelative("Button").objectReferenceValue)); await UniTask.NextFrame();
                     Check(info.HasSelection && build.interactable, "original building offer executable: " + item.BuildingId);
-                    Check(!Ref<GameObject>(actions, "_upgrade._rowRoot").activeSelf, "unimplemented upgrade not offered");
+                    Check(!Ref<GameObject>(actions, "_upgrade._rowRoot").activeSelf, "empty slot has no upgrade action");
                     Check(!Ref<TMP_Text>(info, "_levelText").gameObject.activeSelf, "no invented building level without team API");
                     Check(Ref<TMP_Text>(info, "_nameText").text == item.DisplayName && Ref<TMP_Text>(info, "_descriptionText").text == item.Description, "building info reads original name and description");
                     int before = wallet.GetBalance(CurrencyType.Gold);
@@ -177,10 +180,53 @@ namespace Game.UI.Editor
                 Click(Point(launch));
                 Check(binding.SelectedSlot != null && catalog.Popup.IsVisible, "build shortcut selects a real empty team slot");
                 binding.ClearSelection();
-                Check(await flow.TryStartWave(), "original core phase transition available (TestSpawner, not full combat)");
+                Check(await flow.TrySpawnUnits(), "core preparation submits and completes the real enemy spawn request");
                 Click(Point(slots[0]));
                 Check(binding.SelectedSlot == null && !catalog.Popup.IsVisible, "battle phase blocks original slot construction UI");
                 await ValidateAutomaticRewards(startup, flow, wallet, hud);
+                int beforeCore = wallet.GetBalance(CurrencyType.Gold);
+                Check(beforeCore >= 100, "rewarded run can afford team core upgrade");
+                binding.ClearSelection(); await UniTask.NextFrame();
+                Click(Point(coreSlots[0])); await UniTask.NextFrame();
+                var upgrade = Ref<Button>(actions, "_upgrade._button");
+                Check(binding.SelectedSlot == coreSlots[0] && info.HasSelection && upgrade.interactable,
+                    "clicking the original core opens its real upgrade offer");
+                Check(!dismantle.gameObject.activeInHierarchy, "core demolition is not offered");
+                Check(Ref<TMP_Text>(actions, "_upgrade._quote").text == "100 골드",
+                    "core upgrade quote reads team option cost");
+                int temporarySpend = beforeCore - 99;
+                Check(wallet.TrySpend(CurrencyType.Gold, temporarySpend) && !upgrade.interactable,
+                    "live wallet shortage disables the core upgrade");
+                Check(wallet.TryAdd(CurrencyType.Gold, temporarySpend) && upgrade.interactable,
+                    "restored wallet balance enables the same offer");
+                Click(Point(upgrade)); await UniTask.NextFrame();
+                Check(progress.CurrentLevel == 2 && coreSlots[0].CurrentBuilding.Data.CoreLevel == 2 &&
+                    wallet.GetBalance(CurrencyType.Gold) == beforeCore - 100,
+                    "team TryUpgrade replaces core, spends once, and updates core level");
+                Check(wallet.TryAdd(CurrencyType.Gold, 200), "test-only budget for unlocked barracks upgrade");
+                binding.ClearSelection(); binding.SelectSlot(slots[0]);
+                Check(binding.SelectedSlot == slots[0] && catalog.Popup.IsVisible,
+                    $"unlocked slot catalog opens after core upgrade; occupied={slots[0].IsOccupied}, phase={flow.CurPhase}, build={flow.CanEnterBuildMode()}");
+                var firstUpgradeBuild = (Button)new SerializedObject(catalog).FindProperty("_cards")
+                    .GetArrayElementAtIndex(0).FindPropertyRelative("Button").objectReferenceValue;
+                Check(catalog.ItemCount == candidates.Count && firstUpgradeBuild.gameObject.activeInHierarchy &&
+                    firstUpgradeBuild.interactable, "unlocked catalog retains the real team building cards");
+                // World-pointer input was already covered above; use button events after the camera moves to the core.
+                firstUpgradeBuild.onClick.Invoke();
+                Check(info.HasSelection && build.interactable, "selected team barracks has an executable build offer");
+                build.onClick.Invoke(); await UniTask.NextFrame();
+                var baseBuilding = slots[0].CurrentBuilding.Data;
+                var nextBuildings = new List<BuildingData>();
+                baseBuilding.CollectUpgrades(nextBuildings, progress.CurrentLevel);
+                Check(nextBuildings.Count == 1, "team barracks upgrade unlocked by core level");
+                int beforeBarracks = wallet.GetBalance(CurrencyType.Gold);
+                binding.ClearSelection(); binding.SelectSlot(slots[0]);
+                Check(upgrade.interactable && Ref<TMP_Text>(actions, "_upgrade._quote").text == "50 골드",
+                    "real barracks upgrade offer shows team cost");
+                upgrade.onClick.Invoke(); await UniTask.NextFrame();
+                Check(slots[0].CurrentBuilding.Data == nextBuildings[0] &&
+                    wallet.GetBalance(CurrencyType.Gold) == beforeBarracks - 50,
+                    "UI executes team barracks TryUpgrade exactly once");
                 Check(_errors == 0, "no runtime UI/game errors");
                 _report.Insert(0, $"PASS: {_checks} team scene/UI assertions. Runtime errors: {_errors}; Search startup exceptions: {_searchErrors}.\nUnity 6000.3.23f1, isolated Play Mode. Real team assets/API, not full combat or Player build.\n");
                 File.WriteAllText(Output("results.txt"), _report.ToString());
@@ -215,18 +261,17 @@ namespace Game.UI.Editor
                 atomicSnapshot &= wallet.GetBalance(CurrencyType.Gold) == expectedGold &&
                     wallet.GetBalance(CurrencyType.Gem) == expectedGems;
             };
-            float spawn = flow.SpawnTime;
             float staging = flow.StagingTime;
             wallet.BalanceChanged += changed;
             try
             {
-                flow.SpawnTime = flow.StagingTime = .02f;
+                flow.StagingTime = .02f;
                 for (int round = 0; round < 2; round++)
                 {
                     if (round == 1)
                     {
                         waves.JumpToLastWaveForTest();
-                        Check(await flow.TryStartWave(), "boss reward test starts through Core");
+                        Check(await flow.TrySpawnUnits(), "boss reward test starts through Core");
                     }
                     int gold = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
                     int gems = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gem);
@@ -258,7 +303,7 @@ namespace Game.UI.Editor
                 }
 
                 int beforeLoss = events;
-                Check(await flow.TryStartWave(), "defeat scenario starts through Core");
+                Check(await flow.TrySpawnUnits(), "defeat scenario starts through Core");
                 await flow.ResolveBattleAsync(ResultType.Defeat);
                 Check(flow.CurPhase == GamePhase.Finished && events == beforeLoss &&
                     wallet.GetBalance(CurrencyType.Gold) == expectedGold &&
@@ -267,12 +312,15 @@ namespace Game.UI.Editor
                     "Finished clears prepared reward and rejects late payout");
 
                 Check(wallet.TryEndRun(), "test owner ends wallet run");
-                //wallet.Initialize(waves, flow, null);
+
+                wallet.Initialize(waves, flow, null);
+
+                wallet.Initialize(waves, flow, null, UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>());
                 flow.ResetRun();
                 startup.Refresh();
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && wallet.GetBalance(CurrencyType.Gem) == 0 &&
                     goldText.text == "100" && gemText.text == "보석 0", "explicit new run refreshes both HUD currencies");
-                Check(await flow.TryStartWave(), "new run starts normally");
+                Check(await flow.TrySpawnUnits(), "new run starts normally");
                 expectedGold = 100 + wallet.CurrentGoldReward;
                 expectedGems = wallet.CurrentGemReward;
                 int newRunEvents = events;
@@ -290,7 +338,6 @@ namespace Game.UI.Editor
             finally
             {
                 wallet.BalanceChanged -= changed;
-                flow.SpawnTime = spawn;
                 flow.StagingTime = staging;
             }
         }

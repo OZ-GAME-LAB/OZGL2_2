@@ -112,7 +112,7 @@ namespace Game.UI
             _ui.SetWaveStartInteractable(false);
             try
             {
-                bool started = await _flow.TryStartWave().AttachExternalCancellation(token);
+                bool started = await _flow.TrySpawnUnits().AttachExternalCancellation(token);
                 if (IsCurrentRequest(requestVersion) && !started)
                     _ui.ShowMessage("웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요.");
             }

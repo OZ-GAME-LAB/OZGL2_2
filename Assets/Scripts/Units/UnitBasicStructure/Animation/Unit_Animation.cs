@@ -47,9 +47,9 @@ namespace Units
 
             if (_animator == null)
             {
-                Debug.LogError(
-                    $"[Unit_Animation] {name} : Animator가 없습니다."
-                );
+                //Debug.LogError(
+                    //$"[Unit_Animation] {name} : Animator가 없습니다."
+                //);
             }
         }
 

@@ -2,6 +2,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using Game.Core;
 using TMPro;
+using Units;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -75,7 +76,6 @@ namespace Game.UI.Samples
             _ui.Initialize();
             _rewardGate.Initialize(_flow, _waves);
             _flow.Initialize(_waves, _rewardGate, _artifactManager); //
-            _waves.Initialize(_flow, new TestSpawner());
             _goldBinding.Initialize(_ui, _currencyManager);
             _coreBinding.Initialize(_ui, _flow, _waves);
             if (_runDecisionBinding != null) _runDecisionBinding.Initialize(_flow, _waves);

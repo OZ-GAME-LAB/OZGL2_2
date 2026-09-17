@@ -46,17 +46,21 @@ namespace Game.UI.Editor
                 var waves = Team<WaveController>();
                 var wallet = Team<RunCurrencyManager>();
                 var controller = Team<BuildingBuildController>();
+                var coreProgress = controller.GetComponent<BuildingCoreProgress>();
+                if (coreProgress == null) coreProgress = controller.gameObject.AddComponent<BuildingCoreProgress>();
                 var database = Ref<BuildingDatabase>(controller, "database");
                 if (database == null) throw new InvalidOperationException("Team building database is missing.");
                 var camera = Team<Camera>();
-                var slots = teamRoots.SelectMany(r => r.GetComponentsInChildren<BuildingSlot>(true))
-                    .Where(slot =>
-                    {
-                        var preplaced = slot.GetComponentInChildren<Building>(true);
-                        return preplaced == null || preplaced.Data == null || !preplaced.Data.IsCore;
-                    })
-                    .OrderBy(slot => slot.name).ToArray();
+                var allSlots = teamRoots.SelectMany(r => r.GetComponentsInChildren<BuildingSlot>(true)).ToArray();
+                var coreSlots = allSlots.Where(slot =>
+                {
+                    var preplaced = slot.GetComponentInChildren<Building>(true);
+                    return preplaced != null && preplaced.Data != null && preplaced.Data.IsCore;
+                }).ToArray();
+                var slots = allSlots.Except(coreSlots).OrderBy(slot => slot.name).ToArray();
                 if (slots.Length == 0) throw new InvalidOperationException("No team slots.");
+                if (coreSlots.Length != 1 || coreSlots[0].GetComponent<Collider2D>() == null)
+                    throw new InvalidOperationException("Expected one selectable core slot with a collider.");
                 // 테스트 진행 로직은 보존한다. 복사본에서 테스트 화면/레이캐스트만 숨긴다.
                 foreach (var canvas in teamRoots.SelectMany(r => r.GetComponentsInChildren<Canvas>(true))) canvas.enabled = false;
                 foreach (var raycaster in teamRoots.SelectMany(r => r.GetComponentsInChildren<GraphicRaycaster>(true))) raycaster.enabled = false;
@@ -101,8 +105,8 @@ namespace Game.UI.Editor
                 var binding = owner.AddComponent<RuntimeBuildingUiBinding>();
                 Assign(binding, "_catalog", catalog, "_info", info, "_actions", actions, "_controller", controller,
                     "_database", database, "_wallet", wallet, "_flow", flow, "_feedbackText", hint);
-                SetArray(binding, "_slots", slots);
-                foreach (var slot in slots)
+                SetArray(binding, "_slots", slots.Concat(coreSlots).ToArray());
+                foreach (var slot in slots.Concat(coreSlots))
                 {
                     var target = slot.gameObject.AddComponent<RuntimeBuildingSelectionTarget>();
                     Assign(target, "_slot", slot, "_binding", binding, "_flow", flow);
@@ -121,7 +125,7 @@ namespace Game.UI.Editor
                 Layout(hud, gemText);
                 var startup = owner.AddComponent<TeamBuildingUiStartup>();
                 Assign(startup, "_ui", hud, "_wallet", wallet, "_waves", waves, "_flow", flow,
-                    "_gold", gold, "_core", core, "_gemText", gemText, "_hint", hint);
+                    "_gold", gold, "_core", core, "_coreProgress", coreProgress, "_gemText", gemText, "_hint", hint);
                 var effects = teamRoots.SelectMany(r => r.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
                 if (effects != null) Assign(startup, "_effects", effects);
                 EnsureArtifactBackend(scene, owner);
@@ -154,6 +158,61 @@ namespace Game.UI.Editor
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new IOException("Failed to save UI artifact backend: " + ScenePath);
             Debug.Log("[UI/TeamBuilding] Connected artifact backend in UI-owned scene.");
+        }
+
+        [MenuItem("Game/UI/Connect Team Building Upgrade UI")]
+        public static void ConnectExistingTeamApis()
+        {
+            if (!Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Run the UI scene migration only in a separate batch Editor.");
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    throw new InvalidOperationException("A loaded scene has unsaved changes.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+                throw new InvalidOperationException("Missing UI-owned team building scene: " + ScenePath);
+
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var roots = scene.GetRootGameObjects();
+            var controller = roots.SelectMany(root => root.GetComponentsInChildren<BuildingBuildController>(true)).Single();
+            var owner = roots.Single(root => root.name == "Team Building Player UI");
+            var startup = owner.GetComponent<TeamBuildingUiStartup>();
+            var binding = owner.GetComponent<RuntimeBuildingUiBinding>();
+            var flow = roots.SelectMany(root => root.GetComponentsInChildren<GameFlowController>(true)).Single();
+            var coreSlot = roots.SelectMany(root => root.GetComponentsInChildren<BuildingSlot>(true))
+                .Single(slot =>
+                {
+                    var building = slot.GetComponentInChildren<Building>(true);
+                    return building != null && building.Data != null && building.Data.IsCore;
+                });
+            if (coreSlot.GetComponent<Collider2D>() == null)
+                throw new InvalidOperationException("Core slot has no selectable collider.");
+            bool changed = false;
+            var progress = controller.GetComponent<BuildingCoreProgress>();
+            if (progress == null) { progress = controller.gameObject.AddComponent<BuildingCoreProgress>(); changed = true; }
+            changed |= SetReferenceIfEmpty(startup, "_coreProgress", progress);
+            var target = coreSlot.GetComponent<RuntimeBuildingSelectionTarget>();
+            if (target == null)
+            {
+                target = coreSlot.gameObject.AddComponent<RuntimeBuildingSelectionTarget>();
+                Assign(target, "_slot", coreSlot, "_binding", binding, "_flow", flow);
+                changed = true;
+            }
+            var fields = new SerializedObject(binding);
+            var slots = fields.FindProperty("_slots");
+            bool present = false;
+            for (int i = 0; i < slots.arraySize; i++)
+                present |= slots.GetArrayElementAtIndex(i).objectReferenceValue == coreSlot;
+            if (!present)
+            {
+                slots.InsertArrayElementAtIndex(slots.arraySize);
+                slots.GetArrayElementAtIndex(slots.arraySize - 1).objectReferenceValue = coreSlot;
+                fields.ApplyModifiedPropertiesWithoutUndo();
+                changed = true;
+            }
+            if (!changed) { Debug.Log("[UI/TeamBuilding] Team API UI already connected."); return; }
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                throw new IOException("Failed to save UI-owned team building scene.");
+            Debug.Log("[UI/TeamBuilding] Connected core selection, upgrade input, and currency dependency in UI-owned scene.");
         }
 
         private static bool EnsureArtifactBackend(Scene scene, GameObject owner)

@@ -38,7 +38,6 @@ namespace Game.UI.Editor
             var status = Field<TMP_Text>(panel, "_status");
             var requests = new List<BuildingActionRequest>();
             Action<BuildingActionRequest> receive = requests.Add;
-            float spawnTime = flow.SpawnTime;
             float stagingTime = flow.StagingTime;
             bool autoContinue = flow.AutoContinue;
             int gold = wallet.GetBalance(CurrencyType.Gold);
@@ -46,7 +45,6 @@ namespace Game.UI.Editor
             GameObject replacement = null;
             try
             {
-                flow.SpawnTime = 0.02f;
                 flow.StagingTime = 0.04f;
                 mock.enabled = false;
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
@@ -103,7 +101,7 @@ namespace Game.UI.Editor
                         "UI does not unlock early inside preparation event");
                 };
                 flow.PhaseChanged += observePreparation;
-                flow.TryStartWave().Forget();
+                flow.TrySpawnUnits().Forget();
                 Check(flow.CurPhase == GamePhase.BattlePreparing, "actual spawn transition entered");
                 AssertLocked(panel, build, upgrade, dismantle, requests, "전투 준비");
                 await WaitForPhase(flow, GamePhase.Battle);
@@ -130,7 +128,7 @@ namespace Game.UI.Editor
                 binding.enabled = true;
                 binding.Initialize(panel, flow);
                 Check(panel.IsRequestPending && !build.interactable, "enable/rebind cannot duplicate pending request");
-                flow.TryStartWave().Forget();
+                flow.TrySpawnUnits().Forget();
                 await WaitForPhase(flow, GamePhase.Battle);
                 panel.TryResolveRequest(pending.RequestId, false, "늦은 실패");
                 Check(!panel.IsRequestPending && !build.interactable, "late failure during battle cannot unlock action");
@@ -162,7 +160,7 @@ namespace Game.UI.Editor
                 flow.AutoContinue = false;
                 waves.JumpToLastQuarterForTest();
                 waves.JumpToLastWaveForTest();
-                flow.TryStartWave().Forget();
+                flow.TrySpawnUnits().Forget();
                 await WaitForPhase(flow, GamePhase.Battle);
                 waves.SetSuccess();
                 await WaitForPhase(flow, GamePhase.Reward);
@@ -178,7 +176,7 @@ namespace Game.UI.Editor
                 flow.ResetRun();
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
                 binding.enabled = false;
-                flow.TryStartWave().Forget();
+                flow.TrySpawnUnits().Forget();
                 await WaitForPhase(flow, GamePhase.Battle);
                 Check(!build.interactable, "cancelled preparation refresh cannot unlock later battle");
                 binding.enabled = true;
@@ -193,7 +191,7 @@ namespace Game.UI.Editor
                 binding.Refresh();
                 Check(build.interactable, "explicit refresh observes source re-enable");
                 panel.gameObject.SetActive(false);
-                flow.TryStartWave().Forget();
+                flow.TrySpawnUnits().Forget();
                 await WaitForPhase(flow, GamePhase.Battle);
                 panel.gameObject.SetActive(true);
                 AssertLocked(panel, build, upgrade, dismantle, requests, "전투 중");
@@ -236,7 +234,6 @@ namespace Game.UI.Editor
                 {
                     if (observePreparation != null) flow.PhaseChanged -= observePreparation;
                     flow.enabled = true;
-                    flow.SpawnTime = spawnTime;
                     flow.StagingTime = stagingTime;
                     flow.AutoContinue = autoContinue;
                 }
