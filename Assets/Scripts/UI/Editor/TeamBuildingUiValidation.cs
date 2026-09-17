@@ -81,8 +81,10 @@ namespace Game.UI.Editor
                 var actions = UnityEngine.Object.FindFirstObjectByType<BuildingActionPanel>();
                 var hud = UnityEngine.Object.FindFirstObjectByType<GameUIController>();
                 var slots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None).OrderBy(s => s.name).ToArray();
-                var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Test_BuildingDatabase.asset");
-                var candidates = new List<BuildingData>(); slots[0].CollectCandidates(candidates, data);
+                var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Building/Test_BuildingDatabase.asset");
+                var progress = UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>();
+                var candidates = new List<BuildingData>();
+                slots[0].CollectCandidates(candidates, data, progress != null ? progress.CurrentLevel : 0);
                 var build = Ref<Button>(actions, "_build._button");
                 var dismantle = Ref<Button>(actions, "_dismantle._button");
                 var goldText = Ref<TMP_Text>(hud, "_goldText");

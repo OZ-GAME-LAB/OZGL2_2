@@ -78,7 +78,7 @@ namespace Game.UI.Editor
                 var catalog = UI<BuildingCatalogPanel>();
                 var info = UI<BuildingInfoPanel>();
                 var actions = UI<BuildingActionPanel>();
-                // 원본 BuildingData에는 레벨 계약이 없다. 이전 프리뷰의 고정 레벨 1을 실제 정보처럼 표시하지 않는다.
+                // 실제 업그레이드 레벨 표시는 아직 연결하지 않았다. 고정 레벨 1을 실제 정보처럼 표시하지 않는다.
                 Ref<TMP_Text>(info, "_levelText").gameObject.SetActive(false);
                 var gold = UI<RunGoldHudBinding>();
                 var core = UI<CoreHudBinding>();

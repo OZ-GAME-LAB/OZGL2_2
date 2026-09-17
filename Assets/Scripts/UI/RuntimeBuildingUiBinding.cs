@@ -30,6 +30,7 @@ namespace Game.UI
         private Collider2D _slotCollider;
         private Building _displayedBuilding;
         private BuildingData _candidate;
+        private BuildingCoreProgress _coreProgress;
         private string _selectionId;
         private bool _bound;
         private bool _executing;
@@ -196,13 +197,13 @@ namespace Game.UI
 
         private bool IsCurrentCandidate(BuildingData data)
         {
-            _slot.CollectCandidates(_candidates, _database);
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
             return _candidates.Contains(data);
         }
 
         private void PopulateCatalog()
         {
-            _slot.CollectCandidates(_candidates, _database);
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
             _items.Clear(); _byId.Clear();
             var duplicates = new HashSet<string>();
             foreach (var data in _candidates)
@@ -222,6 +223,14 @@ namespace Game.UI
                     BuildingUiQuote.Category(data.BuildingType), valid ? gold : (int?)null, valid ? gems : (int?)null));
             }
             _catalog.SetItems(_items);
+        }
+
+        private int GetCurrentCoreLevel()
+        {
+            if (_coreProgress == null && _controller != null)
+                _coreProgress = _controller.GetComponent<BuildingCoreProgress>() ??
+                    FindFirstObjectByType<BuildingCoreProgress>();
+            return _coreProgress != null ? _coreProgress.CurrentLevel : 0;
         }
 
         private void Bind()
