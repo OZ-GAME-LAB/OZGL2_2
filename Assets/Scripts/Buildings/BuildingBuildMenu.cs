@@ -47,10 +47,10 @@ namespace OZGL.KDH
             SubscribeWallet(wallet);
 
             if (_titleText != null)
-                _titleText.text = slot.IsOccupied ? "교체" : "건설";
+                _titleText.text = slot.IsOccupied ? "업그레이드" : "건설";
 
             if (_demolishGo != null)
-                _demolishGo.SetActive(slot.IsOccupied);
+                _demolishGo.SetActive(slot.IsOccupied && (_owner == null || !_owner.IsCoreSlot(slot)));
 
             RefreshWalletText();
             EnsureRowCount(candidates != null ? candidates.Count : 0);
@@ -115,7 +115,8 @@ namespace OZGL.KDH
         private void FillRows(List<BuildingData> candidates)
         {
             int count = candidates != null ? candidates.Count : 0;
-            if (count == 0)
+            bool occupied = _slot != null && _slot.IsOccupied;
+            if (count == 0 && !occupied)
             {
                 Debug.LogWarning("[BuildingBuildMenu] 이 칸에 표시할 건물이 없습니다.", this);
             }
@@ -141,13 +142,20 @@ namespace OZGL.KDH
             if (data == null)
                 return;
 
-            bool isCurrent = _owner != null && _owner.IsSameAsCurrent(_slot, data);
-            bool canAfford = !isCurrent && _owner != null && _owner.CanAffordCandidate(_slot, data);
-            row.Label.text = BuildRowLabel(data, canAfford, isCurrent);
+            bool occupied = _slot != null && _slot.IsOccupied;
+            bool canAfford;
+            if (occupied)
+                canAfford = _owner != null && _owner.CanAffordUpgrade(_slot, data);
+            else
+                canAfford = _owner != null && _owner.CanAffordCandidate(_slot, data);
+
+            row.Label.text = BuildRowLabel(data, canAfford, occupied);
             row.Button.interactable = canAfford;
         }
 
-        private string BuildRowLabel(BuildingData data, bool canAfford, bool isCurrent)
+        // Current date KDH 2026-09-16
+        // 점유된 칸은 차액 교체가 아니라 업그레이드 비용을 그대로 보여 줍니다.
+        private string BuildRowLabel(BuildingData data, bool canAfford, bool occupied)
         {
             _costBuilder.Length = 0;
             _costBuilder.Append(data.DisplayName);
@@ -161,68 +169,17 @@ namespace OZGL.KDH
 
             AppendFeatureSummary(_costBuilder, data);
 
-            if (isCurrent)
-            {
-                _costBuilder.Append("현재 건물");
-                return _costBuilder.ToString();
-            }
-
-            bool occupied = _slot != null && _slot.IsOccupied;
             if (occupied)
-                AppendNetCost(_costBuilder, data);
+                AppendCost(_costBuilder, _owner != null ? _owner.GetUpgradeCost(_slot, data) : data.BuildCost);
             else
                 AppendCost(_costBuilder, data.BuildCost);
 
             if (occupied)
-                _costBuilder.Append(canAfford ? "\n교체" : "\n부족");
+                _costBuilder.Append(canAfford ? "\n업그레이드" : "\n부족");
             else
                 _costBuilder.Append(canAfford ? "\n건설" : "\n부족");
 
             return _costBuilder.ToString();
-        }
-
-        private void AppendNetCost(StringBuilder builder, BuildingData data)
-        {
-            if (_owner == null)
-            {
-                AppendCost(builder, data.BuildCost);
-                return;
-            }
-
-            int goldNet = _owner.GetCandidateNet(_slot, data, BuildingResourceType.Gold);
-            int gemNet = _owner.GetCandidateNet(_slot, data, BuildingResourceType.Gem);
-
-            bool first = true;
-            first = AppendNetPart(builder, BuildingResourceType.Gold, goldNet, first);
-            first = AppendNetPart(builder, BuildingResourceType.Gem, gemNet, first);
-
-            if (first)
-                builder.Append("차액 없음");
-        }
-
-        private static bool AppendNetPart(StringBuilder builder, BuildingResourceType type, int net, bool first)
-        {
-            if (net == 0)
-                return first;
-
-            if (!first)
-                builder.Append(" / ");
-
-            if (net > 0)
-            {
-                builder.Append(type);
-                builder.Append(" +");
-                builder.Append(net);
-            }
-            else
-            {
-                builder.Append("환급 ");
-                builder.Append(type);
-                builder.Append(' ');
-                builder.Append(-net);
-            }
-
-            return false;
         }
 
         private static void AppendCost(StringBuilder builder, BuildingResourceCost[] costs)
@@ -359,7 +316,10 @@ namespace OZGL.KDH
                 return;
             }
 
-            _owner.TryBuild(_slot, data);
+            if (_slot.IsOccupied)
+                _owner.TryUpgrade(_slot, data);
+            else
+                _owner.TryBuild(_slot, data);
         }
 
         private void EnsureUi()

@@ -1,5 +1,6 @@
 // Current date KDH 2026-09-08
-// 미리 배치한 건설 칸. 빈 칸만 클릭해서 건물을 올립니다.
+// 미리 배치한 건설 칸. 빈 칸은 건설, 점유된 칸은 업그레이드입니다.
+// 씬에 미리 둔 코어는 Start에서 자식 Building을 칸에 연결합니다.
 // allowedBuildings를 채우면 칸마다 다른 목록, 비우면 Database 기본 목록을 씁니다.
 using System.Collections.Generic;
 using UnityEngine;
@@ -33,7 +34,27 @@ namespace OZGL.KDH
             RefreshMarker();
         }
 
-        public void CollectCandidates(List<BuildingData> results, BuildingDatabase database)
+        private void Start()
+        {
+            // Current date KDH 2026-09-17
+            // 미리 배치한 코어는 TryBuild를 안 타서, 자식 Building을 여기서 칸에 연결합니다.
+            ClaimPreplacedBuilding();
+        }
+
+        private void ClaimPreplacedBuilding()
+        {
+            if (IsOccupied)
+                return;
+
+            Building building = GetComponentInChildren<Building>(true);
+            if (building == null)
+                return;
+
+            if (!TryOccupy(building))
+                Debug.LogWarning("[BuildingSlot] 미리 배치된 건물을 칸에 연결하지 못했습니다.", this);
+        }
+
+        public void CollectCandidates(List<BuildingData> results, BuildingDatabase database, int currentCoreLevel)
         {
             if (results == null)
             {
@@ -45,7 +66,7 @@ namespace OZGL.KDH
 
             if (allowedBuildings != null && allowedBuildings.Length > 0)
             {
-                CollectFromAllowed(results);
+                CollectFromAllowed(results, currentCoreLevel);
                 return;
             }
 
@@ -55,7 +76,7 @@ namespace OZGL.KDH
                 return;
             }
 
-            database.CollectBuildable(results);
+            database.CollectBuildable(results, currentCoreLevel);
         }
 
         public bool TryOccupy(Building building)
@@ -100,7 +121,7 @@ namespace OZGL.KDH
             return released;
         }
 
-        private void CollectFromAllowed(List<BuildingData> results)
+        private void CollectFromAllowed(List<BuildingData> results, int currentCoreLevel)
         {
             for (int i = 0; i < allowedBuildings.Length; i++)
             {
@@ -111,12 +132,15 @@ namespace OZGL.KDH
                     continue;
                 }
 
+                if (!data.CanBuildFromEmptySlot(currentCoreLevel))
+                    continue;
+
                 results.Add(data);
             }
 
             if (results.Count == 0)
             {
-                Debug.LogWarning("[BuildingSlot] 칸 전용 목록이 모두 비어 있습니다.", this);
+                Debug.LogWarning("[BuildingSlot] 칸 전용 목록이 모두 비어 있거나, 코어 레벨로 아직 해금되지 않았습니다.", this);
             }
         }
 
@@ -135,7 +159,25 @@ namespace OZGL.KDH
             if (emptyMarker == null)
                 return;
 
+            // Current date KDH 2026-09-17
+            // 코어 프리팹은 건물 스프라이트를 emptyMarker에 넣어 두므로, 점유 때 끄면 코어가 사라집니다.
+            if (IsOccupied && IsMarkerOnCurrentBuilding())
+                return;
+
             emptyMarker.enabled = !IsOccupied;
+        }
+
+        private bool IsMarkerOnCurrentBuilding()
+        {
+            if (CurrentBuilding == null || emptyMarker == null)
+                return false;
+
+            SpriteRenderer buildingRenderer = CurrentBuilding.GetComponent<SpriteRenderer>();
+            if (buildingRenderer == emptyMarker)
+                return true;
+
+            SpriteRenderer parentRenderer = CurrentBuilding.GetComponentInParent<SpriteRenderer>();
+            return parentRenderer == emptyMarker;
         }
     }
 }

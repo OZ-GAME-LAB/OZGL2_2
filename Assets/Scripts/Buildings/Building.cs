@@ -63,6 +63,7 @@ namespace OZGL.KDH
 
         private void OnDestroy()
         {
+            UnregisterCore();
             TeardownModules();
         }
 
@@ -74,12 +75,14 @@ namespace OZGL.KDH
                 return;
             }
 
+            UnregisterCore();
             data = buildingData;
             CacheRefs();
             ApplyWorldSprite();
             EnsureFeatureModules();
             SetupModules();
             _initialized = true;
+            RegisterCore();
         }
 
         // Current date KDH 2026-09-14
@@ -146,6 +149,35 @@ namespace OZGL.KDH
                 if (_modules[i] != null)
                     _modules[i].Teardown();
             }
+        }
+
+        // Current date KDH 2026-09-17
+        // 코어만 해금 진행에 등록합니다. Find는 생성/파괴 때 한 번만 합니다.
+        private void RegisterCore()
+        {
+            if (data == null || !data.IsCore)
+                return;
+
+            BuildingCoreProgress progress = FindFirstObjectByType<BuildingCoreProgress>();
+            if (progress == null)
+            {
+                Debug.LogWarning("[Building] BuildingCoreProgress가 없어 코어 해금을 등록하지 못했습니다.", this);
+                return;
+            }
+
+            progress.Register(this);
+        }
+
+        private void UnregisterCore()
+        {
+            if (data == null || !data.IsCore)
+                return;
+
+            BuildingCoreProgress progress = FindFirstObjectByType<BuildingCoreProgress>();
+            if (progress == null)
+                return;
+
+            progress.Unregister(this);
         }
     }
 }

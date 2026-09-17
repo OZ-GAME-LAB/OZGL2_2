@@ -1,6 +1,7 @@
 // Current date KDH 2026-09-08
 // 빈 건설 칸 클릭 → 목록 표시 → 지갑이 충분하면 건설.
 // 클릭한 순간에만 OverlapPoint를 호출합니다. Update에서 매 프레임 땅을 훑지 않습니다.
+using System;
 using System.Collections.Generic;
 using Game.Core;
 using UnityEngine;
@@ -23,11 +24,19 @@ namespace OZGL.KDH
 
         private BuildingBuildMenu _menu;
         private Camera _camera;
+        private BuildingSlot _focusedSlot;
+        private BuildingCoreProgress _coreProgress;
         private readonly List<BuildingData> _candidates = new List<BuildingData>(16);
         private readonly Collider2D[] _hits = new Collider2D[HitBufferSize];
         private ContactFilter2D _filter;
 
         public float RefundRate => refundRate;
+
+        // Current date KDH 2026-09-16
+        // 카메라가 슬롯으로 확대/복귀할 수 있게, 칸 선택만 알려 줍니다. 확대 자체는 하지 않습니다.
+        // 위치는 slot.BuildPosition로 잡으실 수 있습니다.
+        public event Action<BuildingSlot> SlotSelected;
+        public event Action SlotDeselected;
 
         private void Awake()
         {
@@ -92,6 +101,18 @@ namespace OZGL.KDH
             if (slot.IsOccupied)
                 return TryReplace(slot, data);
 
+            if (data.IsCore)
+            {
+                Debug.LogWarning("[BuildingBuildController] 코어는 빈 칸에 건설할 수 없습니다.", this);
+                return false;
+            }
+
+            if (!data.CanBuildFromEmptySlot(GetCurrentCoreLevel()))
+            {
+                Debug.LogWarning($"[BuildingBuildController] 아직 해금되지 않았거나 빈 칸에서 지을 수 없는 건물입니다: {data.DisplayName}", this);
+                return false;
+            }
+
             if (!CanCreateVisual(data))
                 return false;
 
@@ -118,9 +139,7 @@ namespace OZGL.KDH
                 return false;
             }
 
-            if (_menu != null)
-                _menu.Hide();
-
+            HideMenu();
             return true;
         }
 
@@ -136,6 +155,12 @@ namespace OZGL.KDH
             if (!slot.IsOccupied)
             {
                 Debug.LogWarning("[BuildingBuildController] 빈 칸은 철거할 수 없습니다.", this);
+                return false;
+            }
+
+            if (IsCoreSlot(slot))
+            {
+                Debug.LogWarning("[BuildingBuildController] 코어는 철거할 수 없습니다.", this);
                 return false;
             }
 
@@ -164,9 +189,85 @@ namespace OZGL.KDH
 
             Destroy(oldBuilding.gameObject);
 
-            if (_menu != null)
-                _menu.Hide();
+            HideMenu();
+            return true;
+        }
 
+        // Current date KDH 2026-09-16
+        // 업그레이드는 환불 차액이 아니라, 이 건물이 적어 둔 cost를 전부 소비합니다. Gold와 Gem이 같이 있으면 동시에 깎입니다.
+        public bool TryUpgrade(BuildingSlot slot, BuildingData next)
+        {
+            if (slot == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] TryUpgrade에 BuildingSlot이 null입니다.", this);
+                return false;
+            }
+
+            if (next == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] TryUpgrade에 BuildingData가 null입니다.", this);
+                return false;
+            }
+
+            if (!slot.IsOccupied)
+            {
+                Debug.LogWarning("[BuildingBuildController] 빈 칸은 업그레이드할 수 없습니다.", this);
+                return false;
+            }
+
+            if (!CanBuildNow())
+                return false;
+
+            Building current = slot.CurrentBuilding;
+            if (current == null || current.Data == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] 현재 건물에 BuildingData가 없어 업그레이드할 수 없습니다.", this);
+                return false;
+            }
+
+            if (!current.Data.TryGetUpgradeCost(next, GetCurrentCoreLevel(), out BuildingResourceCost[] cost))
+            {
+                Debug.LogWarning($"[BuildingBuildController] {current.Data.DisplayName}에서 {next.DisplayName}(으)로 업그레이드할 수 없습니다.", this);
+                return false;
+            }
+
+            if (current.Data.IsSameBuilding(next))
+            {
+                Debug.LogWarning("[BuildingBuildController] 같은 건물로는 업그레이드하지 않습니다.", this);
+                return false;
+            }
+
+            if (!CanCreateVisual(next))
+                return false;
+
+            if (!IsWalletReady())
+            {
+                Debug.LogWarning("[BuildingBuildController] RunCurrencyManager가 없어 업그레이드할 수 없습니다.", this);
+                return false;
+            }
+
+            if (!TrySpendCosts(cost))
+                return false;
+
+            Building spawned = SpawnBuilding(next, slot.BuildPosition);
+            if (spawned == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] 업그레이드 건물 생성에 실패했습니다. 재화는 이미 차감되었을 수 있습니다.", this);
+                return false;
+            }
+
+            Building oldBuilding = slot.ReleaseCurrent();
+            if (oldBuilding != null)
+                Destroy(oldBuilding.gameObject);
+
+            if (!slot.TryOccupy(spawned))
+            {
+                Debug.LogWarning("[BuildingBuildController] 업그레이드 후 슬롯 점유에 실패해 생성한 건물을 제거합니다.", this);
+                Destroy(spawned.gameObject);
+                return false;
+            }
+
+            HideMenu();
             return true;
         }
 
@@ -188,13 +289,45 @@ namespace OZGL.KDH
                 return false;
 
             if (slot == null || !slot.IsOccupied)
-                return CanAffordCosts(data.BuildCost);
+                return data.CanBuildFromEmptySlot(GetCurrentCoreLevel()) && CanAffordCosts(data.BuildCost);
 
             if (IsSameAsCurrent(slot, data))
                 return false;
 
             BuildingResourceCost[] credit = GetCurrentBuildCost(slot);
             return CanAffordNet(data.BuildCost, credit, refundRate);
+        }
+
+        public bool CanAffordUpgrade(BuildingSlot slot, BuildingData next)
+        {
+            if (!HasWallet() || slot == null || next == null || !slot.IsOccupied)
+                return false;
+
+            Building current = slot.CurrentBuilding;
+            if (current == null || current.Data == null)
+                return false;
+
+            if (!current.Data.TryGetUpgradeCost(next, GetCurrentCoreLevel(), out BuildingResourceCost[] cost))
+                return false;
+
+            return CanAffordCosts(cost);
+        }
+
+        public BuildingResourceCost[] GetUpgradeCost(BuildingSlot slot, BuildingData next)
+        {
+            if (slot == null || next == null || slot.CurrentBuilding == null || slot.CurrentBuilding.Data == null)
+                return null;
+
+            slot.CurrentBuilding.Data.TryGetUpgradeCost(next, GetCurrentCoreLevel(), out BuildingResourceCost[] cost);
+            return cost;
+        }
+
+        public bool IsCoreSlot(BuildingSlot slot)
+        {
+            if (slot == null || slot.CurrentBuilding == null || slot.CurrentBuilding.Data == null)
+                return false;
+
+            return slot.CurrentBuilding.Data.IsCore;
         }
 
         public int GetCandidateNet(BuildingSlot slot, BuildingData data, BuildingResourceType type)
@@ -252,9 +385,7 @@ namespace OZGL.KDH
                 return false;
             }
 
-            if (_menu != null)
-                _menu.Hide();
-
+            HideMenu();
             return true;
         }
 
@@ -295,16 +426,14 @@ namespace OZGL.KDH
 
             if (!IsBuildPhase())
             {
-                if (_menu != null)
-                    _menu.Hide();
+                HideMenu();
                 return;
             }
 
             BuildingSlot slot = FindSlotUnderCursor();
             if (slot == null)
             {
-                if (_menu != null)
-                    _menu.Hide();
+                HideMenu();
                 return;
             }
 
@@ -315,26 +444,54 @@ namespace OZGL.KDH
             //    return;
             //}
 
-            if (database == null && !slot.HasAllowedOverride)
-            {
-                Debug.LogWarning("[BuildingBuildController] BuildingDatabase가 없고, 이 칸의 전용 목록도 비어 있습니다.", this);
-                return;
-            }
-
-            slot.CollectCandidates(_candidates, database);
-            if (_candidates.Count == 0)
-            {
-                Debug.LogWarning("[BuildingBuildController] 이 칸에 건설 가능한 건물이 없습니다.", this);
-                return;
-            }
-
             if (!HasWallet())
             {
                 Debug.LogWarning("[BuildingBuildController] RunCurrencyManager가 없거나 아직 초기화되지 않았습니다.", this);
                 return;
             }
 
+            // Current date KDH 2026-09-16
+            // 점유된 칸은 건설 목록 대신 현재 건물의 업그레이드만 보여 줍니다. 최종 단계면 철거만 나옵니다.
+            if (slot.IsOccupied)
+            {
+                CollectOccupiedMenuRows(slot);
+                _menu.Show(slot, _candidates, wallet);
+                NotifySlotSelected(slot);
+                return;
+            }
+
+            if (database == null && !slot.HasAllowedOverride)
+            {
+                Debug.LogWarning("[BuildingBuildController] BuildingDatabase가 없고, 이 칸의 전용 목록도 비어 있습니다.", this);
+                return;
+            }
+
+            slot.CollectCandidates(_candidates, database, GetCurrentCoreLevel());
+            if (_candidates.Count == 0)
+            {
+                Debug.LogWarning("[BuildingBuildController] 이 칸에 건설 가능한 건물이 없습니다.", this);
+                return;
+            }
+
             _menu.Show(slot, _candidates, wallet);
+            NotifySlotSelected(slot);
+        }
+
+        private void CollectOccupiedMenuRows(BuildingSlot slot)
+        {
+            _candidates.Clear();
+            if (slot == null || slot.CurrentBuilding == null || slot.CurrentBuilding.Data == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] 점유 건물에 BuildingData가 없어 업그레이드 목록을 만들 수 없습니다.", this);
+                return;
+            }
+
+            slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+        }
+
+        private int GetCurrentCoreLevel()
+        {
+            return _coreProgress != null ? _coreProgress.CurrentLevel : 0;
         }
 
         private BuildingSlot FindSlotUnderCursor()
@@ -417,8 +574,27 @@ namespace OZGL.KDH
             if (gameFlow != null && gameFlow.CanEnterBuildMode())
                 return;
 
+            HideMenu();
+        }
+
+        // Current date KDH 2026-09-16
+        // 메뉴를 닫을 때만 해제합니다. 다른 칸을 누르면 SlotSelected만 다시 올립니다.
+        private void HideMenu()
+        {
             if (_menu != null)
                 _menu.Hide();
+
+            if (_focusedSlot == null)
+                return;
+
+            _focusedSlot = null;
+            SlotDeselected?.Invoke();
+        }
+
+        private void NotifySlotSelected(BuildingSlot slot)
+        {
+            _focusedSlot = slot;
+            SlotSelected?.Invoke(slot);
         }
 
         private bool IsBuildPhase()
@@ -459,6 +635,15 @@ namespace OZGL.KDH
 
             if (_menu == null)
                 _menu = GetComponent<BuildingBuildMenu>();
+
+            if (_coreProgress == null)
+                _coreProgress = GetComponent<BuildingCoreProgress>();
+
+            if (_coreProgress == null)
+                _coreProgress = FindFirstObjectByType<BuildingCoreProgress>();
+
+            if (_coreProgress == null)
+                _coreProgress = gameObject.AddComponent<BuildingCoreProgress>();
 
             if (gameFlow == null)
                 Debug.LogWarning("[BuildingBuildController] GameFlowController를 찾지 못했습니다. 준비 페이즈 검사를 할 수 없습니다.", this);
