@@ -11589,8 +11589,8 @@ MonoBehaviour:
   _testScript: {fileID: 288519119}
   _gameFlowController: {fileID: 1692919390}
   _waveController: {fileID: 1347968429}
-  _artifactManager: {fileID: 0}
-  _effectManager: {fileID: 0}
+  _artifactManager: {fileID: 1105228278}
+  _effectManager: {fileID: 1105228277}
 --- !u!4 &1039593222
 Transform:
   m_ObjectHideFlags: 0
@@ -12382,6 +12382,8 @@ GameObject:
   - component: {fileID: 1105228276}
   - component: {fileID: 1105228275}
   - component: {fileID: 1105228274}
+  - component: {fileID: 1105228278}
+  - component: {fileID: 1105228277}
   m_Layer: 0
   m_Name: Team Building Player UI
   m_TagString: Untagged
@@ -12405,7 +12407,7 @@ MonoBehaviour:
   _wallet: {fileID: 1835863131}
   _waves: {fileID: 1347968429}
   _flow: {fileID: 1692919390}
-  _effects: {fileID: 0}
+  _effects: {fileID: 1105228277}
   _gold: {fileID: 804319940}
   _core: {fileID: 804319941}
   _gemText: {fileID: 1889478361}
@@ -12456,6 +12458,32 @@ Transform:
   - {fileID: 275053428}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1105228277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1105228273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ae2b5b399cf4016ba4015f017846b25, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectManager
+--- !u!114 &1105228278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1105228273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e38527cc85d488d990a43bbd9d432e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactManager
+  _artifactCatalog: {fileID: 11400000, guid: 3ebed6d65185cb64589cccdad17e9086, type: 2}
+  _rewardTable: {fileID: 11400000, guid: 8db60b0e4b20fc949a7e5bbdf4ca0dc3, type: 2}
 --- !u!1 &1112398847
 GameObject:
   m_ObjectHideFlags: 0

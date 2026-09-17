@@ -118,6 +118,7 @@ namespace Game.UI.Editor
                     "_gold", gold, "_core", core, "_gemText", gemText, "_hint", hint);
                 var effects = teamRoots.SelectMany(r => r.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
                 if (effects != null) Assign(startup, "_effects", effects);
+                EnsureArtifactBackend(scene, owner);
                 owner.SetActive(true);
                 UiCoreCameraRigSetup.Ensure(scene, flow, camera);
                 if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException("UI integration scene save failed.");
@@ -129,6 +130,61 @@ namespace Game.UI.Editor
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
                 if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
             }
+        }
+
+        public static void ConnectExistingArtifactBackend()
+        {
+            if (!Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Run UI scene migration only in a separate batch Editor.");
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    throw new InvalidOperationException("A loaded scene has unsaved changes.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+                throw new InvalidOperationException("Missing UI-owned team building scene: " + ScenePath);
+
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var owner = scene.GetRootGameObjects().Single(root => root.name == "Team Building Player UI");
+            if (!EnsureArtifactBackend(scene, owner)) return;
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                throw new IOException("Failed to save UI artifact backend: " + ScenePath);
+            Debug.Log("[UI/TeamBuilding] Connected artifact backend in UI-owned scene.");
+        }
+
+        private static bool EnsureArtifactBackend(Scene scene, GameObject owner)
+        {
+            var roots = scene.GetRootGameObjects();
+            var bootstrap = roots.SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
+            var startup = owner.GetComponent<TeamBuildingUiStartup>();
+            if (startup == null) throw new InvalidOperationException("Missing TeamBuildingUiStartup.");
+            var catalog = AssetDatabase.LoadAssetAtPath<ArtifactCatalog>(MvpVictoryRewardSetup.CatalogPath);
+            var table = AssetDatabase.LoadAssetAtPath<ArtifactRewardTable>(MvpVictoryRewardSetup.ArtifactTablePath);
+            if (catalog == null || table == null || !table.IsValid)
+                throw new InvalidOperationException("Team artifact catalog or reward table is unavailable.");
+
+            bool changed = false;
+            var manager = roots.SelectMany(root => root.GetComponentsInChildren<ArtifactManager>(true)).SingleOrDefault();
+            if (manager == null) { manager = owner.AddComponent<ArtifactManager>(); changed = true; }
+            var effects = roots.SelectMany(root => root.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
+            if (effects == null) { effects = owner.AddComponent<EffectManager>(); changed = true; }
+            changed |= SetReferenceIfEmpty(manager, "_artifactCatalog", catalog);
+            changed |= SetReferenceIfEmpty(manager, "_rewardTable", table);
+            changed |= SetReferenceIfEmpty(bootstrap, "_artifactManager", manager);
+            changed |= SetReferenceIfEmpty(bootstrap, "_effectManager", effects);
+            changed |= SetReferenceIfEmpty(startup, "_effects", effects);
+            return changed;
+        }
+
+        private static bool SetReferenceIfEmpty(UnityEngine.Object target, string name, UnityEngine.Object value)
+        {
+            var fields = new SerializedObject(target);
+            var property = fields.FindProperty(name);
+            if (property == null) throw new InvalidOperationException("Missing serialized field: " + name);
+            if (property.objectReferenceValue == value) return false;
+            if (property.objectReferenceValue != null)
+                throw new InvalidOperationException("Custom reference will not be overwritten: " + target.name + "." + name);
+            property.objectReferenceValue = value;
+            fields.ApplyModifiedPropertiesWithoutUndo();
+            return true;
         }
 
         private static void Layout(GameUIController hud, TMP_Text gems)
