@@ -53,6 +53,8 @@ namespace Units
         private GroupAIState _state =
             GroupAIState.Idle;
 
+        private bool _isPaused;
+
 
         // =========================
         // Spawn
@@ -73,6 +75,9 @@ namespace Units
             new();
 
         private Unit_GroupAI _advanceReference;
+
+        // 단일 응답자만 등록한다. 알림 이벤트와 달리 결과가 즉시 필요하다.
+        private Func<Unit_GroupAI, Unit_GroupAI, SkillEngagementResult> _skillEngagementHandler;
 
         private readonly List<Unit_GroupAI> _enemyGroups =
             new();
@@ -196,6 +201,9 @@ namespace Units
 
         private void Update()
         {
+            if (_isPaused)
+                return;
+
             if (_state != GroupAIState.Advancing &&
                 _state != GroupAIState.Engaged)
             {
@@ -346,6 +354,9 @@ namespace Units
             unit.RequestFullAssignmentEvent +=
                 HandleFullAssignmentRequested;
 
+            unit.RequestTargetReevaluationEvent +=
+                HandleTargetReevaluationRequested;
+
             unit.RequestPositionAssignmentEvent +=
                 HandlePositionAssignmentRequested;
 
@@ -382,6 +393,9 @@ namespace Units
 
             unit.RequestFullAssignmentEvent -=
                 HandleFullAssignmentRequested;
+
+            unit.RequestTargetReevaluationEvent -=
+                HandleTargetReevaluationRequested;
 
             unit.RequestPositionAssignmentEvent -=
                 HandlePositionAssignmentRequested;
@@ -551,14 +565,73 @@ namespace Units
         // Engagement
         // =========================
 
+        internal void SetSkillEngagementHandler(
+            Func<Unit_GroupAI, Unit_GroupAI, SkillEngagementResult> handler)
+        {
+            _skillEngagementHandler = handler;
+        }
+
+        internal SkillEngagementResult RequestSkillEngagement(
+            Unit_Gateway requester, ICombatTarget target)
+        {
+            if (requester == null || !requester.IsAlive || requester.GroupAI != this
+                || !_members.Contains(requester)
+                || !CombatTargetUtility.IsValid(target) || !target.IsTargetable
+                || !(target is Unit_Gateway gateway) || gateway.GroupAI == null
+                || !gateway.GroupAI._members.Contains(gateway) || target.Team == Team)
+                return SkillEngagementResult.Invalid;
+
+            if (_enemyGroups.Contains(gateway.GroupAI))
+                return SkillEngagementResult.AlreadyEngaged;
+
+            return _skillEngagementHandler != null
+                ? _skillEngagementHandler(this, gateway.GroupAI)
+                : SkillEngagementResult.Invalid;
+        }
+
+        internal Predicate<ICombatTarget> CaptureSkillTargetFilter(Unit_Gateway requester)
+        {
+            // 실행 당시 허용된 유닛과 소속을 고정한다. 뒤의 병합이나 풀 재사용으로 넓어지지 않는다.
+            var allowed = new Dictionary<Unit_Gateway, (Unit_GroupAI group, int lifetime)>();
+            if (requester != null && requester.GroupAI == this && _members.Contains(requester))
+            {
+                for (int i = 0; i < _enemyGroups.Count; i++)
+                {
+                    Unit_GroupAI group = _enemyGroups[i];
+                    if (group == null)
+                        continue;
+                    for (int j = 0; j < group._members.Count; j++)
+                    {
+                        Unit_Gateway member = group._members[j];
+                        if (member != null && member.IsAlive)
+                            allowed[member] = (group, member.LifetimeVersion);
+                    }
+                }
+            }
+
+            return target => target is Unit_Gateway gateway && gateway != null
+                && gateway.IsTargetable && allowed.TryGetValue(gateway, out var entry)
+                && gateway.LifetimeVersion == entry.lifetime
+                && entry.group != null && gateway.GroupAI == entry.group
+                && entry.group._members.Contains(gateway);
+        }
+
+
         public void SetEnemyGroups(
-            IReadOnlyList<Unit_GroupAI> enemyGroups)
+            IReadOnlyList<Unit_GroupAI> enemyGroups,
+            bool updateState = true)
         {
             _enemyGroupController.SetEnemyGroups(
                 enemyGroups
             );
 
 
+            if (updateState)
+                UpdateEngagementState();
+        }
+
+        internal void RefreshEngagementState()
+        {
             UpdateEngagementState();
         }
 
@@ -729,6 +802,64 @@ namespace Units
         }
 
 
+        private void ReevaluateTarget(
+            Unit_Gateway unit)
+        {
+            if (!TryGetAssignmentContext(
+                unit,
+                out UnitAssignmentContext context))
+            {
+                return;
+            }
+
+
+            if (!context.HasTarget)
+            {
+                AssignUnit(
+                    unit
+                );
+
+                return;
+            }
+
+
+            if (_targetSelector.TryReevaluateTarget(
+                unit))
+            {
+                // Target이 변경되었으므로
+                // 기존 Target을 기준으로 만들어진 Position과 Assignment는 무효다.
+                context.ClearPosition();
+            }
+
+            if (!_positionAssigner.TryAssignPosition(
+                unit))
+            {
+                AssignUnit(
+                    unit
+                );
+
+                return;
+            }
+
+
+            if (!_assignmentBuilder.TryBuild(
+                unit))
+            {
+                AssignUnit(
+                    unit
+                );
+
+                return;
+            }
+
+
+            ApplyAssignment(
+                unit,
+                context
+            );
+        }
+
+
         private void ReassignPosition(
             Unit_Gateway unit)
         {
@@ -857,6 +988,22 @@ namespace Units
 
 
             AssignUnit(
+                unit
+            );
+        }
+
+
+        private void HandleTargetReevaluationRequested(
+            Unit_Gateway unit)
+        {
+            if (!CanProcessAssignmentRequest(
+                unit))
+            {
+                return;
+            }
+
+
+            ReevaluateTarget(
                 unit
             );
         }
@@ -1036,6 +1183,64 @@ namespace Units
 
 
                 unit.PauseAI();
+            }
+        }
+
+
+        // =========================
+        // Group Control
+        // =========================
+
+        public void Pause()
+        {
+            if (_isPaused)
+                return;
+
+
+            _isPaused =
+                true;
+
+
+            for (int i = 0;
+                 i < _members.Count;
+                 i++)
+            {
+                Unit_Gateway unit =
+                    _members[i];
+
+
+                if (unit == null)
+                    continue;
+
+
+                unit.Pause();
+            }
+        }
+
+
+        public void Resume()
+        {
+            if (!_isPaused)
+                return;
+
+
+            _isPaused =
+                false;
+
+
+            for (int i = 0;
+                 i < _members.Count;
+                 i++)
+            {
+                Unit_Gateway unit =
+                    _members[i];
+
+
+                if (unit == null)
+                    continue;
+
+
+                unit.Resume();
             }
         }
     }
