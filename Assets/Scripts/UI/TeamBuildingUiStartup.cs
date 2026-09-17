@@ -38,7 +38,7 @@ namespace Game.UI
             _gold.Initialize(_ui, _wallet);
             _core.Initialize(_ui, _flow, _waves);
             // 이 복사 씬에서만 테스트 패널의 수동 Run 시작을 대체한다. 재시작/종료/보상 지급은 하지 않는다.
-            if (!_wallet.IsInitialized) _wallet.Initialize(_waves, _flow, _effects);
+            // if (!_wallet.IsInitialized) _wallet.Initialize(_waves, _flow, _effects);
             IsReady = _wallet.IsInitialized;
             Refresh();
             if (!IsReady) _ui.ShowMessage("재화 연결을 확인해 주세요.");
