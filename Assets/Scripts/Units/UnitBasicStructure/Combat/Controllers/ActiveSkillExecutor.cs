@@ -15,7 +15,7 @@ namespace Units
 
         private readonly Unit_Core _core;
 
-        private readonly HitTargetResolver _hitTargetResolver;
+        private readonly TargetResolver _targetResolver;
 
 
         // ============================================================
@@ -45,6 +45,7 @@ namespace Units
         private int _executionId;
 
         private bool _isExecuting;
+        private Predicate<ICombatTarget> _targetFilter;
 
 
         // ============================================================
@@ -62,6 +63,8 @@ namespace Units
 
         private readonly List<ICombatTarget> _singleTargetBuffer;
 
+        private readonly List<ICombatTarget> _projectileTargetBuffer;
+
 
         // ============================================================
         // Constructor
@@ -70,23 +73,31 @@ namespace Units
         public ActiveSkillExecutor(
             Unit_Core core,
             ActiveSkillData data,
-            HitTargetResolver hitTargetResolver)
+            TargetResolver targetResolver)
         {
             _core =
                 core;
-            _dashController = new DashController(core);
+
+            _dashController =
+                new DashController(
+                    core
+                );
 
             _data =
                 data;
 
-            _hitTargetResolver =
-                hitTargetResolver;
+            _targetResolver =
+                targetResolver;
 
 
             _singleTargetBuffer =
                 new List<ICombatTarget>(
                     1
                 );
+
+
+            _projectileTargetBuffer =
+                new List<ICombatTarget>();
         }
 
 
@@ -94,25 +105,62 @@ namespace Units
         // Execute
         // ============================================================
 
+        public bool CanExecute(ICombatTarget target)
+        {
+            if (_core == null || !_core.IsAlive || !_core.isActiveAndEnabled
+                || _core.RuntimeStatus == null || _data == null
+                || !CombatTargetUtility.IsValid(target) || !target.IsTargetable)
+                return false;
+            if (_data.ActionType != ActiveSkillActionType.Instant
+                && _data.ActionType != ActiveSkillActionType.Cast
+                && _data.ActionType != ActiveSkillActionType.Dash)
+                return false;
+            if (_data.ExecutionType != ActiveSkillExecutionType.Direct
+                && _data.ExecutionType != ActiveSkillExecutionType.Projectile)
+                return false;
+            if (_data.ActionType == ActiveSkillActionType.Dash
+                && (_data.DashDistance <= 0f || _data.DashSpeed <= 0f))
+                return false;
+            if (_data.ExecutionType == ActiveSkillExecutionType.Projectile && _data.ProjectileSpeed <= 0f)
+                return false;
+            return DamageResolver.Instance != null;
+        }
+
         public void Execute(
             ICombatTarget target,
-            Action onCompleted)
+            Action onCompleted,
+            Predicate<ICombatTarget> targetFilter = null)
         {
             Cancel();
-            if (_core == null || _core.RuntimeStatus == null || _data == null
-                || !CombatTargetUtility.IsValid(target))
+
+
+            if (!CanExecute(target) || (targetFilter != null && !targetFilter(target)))
             {
                 onCompleted?.Invoke();
+
                 return;
             }
-            _target = target;
-            _onCompleted = onCompleted;
-            _isExecuting = true;
+
+
+            _targetFilter = targetFilter;
+
+            _target =
+                target;
+
+            _onCompleted =
+                onCompleted;
+
+            _isExecuting =
+                true;
+
+
             switch (_data.ActionType)
             {
                 case ActiveSkillActionType.Instant:
 
-                    FinishAttack(target);
+                    FinishAttack(
+                        target
+                    );
 
                     break;
 
@@ -123,13 +171,6 @@ namespace Units
                         target
                     );
 
-                    // TODO:
-                    // 실제 Casting 완료 시
-                    // ExecuteAttack(target)
-                    // onCompleted.Invoke()
-
-                    // 실제 Action 완료 Callback에서 공격 실행 및 완료를 처리한다.
-
                     break;
 
 
@@ -139,16 +180,13 @@ namespace Units
                         target
                     );
 
-                    // TODO:
-                    // 실제 Dash 완료 시
-                    // ExecuteAttack(target)
-                    // onCompleted.Invoke()
-
-                    // 실제 Action 완료 Callback에서 공격 실행 및 완료를 처리한다.
-
                     break;
+
+
                 default:
+
                     CompleteExecution();
+
                     break;
             }
         }
@@ -165,6 +203,7 @@ namespace Units
                 _castController.Tick(deltaTime);
         }
 
+
         public void FixedTick(
             float deltaTime)
         {
@@ -172,25 +211,32 @@ namespace Units
                 _dashController.FixedTick(deltaTime);
         }
 
+
         public void Cancel()
         {
             _executionId++;
+            _targetFilter = null;
 
-            _isExecuting = false;
+            _isExecuting =
+                false;
 
-            _onCompleted = null;
+            _onCompleted =
+                null;
 
-            _target = null;
+            _target =
+                null;
 
             _castController.Cancel();
 
             _dashController.Cancel();
         }
 
+
         private bool ValidateExecution()
         {
             if (!_isExecuting)
                 return false;
+
 
             if (_core == null || !_core.isActiveAndEnabled || !_core.IsAlive)
             {
@@ -199,7 +245,9 @@ namespace Units
                 return false;
             }
 
-            if (!CombatTargetUtility.IsValid(_target))
+
+            if (!CombatTargetUtility.IsValid(_target)
+                || (_targetFilter != null && !_targetFilter(_target)))
             {
                 // Target이 무효화되면 지연 공격 없이 현재 행동을 완료한다.
                 CompleteExecution();
@@ -207,8 +255,10 @@ namespace Units
                 return false;
             }
 
+
             return true;
         }
+
 
         private void FinishAttack(
             ICombatTarget target)
@@ -216,12 +266,22 @@ namespace Units
             if (!_isExecuting)
                 return;
 
-            int executionId = _executionId;
+
+            int executionId =
+                _executionId;
+
 
             try
             {
-                if (_core != null && _core.IsAlive && CombatTargetUtility.IsValid(target))
-                    ExecuteAttack(target);
+                if (_core != null
+                    && _core.IsAlive
+                    && CombatTargetUtility.IsValid(target)
+                    && (_targetFilter == null || _targetFilter(target)))
+                {
+                    ExecuteAttack(
+                        target
+                    );
+                }
             }
             finally
             {
@@ -230,14 +290,20 @@ namespace Units
             }
         }
 
+
         private void CompleteExecution()
         {
-            var callback = _onCompleted;
+            var callback =
+                _onCompleted;
+
 
             Cancel();
 
+
             callback?.Invoke();
         }
+
+
         private void ExecuteCast(
             ICombatTarget target)
         {
@@ -251,20 +317,26 @@ namespace Units
             float finalCastTime =
                 _data.CastTime
                 / attackSpeed;
+
+
             _core.StopMovement();
-            int executionId = _executionId;
-            _castController.StartCast(finalCastTime, () =>
-            {
-                if (executionId == _executionId) FinishAttack(target);
-            });
-            // 구현 완료: 아래 기존 TODO의 Cast 완료 후 공격 순서를 연결했다.
 
 
-            // TODO:
-            // Cast 처리 시스템 작성 후 연결
-            //
-            // finalCastTime 동안 Cast 후
-            // ExecuteAttack(target) 실행
+            int executionId =
+                _executionId;
+
+
+            _castController.StartCast(
+                finalCastTime,
+                () =>
+                {
+                    if (executionId == _executionId)
+                        FinishAttack(target);
+                }
+            );
+
+            // Cast 완료 후 현재 실행이 유효한 경우
+            // FinishAttack을 통해 실제 공격을 실행하고 Skill Action을 완료한다.
         }
 
 
@@ -276,19 +348,28 @@ namespace Units
 
             float dashSpeed =
                 _data.DashSpeed;
-            int executionId = _executionId;
-            _dashController.StartDash(target, dashDistance, dashSpeed, () =>
-            {
-                if (executionId == _executionId) FinishAttack(target);
-            });
-            // 구현 완료: 일반 이동과 분리된 Dash를 사용하며 MovementCompleted는 발생시키지 않는다.
 
 
-            // TODO:
-            // Dash 실행 시스템 작성 후 연결
+            int executionId =
+                _executionId;
+
+
+            _dashController.StartDash(
+                target,
+                dashDistance,
+                dashSpeed,
+                () =>
+                {
+                    if (executionId == _executionId)
+                        FinishAttack(target);
+                }
+            );
+
+            // Dash는 일반 Movement와 분리해서 처리하며
+            // MovementCompleted는 발생시키지 않는다.
             //
-            // Dash 완료 또는 적절한 타이밍에
-            // ExecuteAttack(target) 실행
+            // Dash 완료 후 현재 실행이 유효한 경우
+            // FinishAttack을 통해 실제 공격을 실행하고 Skill Action을 완료한다.
         }
 
 
@@ -299,9 +380,9 @@ namespace Units
         private void ExecuteAttack(
             ICombatTarget target)
         {
-            switch (_data.AttackType)
+            switch (_data.ExecutionType)
             {
-                case ActiveSkillAttackType.Direct:
+                case ActiveSkillExecutionType.Direct:
 
                     ExecuteDirect(
                         target
@@ -310,28 +391,11 @@ namespace Units
                     break;
 
 
-                case ActiveSkillAttackType.ProjectileSingle:
-                case ActiveSkillAttackType.ProjectileArea:
+                case ActiveSkillExecutionType.Projectile:
 
                     ExecuteProjectile(
                         target
                     );
-
-                    break;
-
-
-                case ActiveSkillAttackType.TargetArea:
-
-                    ExecuteTargetArea(
-                        target
-                    );
-
-                    break;
-
-
-                case ActiveSkillAttackType.SelfArea:
-
-                    ExecuteSelfArea();
 
                     break;
             }
@@ -343,6 +407,51 @@ namespace Units
         // ============================================================
 
         private void ExecuteDirect(
+            ICombatTarget target)
+        {
+            switch (_data.AreaType)
+            {
+                case ActiveSkillAreaType.Single:
+
+                    ExecuteSingle(
+                        target
+                    );
+
+                    break;
+
+
+                case ActiveSkillAreaType.TargetCircle:
+
+                    ExecuteTargetCircle(
+                        target
+                    );
+
+                    break;
+
+
+                case ActiveSkillAreaType.SelfCircle:
+
+                    ExecuteSelfCircle();
+
+                    break;
+
+
+                case ActiveSkillAreaType.SelfCone:
+
+                    ExecuteSelfCone(
+                        target
+                    );
+
+                    break;
+            }
+        }
+
+
+        // ============================================================
+        // Single
+        // ============================================================
+
+        private void ExecuteSingle(
             ICombatTarget target)
         {
             _singleTargetBuffer.Clear();
@@ -367,89 +476,13 @@ namespace Units
 
 
         // ============================================================
-        // Projectile
+        // Target Circle
         // ============================================================
 
-        private void ExecuteProjectile(
+        private void ExecuteTargetCircle(
             ICombatTarget target)
         {
-            if (_hitTargetResolver == null)
-                return;
-
-
-            ProjectileImpactType impactType =
-                _data.AttackType == ActiveSkillAttackType.ProjectileArea
-                    ? ProjectileImpactType.Circle
-                    : ProjectileImpactType.Single;
-
-            // 범위 여부는 AttackType으로 구분하며, 반지름으로 추론하지 않는다.
-
-            Vector2 origin =
-                _core.transform.position;
-
-            IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.ResolveAttackTargets(
-                    origin,
-                    _data.SkillRange,
-                    _data.MaxTargetCount,
-                    target
-                );
-
-
-            // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
-            for (int i = 0; i < targets.Count; i++)
-            {
-                ProjectileRequest request =
-                    new ProjectileRequest(
-                        _core,
-                        targets[i],
-                        origin,
-                        _data.ProjectileSpeed,
-                        impactType,
-                        _data.AreaRadius,
-                        _data.AreaAngle,
-                        impactType == ProjectileImpactType.Single ? 1 : _data.MaxDamageableCount,
-                        DamageSourceType.Skill,
-                        _core.RuntimeStatus.SkillDamageMultiplier
-                    );
-
-                ProjectileManager.GetOrCreate().Fire(
-                    request
-                );
-            }
-
-            // 아래 기존 TODO의 대상 수는 이제 MaxDamageableCount로 전달한다.
-
-            // TODO:
-            // Projectile Manager 구현 후 실행 요청
-            //
-            // Projectile 충돌 시:
-            //
-            // Single
-            // → 충돌 대상 DamageRequest
-            //
-            // Area
-            // → 충돌 위치 기준 HitTargetResolver
-            // → DamageRequest
-            //
-            // 전달 데이터:
-            // Attacker
-            // Target
-            // ProjectileSpeed
-            // AreaRadius
-            // MaxTargetCount
-            // HitFXType
-        }
-
-
-        // ============================================================
-        // Target Area
-        // ============================================================
-
-        private void ExecuteTargetArea(
-            ICombatTarget target)
-        {
-            if (_hitTargetResolver == null)
+            if (_targetResolver == null)
                 return;
 
 
@@ -464,12 +497,14 @@ namespace Units
                     _data.AreaRadius,
                     0f,
                     _data.MaxDamageableCount,
-                    HitAreaType.Circle
+                    HitAreaType.Circle,
+                    target.Team,
+                    _targetFilter
                 );
 
 
             IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.Resolve(
+                _targetResolver.ResolveHitTargets(
                     hitRequest
                 );
 
@@ -488,12 +523,12 @@ namespace Units
 
 
         // ============================================================
-        // Self Area
+        // Self Circle
         // ============================================================
 
-        private void ExecuteSelfArea()
+        private void ExecuteSelfCircle()
         {
-            if (_hitTargetResolver == null)
+            if (_targetResolver == null)
                 return;
 
 
@@ -508,12 +543,14 @@ namespace Units
                     _data.AreaRadius,
                     0f,
                     _data.MaxDamageableCount,
-                    HitAreaType.Circle
+                    HitAreaType.Circle,
+                    GetTargetTeam(),
+                    _targetFilter
                 );
 
 
             IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.Resolve(
+                _targetResolver.ResolveHitTargets(
                     hitRequest
                 );
 
@@ -528,6 +565,221 @@ namespace Units
 
             // TODO:
             // Hit FX 실행
+        }
+
+
+        // ============================================================
+        // Self Cone
+        // ============================================================
+
+        private void ExecuteSelfCone(
+            ICombatTarget target)
+        {
+            if (_targetResolver == null)
+                return;
+
+
+            Vector2 origin =
+                _core.transform.position;
+
+
+            Vector2 direction =
+                (
+                    (Vector2)target.Transform.position
+                    - origin
+                ).normalized;
+
+
+            TargetHitRequest hitRequest =
+                new TargetHitRequest(
+                    origin,
+                    direction,
+                    _data.AreaRadius,
+                    _data.AreaAngle,
+                    _data.MaxDamageableCount,
+                    HitAreaType.Cone,
+                    GetTargetTeam(),
+                    _targetFilter
+                );
+
+
+            IReadOnlyList<ICombatTarget> targets =
+                _targetResolver.ResolveHitTargets(
+                    hitRequest
+                );
+
+
+            RequestDamage(
+                targets
+            );
+
+
+            // TODO:
+            // Skill FX 실행
+
+            // TODO:
+            // Hit FX 실행
+        }
+
+
+        // ============================================================
+        // Projectile
+        // ============================================================
+
+        private void ExecuteProjectile(
+            ICombatTarget target)
+        {
+            if (_targetResolver == null)
+                return;
+
+
+            ProjectileImpactType impactType =
+                GetProjectileImpactType();
+
+            // Projectile의 SelfCircle / SelfCone도 충돌 위치에서 범위를 판정한다.
+
+            Vector2 origin =
+                _core.transform.position;
+
+
+            _projectileTargetBuffer.Clear();
+
+
+            _projectileTargetBuffer.Add(
+                target
+            );
+
+
+            if (_data.MaxTargetCount > 1)
+            {
+                TargetCandidateRequest candidateRequest =
+                    new TargetCandidateRequest(
+                        origin,
+                        _data.SkillRange,
+                        target.Team,
+                        _targetFilter
+                    );
+
+
+                IReadOnlyList<ICombatTarget> candidates =
+                    _targetResolver.ResolveCandidates(
+                        candidateRequest
+                    );
+
+
+                for (int i = 0;
+                    i < candidates.Count
+                    && _projectileTargetBuffer.Count < _data.MaxTargetCount;
+                    i++)
+                {
+                    ICombatTarget candidate =
+                        candidates[i];
+
+
+                    if (candidate == target)
+                        continue;
+
+
+                    _projectileTargetBuffer.Add(
+                        candidate
+                    );
+                }
+            }
+
+
+            // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
+            for (int i = 0; i < _projectileTargetBuffer.Count; i++)
+            {
+                ProjectileRequest request =
+                    new ProjectileRequest(
+                        _core,
+                        _projectileTargetBuffer[i],
+                        origin,
+                        _data.ProjectileSpeed,
+                        impactType,
+                        _data.AreaRadius,
+                        _data.AreaAngle,
+                        impactType == ProjectileImpactType.Single
+                            ? 1
+                            : _data.MaxDamageableCount,
+                        DamageSourceType.Skill,
+                        _core.RuntimeStatus.SkillDamageMultiplier,
+                        _targetFilter
+                    );
+
+
+                ProjectileManager.GetOrCreate().Fire(
+                    request
+                );
+            }
+
+            // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
+            // 실제 피해 처리는 Projectile 충돌 시 ImpactType에 따라 처리된다.
+            //
+            // Single
+            // → 충돌 대상에게 피해 적용
+            //
+            // Circle / Cone
+            // → 충돌 위치 기준 범위 판정 후 피해 적용
+
+
+            // TODO:
+            // Skill FX 실행
+        }
+
+
+        private ProjectileImpactType GetProjectileImpactType()
+        {
+            switch (_data.AreaType)
+            {
+                case ActiveSkillAreaType.Single:
+
+                    return ProjectileImpactType.Single;
+
+
+                case ActiveSkillAreaType.SelfCone:
+
+                    return ProjectileImpactType.Cone;
+
+
+                case ActiveSkillAreaType.TargetCircle:
+                case ActiveSkillAreaType.SelfCircle:
+
+                    return ProjectileImpactType.Circle;
+
+
+                default:
+
+                    return ProjectileImpactType.Single;
+            }
+        }
+
+
+        // ============================================================
+        // Target Team
+        // ============================================================
+
+        private UnitTeam GetTargetTeam()
+        {
+            switch (_data.TargetSide)
+            {
+                case SkillTargetRelation.Friendly:
+                case SkillTargetRelation.Self:
+
+                    return _core.Team;
+
+
+                case SkillTargetRelation.Hostile:
+
+                    return _core.Team == UnitTeam.Ally
+                        ? UnitTeam.Enemy
+                        : UnitTeam.Ally;
+
+
+                default:
+
+                    return _core.Team;
+            }
         }
 
 

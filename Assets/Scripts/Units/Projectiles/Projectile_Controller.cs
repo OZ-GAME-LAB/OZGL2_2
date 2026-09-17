@@ -21,6 +21,9 @@ namespace Units
         private RaycastHit2D[] _hits = new RaycastHit2D[16];
 
 
+        private Vector2 _direction;
+
+
         private float _radius;
 
 
@@ -61,9 +64,23 @@ namespace Units
                 maxLifetime
             );
 
-            _impactResolver = new ProjectileImpactResolver(request.Attacker);
+            _impactResolver =
+                new ProjectileImpactResolver(
+                    request.Attacker
+                );
 
-            transform.position = request.Origin;
+            transform.position =
+                request.Origin;
+
+
+            Vector2 offset =
+                (Vector2)request.Target.Transform.position - request.Origin;
+
+            _direction =
+                offset.sqrMagnitude > 0f
+                    ? offset.normalized
+                    : Vector2.right;
+
 
             _isFlying = true;
         }
@@ -78,33 +95,36 @@ namespace Units
             if (!_isFlying)
                 return;
 
-            _remainingLifetime -= Time.fixedDeltaTime;
 
-            // Target이 사망하거나 사라지면 다른 대상을 찾지 않고 투사체를 제거한다.
-            // 공격자가 사망해도 Object가 남아 있으면 이미 발사한 투사체는 유지한다.
-            if (_remainingLifetime <= 0f
-                || _request.Attacker == null
-                || !CombatTargetUtility.IsValid(_request.Target))
+            _remainingLifetime -=
+                Time.fixedDeltaTime;
+
+
+            // 이미 발사된 투사체는 Target과 공격자의 상태에 관계없이 유지되며,
+            // 충돌하거나 수명이 종료될 때까지 발사 시점의 방향으로 이동한다.
+            if (_remainingLifetime <= 0f)
             {
                 Release();
 
                 return;
             }
 
-            Vector2 origin = transform.position;
 
-            Vector2 offset = (Vector2)_request.Target.Transform.position - origin;
+            Vector2 origin =
+                transform.position;
 
-            Vector2 direction = offset.sqrMagnitude > 0f ? offset.normalized : Vector2.right;
 
-            float distance = Mathf.Min(
-                offset.magnitude,
-                _request.ProjectileSpeed * Time.fixedDeltaTime
-            );
+            float distance =
+                _request.ProjectileSpeed
+                * Time.fixedDeltaTime;
 
-            var filter = ContactFilter2D.noFilter;
+
+            var filter =
+                ContactFilter2D.noFilter;
+
 
             int count;
+
 
             // 고속 투사체가 Collider를 건너뛰지 않도록 이번 틱의 이동 구간 전체를 검사한다.
             do
@@ -112,14 +132,16 @@ namespace Units
                 count = Physics2D.CircleCast(
                     origin,
                     _radius,
-                    direction,
+                    _direction,
                     filter,
                     _hits,
                     distance
                 );
 
+
                 if (count < _hits.Length)
                     break;
+
 
                 Array.Resize(
                     ref _hits,
@@ -128,50 +150,70 @@ namespace Units
             }
             while (true);
 
-            ICombatTarget impactTarget = null;
 
-            float nearestDistance = float.MaxValue;
+            ICombatTarget impactTarget =
+                null;
 
-            for (int i = 0; i < count; i++)
+
+            float nearestDistance =
+                float.MaxValue;
+
+
+            for (int i = 0;
+                i < count;
+                i++)
             {
-                var collider = _hits[i].collider;
+                var collider =
+                    _hits[i].collider;
+
 
                 if (collider == null)
                     continue;
 
-                var candidate = collider.GetComponentInParent<ICombatTarget>();
 
-                // 발사자 기준 상대 팀에만 충돌하고, 같은 팀과 환경 Collider는 통과한다.
+                var candidate =
+                    collider.GetComponentInParent<ICombatTarget>();
+
+
+                // 발사 시점에 저장한 Target Team의 유닛에만 충돌하며,
+                // 다른 팀과 환경 Collider는 통과한다.
                 if (!CombatTargetUtility.IsValid(candidate)
-                    || candidate.Team == _request.Attacker.Team
+                    || candidate.Team != _request.TargetTeam
+                    || (_request.TargetFilter != null && !_request.TargetFilter(candidate))
                     || _hits[i].distance >= nearestDistance)
+                {
                     continue;
+                }
 
-                impactTarget = candidate;
 
-                nearestDistance = _hits[i].distance;
+                impactTarget =
+                    candidate;
+
+
+                nearestDistance =
+                    _hits[i].distance;
             }
+
 
             if (impactTarget != null)
             {
                 Impact(
                     impactTarget,
-                    origin + direction * nearestDistance,
-                    direction
+                    origin
+                    + _direction
+                    * nearestDistance,
+                    _direction
                 );
+
 
                 return;
             }
 
-            transform.position = origin + direction * distance;
 
-            // Collider가 없는 ICombatTarget은 목표 위치 도달 시 명중 처리한다.
-            if (offset.magnitude <= distance + 0.001f)
-                Impact(
-                    _request.Target,
-                    transform.position,
-                    direction
-                );
+            transform.position =
+                origin
+                + _direction
+                * distance;
         }
 
 
@@ -187,9 +229,13 @@ namespace Units
             if (!_isFlying)
                 return;
 
+
             _isFlying = false;
 
-            transform.position = position;
+
+            transform.position =
+                position;
+
 
             try
             {
@@ -214,6 +260,7 @@ namespace Units
         private void Release()
         {
             _isFlying = false;
+
 
             if (_manager != null)
                 _manager.Release(this);

@@ -80,13 +80,21 @@ namespace Game.UI.Editor
                 var info = UnityEngine.Object.FindFirstObjectByType<BuildingInfoPanel>();
                 var actions = UnityEngine.Object.FindFirstObjectByType<BuildingActionPanel>();
                 var hud = UnityEngine.Object.FindFirstObjectByType<GameUIController>();
-                var slots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None).OrderBy(s => s.name).ToArray();
-                var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Test_BuildingDatabase.asset");
-                var candidates = new List<BuildingData>(); slots[0].CollectCandidates(candidates, data, 1);
+                var allSlots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None);
+                var coreSlots = allSlots.Where(slot => slot.CurrentBuilding != null &&
+                    slot.CurrentBuilding.Data != null && slot.CurrentBuilding.Data.IsCore).ToArray();
+                var slots = allSlots.Except(coreSlots).OrderBy(slot => slot.name).ToArray();
+                var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Building/Test_BuildingDatabase.asset");
+                var progress = UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>();
+                var candidates = new List<BuildingData>();
+                slots[0].CollectCandidates(candidates, data, progress != null ? progress.CurrentLevel : 0);
                 var build = Ref<Button>(actions, "_build._button");
                 var dismantle = Ref<Button>(actions, "_dismantle._button");
                 var goldText = Ref<TMP_Text>(hud, "_goldText");
-                Check(slots.Length > 0 && slots.All(s => s.GetComponent<RuntimeBuildingSelectionTarget>() != null), "all original slots have UI input: " + slots.Length);
+                Check(coreSlots.Length == 1 && coreSlots[0].GetComponent<RuntimeBuildingSelectionTarget>() == null,
+                    "preplaced core is not a normal building input target");
+                Check(slots.Length > 1 && slots.All(s => s.GetComponent<RuntimeBuildingSelectionTarget>() != null),
+                    "all buildable team slots have UI input: " + slots.Length);
                 Check(candidates.Count == 3, "three original team building candidates, no UI fixture database");
                 Check(Ref<BuildingDatabase>(binding, "_database") == data, "binding uses team database identity");
                 Check(Ref<RunCurrencyManager>(binding, "_wallet") == wallet && Ref<BuildingBuildController>(binding, "_controller") == controller, "UI and controller share team authority");
@@ -169,7 +177,7 @@ namespace Game.UI.Editor
                 Click(Point(launch));
                 Check(binding.SelectedSlot != null && catalog.Popup.IsVisible, "build shortcut selects a real empty team slot");
                 binding.ClearSelection();
-                Check(await flow.TrySpawnUnits(), "original core phase transition available (TestSpawner, not full combat)");
+                Check(await flow.TryStartWave(), "original core phase transition available (TestSpawner, not full combat)");
                 Click(Point(slots[0]));
                 Check(binding.SelectedSlot == null && !catalog.Popup.IsVisible, "battle phase blocks original slot construction UI");
                 await ValidateAutomaticRewards(startup, flow, wallet, hud);
@@ -218,7 +226,7 @@ namespace Game.UI.Editor
                     if (round == 1)
                     {
                         waves.JumpToLastWaveForTest();
-                        Check(await flow.TrySpawnUnits(), "boss reward test starts through Core");
+                        Check(await flow.TryStartWave(), "boss reward test starts through Core");
                     }
                     int gold = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
                     int gems = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gem);
@@ -244,13 +252,13 @@ namespace Game.UI.Editor
                     Check(events == stableEvents && wallet.GetBalance(CurrencyType.Gold) == expectedGold,
                         "UI re-enable cannot reinitialize or repay the wallet: " + round);
                     gate.ChooseResultBtn();
-                    await Wait(() => flow.CurPhase == GamePhase.Preparation);
+                    await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                     Check(waves.CurQuarter == (round == 0 ? 1 : 2) && waves.CurWave == (round == 0 ? 2 : 1),
                         "explicit test gate progresses the original Core once: " + round);
                 }
 
                 int beforeLoss = events;
-                Check(await flow.TrySpawnUnits(), "defeat scenario starts through Core");
+                Check(await flow.TryStartWave(), "defeat scenario starts through Core");
                 await flow.ResolveBattleAsync(ResultType.Defeat);
                 Check(flow.CurPhase == GamePhase.Finished && events == beforeLoss &&
                     wallet.GetBalance(CurrencyType.Gold) == expectedGold &&
@@ -264,7 +272,7 @@ namespace Game.UI.Editor
                 startup.Refresh();
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && wallet.GetBalance(CurrencyType.Gem) == 0 &&
                     goldText.text == "100" && gemText.text == "보석 0", "explicit new run refreshes both HUD currencies");
-                Check(await flow.TrySpawnUnits(), "new run starts normally");
+                Check(await flow.TryStartWave(), "new run starts normally");
                 expectedGold = 100 + wallet.CurrentGoldReward;
                 expectedGems = wallet.CurrentGemReward;
                 int newRunEvents = events;
@@ -277,7 +285,7 @@ namespace Game.UI.Editor
                 Check(goldText.text == expectedGold.ToString("N0") && gemText.text == $"보석 {expectedGems:N0}",
                     "new-run reward is reflected in the visible HUD");
                 gate.ChooseResultBtn();
-                await Wait(() => flow.CurPhase == GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
             }
             finally
             {

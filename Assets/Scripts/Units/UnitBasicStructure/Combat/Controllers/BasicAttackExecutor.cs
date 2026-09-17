@@ -14,7 +14,7 @@ namespace Units
 
         private readonly Unit_Core _core;
 
-        private readonly HitTargetResolver _hitTargetResolver;
+        private readonly TargetResolver _targetResolver;
 
 
         // ============================================================
@@ -37,6 +37,8 @@ namespace Units
 
         private readonly List<ICombatTarget> _singleTargetBuffer;
 
+        private readonly List<ICombatTarget> _projectileTargetBuffer;
+
 
         // ============================================================
         // Constructor
@@ -45,7 +47,7 @@ namespace Units
         public BasicAttackExecutor(
             Unit_Core core,
             BasicAttackData data,
-            HitTargetResolver hitTargetResolver)
+            TargetResolver targetResolver)
         {
             _core =
                 core;
@@ -53,14 +55,18 @@ namespace Units
             _data =
                 data;
 
-            _hitTargetResolver =
-                hitTargetResolver;
+            _targetResolver =
+                targetResolver;
 
 
             _singleTargetBuffer =
                 new List<ICombatTarget>(
                     1
                 );
+
+
+            _projectileTargetBuffer =
+                new List<ICombatTarget>();
         }
 
 
@@ -180,7 +186,7 @@ namespace Units
         private void ExecuteTargetCircle(
             ICombatTarget target)
         {
-            if (_hitTargetResolver == null)
+            if (_targetResolver == null)
                 return;
 
 
@@ -195,12 +201,13 @@ namespace Units
                     _data.AreaRadius,
                     0f,
                     _data.MaxDamageableCount,
-                    HitAreaType.Circle
+                    HitAreaType.Circle,
+                    GetEnemyTeam()
                 );
 
 
             IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.Resolve(
+                _targetResolver.ResolveHitTargets(
                     hitRequest
                 );
 
@@ -224,7 +231,7 @@ namespace Units
 
         private void ExecuteSelfCircle()
         {
-            if (_hitTargetResolver == null)
+            if (_targetResolver == null)
                 return;
 
 
@@ -239,12 +246,13 @@ namespace Units
                     _data.AreaRadius,
                     0f,
                     _data.MaxDamageableCount,
-                    HitAreaType.Circle
+                    HitAreaType.Circle,
+                    GetEnemyTeam()
                 );
 
 
             IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.Resolve(
+                _targetResolver.ResolveHitTargets(
                     hitRequest
                 );
 
@@ -269,7 +277,7 @@ namespace Units
         private void ExecuteSelfCone(
             ICombatTarget target)
         {
-            if (_hitTargetResolver == null)
+            if (_targetResolver == null)
                 return;
 
 
@@ -291,12 +299,13 @@ namespace Units
                     _data.AreaRadius,
                     _data.AreaAngle,
                     _data.MaxDamageableCount,
-                    HitAreaType.Cone
+                    HitAreaType.Cone,
+                    GetEnemyTeam()
                 );
 
 
             IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.Resolve(
+                _targetResolver.ResolveHitTargets(
                     hitRequest
                 );
 
@@ -321,7 +330,7 @@ namespace Units
         private void ExecuteProjectile(
             ICombatTarget target)
         {
-            if (_hitTargetResolver == null)
+            if (_targetResolver == null)
                 return;
 
 
@@ -337,22 +346,59 @@ namespace Units
             Vector2 origin =
                 _core.transform.position;
 
-            IReadOnlyList<ICombatTarget> targets =
-                _hitTargetResolver.ResolveAttackTargets(
-                    origin,
-                    _data.BasicAttackRange,
-                    _data.MaxTargetCount,
-                    target
-                );
+
+            _projectileTargetBuffer.Clear();
+
+
+            // 현재 배정된 Target은 항상 첫 번째 발사 대상으로 사용한다.
+            _projectileTargetBuffer.Add(
+                target
+            );
+
+
+            if (_data.MaxTargetCount > 1)
+            {
+                TargetCandidateRequest candidateRequest =
+                    new TargetCandidateRequest(
+                        origin,
+                        _data.BasicAttackRange,
+                        GetEnemyTeam()
+                    );
+
+
+                IReadOnlyList<ICombatTarget> candidates =
+                    _targetResolver.ResolveCandidates(
+                        candidateRequest
+                    );
+
+
+                for (int i = 0;
+                    i < candidates.Count
+                    && _projectileTargetBuffer.Count < _data.MaxTargetCount;
+                    i++)
+                {
+                    ICombatTarget candidate =
+                        candidates[i];
+
+
+                    if (candidate == target)
+                        continue;
+
+
+                    _projectileTargetBuffer.Add(
+                        candidate
+                    );
+                }
+            }
 
 
             // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
-            for (int i = 0; i < targets.Count; i++)
+            for (int i = 0; i < _projectileTargetBuffer.Count; i++)
             {
                 ProjectileRequest request =
                     new ProjectileRequest(
                         _core,
-                        targets[i],
+                        _projectileTargetBuffer[i],
                         origin,
                         _data.ProjectileSpeed,
                         impactType,
@@ -368,33 +414,30 @@ namespace Units
                 );
             }
 
-            // 아래 기존 TODO의 대상 수는 이제 MaxDamageableCount로 전달한다.
-
-            // TODO:
-            // Projectile Manager 구현 후 실행 요청
-            //
-            // Projectile 충돌 시:
+            // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
+            // 실제 피해 처리는 Projectile 충돌 시 ImpactType에 따라 처리된다.
             //
             // Single
-            // → 충돌 대상 DamageRequest
+            // → 충돌 대상에게 피해 적용
             //
-            // Area
-            // → 충돌 위치 기준 HitTargetResolver
-            // → DamageRequest
-            //
-            // 전달할 데이터:
-            // Attacker
-            // Target
-            // ProjectileSpeed
-            // AreaType
-            // AreaRadius
-            // AreaAngle
-            // MaxTargetCount
-            // HitFXType
+            // Circle / Cone
+            // → 충돌 위치 기준 범위 판정 후 피해 적용
 
 
             // TODO:
             // Attack FX 실행
+        }
+
+
+        // ============================================================
+        // Target Team
+        // ============================================================
+
+        private UnitTeam GetEnemyTeam()
+        {
+            return _core.Team == UnitTeam.Ally
+                ? UnitTeam.Enemy
+                : UnitTeam.Ally;
         }
 
 

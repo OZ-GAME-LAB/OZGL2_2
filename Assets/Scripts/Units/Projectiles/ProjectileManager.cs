@@ -24,7 +24,7 @@ namespace Units
 
 
         [SerializeField, Min(0.1f)]
-        private float _maxLifetime = 10f;
+        private float _maxLifetime = 5f;
 
 
         // ============================================================
@@ -81,12 +81,16 @@ namespace Units
             if (request.Attacker == null
                 || request.Attacker.RuntimeStatus == null
                 || !CombatTargetUtility.IsValid(request.Target)
-                || request.Target.Team == request.Attacker.Team
                 || !(request.ProjectileSpeed > 0f)
                 || float.IsInfinity(request.ProjectileSpeed))
+            {
                 return false;
+            }
 
-            var prefab = _projectilePrefab != null ? _projectilePrefab : GetFallbackPrefab();
+            var prefab =
+                _projectilePrefab != null
+                    ? _projectilePrefab
+                    : GetFallbackPrefab();
 
             var projectile = Instantiate(
                 prefab,

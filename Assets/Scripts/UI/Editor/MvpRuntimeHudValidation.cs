@@ -177,7 +177,11 @@ namespace Game.UI.Editor
                 if (SessionState.GetBool(VictoryKey, false))
                     MvpVictoryRewardSetup.ConfigureScene(testScene, false);
                 else if (MvpEconomyUiSetup.IsSupportedScene(testScene.path))
+                {
                     MvpEconomyUiSetup.ConfigureScene(testScene, false);
+                    // 최신 Core는 수동 재화 테스트에서도 실제 유물 매니저 참조를 요구한다.
+                    MvpVictoryRewardSetup.ConfigureScene(testScene, false);
+                }
                 if (!SessionState.GetBool(VictoryKey, false))
                 {
                     // 사용자가 승리 UI 연결을 저장한 씬도 기존 수동 지급 검사는 독립적으로 검사한다.
@@ -280,7 +284,8 @@ namespace Game.UI.Editor
                 var toggle = Field<Button>(sampleFields, "_toggleHudButton");
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && goldText.text == "100", "initial authoritative gold");
                 Check(flow.CurPhase == GamePhase.Preparation && phaseText.text == "건설", "initial core phase");
-                Check(waveText.text == "1 / 3" && start.interactable, "initial wave and input unlocked after phase event");
+                int wavesPerQuarter = WaveController.MAX_WAVE;
+                Check(waveText.text == $"1 / {wavesPerQuarter}" && start.interactable, "initial wave and input unlocked after phase event");
                 add.onClick.Invoke();
                 Check(wallet.GetBalance(CurrencyType.Gold) == 150 && goldText.text == "150", "real add event updates HUD");
                 spend.onClick.Invoke();
@@ -340,9 +345,9 @@ namespace Game.UI.Editor
                 reset.onClick.Invoke();
 
                 int totalWaveGold = 100;
-                for (int wave = 1; wave <= 3; wave++)
+                for (int wave = 1; wave <= wavesPerQuarter; wave++)
                 {
-                    Check(waveText.text == wave + " / 3" && start.interactable, "wave " + wave + " ready");
+                    Check(waveText.text == $"{wave} / {wavesPerQuarter}" && start.interactable, "wave " + wave + " ready");
                     start.onClick.Invoke();
                     await WaitForPhase(flow, GamePhase.Battle);
                     Check(phaseText.text == "전투" && !start.interactable, "wave " + wave + " battle");
@@ -360,12 +365,12 @@ namespace Game.UI.Editor
                     Check(wallet.GetBalance(CurrencyType.Gold) == beforeReward + expectedReward &&
                         goldText.text == (beforeReward + expectedReward).ToString("N0"), "wave " + wave + " table reward applied once by real manager");
                     Check(wallet.GetBalance(CurrencyType.Gem) == expectedGem, "wave " + wave + " table Gem reward");
-                    await WaitForPhase(flow, GamePhase.Preparation);
+                    await WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation, phaseText);
                 }
-                Check(waves.CurQuarter == 2 && waves.CurWave == 1 && waveText.text == "1 / 3" && phaseText.text == "건설", "first quarter continues to next quarter");
-                Check(wallet.GetBalance(CurrencyType.Gold) == totalWaveGold && goldText.text == totalWaveGold.ToString("N0"), "three actual reward transactions reflected");
+                Check(waves.CurQuarter == 2 && waves.CurWave == 1 && waveText.text == $"1 / {wavesPerQuarter}" && phaseText.text == "건설", "first quarter continues to next quarter");
+                Check(wallet.GetBalance(CurrencyType.Gold) == totalWaveGold && goldText.text == totalWaveGold.ToString("N0"), "all first-quarter reward transactions reflected");
                 reset.onClick.Invoke();
-                Check(waveText.text == "1 / 3" && goldText.text == "100" && start.interactable, "restart resets core/economy/view");
+                Check(waveText.text == $"1 / {wavesPerQuarter}" && goldText.text == "100" && start.interactable, "restart resets core/economy/view");
                 await MvpEconomyUiValidation.RunChecksAsync();
                 await MvpCoreQuarterValidation.RunChecksAsync();
                 // Let only the button color transition settle before visual capture.
@@ -429,6 +434,31 @@ namespace Game.UI.Editor
                 await UniTask.NextFrame();
             }
             // PhaseChanged occurs inside the core call; allow completion/finally to finish.
+            await UniTask.NextFrame();
+        }
+
+        internal static async UniTask WaitForPhaseAfterContentAsync(
+            GameFlowController flow, GamePhase phase, TMP_Text phaseText = null)
+        {
+            var gate = UnityEngine.Object.FindFirstObjectByType<TestWaitingScript>();
+            float deadline = Time.realtimeSinceStartup + 12;
+            while (flow.CurPhase != phase)
+            {
+                GamePhase current = flow.CurPhase;
+                if (current == GamePhase.Event || current == GamePhase.Store)
+                {
+                    await UniTask.NextFrame();
+                    string label = current == GamePhase.Event ? "이벤트" : "상점";
+                    if (phaseText != null && phaseText.text != label)
+                        throw new InvalidOperationException($"Expected {label} HUD label, got {phaseText.text}");
+                    if (gate == null || !gate.IsWaitingForPostBattleContent)
+                        throw new InvalidOperationException($"{current} phase has no pending test content");
+                    gate.CompletePostBattleContent(gate.PostBattleRequestId);
+                }
+                if (Time.realtimeSinceStartup > deadline)
+                    throw new TimeoutException($"Expected phase {phase}; got {flow.CurPhase}");
+                await UniTask.NextFrame();
+            }
             await UniTask.NextFrame();
         }
 

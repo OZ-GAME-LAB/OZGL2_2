@@ -92,11 +92,21 @@ namespace Game.UI.Editor
                         Check(flow.CurPhase == GamePhase.BattleResolving && phaseText.text == "전투 정산" && !start.interactable,
                             "victory staging is visible and locked");
                         bool mainEnd = quarter == WaveController.MAIN_QUARTERS && wave == WaveController.MAX_WAVE;
+                        await WaitFor(flow, GamePhase.Reward);
+                        Check(!binding.IsVisible && !start.interactable, "reward is separate from choice");
+                        if (wave == WaveController.MAX_WAVE)
+                            Check(flow.IsWaitingForArtifactSelection, "quarter reward keeps team artifact wait contract");
+                        int before = wallet.GetBalance(CurrencyType.Gold);
+                        int expectedReward = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
+                        totalWaveGold += expectedReward;
+                        reward.onClick.Invoke();
+                        reward.onClick.Invoke();
+                        Check(wallet.GetBalance(CurrencyType.Gold) == before + expectedReward, "one table reward per quarter/wave");
                         if (mainEnd)
                         {
-                            await WaitFor(flow, GamePhase.QuarterComplete);
+                            await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.QuarterComplete, phaseText);
                             Check(flow.HasClearedMainGame && binding.IsVisible && flow.CanChooseRunDecision,
-                                "main clear waits for user decision");
+                                "main clear waits for user decision after reward");
                             Check(phaseText.text == "분기 완료", "quarter complete label");
                             int balance = wallet.GetBalance(CurrencyType.Gold);
                             reward.onClick.Invoke();
@@ -123,17 +133,7 @@ namespace Game.UI.Editor
                             Check(!flow.CanChooseRunDecision && !binding.IsVisible && !finish.interactable && !next.interactable,
                                 "first choice consumes core request and locks both buttons");
                         }
-                        await WaitFor(flow, GamePhase.Reward);
-                        Check(!binding.IsVisible && !start.interactable, "reward is separate from choice");
-                        if (wave == WaveController.MAX_WAVE)
-                            Check(flow.IsWaitingForArtifactSelection, "quarter reward keeps team artifact wait contract");
-                        int before = wallet.GetBalance(CurrencyType.Gold);
-                        int expectedReward = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
-                        totalWaveGold += expectedReward;
-                        reward.onClick.Invoke();
-                        reward.onClick.Invoke();
-                        Check(wallet.GetBalance(CurrencyType.Gold) == before + expectedReward, "one table reward per quarter/wave");
-                        await WaitFor(flow, GamePhase.Preparation);
+                        await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation, phaseText);
                     }
                 }
                 Check(waves.CurQuarter == WaveController.MAIN_QUARTERS + 1 && waves.CurWave == 1 && flow.HasClearedMainGame,
@@ -156,9 +156,12 @@ namespace Game.UI.Editor
                     wallet.GetBalance(CurrencyType.Gold) == 100, "test shortcuts never grant rewards");
                 start.onClick.Invoke();
                 await WaitFor(flow, GamePhase.Battle);
-                ui.gameObject.SetActive(false);
                 win.onClick.Invoke();
-                await WaitFor(flow, GamePhase.QuarterComplete);
+                await WaitFor(flow, GamePhase.Reward);
+                int finishReward = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
+                reward.onClick.Invoke();
+                ui.gameObject.SetActive(false);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.QuarterComplete);
                 Check(!binding.IsVisible && flow.CanChooseRunDecision, "choice request survives fully hidden HUD");
                 ui.gameObject.SetActive(true);
                 Check(binding.IsVisible && finish.interactable, "hidden request is recovered from core state");
@@ -172,7 +175,8 @@ namespace Game.UI.Editor
                 await WaitFor(flow, GamePhase.Finished);
                 Check(waves.CurQuarter == WaveController.MAIN_QUARTERS && flow.HasClearedMainGame && !binding.IsVisible,
                     "finish stops at cleared quarter; late continue is ignored");
-                Check(wallet.GetBalance(CurrencyType.Gold) == 100, "UI does not invent rewards for finish path");
+                Check(wallet.GetBalance(CurrencyType.Gold) == 100 + finishReward,
+                    "finish path keeps only the authoritative quarter reward");
 
                 reset.onClick.Invoke();
                 lastQuarter.onClick.Invoke();
@@ -185,7 +189,7 @@ namespace Game.UI.Editor
                 Check(!binding.IsVisible && !flow.CanChooseRunDecision && flow.IsWaitingForArtifactSelection,
                     "core auto-continue does not open a decision UI");
                 reward.onClick.Invoke();
-                await WaitFor(flow, GamePhase.Preparation);
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation, phaseText);
                 Check(waves.CurQuarter == WaveController.MAIN_QUARTERS + 1, "auto-continue advances through reward gate");
                 flow.AutoContinue = false;
 
@@ -195,7 +199,9 @@ namespace Game.UI.Editor
                 start.onClick.Invoke();
                 await WaitFor(flow, GamePhase.Battle);
                 win.onClick.Invoke();
-                await WaitFor(flow, GamePhase.QuarterComplete);
+                await WaitFor(flow, GamePhase.Reward);
+                reward.onClick.Invoke();
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.QuarterComplete, phaseText);
                 reset.onClick.Invoke();
                 next.onClick.Invoke();
                 finish.onClick.Invoke();

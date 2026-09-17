@@ -3,6 +3,7 @@ using Game.Core;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
+using TMPro;
 
 
 namespace Units
@@ -18,6 +19,16 @@ namespace Units
 
         [SerializeField]
         private RuntimeUnitManager _runtimeUnitManager;
+
+
+        // ============================================================
+        // Engagement Debug UI
+        // ============================================================
+
+        [Header("Engagement Debug")]
+
+        [SerializeField]
+        private TMP_Text _engagementDebugText;
 
 
         // ============================================================
@@ -148,6 +159,136 @@ namespace Units
 
             _runtimeUnitManager.PreparationCompleted -=
                 OnPreparationCompleted;
+        }
+
+        private void Update()
+        {
+            UpdateEngagementDebugUI();
+        }
+
+
+        // ============================================================
+        // Engagement Debug
+        // ============================================================
+
+        private void UpdateEngagementDebugUI()
+        {
+            if (_engagementDebugText == null)
+                return;
+
+
+            if (_runtimeUnitManager == null)
+            {
+                _engagementDebugText.text =
+                    "RuntimeUnitManager 없음";
+
+                return;
+            }
+
+
+            IReadOnlyList<EngagementContext> engagements =
+                _runtimeUnitManager.Engagements;
+
+
+            if (engagements.Count == 0)
+            {
+                _engagementDebugText.text =
+                    "[Engagement Debug]\n" +
+                    "진행 중인 교전 없음";
+
+                return;
+            }
+
+
+            System.Text.StringBuilder builder =
+                new();
+
+
+            builder.AppendLine(
+                "[Engagement Debug]"
+            );
+
+            builder.AppendLine(
+                $"진행 중인 교전 : {engagements.Count}"
+            );
+
+
+            for (int i = 0;
+                 i < engagements.Count;
+                 i++)
+            {
+                EngagementContext engagement =
+                    engagements[i];
+
+
+                if (engagement == null)
+                    continue;
+
+
+                builder.AppendLine();
+                builder.AppendLine(
+                    $"========== Engagement {i + 1} =========="
+                );
+
+
+                AppendGroupDebugInfo(
+                    builder,
+                    "Ally",
+                    engagement.AllyGroups
+                );
+
+
+                AppendGroupDebugInfo(
+                    builder,
+                    "Enemy",
+                    engagement.EnemyGroups
+                );
+            }
+
+
+            _engagementDebugText.text =
+                builder.ToString();
+        }
+
+
+        private void AppendGroupDebugInfo(
+            System.Text.StringBuilder builder,
+            string teamName,
+            IReadOnlyList<Unit_GroupAI> groups)
+        {
+            builder.AppendLine(
+                $"[{teamName}]"
+            );
+
+
+            if (groups == null ||
+                groups.Count == 0)
+            {
+                builder.AppendLine(
+                    "- 없음"
+                );
+
+                return;
+            }
+
+
+            for (int i = 0;
+                 i < groups.Count;
+                 i++)
+            {
+                Unit_GroupAI group =
+                    groups[i];
+
+
+                if (group == null)
+                    continue;
+
+
+                builder.AppendLine(
+                    $"- {group.name} " +
+                    $"({group.Members.Count}명)"
+                );
+            }
         }
 
 

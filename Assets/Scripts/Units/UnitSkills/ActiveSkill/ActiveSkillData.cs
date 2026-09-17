@@ -25,6 +25,20 @@ namespace Units.Skills
 
 
         // ============================================================
+        // Target
+        // ============================================================
+
+        [Header("Target")]
+        [SerializeField]
+        private SkillTargetRelation _targetSide =
+            SkillTargetRelation.Hostile;
+
+        [SerializeField]
+        private SkillTargetPolicy _targetPolicy =
+            SkillTargetPolicy.Current;
+
+
+        // ============================================================
         // Action
         // ============================================================
 
@@ -39,23 +53,29 @@ namespace Units.Skills
 
 
         // ============================================================
-        // Attack
+        // Execution
         // ============================================================
 
-        [Header("Attack")]
+        [Header("Execution")]
         [SerializeField]
-        private ActiveSkillAttackType _attackType =
-            ActiveSkillAttackType.Direct;
+        private ActiveSkillExecutionType _executionType =
+            ActiveSkillExecutionType.Direct;
 
+
+        // ============================================================
+        // Target Count
+        // ============================================================
+
+        [Header("Target Count")]
         [SerializeField]
         [Tooltip("Projectile을 발사할 최대 목표 수")]
         private int _maxTargetCount =
             1;
 
-
         [SerializeField]
         [Tooltip("광역 판정 1회에 피해를 적용할 최대 인원")]
-        private int _maxDamageableCount = 1;
+        private int _maxDamageableCount =
+            1;
 
 
         // ============================================================
@@ -63,6 +83,10 @@ namespace Units.Skills
         // ============================================================
 
         [Header("Area")]
+        [SerializeField]
+        private ActiveSkillAreaType _areaType =
+            ActiveSkillAreaType.Single;
+
         [SerializeField]
         private float _areaRadius =
             1f;
@@ -121,6 +145,13 @@ namespace Units.Skills
             _skillCooldown;
 
 
+        public SkillTargetRelation TargetSide =>
+            _targetSide;
+
+        public SkillTargetPolicy TargetPolicy =>
+            _targetPolicy;
+
+
         public ActiveSkillActionType ActionType =>
             _actionType;
 
@@ -128,18 +159,21 @@ namespace Units.Skills
             _castTime;
 
 
-        public ActiveSkillAttackType AttackType =>
-            _attackType;
-
-        // 광역 판정 1회에 피해를 적용할 최대 인원이다.
-        public int MaxDamageableCount =>
-            _maxDamageableCount;
+        public ActiveSkillExecutionType ExecutionType =>
+            _executionType;
 
 
         // Projectile을 발사할 최대 목표 수이다.
         public int MaxTargetCount =>
             _maxTargetCount;
 
+        // 광역 판정 1회에 피해를 적용할 최대 인원이다.
+        public int MaxDamageableCount =>
+            _maxDamageableCount;
+
+
+        public ActiveSkillAreaType AreaType =>
+            _areaType;
 
         public float AreaRadius =>
             _areaRadius;
@@ -169,10 +203,6 @@ namespace Units.Skills
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            _maxDamageableCount =
-                Mathf.Max(1, _maxDamageableCount);
-
-
             _skillRange =
                 Mathf.Max(
                     0f,
@@ -195,6 +225,12 @@ namespace Units.Skills
                 Mathf.Max(
                     1,
                     _maxTargetCount
+                );
+
+            _maxDamageableCount =
+                Mathf.Max(
+                    1,
+                    _maxDamageableCount
                 );
 
             _areaRadius =

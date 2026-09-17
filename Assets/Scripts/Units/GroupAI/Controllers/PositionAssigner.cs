@@ -91,6 +91,20 @@ namespace Units
             }
 
 
+            if (IsCurrentPositionValid(
+                unit,
+                target))
+            {
+                context.SetPosition(
+                    unit.transform.position,
+                    DefaultPositionTolerance
+                );
+
+
+                return true;
+            }
+
+
             float preferredRange =
                 CalculatePreferredRange(
                     unit
@@ -131,6 +145,45 @@ namespace Units
 
             return combatRange
                 * PreferredRangeRatio;
+        }
+
+
+        // =========================
+        // Current Position
+        // =========================
+
+        private bool IsCurrentPositionValid(
+            Unit_Gateway unit,
+            ICombatTarget target)
+        {
+            float combatRange =
+                Mathf.Max(
+                    0f,
+                    unit.PreferredCombatRange
+                );
+
+
+            Vector2 unitPosition =
+                unit.transform.position;
+
+            Vector2 targetPosition =
+                target.Transform.position;
+
+
+            float sqrDistance =
+                (
+                    targetPosition
+                    - unitPosition
+                ).sqrMagnitude;
+
+
+            float combatRangeSqr =
+                combatRange
+                * combatRange;
+
+
+            return sqrDistance
+                <= combatRangeSqr;
         }
 
 

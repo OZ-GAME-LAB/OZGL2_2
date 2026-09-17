@@ -184,6 +184,8 @@ namespace Game.UI
                 case GamePhase.BattleResolving: return "전투 정산";
                 case GamePhase.QuarterComplete: return "분기 완료";
                 case GamePhase.Reward: return "보상";
+                case GamePhase.Event: return "이벤트";
+                case GamePhase.Store: return "상점";
                 case GamePhase.Finished: return "결과";
                 default: return "연결 대기";
             }

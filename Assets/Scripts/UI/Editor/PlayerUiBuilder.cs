@@ -122,6 +122,7 @@ namespace Game.UI.Editor
                 hidden.SetActive(false);
                 unitObject.SetActive(true); systemRoot.SetActive(true);
                 ApplyWireframe(scene);
+                UiCoreCameraRigSetup.Ensure(scene, flow, camera);
                 foreach (var root in scene.GetRootGameObjects())
                     foreach (var label in root.GetComponentsInChildren<TMP_Text>(true)) label.font = _font;
                 if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new InvalidOperationException("Player UI scene save failed.");

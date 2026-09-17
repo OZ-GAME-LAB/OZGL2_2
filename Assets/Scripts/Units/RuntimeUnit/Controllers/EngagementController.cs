@@ -13,6 +13,8 @@ namespace Units
 
         private readonly List<EngagementContext> _engagements;
 
+        private readonly EngagementExpansionPolicy _expansionPolicy;
+
         private readonly List<Unit_GroupAI> _allyGroups;
 
         private readonly List<Unit_GroupAI> _enemyGroups;
@@ -34,8 +36,10 @@ namespace Units
         public EngagementController(
             List<EngagementContext> engagements,
             List<Unit_GroupAI> allyGroups,
-            List<Unit_GroupAI> enemyGroups)
+            List<Unit_GroupAI> enemyGroups,
+            EngagementExpansionPolicy expansionPolicy = null)
         {
+            _expansionPolicy = expansionPolicy ?? new EngagementExpansionPolicy();
             _engagements =
                 engagements;
 
@@ -103,6 +107,12 @@ namespace Units
             }
 
 
+            // 탐지만으로 기존 교전끼리 병합하지 않는다. 신규 그룹 합류에도 같은 상한을 적용한다.
+            if (!_expansionPolicy.Allows(
+                GetParticipants(allyContext, allyGroup),
+                GetParticipants(enemyContext, enemyGroup)))
+                return false;
+
             if (allyEngaged)
             {
                 return TryAddEnemyGroup(
@@ -116,6 +126,90 @@ namespace Units
                 enemyContext,
                 allyGroup
             );
+        }
+
+
+        // 스킬 요청 한 번에 선택된 상대 교전 하나만 검토한다.
+        public SkillEngagementResult TryExpandForSkill(
+            Unit_GroupAI sourceGroup,
+            Unit_GroupAI targetGroup)
+        {
+            if (sourceGroup == null || targetGroup == null || sourceGroup.Team == targetGroup.Team)
+                return SkillEngagementResult.Invalid;
+
+            Unit_GroupAI ally = sourceGroup.Team == UnitTeam.Ally ? sourceGroup : targetGroup;
+            Unit_GroupAI enemy = sourceGroup.Team == UnitTeam.Enemy ? sourceGroup : targetGroup;
+            if (!IsValidAllyGroup(ally) || !IsValidEnemyGroup(enemy)
+                || ally.Members.Count == 0 || enemy.Members.Count == 0)
+                return SkillEngagementResult.Invalid;
+
+            _groupEngagementMap.TryGetValue(sourceGroup, out EngagementContext source);
+            _groupEngagementMap.TryGetValue(targetGroup, out EngagementContext target);
+            if (source != null && ReferenceEquals(source, target))
+                return SkillEngagementResult.AlreadyEngaged;
+
+            List<Unit_GroupAI> sourceGroups = GetParticipants(source, sourceGroup);
+            List<Unit_GroupAI> targetGroups = GetParticipants(target, targetGroup);
+            if (!AreRegistered(sourceGroups) || !AreRegistered(targetGroups))
+                return SkillEngagementResult.Invalid;
+            if (!_expansionPolicy.Allows(sourceGroups, targetGroups))
+                return SkillEngagementResult.Denied;
+
+            if (source != null && target != null)
+            {
+                // 종료 처리 없이 이전하여 중간 Advancing 전환과 배정 해제를 방지한다.
+                for (int i = 0; i < target.AllyGroups.Count; i++)
+                    source.AddAllyGroup(target.AllyGroups[i]);
+                for (int i = 0; i < target.EnemyGroups.Count; i++)
+                    source.AddEnemyGroup(target.EnemyGroups[i]);
+                for (int i = 0; i < targetGroups.Count; i++)
+                    _groupEngagementMap[targetGroups[i]] = source;
+
+                _engagements.Remove(target);
+                RefreshEngagement(source);
+                return SkillEngagementResult.Expanded;
+            }
+
+            if (source == null && target == null)
+                CreateEngagement(ally, enemy);
+            else
+            {
+                EngagementContext context = source ?? target;
+                Unit_GroupAI joining = source == null ? sourceGroup : targetGroup;
+                bool added = joining.Team == UnitTeam.Ally
+                    ? TryAddAllyGroup(context, joining)
+                    : TryAddEnemyGroup(context, joining);
+                if (!added)
+                    return SkillEngagementResult.Invalid;
+            }
+
+            return SkillEngagementResult.Expanded;
+        }
+
+        private bool AreRegistered(IReadOnlyList<Unit_GroupAI> groups)
+        {
+            for (int i = 0; i < groups.Count; i++)
+            {
+                Unit_GroupAI group = groups[i];
+                if (group == null || group.Members.Count == 0
+                    || !(IsValidAllyGroup(group) || IsValidEnemyGroup(group)))
+                    return false;
+            }
+            return true;
+        }
+
+        private static List<Unit_GroupAI> GetParticipants(
+            EngagementContext context, Unit_GroupAI single)
+        {
+            var result = new List<Unit_GroupAI>();
+            if (context == null)
+                result.Add(single);
+            else
+            {
+                result.AddRange(context.AllyGroups);
+                result.AddRange(context.EnemyGroups);
+            }
+            return result;
         }
 
 
@@ -392,11 +486,12 @@ namespace Units
         private void RefreshEngagement(
             EngagementContext context)
         {
+            // 모든 상대 목록을 먼저 반영하고, 이후 상태 진입/배정을 허용한다.
             IReadOnlyList<Unit_GroupAI> allyGroups =
-                context.AllyGroups;
+                new List<Unit_GroupAI>(context.AllyGroups);
 
             IReadOnlyList<Unit_GroupAI> enemyGroups =
-                context.EnemyGroups;
+                new List<Unit_GroupAI>(context.EnemyGroups);
 
 
             for (int i = 0;
@@ -410,7 +505,8 @@ namespace Units
                     continue;
 
                 allyGroup.SetEnemyGroups(
-                    enemyGroups
+                    enemyGroups,
+                    false
                 );
             }
 
@@ -426,9 +522,17 @@ namespace Units
                     continue;
 
                 enemyGroup.SetEnemyGroups(
-                    allyGroups
+                    allyGroups,
+                    false
                 );
             }
+
+            for (int i = 0; i < allyGroups.Count; i++)
+                if (allyGroups[i] != null)
+                    allyGroups[i].RefreshEngagementState();
+            for (int i = 0; i < enemyGroups.Count; i++)
+                if (enemyGroups[i] != null)
+                    enemyGroups[i].RefreshEngagementState();
         }
 
 

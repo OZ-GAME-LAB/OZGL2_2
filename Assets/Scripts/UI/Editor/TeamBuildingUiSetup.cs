@@ -49,7 +49,13 @@ namespace Game.UI.Editor
                 var database = Ref<BuildingDatabase>(controller, "database");
                 if (database == null) throw new InvalidOperationException("Team building database is missing.");
                 var camera = Team<Camera>();
-                var slots = teamRoots.SelectMany(r => r.GetComponentsInChildren<BuildingSlot>(true)).OrderBy(s => s.name).ToArray();
+                var slots = teamRoots.SelectMany(r => r.GetComponentsInChildren<BuildingSlot>(true))
+                    .Where(slot =>
+                    {
+                        var preplaced = slot.GetComponentInChildren<Building>(true);
+                        return preplaced == null || preplaced.Data == null || !preplaced.Data.IsCore;
+                    })
+                    .OrderBy(slot => slot.name).ToArray();
                 if (slots.Length == 0) throw new InvalidOperationException("No team slots.");
                 // 테스트 진행 로직은 보존한다. 복사본에서 테스트 화면/레이캐스트만 숨긴다.
                 foreach (var canvas in teamRoots.SelectMany(r => r.GetComponentsInChildren<Canvas>(true))) canvas.enabled = false;
@@ -78,7 +84,7 @@ namespace Game.UI.Editor
                 var catalog = UI<BuildingCatalogPanel>();
                 var info = UI<BuildingInfoPanel>();
                 var actions = UI<BuildingActionPanel>();
-                // 원본 BuildingData에는 레벨 계약이 없다. 이전 프리뷰의 고정 레벨 1을 실제 정보처럼 표시하지 않는다.
+                // 실제 업그레이드 레벨 표시는 아직 연결하지 않았다. 고정 레벨 1을 실제 정보처럼 표시하지 않는다.
                 Ref<TMP_Text>(info, "_levelText").gameObject.SetActive(false);
                 var gold = UI<RunGoldHudBinding>();
                 var core = UI<CoreHudBinding>();
@@ -118,7 +124,9 @@ namespace Game.UI.Editor
                     "_gold", gold, "_core", core, "_gemText", gemText, "_hint", hint);
                 var effects = teamRoots.SelectMany(r => r.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
                 if (effects != null) Assign(startup, "_effects", effects);
+                EnsureArtifactBackend(scene, owner);
                 owner.SetActive(true);
+                UiCoreCameraRigSetup.Ensure(scene, flow, camera);
                 if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException("UI integration scene save failed.");
                 Debug.Log($"[UI/TeamBuilding] Created {ScenePath}; slots={slots.Length}, original refund={controller.RefundRate}. Source assets unchanged.");
             }
@@ -128,6 +136,61 @@ namespace Game.UI.Editor
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
                 if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
             }
+        }
+
+        public static void ConnectExistingArtifactBackend()
+        {
+            if (!Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Run UI scene migration only in a separate batch Editor.");
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    throw new InvalidOperationException("A loaded scene has unsaved changes.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+                throw new InvalidOperationException("Missing UI-owned team building scene: " + ScenePath);
+
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var owner = scene.GetRootGameObjects().Single(root => root.name == "Team Building Player UI");
+            if (!EnsureArtifactBackend(scene, owner)) return;
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                throw new IOException("Failed to save UI artifact backend: " + ScenePath);
+            Debug.Log("[UI/TeamBuilding] Connected artifact backend in UI-owned scene.");
+        }
+
+        private static bool EnsureArtifactBackend(Scene scene, GameObject owner)
+        {
+            var roots = scene.GetRootGameObjects();
+            var bootstrap = roots.SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
+            var startup = owner.GetComponent<TeamBuildingUiStartup>();
+            if (startup == null) throw new InvalidOperationException("Missing TeamBuildingUiStartup.");
+            var catalog = AssetDatabase.LoadAssetAtPath<ArtifactCatalog>(MvpVictoryRewardSetup.CatalogPath);
+            var table = AssetDatabase.LoadAssetAtPath<ArtifactRewardTable>(MvpVictoryRewardSetup.ArtifactTablePath);
+            if (catalog == null || table == null || !table.IsValid)
+                throw new InvalidOperationException("Team artifact catalog or reward table is unavailable.");
+
+            bool changed = false;
+            var manager = roots.SelectMany(root => root.GetComponentsInChildren<ArtifactManager>(true)).SingleOrDefault();
+            if (manager == null) { manager = owner.AddComponent<ArtifactManager>(); changed = true; }
+            var effects = roots.SelectMany(root => root.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
+            if (effects == null) { effects = owner.AddComponent<EffectManager>(); changed = true; }
+            changed |= SetReferenceIfEmpty(manager, "_artifactCatalog", catalog);
+            changed |= SetReferenceIfEmpty(manager, "_rewardTable", table);
+            changed |= SetReferenceIfEmpty(bootstrap, "_artifactManager", manager);
+            changed |= SetReferenceIfEmpty(bootstrap, "_effectManager", effects);
+            changed |= SetReferenceIfEmpty(startup, "_effects", effects);
+            return changed;
+        }
+
+        private static bool SetReferenceIfEmpty(UnityEngine.Object target, string name, UnityEngine.Object value)
+        {
+            var fields = new SerializedObject(target);
+            var property = fields.FindProperty(name);
+            if (property == null) throw new InvalidOperationException("Missing serialized field: " + name);
+            if (property.objectReferenceValue == value) return false;
+            if (property.objectReferenceValue != null)
+                throw new InvalidOperationException("Custom reference will not be overwritten: " + target.name + "." + name);
+            property.objectReferenceValue = value;
+            fields.ApplyModifiedPropertiesWithoutUndo();
+            return true;
         }
 
         private static void Layout(GameUIController hud, TMP_Text gems)
