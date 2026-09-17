@@ -611,7 +611,7 @@ namespace Units
 
         public void Resume()
         {
-            _combat.Resume();
+            _combat?.Resume();
 
             _ai?.StartAI();
         }
