@@ -65,7 +65,13 @@ namespace Game.UI
             if (!HasLiveSlot()) { ClearSelection(); return; }
             _selectionId = Guid.NewGuid().ToString("N");
             _displayedBuilding = slot.IsOccupied ? slot.CurrentBuilding : null;
-            if (slot.IsOccupied) Refresh();
+            if (slot.IsOccupied)
+            {
+                PopulateUpgradeCatalog();
+                if (_candidates.Count == 1) _candidate = _candidates[0];
+                if (_candidates.Count > 1) _catalog.Show();
+                else Refresh();
+            }
             else
             {
                 PopulateCatalog();
@@ -119,21 +125,36 @@ namespace Game.UI
                 out int refundGold, out int refundGems);
             string reason = !valid ? "건물 비용 설정을 확인해 주세요." : !_wallet.IsInitialized
                 ? "재화 연결을 기다리고 있습니다." : "재화가 부족합니다.";
-            var offer = _slot.IsOccupied
+            bool occupied = _slot.IsOccupied;
+            bool coreSlot = occupied && _controller.IsCoreSlot(_slot);
+            var offer = occupied
                 ? new BuildingActionOffer(BuildingUiAction.Dismantle, "해체", refundGold, refundGems,
                     valid && _wallet.IsInitialized, reason)
                 : new BuildingActionOffer(BuildingUiAction.Build, data.DisplayName, gold, gems,
                     valid && _wallet.IsInitialized && _controller.CanAffordCandidate(_slot, data), reason, data.BuildingId);
+            BuildingActionOffer upgrade = null;
+            if (occupied && _candidate != null && IsCurrentUpgrade(_candidate))
+            {
+                var costs = _controller.GetUpgradeCost(_slot, _candidate);
+                bool quoteValid = BuildingUiQuote.TryReadUpgrade(costs, out int upgradeGold, out int upgradeGems);
+                bool affordable = quoteValid && _controller.CanAffordUpgrade(_slot, _candidate);
+                upgrade = new BuildingActionOffer(BuildingUiAction.Upgrade, _candidate.DisplayName,
+                    upgradeGold, upgradeGems, affordable,
+                    !quoteValid ? "업그레이드 비용 설정을 확인해 주세요." : "재화가 부족합니다.",
+                    _candidate.BuildingId);
+            }
             _info.ShowBuildingInfo(new BuildingInfoData(_selectionId, data.DisplayName,
                 BuildingUiQuote.Category(data.BuildingType), 1, data.Description,
                 BuildingUiQuote.Production(data), icon: data.Icon));
             _actions.ShowActions(new BuildingActionViewData(_selectionId, data.DisplayName,
-                build: _slot.IsOccupied ? null : offer, dismantle: _slot.IsOccupied ? offer : null));
+                build: occupied ? null : offer, upgrade: upgrade,
+                dismantle: occupied && !coreSlot ? offer : null));
         }
 
         private void HandleCandidateSelected(string id)
         {
-            if (!CanOperate() || !HasLiveSlot() || _slot.IsOccupied || !_byId.TryGetValue(id, out var data)) return;
+            if (!CanOperate() || !HasLiveSlot() || !_byId.TryGetValue(id, out var data)) return;
+            if (_slot.IsOccupied && !IsCurrentUpgrade(data)) return;
             _candidate = data;
             Refresh();
         }
@@ -154,9 +175,14 @@ namespace Game.UI
                 if (request.Action == BuildingUiAction.Build && !_slot.IsOccupied &&
                     request.OptionId == data.BuildingId && IsCurrentCandidate(data))
                     succeeded = _controller.TryBuild(_slot, data);
-                else if (request.Action == BuildingUiAction.Dismantle && _slot.IsOccupied)
+                else if (request.Action == BuildingUiAction.Upgrade && _slot.IsOccupied &&
+                    _candidate != null && request.OptionId == _candidate.BuildingId &&
+                    IsCurrentUpgrade(_candidate) &&
+                    BuildingUiQuote.TryReadUpgrade(_controller.GetUpgradeCost(_slot, _candidate), out _, out _))
+                    succeeded = _controller.TryUpgrade(_slot, _candidate);
+                else if (request.Action == BuildingUiAction.Dismantle && _slot.IsOccupied &&
+                    !_controller.IsCoreSlot(_slot))
                     succeeded = _controller.TryDemolish(_slot);
-                // TryReplace를 업그레이드로 호출하지 않는다. 업그레이드/해금 API는 아직 제공되지 않았다.
                 message = succeeded ? "완료되었습니다." : "실행하지 못했습니다. 현재 재화와 건물을 확인해 주세요.";
             }
             catch (Exception exception)
@@ -172,7 +198,13 @@ namespace Game.UI
                 if (succeeded && HasLiveSlot())
                 {
                     _displayedBuilding = _slot.CurrentBuilding;
-                    if (_slot.IsOccupied) { _candidate = null; Refresh(); }
+                    if (_slot.IsOccupied)
+                    {
+                        _candidate = null;
+                        PopulateUpgradeCatalog();
+                        if (_candidates.Count == 1) _candidate = _candidates[0];
+                        Refresh();
+                    }
                     else ClearSelection();
                 }
                 else if (!succeeded) ClearSelection();
@@ -199,6 +231,31 @@ namespace Game.UI
         {
             _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
             return _candidates.Contains(data);
+        }
+
+        private bool IsCurrentUpgrade(BuildingData data)
+        {
+            if (!_slot.IsOccupied || _slot.CurrentBuilding.Data == null) return false;
+            _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            return _candidates.Contains(data);
+        }
+
+        private void PopulateUpgradeCatalog()
+        {
+            _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            _items.Clear(); _byId.Clear();
+            foreach (var next in _candidates)
+            {
+                if (next == null || string.IsNullOrWhiteSpace(next.BuildingId) ||
+                    string.IsNullOrWhiteSpace(next.DisplayName) || _byId.ContainsKey(next.BuildingId)) continue;
+                _byId.Add(next.BuildingId, next);
+                bool valid = BuildingUiQuote.TryReadUpgrade(_controller.GetUpgradeCost(_slot, next),
+                    out int gold, out int gems);
+                _items.Add(new BuildingCatalogItem(next.BuildingId, next.DisplayName,
+                    BuildingUiQuote.Category(next.BuildingType), valid ? gold : (int?)null,
+                    valid ? gems : (int?)null));
+            }
+            _catalog.SetItems(_items);
         }
 
         private void PopulateCatalog()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Game.Core;
+using OZGL.KDH;
 using UnityEngine;
 
 public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunCurrencyRewards
@@ -18,6 +19,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     [SerializeField] private CurrencyCatalog _currencyCatalog;
     [SerializeField] private WaveRewardTable _waveRewardTable;
     private EffectManager _effectManager;
+    private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private List<CurrencyAmount> _baseStartingCurrencies =
         new List<CurrencyAmount>();
 
@@ -219,7 +221,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         }
 
         //건물 스크립트에서 실제 베이스캠프 레벨 프로퍼티를 읽어와야 함. 현재는 임시로 1 고정
-        int baseCampLevel = 1;
+        int baseCampLevel = _buildingCoreProgress.CurrentLevel;
 
         // 4분기 이후에는 3분기의 같은 웨이브 보상을 사용하도록 설정(임시)
         int rewardQuarterNumber = Mathf.Min(quarterNumber, WaveController.MAIN_QUARTERS);
@@ -393,7 +395,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
 
     // 게임 시작 시에 Run 재화 초기화
     // effectManager가 null이면 효과 보정 없이 기본 보상을 사용합니다.
-    public void Initialize(WaveController waveController, GameFlowController gameFlowController, EffectManager effectManager)
+    public void Initialize(WaveController waveController, GameFlowController gameFlowController, EffectManager effectManager, BuildingCoreProgress buildingCoreProgress)
     {
         if (IsInitialized)
         {
@@ -455,6 +457,7 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         ClearWaveReward();
         _waveController = waveController;
         _effectManager = effectManager;
+        _buildingCoreProgress = buildingCoreProgress;
         _wallet = newWallet;
         CurrentGoldReward = 0;
         CurrentGemReward = 0;

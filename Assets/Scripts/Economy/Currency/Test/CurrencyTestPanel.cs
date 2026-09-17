@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using Game.Core;
+using OZGL.KDH;
 using UnityEngine;
 
 // EconomyTestScene 전용 도구. 재화 변경은 매니저의 공개 API로만 수행합니다.
@@ -9,6 +10,9 @@ public class CurrencyTestPanel : MonoBehaviour
 {
     [SerializeField] private RunCurrencyManager _run;
     [SerializeField] private WaveController _waveController;
+    // 켜면 외부에서 초기화한 WaveController 사용. 인스펙터에 같은 컴포넌트 연결
+    [SerializeField] private bool _useInitializedWaveController = true;
+    [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private ArtifactTestPanel _artifactTestPanel;
     [SerializeField] private PersistentCurrencyManager _persistent;
@@ -65,9 +69,9 @@ public class CurrencyTestPanel : MonoBehaviour
     {
         if (!Application.isPlaying || !isActiveAndEnabled || _run == null || _persistent == null ||
             _gold == null || _gem == null || _bloodstone == null ||
-            _waveController == null)
+            _waveController == null || _buildingCoreProgress == null)
         {
-            _result = "테스트 씬을 단독으로 Play하고 매니저 및 재화 연결을 확인하세요.";
+            _result = "Play 모드에서 매니저·재화·BuildingCoreProgress 연결을 확인하세요.";
             return false;
         }
 
@@ -100,10 +104,10 @@ public class CurrencyTestPanel : MonoBehaviour
         bool newRun = !_run.IsInitialized;
         if (newRun && _shopTestPanel != null) { _shopTestPanel.ResetPanel(); }
         _persistent.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
-        _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
+        _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager, buildingCoreProgress: _buildingCoreProgress);
         if (_run.IsInitialized)
         {
-            if (newRun)
+            if (newRun && !_useInitializedWaveController)
             {
                 if (_testFlow != null)
                 {
@@ -117,12 +121,12 @@ public class CurrencyTestPanel : MonoBehaviour
             }
             if (!EnsureWaveStarted())
             {
-                Report("웨이브 시작 — Wave Catalog 설정 확인", false);
+                Report("웨이브 시작 — 외부 초기화 또는 Wave Catalog 설정 확인", false);
                 return;
             }
             if (_artifactTestPanel != null)
             {
-                _artifactTestPanel.Initialize();
+                _artifactTestPanel.Initialize(_waveController, _effectManager);
             }
         }
         Report("Run 시작", _run.IsInitialized);
@@ -323,7 +327,7 @@ public class CurrencyTestPanel : MonoBehaviour
                 _run.GetBalance(CurrencyType.Gem) == 0, "초기화 전 Balances null 및 Type 조회 0");
             Check(!_run.CanSpend(_gold.Type, 0), "Run 시작 전 소비 불가");
             _persistent.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
-            _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
+            _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager, buildingCoreProgress: _buildingCoreProgress);
             Check(_run.IsInitialized, "Run 초기화");
             if (!_run.IsInitialized)
                 throw new InvalidOperationException("Run 초기화 실패: 카탈로그 및 기본 시작 재화 설정을 확인하세요.");
@@ -332,7 +336,7 @@ public class CurrencyTestPanel : MonoBehaviour
             int startingGem = _run.GetBalance(_gem.Type);
             Check(_eventCount == events, "초기화 중 변경 이벤트 없음");
             var initializedBalances = _run.Balances;
-            _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
+            _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager, buildingCoreProgress: _buildingCoreProgress);
             Check(_run.IsInitialized && ReferenceEquals(initializedBalances, _run.Balances) &&
                 _run.GetBalance(_gold.Type) == startingGold &&
                 _run.GetBalance(_gem.Type) == startingGem && _eventCount == events, "중복 초기화 시 잔액 및 이벤트 유지");
@@ -379,7 +383,7 @@ public class CurrencyTestPanel : MonoBehaviour
                 _persistent.Balances.TryGetValue(_bloodstone, out int remainingBloodstone) && remainingBloodstone == 20,
                 "종료 후 Run 목록 null, Persistent 목록 유지");
             Check(!_run.CanSpend(_gold.Type, 1), "종료 후 소비 불가");
-            _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
+            _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager, buildingCoreProgress: _buildingCoreProgress);
             Check(_run.IsInitialized && _run.GetBalance(_gold.Type) == startingGold &&
                 _run.GetBalance(_gem.Type) == startingGem && _eventCount == events,
                 "다음 Run은 최초 시작 잔액으로 초기화하고 이벤트 없음");
@@ -405,6 +409,13 @@ public class CurrencyTestPanel : MonoBehaviour
 
     private bool EnsureWaveStarted()
     {
+        // 외부 초기화 모드에서는 진행 상태만 확인하고 재초기화하지 않음
+        if (_useInitializedWaveController)
+        {
+            return _waveController != null &&
+                _waveController.CurQuarter > 0 && _waveController.CurWave > 0;
+        }
+
         if (_waveController.CurQuarter < 1 || _waveController.CurWave < 1)
         {
             // 실제 플로우가 연결된 경우 먼저 기존 BeginRun 사용
