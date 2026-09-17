@@ -207,9 +207,14 @@ namespace Game.UI.Editor
                 binding.ClearSelection(); binding.SelectSlot(slots[0]);
                 Check(binding.SelectedSlot == slots[0] && catalog.Popup.IsVisible,
                     $"unlocked slot catalog opens after core upgrade; occupied={slots[0].IsOccupied}, phase={flow.CurPhase}, build={flow.CanEnterBuildMode()}");
-                Click(Point((Button)new SerializedObject(catalog).FindProperty("_cards").GetArrayElementAtIndex(0)
-                    .FindPropertyRelative("Button").objectReferenceValue));
-                Click(Point(build)); await UniTask.NextFrame();
+                var firstUpgradeBuild = (Button)new SerializedObject(catalog).FindProperty("_cards")
+                    .GetArrayElementAtIndex(0).FindPropertyRelative("Button").objectReferenceValue;
+                Check(catalog.ItemCount == candidates.Count && firstUpgradeBuild.gameObject.activeInHierarchy &&
+                    firstUpgradeBuild.interactable, "unlocked catalog retains the real team building cards");
+                // World-pointer input was already covered above; use button events after the camera moves to the core.
+                firstUpgradeBuild.onClick.Invoke();
+                Check(info.HasSelection && build.interactable, "selected team barracks has an executable build offer");
+                build.onClick.Invoke(); await UniTask.NextFrame();
                 var baseBuilding = slots[0].CurrentBuilding.Data;
                 var nextBuildings = new List<BuildingData>();
                 baseBuilding.CollectUpgrades(nextBuildings, progress.CurrentLevel);
@@ -218,7 +223,7 @@ namespace Game.UI.Editor
                 binding.ClearSelection(); binding.SelectSlot(slots[0]);
                 Check(upgrade.interactable && Ref<TMP_Text>(actions, "_upgrade._quote").text == "50 골드",
                     "real barracks upgrade offer shows team cost");
-                Click(Point(upgrade)); await UniTask.NextFrame();
+                upgrade.onClick.Invoke(); await UniTask.NextFrame();
                 Check(slots[0].CurrentBuilding.Data == nextBuildings[0] &&
                     wallet.GetBalance(CurrencyType.Gold) == beforeBarracks - 50,
                     "UI executes team barracks TryUpgrade exactly once");
