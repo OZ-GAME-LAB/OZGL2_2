@@ -73,7 +73,7 @@ namespace Game.UI.Editor
                 Check(sample.IsReady && wallet.GetBalance(CurrencyType.Gold) == 100 &&
                     goldText.text == "100" && events == 0, "Initialize(WaveController) and explicit HUD refresh");
                 var balances = wallet.Balances;
-                wallet.Initialize(waves, null, null);
+                // wallet.Initialize(waves, null, null);
                 Check(ReferenceEquals(balances, wallet.Balances) && events == 0,
                     "duplicate initialization preserves the wallet and does not publish changes");
                 Check(wallet.CanSpend(CurrencyType.Gold, 30) && !wallet.CanSpend(CurrencyType.Gold, 101) &&

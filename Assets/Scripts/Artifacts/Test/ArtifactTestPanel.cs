@@ -18,8 +18,10 @@ public class ArtifactTestPanel : MonoBehaviour
     private string _result = "재화 패널에서 웨이브 보상을 지급하세요.";
     private Vector2 _scroll;
 
-    public void Initialize()
+    public void Initialize(WaveController waveController, EffectManager effectManager)
     {
+        _wave = waveController;
+        _effects = effectManager;
         if (_artifacts != null && !_artifacts.IsInitialized)
         {
             _artifacts.Initialize(_wave, _effects);

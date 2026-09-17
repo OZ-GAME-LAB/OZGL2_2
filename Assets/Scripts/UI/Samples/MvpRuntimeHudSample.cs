@@ -241,7 +241,7 @@ namespace Game.UI.Samples
             }
             // 이 샘플은 지급 실패/재시도를 검사하는 유일한 지급 주체다.
             // flow=null로 자동 지급을 구독하지 않는다. 실제 팀 씬은 flow를 전달하고 UI에서 지급하지 않는다.
-            _currencyManager.Initialize(_waves, null, _effectManager);
+            // _currencyManager.Initialize(_waves, null, _effectManager);
             IsReady = _currencyManager.IsInitialized && artifactsReady;
         }
 
