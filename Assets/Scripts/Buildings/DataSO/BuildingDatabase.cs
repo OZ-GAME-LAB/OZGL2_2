@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace OZGL.KDH
 {
-    [CreateAssetMenu(fileName = "BuildingDatabase", menuName = "OZGL/Buildings/Building Database")]
+    [CreateAssetMenu(fileName = "BuildingDatabase", menuName = "Buildings/Building Database")]
     public class BuildingDatabase : ScriptableObject
     {
         [SerializeField] private BuildingData[] buildings;
@@ -39,7 +39,7 @@ namespace OZGL.KDH
         }
 
         // 호출 쪽이 List를 재사용하면 클릭할 때마다 new List가 나지 않습니다.
-        public void CollectBuildable(List<BuildingData> results)
+        public void CollectBuildable(List<BuildingData> results, int currentCoreLevel)
         {
             if (results == null)
             {
@@ -70,6 +70,11 @@ namespace OZGL.KDH
 
                 // 타워 건물은 아직 만들 예정이 없습니다.
                 if (data.BuildingType == BuildingType.Tower)
+                    continue;
+
+                // Current date KDH 2026-09-17
+                // T2는 빈 칸이 아니라 업그레이드로만, requiredCoreLevel은 코어 해금용입니다.
+                if (!data.CanBuildFromEmptySlot(currentCoreLevel))
                     continue;
 
                 results.Add(data);

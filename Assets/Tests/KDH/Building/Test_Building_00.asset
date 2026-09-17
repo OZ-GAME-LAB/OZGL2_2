@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
   m_Name: Test_Building_00
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: 1
-  displayName: melee
-  description: test melee building
+  buildingId: melee1
+  displayName: melee1
+  description: test melee1
   buildingType: 2
   icon: {fileID: 21300000, guid: 57350800593c039418b0d2be05b22ade, type: 3}
   worldSprite: {fileID: 21300000, guid: 57350800593c039418b0d2be05b22ade, type: 3}
@@ -22,6 +22,9 @@ MonoBehaviour:
   buildCost:
   - type: 0
     amount: 10
+  buildFromEmptySlot: 1
+  requiredCoreLevel: 0
+  coreLevel: 0
   production:
     enabled: 0
     resourceType: 0
@@ -30,6 +33,11 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 1
-    unitPrefab: {fileID: 1283601080074174613, guid: 455c93280dab1b741945d04a50ce7743, type: 3}
     countPerWave: 3
     maxAlive: 3
+  upgrades:
+  - nextBuilding: {fileID: 11400000, guid: 6b7867fc887d36344869bc0d768e061a, type: 2}
+    cost:
+    - type: 0
+      amount: 50
+    requiredCoreLevel: 2
