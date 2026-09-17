@@ -419,7 +419,7 @@ public class CurrencyTestPanel : MonoBehaviour
                 waiting.Initialize(_testFlow, _waveController);
                 _testFlow.Initialize(_waveController, waiting,
                     _artifactTestPanel != null ? _artifactTestPanel.Artifacts : null);
-                _waveController.Initialize(_testFlow, new TestSpawner());
+                //_waveController.Initialize(_testFlow, new TestSpawner());
                 _testFlow.BeginRun();
             }
         }

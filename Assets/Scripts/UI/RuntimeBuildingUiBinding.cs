@@ -196,13 +196,13 @@ namespace Game.UI
 
         private bool IsCurrentCandidate(BuildingData data)
         {
-            _slot.CollectCandidates(_candidates, _database);
+            _slot.CollectCandidates(_candidates, _database, 1);
             return _candidates.Contains(data);
         }
 
         private void PopulateCatalog()
         {
-            _slot.CollectCandidates(_candidates, _database);
+            _slot.CollectCandidates(_candidates, _database, 1);
             _items.Clear(); _byId.Clear();
             var duplicates = new HashSet<string>();
             foreach (var data in _candidates)

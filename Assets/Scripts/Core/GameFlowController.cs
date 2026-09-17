@@ -66,6 +66,8 @@ namespace Game.Core
         private ArtifactManager _artifactManager;
         private GamePhase _curPhase;
         private bool _isTransitioning;
+        private bool _isResetting;
+        private UniTaskCompletionSource _spawnCompletion;
         private CancellationTokenSource _cts;
         private RunDecision? _runDecision;
 
@@ -102,6 +104,7 @@ namespace Game.Core
             HasClearedMainGame = false;
             ResetDecisionState();
             _nodeController.Reset();
+            _waveController.CleanupBattle();
             _waveController.ResetTestBattle();
             if (!StartQuarter(1))
             {
@@ -114,11 +117,31 @@ namespace Game.Core
 
         public void ResetRun()
         {
+            if (_isResetting) return;
+            _isResetting = true;
+            ResetRunAsync().Forget();
+        }
+
+        private async UniTask ResetRunAsync()
+        {
+            var pendingSpawn = _spawnCompletion?.Task ?? UniTask.CompletedTask;
+            _isTransitioning = true;
             ClearToken();
+            var token = _cts.Token;
             ResetDecisionState();
-            _isTransitioning = false;
             ChangePhase(GamePhase.None);
-            BeginRun();
+            try
+            {
+                // 스포너의 배치 공간 정리까지 끝난 후 런타임을 비운다.
+                await pendingSpawn;
+                token.ThrowIfCancellationRequested();
+                _isTransitioning = false;
+                BeginRun();
+            }
+            finally
+            {
+                _isResetting = false;
+            }
         }
 
         /// <summary>
@@ -140,23 +163,42 @@ namespace Game.Core
         }
 
         // 전투 시작 및 결과 처리
-        public async UniTask<bool> TryStartWave()
+        public async UniTask<bool> TrySpawnUnits()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
             if (_waveController.CurrentPreset == null) return false;
             _isTransitioning = true;
             var token = _cts.Token;
-            ChangePhase(GamePhase.BattlePreparing);
-            _cameraController.ShowBase();
-            // 실제 아군 준비 연동 시 적 준비와 함께 완료를 기다린다.
-            
-            _cameraController.ShowBattleField();
-            bool canceled = await _waveController.PrepareEnemy(SpawnTime, token).SuppressCancellationThrow();
-            
-            if (canceled || token.IsCancellationRequested) return false;
+            var completion = new UniTaskCompletionSource();
+            _spawnCompletion = completion;
+            try
+            {
+                ChangePhase(GamePhase.BattlePreparing);
+                if (token.IsCancellationRequested) return false;
+                _cameraController.ShowBase();
+                // 실제 아군 준비 연동 시 적 준비와 함께 완료를 기다린다.
+
+                _cameraController.ShowBattleField();
+                // 리셋은 진행만 취소하고 적 생성은 완료까지 기다린다. 파괴 시에는 생성도 취소한다.
+                bool canceled = await _waveController.PrepareEnemy(
+                    SpawnTime, token, this.GetCancellationTokenOnDestroy()).SuppressCancellationThrow();
+
+                if (canceled || token.IsCancellationRequested) return false;
+                return true;
+            }
+            finally
+            {
+                completion.TrySetResult();
+                if (ReferenceEquals(_spawnCompletion, completion))
+                    _spawnCompletion = null;
+            }
+        }
+
+        public void TryStartWave()
+        {
             ChangePhase(GamePhase.Battle);
+            _waveController.BattleStart();
             _isTransitioning = false;
-            return true;
         }
 
         /// <summary>
@@ -410,13 +452,11 @@ namespace Game.Core
             return _testScript.WaitForSeconds(StagingTime, token);
         }
 
-        /// <summary>현재는 더미 생존 수만 정리한다. 실제 스포너의 정리 완료 대기로 교체한다.
-        /// 담당 요청 파트 : 유닛
-        /// </summary>
+        /// <summary>현재 전투의 유닛·그룹과 준비 상태를 정리한다.</summary>
         private UniTask CleanupBattleAsync(CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            _waveController.CleanupTestBattle();
+            _waveController.CleanupBattle();
             return UniTask.CompletedTask;
         }
     #endregion

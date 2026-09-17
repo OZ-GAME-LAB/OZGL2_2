@@ -7,14 +7,7 @@ using UnityEngine;
 
 namespace Game.Core
 {
-    public interface ISpawner
-    {
-        
-        public event Action MonsterKilled;
-        public UniTask SpawnAllEnemy(float time, int cost, SpawnContext context, CancellationToken cts); //실제 사용목적 메서드입니다
-        public bool GetRemain(out int enemy,out int  allies);
-        public bool GetRemainBoss(out int enemy, out int allies);
-    }
+
 
     public struct SpawnContext
     {
@@ -37,6 +30,9 @@ namespace Game.Core
         public const int MAX_WAVE = NodeController.WavesPerQuarter;
         public const int MAIN_QUARTERS = NodeController.MainQuarters;
         [SerializeField] private WaveSODictionary _waveCatalog;
+        [Header("아군 생성 없는 테스트")]
+        [Tooltip("아군 생성 요청이 없는 테스트에서만 사용합니다. 실제 아군 연동 시 해제하세요.")]
+        [SerializeField] private bool _completeEmptyAllySpawnForTest = true;
         internal WaveSODictionary WaveCatalog => _waveCatalog;
         public WaveSO CurrentPreset => _controller?.CurrentNode?.Preset;
         public EnemyUnitFaction CurrentFaction => _controller?.CurrentNode?.Faction ?? default;
@@ -44,9 +40,11 @@ namespace Game.Core
         public int CurQuarter => _controller?.CurrentQuarter ?? 0;
         public bool IsLastWave => _controller != null && _controller.IsLastNode;
         public event Action<WaveChangedInfo> WaveChanged;
-        private ISpawner _spawner;
-        private GameFlowController _controller;
+        private ISpawnManager _spawner;
         private IRuntimeUnitManager _runtimeUnitManager;
+        private GameFlowController _controller;
+        private bool _isWaitingForPreparation;
+        private CancellationToken _preparationToken;
 
         public bool CanJumpToLastWave => _controller != null && _controller.CanJumpToLastWave;
         public bool CanJumpToLastQuarter => _controller != null && _controller.CanJumpToLastQuarter;
@@ -55,47 +53,74 @@ namespace Game.Core
         /// <summary>
         /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
         /// </summary>
-        public void Initialize(GameFlowController controller, ISpawner spawner)
+        public void Initialize(GameFlowController controller, ISpawnManager spawner, IRuntimeUnitManager runtimeUnitManager)
         {
-            if (_spawner != null)
-                _spawner.MonsterKilled -= HandleMonsterDead;
+            _isWaitingForPreparation = false;
+            if (_runtimeUnitManager != null)
+            {
+                _runtimeUnitManager.UnitDied -= HandleMonsterDead;
+                _runtimeUnitManager.PreparationCompleted -= HandleMonsterSpawnCompleted;
+            }
             _controller = controller;
             _spawner = spawner;
-            _spawner.MonsterKilled += HandleMonsterDead;
+            _runtimeUnitManager = runtimeUnitManager;
+            _runtimeUnitManager.UnitDied += HandleMonsterDead;
+            _runtimeUnitManager.PreparationCompleted += HandleMonsterSpawnCompleted;
         }
 
         private void OnDestroy()
         {
-            if (_spawner != null)
-                _spawner.MonsterKilled -= HandleMonsterDead;
+            _isWaitingForPreparation = false;
+            if (_runtimeUnitManager != null)
+            {
+                _runtimeUnitManager.UnitDied -= HandleMonsterDead;
+                _runtimeUnitManager.PreparationCompleted -= HandleMonsterSpawnCompleted;
+            }
         }
 
         // 전투 준비 및 승패 판정
-        public UniTask PrepareEnemy(float time, CancellationToken token)
+        public UniTask PrepareEnemy(float time, CancellationToken runToken, CancellationToken spawnToken)
         {
+            runToken.ThrowIfCancellationRequested();
+            _preparationToken = runToken;
+            _isWaitingForPreparation = true;
+            CompleteEmptyAllySpawnForTest();
+            runToken.ThrowIfCancellationRequested();
             SpawnContext context = new(
                 weights:CurrentPreset.Weights, 
                 monsterIDs:CurrentPreset.MonsterIDs);
             
-            return _spawner.SpawnAllEnemy(time,0, context,token);
+            return _spawner.SpawnEnemyWaveAsync(10, context, spawnToken);
         }
 
         /// <summary>
         /// 유닛 파트에서 발행하는 몬스터 사망 이벤트와 연결해 클리어 조건을 확인
         /// </summary>
-        private void HandleMonsterDead()
+        private void HandleMonsterDead(Unit_Gateway unit)
         {
             if (_controller == null || _controller.CurPhase != GamePhase.Battle) return;
             //스폰 매니저에게 남은 적 / 아군 수 요청
             EvaluateBattleResult();
         }
 
+        private void HandleMonsterSpawnCompleted()
+        {
+            if (!_isWaitingForPreparation || _preparationToken.IsCancellationRequested ||
+                _controller == null || _controller.CurPhase != GamePhase.BattlePreparing) return;
+            _isWaitingForPreparation = false;
+            _controller.TryStartWave();
+        }
+
+        public void BattleStart()
+        {
+            _runtimeUnitManager.StartBattlePhase();
+        }
         /// <summary>
         /// 전투 결과를 확인하고 승/패를 판정한다.
         /// </summary>
         private void EvaluateBattleResult()
         {
-            if (!_spawner.GetRemain(out int enemy, out int allies)) return;
+            if (!_runtimeUnitManager.GetRemain(out int enemy, out int allies)) return;
 
             if (enemy == 0)
             {
@@ -140,10 +165,11 @@ namespace Game.Core
                 testSpawner.ResetUnits();
         }
 
-        public void CleanupTestBattle()
+        public void CleanupBattle()
         {
-            if (_spawner is TestSpawner testSpawner)
-                testSpawner.ClearUnits();
+            // 그룹 제거 도중 발생하는 준비 완료 알림으로 전투에 재진입하지 않는다.
+            _isWaitingForPreparation = false;
+            _runtimeUnitManager.ClearRuntime();
         }
 
         /// <summary>
@@ -173,25 +199,30 @@ namespace Game.Core
                 spawner.invokeMonsterKilled();
             }
         }
+
+        /// <summary>아군을 생성하지 않는 테스트에서만 생성 완료 조건을 충족한다.</summary>
+        private void CompleteEmptyAllySpawnForTest()
+        {
+            if (_completeEmptyAllySpawnForTest && _runtimeUnitManager is RuntimeUnitManager runtime)
+                runtime.NotifyAllySpawnCompleted();
+        }
     }
     /// <summary>
     /// 스테이지 내 몬스터 구현을 위해 임시로 만든 테스트클래스
     /// </summary>
-    public class TestSpawner : ISpawner
+    public class TestSpawner : ISpawnManager, IRuntimeUnitManager
     {
         public event Action MonsterKilled;
 
         private int _enemyCount = 5;
         private int _alliesCount = 5;
 
-        public async UniTask SpawnAllEnemy(float time, int cost, SpawnContext context, CancellationToken cts)
-        {
-            cts.ThrowIfCancellationRequested();
-            ResetUnits();
-            Debug.Log("[Test] 유닛 생성중....");
-            await UniTask.WaitForSeconds(time, cancellationToken: cts);
-            Debug.Log("[Test] 유닛 생성완료!");
-        }
+
+        public event Action PreparationCompleted;
+        public event Action<Unit_Gateway> UnitDied;
+        public event Action<UnitTeam> TeamWiped;
+        public int AllyUnitCount { get; }
+        public int EnemyUnitCount { get; }
 
         public bool GetRemain(out int enemy, out int allies)
         {
@@ -200,6 +231,16 @@ namespace Game.Core
             if(_enemyCount == 0 || _alliesCount == 0)
                 return true;
             return false;
+        }
+
+        public void StartBattlePhase()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ClearRuntime()
+        {
+            ClearUnits();
         }
 
         public bool GetRemainBoss(out int enemy, out int allies)
@@ -234,5 +275,30 @@ namespace Game.Core
         }
 
         public void invokeMonsterKilled() => MonsterKilled?.Invoke();
+        public event Action AllySpawnCompleted;
+        public event Action EnemySpawnCompleted;
+        public void SpawnAllyGroup(AllyUnitType unitType, Vector2 spawnPosition, int count, Vector2 rallyPoint)
+        {
+            Debug.Log("[Test] SpawnAllyGroup 미구현....");
+        }
+
+        public async UniTask SpawnEnemyWaveAsync(int cost, SpawnContext context, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ResetUnits();
+            Debug.Log("[Test] 유닛 생성중....");
+            await UniTask.WaitForSeconds(0.5f, cancellationToken: cancellationToken);
+            Debug.Log("[Test] 유닛 생성완료!");
+        }
+
+        public bool TryGetAllyPrefab(AllyUnitType unitType, out GameObject prefab)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetEnemyPrefab(EnemyUnitType unitType, out GameObject prefab)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

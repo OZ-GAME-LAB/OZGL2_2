@@ -82,7 +82,7 @@ namespace Game.UI.Editor
                 var hud = UnityEngine.Object.FindFirstObjectByType<GameUIController>();
                 var slots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None).OrderBy(s => s.name).ToArray();
                 var data = AssetDatabase.LoadAssetAtPath<BuildingDatabase>("Assets/Tests/KDH/Test_BuildingDatabase.asset");
-                var candidates = new List<BuildingData>(); slots[0].CollectCandidates(candidates, data);
+                var candidates = new List<BuildingData>(); slots[0].CollectCandidates(candidates, data, 1);
                 var build = Ref<Button>(actions, "_build._button");
                 var dismantle = Ref<Button>(actions, "_dismantle._button");
                 var goldText = Ref<TMP_Text>(hud, "_goldText");
@@ -169,7 +169,7 @@ namespace Game.UI.Editor
                 Click(Point(launch));
                 Check(binding.SelectedSlot != null && catalog.Popup.IsVisible, "build shortcut selects a real empty team slot");
                 binding.ClearSelection();
-                Check(await flow.TryStartWave(), "original core phase transition available (TestSpawner, not full combat)");
+                Check(await flow.TrySpawnUnits(), "original core phase transition available (TestSpawner, not full combat)");
                 Click(Point(slots[0]));
                 Check(binding.SelectedSlot == null && !catalog.Popup.IsVisible, "battle phase blocks original slot construction UI");
                 await ValidateAutomaticRewards(startup, flow, wallet, hud);
@@ -218,7 +218,7 @@ namespace Game.UI.Editor
                     if (round == 1)
                     {
                         waves.JumpToLastWaveForTest();
-                        Check(await flow.TryStartWave(), "boss reward test starts through Core");
+                        Check(await flow.TrySpawnUnits(), "boss reward test starts through Core");
                     }
                     int gold = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
                     int gems = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gem);
@@ -250,7 +250,7 @@ namespace Game.UI.Editor
                 }
 
                 int beforeLoss = events;
-                Check(await flow.TryStartWave(), "defeat scenario starts through Core");
+                Check(await flow.TrySpawnUnits(), "defeat scenario starts through Core");
                 await flow.ResolveBattleAsync(ResultType.Defeat);
                 Check(flow.CurPhase == GamePhase.Finished && events == beforeLoss &&
                     wallet.GetBalance(CurrencyType.Gold) == expectedGold &&
@@ -264,7 +264,7 @@ namespace Game.UI.Editor
                 startup.Refresh();
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && wallet.GetBalance(CurrencyType.Gem) == 0 &&
                     goldText.text == "100" && gemText.text == "보석 0", "explicit new run refreshes both HUD currencies");
-                Check(await flow.TryStartWave(), "new run starts normally");
+                Check(await flow.TrySpawnUnits(), "new run starts normally");
                 expectedGold = 100 + wallet.CurrentGoldReward;
                 expectedGems = wallet.CurrentGemReward;
                 int newRunEvents = events;

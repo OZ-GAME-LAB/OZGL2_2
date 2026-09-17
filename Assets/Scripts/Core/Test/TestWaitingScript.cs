@@ -121,7 +121,7 @@ public class TestWaitingScript : MonoBehaviour
     public void WaveStartBtn()
     {
         Debug.Log($"[TestWaitingScript] 웨이브 시작 테스트");
-        _gameFlowController.TryStartWave().Forget();
+        _gameFlowController.TrySpawnUnits().Forget();
     }
 
     public void ResultBtn()
