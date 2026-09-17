@@ -15,6 +15,27 @@ namespace Game.UI
             return false;
         }
 
+        public static bool TryReadUpgrade(BuildingResourceCost[] costs, out int gold, out int gems)
+        {
+            gold = gems = 0;
+            bool hasGold = false, hasGem = false;
+            foreach (var cost in costs ?? System.Array.Empty<BuildingResourceCost>())
+            {
+                if (cost.amount < 0) return false;
+                switch (cost.type)
+                {
+                    case BuildingResourceType.Gold:
+                        if (hasGold) return false;
+                        hasGold = true; gold = cost.amount; break;
+                    case BuildingResourceType.Gem:
+                        if (hasGem) return false;
+                        hasGem = true; gems = cost.amount; break;
+                    default: return false;
+                }
+            }
+            return true;
+        }
+
         public static string Category(BuildingType type)
         {
             switch (type)

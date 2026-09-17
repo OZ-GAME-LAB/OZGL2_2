@@ -12408,6 +12408,7 @@ MonoBehaviour:
   _waves: {fileID: 1347968429}
   _flow: {fileID: 1692919390}
   _effects: {fileID: 1105228277}
+  _coreProgress: {fileID: 1306347857}
   _gold: {fileID: 804319940}
   _core: {fileID: 804319941}
   _gemText: {fileID: 1889478361}
@@ -12440,6 +12441,7 @@ MonoBehaviour:
   - {fileID: 1515563149}
   - {fileID: 605125359}
   - {fileID: 442771072}
+  - {fileID: 1993634000}
 --- !u!4 &1105228276
 Transform:
   m_ObjectHideFlags: 0
@@ -14361,6 +14363,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1306347856}
   - component: {fileID: 1306347855}
+  - component: {fileID: 1306347857}
   m_Layer: 0
   m_Name: BuildingBuildController
   m_TagString: Untagged
@@ -14403,6 +14406,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1306347857
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1306347854}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97bce2d299c460447b234d598034d897, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingCoreProgress
 --- !u!1 &1318166504
 GameObject:
   m_ObjectHideFlags: 0
@@ -19973,6 +19988,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21ef7488364941d4a99b291580654e50, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.RuntimeUnitManager
+  _engagementExpansionPolicy:
+    _maxJoinDistance: 6
+    _maxCombinedExtent: 15
+    _maxCombinedGroups: 10
 --- !u!4 &1790501617
 Transform:
   m_ObjectHideFlags: 0
@@ -22107,6 +22126,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyTestPanel
   _run: {fileID: 1835863131}
   _waveController: {fileID: 1347968429}
+  _useInitializedWaveController: 1
+  _buildingCoreProgress: {fileID: 0}
   _effectManager: {fileID: 0}
   _artifactTestPanel: {fileID: 0}
   _persistent: {fileID: 386840905}
@@ -22200,8 +22221,42 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1361405447030809952, guid: a41c5230301f86944bfb8262899cc3f1, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1993634002}
   m_SourcePrefab: {fileID: 100100000, guid: a41c5230301f86944bfb8262899cc3f1, type: 3}
+--- !u!114 &1993634000 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4173041927233043995, guid: a41c5230301f86944bfb8262899cc3f1, type: 3}
+  m_PrefabInstance: {fileID: 1993633999}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1993634001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f93557fa4bbb0344bf1d2cb3e7a7c71, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingSlot
+--- !u!1 &1993634001 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1361405447030809952, guid: a41c5230301f86944bfb8262899cc3f1, type: 3}
+  m_PrefabInstance: {fileID: 1993633999}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1993634002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1993634001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9c927249a1efa946875ce0fbf057a78, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.UI.RuntimeBuildingSelectionTarget
+  _binding: {fileID: 1105228275}
+  _slot: {fileID: 1993634000}
+  _flow: {fileID: 1692919390}
 --- !u!1 &2024561863
 GameObject:
   m_ObjectHideFlags: 0
