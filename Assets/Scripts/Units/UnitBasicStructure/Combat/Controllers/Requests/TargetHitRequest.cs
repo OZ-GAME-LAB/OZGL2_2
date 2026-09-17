@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 namespace Units
 {
@@ -22,6 +23,10 @@ namespace Units
 
         public HitAreaType AreaType { get; }
 
+        public UnitTeam TargetTeam { get; }
+
+        public Predicate<ICombatTarget> TargetFilter { get; }
+
 
         public TargetHitRequest(
             Vector2 origin,
@@ -29,9 +34,12 @@ namespace Units
             float radius,
             float angle,
             int maxTargetCount,
-            HitAreaType areaType)
+            HitAreaType areaType,
+            UnitTeam targetTeam,
+            Predicate<ICombatTarget> targetFilter = null)
         {
             Origin = origin;
+
             Direction = direction;
 
             Radius = Mathf.Max(
@@ -51,6 +59,9 @@ namespace Units
             );
 
             AreaType = areaType;
+
+            TargetTeam = targetTeam;
+            TargetFilter = targetFilter;
         }
     }
 }

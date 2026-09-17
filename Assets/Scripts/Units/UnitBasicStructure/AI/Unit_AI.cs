@@ -34,6 +34,9 @@ namespace Units
         [SerializeField]
         private float _thinkInterval = 0.1f;
 
+        [SerializeField]
+        private float _targetReevaluationInterval = 0.5f;
+
 
         // ============================================================
         // Assignment
@@ -53,6 +56,12 @@ namespace Units
         private bool _isRunning;
 
         private bool _movementCompleted;
+
+        private bool _isTargetReevaluationLocked;
+
+        private bool _pendingSkillTargetReevaluation;
+
+        private float _nextTargetReevaluationTime;
 
 
         // ============================================================
@@ -99,6 +108,8 @@ namespace Units
 
             _movementCompleted =
                 false;
+
+            _pendingSkillTargetReevaluation = false;
 
             _isRunning =
                 false;
@@ -281,6 +292,15 @@ namespace Units
             _nextThinkTime =
                 Time.time + _thinkInterval;
 
+
+            if (_pendingSkillTargetReevaluation)
+            {
+                _pendingSkillTargetReevaluation = false;
+                if (!ValidateCurrentAssignment())
+                    return;
+                RequestTargetReevaluation();
+                return;
+            }
 
             if (!ValidateCurrentAssignment())
                 return;
@@ -519,6 +539,12 @@ namespace Units
         }
 
 
+        private void RequestTargetReevaluation()
+        {
+            _core.RequestTargetReevaluation();
+        }
+
+
         private void RequestPositionAssignment()
         {
             _movementCompleted =
@@ -534,6 +560,35 @@ namespace Units
         }
 
 
+        public void QueueTargetReevaluation()
+        {
+            if (_isRunning)
+                _pendingSkillTargetReevaluation = true;
+        }
+
+
+        public void NotifyTargetReevaluation()
+        {
+            if (!_isRunning)
+                return;
+
+
+            if (Time.time <
+                _nextTargetReevaluationTime)
+            {
+                return;
+            }
+
+
+            _nextTargetReevaluationTime =
+                Time.time
+                + _targetReevaluationInterval;
+
+
+            RequestTargetReevaluation();
+        }
+
+
         // ============================================================
         // Start AI
         // ============================================================
@@ -543,12 +598,11 @@ namespace Units
             if (_isRunning)
                 return;
 
+            _isRunning = true;
 
-            _isRunning =
-                true;
+            _nextThinkTime = 0f;
 
-            _nextThinkTime =
-                0f;
+            EvaluateAction();
         }
 
 
@@ -561,6 +615,8 @@ namespace Units
             if (!_isRunning)
                 return;
 
+
+            _pendingSkillTargetReevaluation = false;
 
             _isRunning =
                 false;
@@ -585,6 +641,8 @@ namespace Units
 
         public void PauseAI()
         {
+            _pendingSkillTargetReevaluation = false;
+
             _isRunning =
                 false;
 
@@ -659,44 +717,44 @@ namespace Units
             }
 
 
-            if (IsTargetValid(
-                assignment.Target))
-            {
-                DrawAttackGizmo(
-                    assignment.Target
-                );
-            }
+            DrawTargetGizmo(
+                assignment.Target
+            );
         }
 
 
         private void DrawMoveGizmo(
             UnitAssignment assignment)
         {
-            Vector3 targetPosition =
-                assignment.Target.Transform.position;
+            Vector3 destination =
+                assignment.PreferredPosition;
 
 
             Gizmos.color =
                 Color.green;
 
 
+            // 현재 위치 -> 이동 목표 좌표
             Gizmos.DrawLine(
                 transform.position,
-                targetPosition
+                destination
             );
 
 
             Gizmos.DrawWireSphere(
-                targetPosition,
+                destination,
                 0.15f
             );
         }
 
 
-        private void DrawAttackGizmo(
+        private void DrawTargetGizmo(
             ICombatTarget target)
         {
-            if (!IsTargetValid(target))
+            if (target == null)
+                return;
+
+            if (target.Transform == null)
                 return;
 
 
@@ -708,6 +766,7 @@ namespace Units
                 Color.red;
 
 
+            // 현재 위치 -> 현재 배정된 타겟
             Gizmos.DrawLine(
                 transform.position,
                 targetPosition

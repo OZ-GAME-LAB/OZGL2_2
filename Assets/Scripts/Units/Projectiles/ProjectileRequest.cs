@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Units
@@ -23,6 +24,9 @@ namespace Units
         public ICombatTarget Target { get; }
 
 
+        public UnitTeam TargetTeam { get; }
+
+
         public Vector2 Origin { get; }
 
 
@@ -46,6 +50,10 @@ namespace Units
 
         public float DamageMultiplier { get; }
 
+        public Predicate<ICombatTarget> TargetFilter { get; }
+
+        public int AttackerLifetimeVersion { get; }
+
 
         // ============================================================
         // Constructor
@@ -61,11 +69,17 @@ namespace Units
             float areaAngle,
             int maxDamageableCount,
             DamageSourceType damageSourceType,
-            float damageMultiplier)
+            float damageMultiplier,
+            Predicate<ICombatTarget> targetFilter = null)
         {
             Attacker = attacker;
 
             Target = target;
+
+            TargetTeam =
+                target != null
+                    ? target.Team
+                    : default;
 
             Origin = origin;
 
@@ -92,6 +106,9 @@ namespace Units
             DamageSourceType = damageSourceType;
 
             DamageMultiplier = damageMultiplier;
+            TargetFilter = targetFilter;
+            Unit_Gateway gateway = attacker != null ? attacker.GetComponent<Unit_Gateway>() : null;
+            AttackerLifetimeVersion = gateway != null ? gateway.LifetimeVersion : 0;
         }
     }
 }

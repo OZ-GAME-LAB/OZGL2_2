@@ -18,6 +18,8 @@ namespace Units
 
         private Unit_GroupAI _groupAI;
 
+        public int LifetimeVersion { get; private set; }
+
 
         // ============================================================
         // Runtime State
@@ -36,6 +38,8 @@ namespace Units
 
         public event Action<Unit_Gateway> RequestFullAssignmentEvent;
 
+        public event Action<Unit_Gateway> RequestTargetReevaluationEvent;
+
         public event Action<Unit_Gateway> RequestPositionAssignmentEvent;
 
         public event Action<Unit_Gateway> RallyCompleted;
@@ -48,6 +52,11 @@ namespace Units
         public UnitTeam Team
             => _core != null
                 ? _core.Team
+                : default;
+
+        public Unit_RuntimeStatus RuntimeStatus
+            => _core != null
+                ? _core.RuntimeStatus
                 : default;
 
 
@@ -78,6 +87,11 @@ namespace Units
                 ? _core.PreferredCombatRange
                 : 0f;
 
+        public float CurrentHp
+            => _core != null
+                ? _core.CurrentHp
+                : 0f;
+
 
         // ============================================================
         // Initialize
@@ -98,6 +112,7 @@ namespace Units
 
             UnbindEvents();
 
+            LifetimeVersion++;
 
             _core =
                 core;
@@ -195,6 +210,23 @@ namespace Units
         // Group
         // ============================================================
 
+        internal SkillEngagementResult RequestSkillEngagement(ICombatTarget target)
+        {
+            return _groupAI != null
+                ? _groupAI.RequestSkillEngagement(this, target)
+                : SkillEngagementResult.Invalid;
+        }
+
+        internal Predicate<ICombatTarget> CaptureSkillTargetFilter()
+        {
+            return _groupAI != null
+                ? _groupAI.CaptureSkillTargetFilter(this)
+                : RejectSkillTarget;
+        }
+
+        private static bool RejectSkillTarget(ICombatTarget target) => false;
+
+
         internal void SetGroupAI(
             Unit_GroupAI groupAI)
         {
@@ -240,6 +272,14 @@ namespace Units
         public void RequestFullAssignment()
         {
             RequestFullAssignmentEvent?.Invoke(this);
+        }
+
+
+        public void RequestTargetReevaluation()
+        {
+            RequestTargetReevaluationEvent?.Invoke(
+                this
+            );
         }
 
 
@@ -332,6 +372,22 @@ namespace Units
             _core.MoveTo(
                 destination
             );
+        }
+
+
+        // ============================================================
+        // Unit Control
+        // ============================================================
+
+        public void Pause()
+        {
+            _core?.Pause();
+        }
+
+
+        public void Resume()
+        {
+            _core?.Resume();
         }
     }
 }

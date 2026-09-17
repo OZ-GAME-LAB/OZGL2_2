@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Units
 {
-    public class HitTargetResolver
+    public class TargetResolver
     {
         private const int DefaultBufferSize =
             32;
@@ -38,7 +38,7 @@ namespace Units
         // Constructor
         // ============================================================
 
-        public HitTargetResolver(
+        public TargetResolver(
             Unit_Core core,
             int bufferSize = DefaultBufferSize)
         {
@@ -73,7 +73,7 @@ namespace Units
         // Resolve
         // ============================================================
 
-        public IReadOnlyList<ICombatTarget> Resolve(
+        public IReadOnlyList<ICombatTarget> ResolveHitTargets(
             TargetHitRequest request)
         {
             _targets.Clear();
@@ -110,6 +110,9 @@ namespace Units
             }
 
 
+            if (request.TargetFilter != null)
+                _targets.RemoveAll(target => !request.TargetFilter(target));
+
             SortByDistance(
                 request.Origin
             );
@@ -125,49 +128,70 @@ namespace Units
 
 
         // ============================================================
-        // Projectile Target Selection
+        // Candidate Resolve
         // ============================================================
 
-        public IReadOnlyList<ICombatTarget> ResolveAttackTargets(
-            Vector2 origin,
-            float range,
-            int maxTargetCount,
-            ICombatTarget preferredTarget)
+        public IReadOnlyList<ICombatTarget> ResolveCandidates(
+            TargetCandidateRequest request)
         {
-            Resolve(
-                new TargetHitRequest(
-                    origin,
-                    Vector2.zero,
-                    range,
-                    0f,
-                    int.MaxValue,
-                    HitAreaType.Circle
-                )
-            );
+            _targets.Clear();
 
-            if (_core == null || range < 0f || maxTargetCount <= 0)
-            {
-                _targets.Clear();
+
+            if (_core == null)
                 return _targets;
+
+            if (request.Range <= 0f)
+                return _targets;
+
+
+            int hitCount =
+                CollectColliders(
+                    request.Origin,
+                    request.Range
+                );
+
+
+            for (int i = 0;
+                i < hitCount;
+                i++)
+            {
+                Collider2D hit =
+                    _colliderBuffer[i];
+
+
+                TryAddTarget(
+                    hit,
+                    request.TargetTeam
+                );
             }
 
-            float rangeSquared = range * range;
 
             // Collider 일부만 사거리에 걸친 대상은 위치 기준으로 다시 검사한다.
+            float rangeSquared =
+                request.Range
+                * request.Range;
+
+
             _targets.RemoveAll(
-                target => !IsValidTarget(target)
-                    || ((Vector2)target.Transform.position - origin).sqrMagnitude > rangeSquared
+                target =>
+                    !IsValidTarget(
+                        target,
+                        request.TargetTeam
+                    )
+                    || (
+                        (Vector2)target.Transform.position
+                        - request.Origin
+                    ).sqrMagnitude > rangeSquared
             );
 
-            // 현재 목표도 동일한 사거리 검사를 통과해야 우선 선택된다.
-            if (IsValidTarget(preferredTarget)
-                && ((Vector2)preferredTarget.Transform.position - origin).sqrMagnitude <= rangeSquared)
-            {
-                _targets.Remove(preferredTarget);
-                _targets.Insert(0, preferredTarget);
-            }
 
-            TrimTargetCount(maxTargetCount);
+            if (request.TargetFilter != null)
+                _targets.RemoveAll(target => !request.TargetFilter(target));
+
+            SortByDistance(
+                request.Origin
+            );
+
 
             return _targets;
         }
@@ -201,6 +225,7 @@ namespace Units
             }
         }
 
+
         // ============================================================
         // Circle
         // ============================================================
@@ -224,7 +249,8 @@ namespace Units
 
 
                 TryAddTarget(
-                    hit
+                    hit,
+                    request.TargetTeam
                 );
             }
         }
@@ -276,7 +302,8 @@ namespace Units
 
 
                 if (!IsValidTarget(
-                    target))
+                    target,
+                    request.TargetTeam))
                 {
                     continue;
                 }
@@ -314,7 +341,8 @@ namespace Units
         // ============================================================
 
         private void TryAddTarget(
-            Collider2D hit)
+            Collider2D hit,
+            UnitTeam targetTeam)
         {
             if (hit == null)
                 return;
@@ -327,7 +355,8 @@ namespace Units
 
 
             if (!IsValidTarget(
-                target))
+                target,
+                targetTeam))
             {
                 return;
             }
@@ -355,7 +384,8 @@ namespace Units
         // ============================================================
 
         private bool IsValidTarget(
-            ICombatTarget target)
+            ICombatTarget target,
+            UnitTeam targetTeam)
         {
             if (!CombatTargetUtility.IsValid(target))
                 return false;
@@ -369,7 +399,7 @@ namespace Units
                 return false;
 
 
-            if (target.Team == _core.Team)
+            if (target.Team != targetTeam)
                 return false;
 
 

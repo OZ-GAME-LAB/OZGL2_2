@@ -72,6 +72,10 @@ namespace Units
                 ? _combat.PreferredCombatRange
                 : 0f;
 
+        public float CurrentHp
+            => _life != null
+                ? _life.CurrentHp
+                : 0f;
 
         // ============================================================
         // Events
@@ -107,9 +111,38 @@ namespace Units
         }
 
 
-        public void NotifyActiveSkillCompleted()
+        public void NotifyActiveSkillCompleted(bool reevaluateAfterMovement = false)
         {
+            if (reevaluateAfterMovement)
+                _ai?.QueueTargetReevaluation();
+
             ActiveSkillCompleted?.Invoke();
+        }
+
+        public SkillEngagementResult RequestSkillEngagement(ICombatTarget target)
+        {
+            return _gateway != null
+                ? _gateway.RequestSkillEngagement(target)
+                : SkillEngagementResult.Invalid;
+        }
+
+        public Predicate<ICombatTarget> CaptureSkillTargetFilter()
+        {
+            return _gateway != null
+                ? _gateway.CaptureSkillTargetFilter()
+                : RejectSkillTarget;
+        }
+
+        private static bool RejectSkillTarget(ICombatTarget target) => false;
+
+
+        // ============================================================
+        // Unity Lifecycle
+        // ============================================================
+
+        private void OnDestroy()
+        {
+            UnbindComponentEvents();
         }
 
 
@@ -121,6 +154,8 @@ namespace Units
             FinalStatModifier spawnModifier)
         {
             InitComponents();
+
+            UnbindComponentEvents();
 
             if (_gateway != null)
             {
@@ -179,6 +214,8 @@ namespace Units
                     this
                 );
             }
+
+            BindComponentEvents();
         }
 
 
@@ -230,6 +267,30 @@ namespace Units
             {
                 _ai =
                     GetComponent<Unit_AI>();
+            }
+        }
+
+
+        // ============================================================
+        // Component Events
+        // ============================================================
+
+        private void BindComponentEvents()
+        {
+            if (_life != null)
+            {
+                _life.Damaged +=
+                    OnDamaged;
+            }
+        }
+
+
+        private void UnbindComponentEvents()
+        {
+            if (_life != null)
+            {
+                _life.Damaged -=
+                    OnDamaged;
             }
         }
 
@@ -306,6 +367,11 @@ namespace Units
             return _combat.TryActiveSkill(
                 target
             );
+        }
+
+        public void NotifyCombatPositionChanged()
+        {
+            NotifyTargetReevaluation();
         }
 
 
@@ -387,6 +453,11 @@ namespace Units
             _animation?.PlayAnimation_Death();
 
             _gateway?.NotifyDeath();
+        }
+
+        private void OnDamaged(DamageResult result)
+        {
+            NotifyTargetReevaluation();
         }
 
 
@@ -504,14 +575,45 @@ namespace Units
             _ai.ClearUnitAssignment();
         }
 
+        private void NotifyTargetReevaluation()
+        {
+            _ai?.NotifyTargetReevaluation();
+        }
+
         public void RequestFullAssignment()
         {
             _gateway?.RequestFullAssignment();
         }
 
+        public void RequestTargetReevaluation()
+        {
+            _gateway?.RequestTargetReevaluation();
+        }
+
         public void RequestPositionAssignment()
         {
             _gateway?.RequestPositionAssignment();
+        }
+
+
+        // ============================================================
+        // Unit Control
+        // ============================================================
+
+        public void Pause()
+        {
+            _ai?.PauseAI();
+
+            _movement?.Stop();
+
+            _combat?.Pause();
+        }
+
+        public void Resume()
+        {
+            _combat.Resume();
+
+            _ai?.StartAI();
         }
     }
 }

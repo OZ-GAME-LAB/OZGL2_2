@@ -11,9 +11,15 @@ namespace Units
         // Runtime States
         // =========================
 
+        [Header("Engagement Expansion")]
+        [SerializeField]
+        private EngagementExpansionPolicy _engagementExpansionPolicy = new EngagementExpansionPolicy();
+
         private bool _battleStarted;
 
         private bool _battleEnded;
+
+        private bool _battlePaused;
 
         private bool _isAllySpawnCompleted;
 
@@ -150,7 +156,8 @@ namespace Units
                 new EngagementController(
                     _engagements,
                     _allyGroups,
-                    _enemyGroups
+                    _enemyGroups,
+                    _engagementExpansionPolicy
                 );
 
 
@@ -357,6 +364,10 @@ namespace Units
                 return;
 
 
+            group.SetSkillEngagementHandler(
+                HandleSkillEngagementRequested
+            );
+
             group.NewEnemyGroupDetected +=
                 HandleNewEnemyGroupDetected;
 
@@ -377,6 +388,10 @@ namespace Units
             if (group == null)
                 return;
 
+
+            group.SetSkillEngagementHandler(
+                null
+            );
 
             group.NewEnemyGroupDetected -=
                 HandleNewEnemyGroupDetected;
@@ -411,6 +426,7 @@ namespace Units
             );
         }
 
+
         private void HandleGroupEliminated(
             Unit_GroupAI group)
         {
@@ -433,6 +449,7 @@ namespace Units
                 team
             );
         }
+
 
         private void TryNotifyTeamWiped(
             UnitTeam team)
@@ -474,6 +491,12 @@ namespace Units
             _battleEnded =
                 true;
 
+            _battlePaused =
+                false;
+
+
+            PauseAllGroups();
+
 
             Debug.Log(
                 $"[RuntimeUnitManager] " +
@@ -505,10 +528,37 @@ namespace Units
         }
 
 
+        private SkillEngagementResult HandleSkillEngagementRequested(
+            Unit_GroupAI sourceGroup,
+            Unit_GroupAI targetGroup)
+        {
+            if (_battleEnded ||
+                _battlePaused ||
+                _engagementController == null)
+            {
+                return SkillEngagementResult.Invalid;
+            }
+
+
+            // 등록 여부와 양쪽 Team은 Controller의 권위 있는 목록으로 검증한다.
+            return _engagementController.TryExpandForSkill(
+                sourceGroup,
+                targetGroup
+            );
+        }
+
+
         private void HandleNewEnemyGroupDetected(
             Unit_GroupAI sourceGroup,
             Unit_GroupAI detectedGroup)
         {
+            if (_battleEnded ||
+                _battlePaused)
+            {
+                return;
+            }
+
+
             if (sourceGroup == null ||
                 detectedGroup == null)
             {
@@ -545,6 +595,13 @@ namespace Units
         private void HandleAdvanceReferenceRequested(
             Unit_GroupAI sourceGroup)
         {
+            if (_battleEnded ||
+                _battlePaused)
+            {
+                return;
+            }
+
+
             if (sourceGroup == null)
                 return;
 
@@ -701,6 +758,12 @@ namespace Units
             _battleStarted =
                 true;
 
+            _battleEnded =
+                false;
+
+            _battlePaused =
+                false;
+
 
             StartAdvancingGroups(
                 _allyGroups
@@ -752,6 +815,110 @@ namespace Units
         }
 
 
+        public void PauseBattle()
+        {
+            if (!_battleStarted)
+                return;
+
+            if (_battleEnded)
+                return;
+
+            if (_battlePaused)
+                return;
+
+
+            _battlePaused =
+                true;
+
+
+            PauseAllGroups();
+        }
+
+
+        public void ResumeBattle()
+        {
+            if (!_battleStarted)
+                return;
+
+            if (_battleEnded)
+                return;
+
+            if (!_battlePaused)
+                return;
+
+
+            _battlePaused =
+                false;
+
+
+            ResumeAllGroups();
+        }
+
+
+        private void PauseAllGroups()
+        {
+            PauseGroups(
+                _allyGroups
+            );
+
+            PauseGroups(
+                _enemyGroups
+            );
+        }
+
+
+        private void ResumeAllGroups()
+        {
+            ResumeGroups(
+                _allyGroups
+            );
+
+            ResumeGroups(
+                _enemyGroups
+            );
+        }
+
+
+        private void PauseGroups(
+            IReadOnlyList<Unit_GroupAI> groups)
+        {
+            for (int i = 0;
+                 i < groups.Count;
+                 i++)
+            {
+                Unit_GroupAI group =
+                    groups[i];
+
+
+                if (group == null)
+                    continue;
+
+
+                group.Pause();
+            }
+        }
+
+
+        private void ResumeGroups(
+            IReadOnlyList<Unit_GroupAI> groups)
+        {
+            for (int i = 0;
+                 i < groups.Count;
+                 i++)
+            {
+                Unit_GroupAI group =
+                    groups[i];
+
+
+                if (group == null)
+                    continue;
+
+
+                group.Resume();
+            }
+        }
+
+
         // =========================
         // Runtime Clear
         // =========================
@@ -783,6 +950,9 @@ namespace Units
                 false;
 
             _battleEnded =
+                false;
+
+            _battlePaused =
                 false;
 
             _isAllySpawnCompleted =

@@ -11,6 +11,8 @@ namespace Units
 
         private readonly Unit_Core _core;
 
+        private bool _started;
+
 
         // ============================================================
         // Properties
@@ -38,6 +40,7 @@ namespace Units
         public void Enter(
             UnitAssignment? assignment)
         {
+            _started = false;
             if (!assignment.HasValue)
                 return;
 
@@ -55,7 +58,7 @@ namespace Units
 
             _core.StopMovement();
 
-            _core.TryActiveSkill(
+            _started = _core.TryActiveSkill(
                 target
             );
         }
@@ -64,7 +67,7 @@ namespace Units
         public UnitAIActionType? Evaluate(
             UnitAssignment? assignment)
         {
-            if (!assignment.HasValue)
+            if (!_started || !assignment.HasValue)
             {
                 return UnitAIActionType.Idle;
             }

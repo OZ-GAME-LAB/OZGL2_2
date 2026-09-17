@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 
 
@@ -115,13 +115,9 @@ namespace Units
             Unit_GroupAI sourceGroup,
             Unit_GroupAI candidate)
         {
-            // TODO:
-            // 후열 우선
-            // 엘리트 우선
-            // Y축 거리
-            // 기타 선호도 계산
-
-            return 0f;
+            // 그룹 중심이 가까울수록 높은 점수로 전진 목표를 선택한다.
+            return -(candidate.CenterPosition - sourceGroup.CenterPosition)
+                .sqrMagnitude;
         }
     }
 }

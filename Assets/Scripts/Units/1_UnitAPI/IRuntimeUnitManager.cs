@@ -37,10 +37,14 @@ namespace Units
 
 
         // =========================
-        // Unit Count
+        // Battle Management
         // =========================
 
         void StartBattlePhase();
+
+        void PauseBattle();
+
+        void ResumeBattle(); // 불안정한 기능 가급적 사용하지 말 것
 
 
         // =========================
