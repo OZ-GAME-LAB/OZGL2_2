@@ -12,11 +12,8 @@ namespace Units
 
         private readonly RallyFormation _rallyFormation;
 
-        private readonly List<Vector2> _sectorCenters =
-            new List<Vector2>();
-
-        private readonly List<bool> _occupiedSectors =
-            new List<bool>();
+        private readonly List<RallySector> _sectors =
+            new List<RallySector>();
 
         private readonly Queue<int> _preparedSectorIndices =
             new Queue<int>();
@@ -29,6 +26,11 @@ namespace Units
         private readonly Vector2 _sectorSize;
 
         private readonly float _formationSpacing;
+
+
+        private readonly RallySector _sectorPrefab;
+
+        private readonly Transform _sectorRoot;
 
 
         private int _columnCount;
@@ -44,7 +46,9 @@ namespace Units
             Transform areaPointA,
             Transform areaPointB,
             Vector2 sectorSize,
-            float formationSpacing)
+            float formationSpacing,
+            RallySector sectorPrefab,
+            Transform sectorRoot)
         {
             Vector2 positionA =
                 areaPointA.position;
@@ -85,6 +89,12 @@ namespace Units
             _formationSpacing =
                 formationSpacing;
 
+            _sectorPrefab =
+                sectorPrefab;
+
+            _sectorRoot =
+                sectorRoot;
+
 
             _rallyFormation =
                 new RallyFormation();
@@ -96,9 +106,7 @@ namespace Units
 
         private void InitializeSectors()
         {
-            _sectorCenters.Clear();
-
-            _occupiedSectors.Clear();
+            _sectors.Clear();
 
             _preparedSectorIndices.Clear();
 
@@ -109,6 +117,28 @@ namespace Units
                 Debug.LogError(
                     "[RallyGridAllocator] " +
                     "Sector 크기는 0보다 커야 합니다."
+                );
+
+                return;
+            }
+
+
+            if (_sectorPrefab == null)
+            {
+                Debug.LogError(
+                    "[RallyGridAllocator] " +
+                    "RallySector Prefab이 없습니다."
+                );
+
+                return;
+            }
+
+
+            if (_sectorRoot == null)
+            {
+                Debug.LogError(
+                    "[RallyGridAllocator] " +
+                    "RallySector Root가 없습니다."
                 );
 
                 return;
@@ -169,13 +199,37 @@ namespace Units
                         );
 
 
-                    _sectorCenters.Add(
-                        sectorCenter
-                    );
+                    RallySector sector =
+                        Object.Instantiate(
+                            _sectorPrefab,
+                            sectorCenter,
+                            Quaternion.identity,
+                            _sectorRoot
+                        );
 
 
-                    _occupiedSectors.Add(
-                        false
+                    if (sector == null)
+                    {
+                        Debug.LogError(
+                            $"[RallyGridAllocator] " +
+                            $"RallySector 생성 실패. " +
+                            $"Column={x} / Row={y}"
+                        );
+
+                        continue;
+                    }
+
+
+                    int sectorIndex =
+                        _sectors.Count;
+
+
+                    sector.name =
+                        $"RallySector_{sectorIndex}";
+
+
+                    _sectors.Add(
+                        sector
                     );
                 }
             }
@@ -184,7 +238,7 @@ namespace Units
             Debug.Log(
                 $"[RallyGridAllocator] " +
                 $"Sector 생성 완료. " +
-                $"Count: {_sectorCenters.Count} / " +
+                $"Count: {_sectors.Count} / " +
                 $"Column: {_columnCount} / " +
                 $"Row: {_rowCount}"
             );
@@ -384,8 +438,9 @@ namespace Units
                         continue;
 
 
-                    if (_occupiedSectors[
-                        sectorIndex])
+                    if (_sectors[
+                        sectorIndex
+                    ].IsOccupied)
                     {
                         continue;
                     }
@@ -521,10 +576,10 @@ namespace Units
 
 
             for (int i = 0;
-                 i < _sectorCenters.Count;
+                 i < _sectors.Count;
                  i++)
             {
-                if (_occupiedSectors[i])
+                if (_sectors[i].IsOccupied)
                     continue;
 
                 if (_preparedSectorIndices.Contains(
@@ -544,10 +599,10 @@ namespace Units
                 (a, b) =>
                 {
                     Vector2 positionA =
-                        _sectorCenters[a];
+                        _sectors[a].Center;
 
                     Vector2 positionB =
-                        _sectorCenters[b];
+                        _sectors[b].Center;
 
 
                     float distanceA =
@@ -609,10 +664,18 @@ namespace Units
 
         public IReadOnlyList<Vector2> Allocate(
             int unitCount,
-            Vector2 preferredRallyPoint)
+            Vector2 preferredRallyPoint,
+            Unit_GroupAI group)
         {
             if (!ValidateUnitCount(
                 unitCount))
+            {
+                return null;
+            }
+
+
+            if (!ValidateGroup(
+                group))
             {
                 return null;
             }
@@ -637,16 +700,25 @@ namespace Units
 
             return AllocateSector(
                 sectorIndex,
-                unitCount
+                unitCount,
+                group
             );
         }
 
 
         public IReadOnlyList<Vector2> Allocate(
-            int unitCount)
+            int unitCount,
+            Unit_GroupAI group)
         {
             if (!ValidateUnitCount(
                 unitCount))
+            {
+                return null;
+            }
+
+
+            if (!ValidateGroup(
+                group))
             {
                 return null;
             }
@@ -669,15 +741,60 @@ namespace Units
 
             return AllocateSector(
                 sectorIndex,
-                unitCount
+                unitCount,
+                group
             );
         }
 
 
         private IReadOnlyList<Vector2> AllocateSector(
             int sectorIndex,
-            int unitCount)
+            int unitCount,
+            Unit_GroupAI group)
         {
+            if (sectorIndex < 0 ||
+                sectorIndex >= _sectors.Count)
+            {
+                Debug.LogError(
+                    $"[RallyGridAllocator] " +
+                    $"잘못된 Sector Index입니다. " +
+                    $"Index={sectorIndex}"
+                );
+
+                return null;
+            }
+
+
+            RallySector sector =
+                _sectors[
+                    sectorIndex
+                ];
+
+
+            if (sector == null)
+            {
+                Debug.LogError(
+                    $"[RallyGridAllocator] " +
+                    $"RallySector가 없습니다. " +
+                    $"Index={sectorIndex}"
+                );
+
+                return null;
+            }
+
+
+            if (sector.IsOccupied)
+            {
+                Debug.LogError(
+                    $"[RallyGridAllocator] " +
+                    $"이미 점유된 RallySector입니다. " +
+                    $"Index={sectorIndex}"
+                );
+
+                return null;
+            }
+
+
             IReadOnlyList<Vector2> formation =
                 _rallyFormation.GetFormation(
                     unitCount
@@ -699,15 +816,13 @@ namespace Units
 
             // Rally 좌표가 확정되는 순간 Sector를 점유 처리한다.
             // 실제 유닛의 도착 여부와는 관계없이 다른 그룹에서는 사용할 수 없다.
-            _occupiedSectors[
-                sectorIndex
-            ] = true;
+            sector.Assign(
+                group
+            );
 
 
             Vector2 sectorCenter =
-                _sectorCenters[
-                    sectorIndex
-                ];
+                sector.Center;
 
 
             List<Vector2> rallyPositions =
@@ -750,17 +865,24 @@ namespace Units
 
                 if (sectorIndex < 0 ||
                     sectorIndex >=
-                    _occupiedSectors.Count)
+                    _sectors.Count)
                 {
                     continue;
                 }
 
 
-                if (_occupiedSectors[
-                    sectorIndex])
-                {
+                RallySector sector =
+                    _sectors[
+                        sectorIndex
+                    ];
+
+
+                if (sector == null)
                     continue;
-                }
+
+
+                if (sector.IsOccupied)
+                    continue;
 
 
                 return sectorIndex;
@@ -787,18 +909,24 @@ namespace Units
 
 
             for (int i = 0;
-                 i < _sectorCenters.Count;
+                 i < _sectors.Count;
                  i++)
             {
-                if (_occupiedSectors[i])
-                {
+                RallySector sector =
+                    _sectors[i];
+
+
+                if (sector == null)
                     continue;
-                }
+
+
+                if (sector.IsOccupied)
+                    continue;
 
 
                 float distanceSqr =
                     (
-                        _sectorCenters[i] -
+                        sector.Center -
                         preferredRallyPoint
                     ).sqrMagnitude;
 
@@ -853,10 +981,18 @@ namespace Units
 
 
             for (int i = 0;
-                 i < _occupiedSectors.Count;
+                 i < _sectors.Count;
                  i++)
             {
-                if (!_occupiedSectors[i])
+                RallySector sector =
+                    _sectors[i];
+
+
+                if (sector == null)
+                    continue;
+
+
+                if (!sector.IsOccupied)
                 {
                     count++;
                 }
@@ -874,11 +1010,18 @@ namespace Units
         public void Clear()
         {
             for (int i = 0;
-                 i < _occupiedSectors.Count;
+                 i < _sectors.Count;
                  i++)
             {
-                _occupiedSectors[i] =
-                    false;
+                RallySector sector =
+                    _sectors[i];
+
+
+                if (sector == null)
+                    continue;
+
+
+                sector.Clear();
             }
 
 
@@ -913,6 +1056,25 @@ namespace Units
 
 
             return true;
+        }
+
+
+        private bool ValidateGroup(
+            Unit_GroupAI group)
+        {
+            if (group != null)
+            {
+                return true;
+            }
+
+
+            Debug.LogError(
+                "[RallyGridAllocator] " +
+                "할당할 Unit_GroupAI가 없습니다."
+            );
+
+
+            return false;
         }
     }
 }

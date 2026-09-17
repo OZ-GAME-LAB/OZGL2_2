@@ -106,7 +106,8 @@ namespace Units
             IReadOnlyList<Vector2> rallyPositions =
                 AllocateRallyPositions(
                     count,
-                    rallyPoint
+                    rallyPoint,
+                    group
                 );
 
 
@@ -725,12 +726,14 @@ namespace Units
 
         private IReadOnlyList<Vector2> AllocateRallyPositions(
             int count,
-            Vector2 rallyPoint)
+            Vector2 rallyPoint,
+            Unit_GroupAI group)
         {
             IReadOnlyList<Vector2> rallyPositions =
                 _rallyGridAllocator.Allocate(
                     count,
-                    rallyPoint
+                    rallyPoint,
+                    group
                 );
 
 

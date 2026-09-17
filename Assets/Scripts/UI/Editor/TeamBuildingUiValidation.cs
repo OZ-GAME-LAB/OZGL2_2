@@ -313,7 +313,7 @@ namespace Game.UI.Editor
 
                 Check(wallet.TryEndRun(), "test owner ends wallet run");
 
-                wallet.Initialize(waves, flow, null);
+                //wallet.Initialize(waves, flow, null);
 
                 wallet.Initialize(waves, flow, null, UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>());
                 flow.ResetRun();
