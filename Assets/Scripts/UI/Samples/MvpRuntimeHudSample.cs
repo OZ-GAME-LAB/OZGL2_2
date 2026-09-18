@@ -1,6 +1,8 @@
 using System;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Core;
+using OZGL.KDH;
 using TMPro;
 using Units;
 using UnityEngine;
@@ -37,6 +39,8 @@ namespace Game.UI.Samples
         [SerializeField] private ArtifactRewardBinding _artifactRewards;
         [SerializeField] private ArtifactManager _artifactManager;
         [SerializeField] private EffectManager _effectManager;
+        [SerializeField] private BuildingData _testCoreData;
+        private MvpTestBattle _testBattle;
 
         private string _runId;
         private string _pendingRewardId;
@@ -76,6 +80,8 @@ namespace Game.UI.Samples
             _ui.Initialize();
             _rewardGate.Initialize(_flow, _waves);
             _flow.Initialize(_waves, _rewardGate, _artifactManager); //
+            _testBattle = new MvpTestBattle();
+            _waves.Initialize(_flow, _testBattle, _testBattle);
             _goldBinding.Initialize(_ui, _currencyManager);
             _coreBinding.Initialize(_ui, _flow, _waves);
             if (_runDecisionBinding != null) _runDecisionBinding.Initialize(_flow, _waves);
@@ -233,6 +239,17 @@ namespace Game.UI.Samples
 
         private void InitializeRewardSystems()
         {
+            if (_testCoreData == null || !_testCoreData.IsCore)
+            {
+                IsReady = false;
+                return;
+            }
+            var progress = _currencyManager.GetComponent<BuildingCoreProgress>();
+            if (progress == null) progress = _currencyManager.gameObject.AddComponent<BuildingCoreProgress>();
+            var core = _currencyManager.GetComponent<Building>();
+            if (core == null) core = _currencyManager.gameObject.AddComponent<Building>();
+            if (core.Data != _testCoreData) core.Initialize(_testCoreData);
+            progress.Register(core);
             bool artifactsReady = _artifactManager != null && _effectManager != null;
             if (artifactsReady && !_artifactManager.IsInitialized)
                 _artifactManager.Initialize(_waves, _effectManager);
@@ -241,8 +258,57 @@ namespace Game.UI.Samples
                 artifactsReady = _artifactRewards.TryInitialize(_artifactManager);
             // 이 샘플은 지급 실패/재시도를 검사하는 유일한 지급 주체다.
             // flow=null로 자동 지급을 구독하지 않는다. 실제 팀 씬은 flow를 전달하고 UI에서 지급하지 않는다.
-            // _currencyManager.Initialize(_waves, null, _effectManager);
+            if (!_currencyManager.IsInitialized)
+                _currencyManager.Initialize(_waves, null, _effectManager, progress);
             IsReady = _currencyManager.IsInitialized && artifactsReady;
+        }
+
+        /// <summary>UI 테스트 버튼만을 위한 전투 준비 대역. 실제 팀 스폰·전투는 사용하지 않는다.</summary>
+        private sealed class MvpTestBattle : ISpawnManager, IRuntimeUnitManager
+        {
+            public event Action AllySpawnCompleted;
+            public event Action EnemySpawnCompleted;
+            public event Action PreparationCompleted;
+            // UI 수동 승패 버튼만 검증하므로 전투 사망 이벤트는 발생시키지 않는다.
+            public event Action<Unit_Gateway> UnitDied { add { } remove { } }
+            public event Action<UnitTeam> TeamWiped { add { } remove { } }
+
+            public int AllyUnitCount => 0;
+            public int EnemyUnitCount => 0;
+
+            public void SpawnAllyGroup(AllyUnitType unitType, Vector2 spawnPosition, int count, Vector2 rallyPoint)
+                => AllySpawnCompleted?.Invoke();
+
+            public async UniTask SpawnEnemyWaveAsync(int cost, SpawnContext context, CancellationToken cancellationToken)
+            {
+                await UniTask.Delay(TimeSpan.FromMilliseconds(150), cancellationToken: cancellationToken);
+                EnemySpawnCompleted?.Invoke();
+                PreparationCompleted?.Invoke();
+            }
+
+            public bool TryGetAllyPrefab(AllyUnitType unitType, out GameObject prefab)
+            {
+                prefab = null;
+                return false;
+            }
+
+            public bool TryGetEnemyPrefab(EnemyUnitType unitType, out GameObject prefab)
+            {
+                prefab = null;
+                return false;
+            }
+
+            public bool GetRemain(out int enemy, out int allies)
+            {
+                enemy = 0;
+                allies = 0;
+                return false;
+            }
+
+            public void StartBattlePhase() { }
+            public void PauseBattle() { }
+            public void ResumeBattle() { }
+            public void ClearRuntime() { }
         }
 
         private void HandleLose()

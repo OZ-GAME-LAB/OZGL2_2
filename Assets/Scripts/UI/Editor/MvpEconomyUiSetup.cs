@@ -1,6 +1,7 @@
 using System;
 using Game.Core;
 using Game.UI.Samples;
+using OZGL.KDH;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -12,6 +13,7 @@ namespace Game.UI.Editor
     public static class MvpEconomyUiSetup
     {
         public const string RewardTablePath = "Assets/Data/Economy/S.O/WaveRewardTable.asset";
+        private const string TestCoreDataPath = "Assets/Tests/KDH/Building/Test_Building_core1.asset";
 
         [MenuItem("Game/UI/Connect Economy In Current UI Test Scene")]
         public static void ConnectCurrentScene()
@@ -56,18 +58,39 @@ namespace Game.UI.Editor
             if (sampleFields.FindProperty("_currencyManager").objectReferenceValue != manager)
                 throw new InvalidOperationException("The UI sample must reference this scene's currency manager.");
             var table = LoadRewardTable();
+            var coreData = AssetDatabase.LoadAssetAtPath<BuildingData>(TestCoreDataPath);
+            if (coreData == null || !coreData.IsCore || coreData.CoreLevel != 1)
+                throw new InvalidOperationException("The UI-only level-one core fixture is missing.");
+            var coreProperty = sampleFields.FindProperty("_testCoreData");
+            if (coreProperty == null)
+                throw new InvalidOperationException("UI sample core fixture field is missing.");
+            if (coreProperty.objectReferenceValue != null && coreProperty.objectReferenceValue != coreData)
+                throw new InvalidOperationException("A custom UI test core will not be overwritten.");
             var fields = new SerializedObject(manager);
             var property = fields.FindProperty("_waveRewardTable");
             if (property == null) throw new InvalidOperationException("Latest team Economy API is required.");
-            if (property.objectReferenceValue == table) return false;
-            if (property.objectReferenceValue != null)
+            if (property.objectReferenceValue != null && property.objectReferenceValue != table)
                 throw new InvalidOperationException("A custom reward table is already assigned; it will not be overwritten.");
+            bool changeCore = coreProperty.objectReferenceValue == null;
+            bool changeTable = property.objectReferenceValue == null;
+            if (!changeCore && !changeTable) return false;
 
-            if (recordUndo) Undo.RecordObject(manager, "Connect UI test wave rewards");
-            property.objectReferenceValue = table;
-            fields.ApplyModifiedPropertiesWithoutUndo();
-            if (PrefabUtility.IsPartOfPrefabInstance(manager))
-                PrefabUtility.RecordPrefabInstancePropertyModifications(manager);
+            if (changeCore)
+            {
+                if (recordUndo) Undo.RecordObject(sample, "Connect UI test core fixture");
+                coreProperty.objectReferenceValue = coreData;
+                sampleFields.ApplyModifiedPropertiesWithoutUndo();
+                if (PrefabUtility.IsPartOfPrefabInstance(sample))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(sample);
+            }
+            if (changeTable)
+            {
+                if (recordUndo) Undo.RecordObject(manager, "Connect UI test wave rewards");
+                property.objectReferenceValue = table;
+                fields.ApplyModifiedPropertiesWithoutUndo();
+                if (PrefabUtility.IsPartOfPrefabInstance(manager))
+                    PrefabUtility.RecordPrefabInstancePropertyModifications(manager);
+            }
             EditorSceneManager.MarkSceneDirty(scene);
             return true;
         }

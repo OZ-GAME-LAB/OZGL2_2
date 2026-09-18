@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.UI.Samples;
 using TMPro;
@@ -226,6 +227,7 @@ namespace Game.UI.Editor
             panel.ResetReward();
             panel.ChoiceRequested -= receive;
             await RunPagingChecksAsync(panel);
+            await RunAsyncSelectionChecksAsync(panel);
             sample.enabled = true;
             sample.ShowNextReward();
             Debug.Log("[UI/MvpArtifactRewardValidation] PASS " + _checks + " checks. No gameplay changes; synthetic UI input only.");
@@ -367,6 +369,76 @@ namespace Game.UI.Editor
             {
                 panel.ResetReward();
                 panel.ChoiceRequested -= receive;
+            }
+        }
+
+        private static async UniTask RunAsyncSelectionChecksAsync(ArtifactRewardPanel panel)
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<ArtifactCatalog>(MvpVictoryRewardSetup.CatalogPath);
+            Check(catalog != null, "team artifact catalog available");
+            var common = catalog.GetByRarity(ArtifactRarity.Common);
+            Check(common.Count >= 2, "at least two real artifact candidates available");
+            var candidates = new[] { common[0], common[1] };
+            var fields = new SerializedObject(panel);
+            var cards = fields.FindProperty("_cards");
+            var firstCard = Row<Button>(cards, 0, "Button");
+            var confirm = Field<Button>(fields, "_confirmButton");
+            var rewardText = Field<TMP_Text>(fields, "_rewardText");
+            var owner = new GameObject("Async Artifact Selection Validation");
+            var binding = owner.AddComponent<ArtifactRewardBinding>();
+            var bindingFields = new SerializedObject(binding);
+            bindingFields.FindProperty("_panel").objectReferenceValue = panel;
+            bindingFields.ApplyModifiedPropertiesWithoutUndo();
+            try
+            {
+                var choice = binding.SelectAsync(candidates, CancellationToken.None);
+                Check(panel.IsVisible && binding.IsChoosing && !panel.IsRequestPending,
+                    "async selection opens without modifying inventory");
+                Check(!rewardText.gameObject.activeSelf, "selection-only UI hides unknown currency amounts");
+                Click(firstCard);
+                Click(confirm);
+                Check(ReferenceEquals(await choice, candidates[0]), "selection returns the original team data");
+                Check(!panel.IsVisible && !binding.IsChoosing && !panel.IsRequestPending,
+                    "confirmed selection closes and clears UI state");
+
+                var forfeit = binding.SelectAsync(candidates, CancellationToken.None);
+                Click(confirm);
+                Check(await forfeit == null && !panel.IsVisible, "forfeit returns null without granting an artifact");
+
+                using (var cancellation = new CancellationTokenSource())
+                {
+                    var pending = binding.SelectAsync(candidates, cancellation.Token);
+                    Check(panel.IsVisible, "cancelable selection opened");
+                    cancellation.Cancel();
+                    bool canceled = false;
+                    try { await pending; }
+                    catch (OperationCanceledException) { canceled = true; }
+                    Check(canceled && !panel.IsVisible && !binding.IsChoosing,
+                        "run cancellation closes and releases the selection UI");
+                }
+
+                var disabled = binding.SelectAsync(candidates, CancellationToken.None);
+                binding.enabled = false;
+                bool disabledCanceled = false;
+                try { await disabled; }
+                catch (OperationCanceledException) { disabledCanceled = true; }
+                Check(disabledCanceled && !panel.IsVisible, "disabled UI cancels the pending choice");
+                binding.enabled = true;
+                var reopened = binding.SelectAsync(candidates, CancellationToken.None);
+                Click(firstCard);
+                Click(confirm);
+                Check(ReferenceEquals(await reopened, candidates[0]), "selection works after re-enable");
+
+                bool duplicateRejected = false;
+                try { await binding.SelectAsync(new[] { candidates[0], candidates[0] }, CancellationToken.None); }
+                catch (ArgumentException) { duplicateRejected = true; }
+                Check(duplicateRejected && !panel.IsVisible, "duplicate candidate IDs cannot open a reward");
+            }
+            finally
+            {
+                binding.enabled = false;
+                panel.ResetReward();
+                UnityEngine.Object.Destroy(owner);
             }
         }
 

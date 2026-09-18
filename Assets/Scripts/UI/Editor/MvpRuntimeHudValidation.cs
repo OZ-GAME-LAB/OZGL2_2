@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using Cysharp.Threading.Tasks;
+using Game.Cameras;
 using Game.Core;
 using Game.UI.Samples;
+using OZGL.KDH;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -174,11 +176,12 @@ namespace Game.UI.Editor
                     EditorSceneManager.OpenScene(MvpRuntimeHudBuilder.ScenePath, OpenSceneMode.Single);
                 }
                 var testScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                if (MvpEconomyUiSetup.IsSupportedScene(testScene.path))
+                    MvpEconomyUiSetup.ConfigureScene(testScene, false);
                 if (SessionState.GetBool(VictoryKey, false))
                     MvpVictoryRewardSetup.ConfigureScene(testScene, false);
                 else if (MvpEconomyUiSetup.IsSupportedScene(testScene.path))
                 {
-                    MvpEconomyUiSetup.ConfigureScene(testScene, false);
                     // 최신 Core는 수동 재화 테스트에서도 실제 유물 매니저 참조를 요구한다.
                     MvpVictoryRewardSetup.ConfigureScene(testScene, false);
                 }
@@ -194,6 +197,20 @@ namespace Game.UI.Editor
                             fields.ApplyModifiedPropertiesWithoutUndo();
                         }
                 }
+                // UI 테스트 씬의 카메라는 실제 건설 입력을 사용하지 않는다. 종료 시 팀 카메라의
+                // 참조 해제가 안전하도록 메모리상의 비활성 테스트 의존성만 제공한다.
+                foreach (var root in testScene.GetRootGameObjects())
+                    foreach (var camera in root.GetComponentsInChildren<InGameCameraController>(true))
+                    {
+                        var cameraFields = new SerializedObject(camera);
+                        if (cameraFields.FindProperty("_buildController").objectReferenceValue != null) continue;
+                        var owner = new GameObject("UI Validation Camera Dependency");
+                        owner.SetActive(false);
+                        UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(owner, testScene);
+                        var build = owner.AddComponent<BuildingBuildController>();
+                        build.enabled = false;
+                        camera.Initialize(build);
+                    }
                 SessionState.SetInt(ResultKey, 1);
                 SessionState.SetBool(LifecycleErrorKey, false);
                 SessionState.SetBool(ActiveKey, true);
@@ -322,6 +339,7 @@ namespace Game.UI.Editor
                 Check(preparingCount == 1 && flow.CurPhase == GamePhase.BattlePreparing, "double click creates one start");
                 Check(!start.interactable && coreBinding.IsStartPending && phaseText.text == "전투 준비", "input locks until actual Battle entry");
                 reset.onClick.Invoke();
+                await WaitForPhase(flow, GamePhase.Preparation);
                 Check(flow.CurPhase == GamePhase.Preparation && start.interactable && !coreBinding.IsStartPending, "reset cancels old request and unlocks new run");
                 start.onClick.Invoke();
                 await WaitForPhase(flow, GamePhase.Battle);

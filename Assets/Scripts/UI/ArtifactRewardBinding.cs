@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace Game.UI
@@ -27,6 +29,7 @@ namespace Game.UI
         private bool _isApplying;
         private bool _faulted;
         private bool _listening;
+        private UniTaskCompletionSource<ArtifactData> _selectionCompletion;
 
         private void OnEnable()
         {
@@ -36,13 +39,20 @@ namespace Game.UI
 
         private void OnDisable()
         {
+            if (_selectionCompletion != null) ResetReward();
             Unsubscribe();
             if (_panel != null) _panel.HideReward();
+        }
+
+        private void OnDestroy()
+        {
+            if (_selectionCompletion != null) ResetReward();
         }
 
         public bool TryInitialize(ArtifactManager manager)
         {
             if (_panel == null || manager == null || !manager.IsInitialized || _isApplying ||
+                _selectionCompletion != null ||
                 (IsChoosing && _manager != manager)) return false;
             if (_manager == manager && ReferenceEquals(_inventory, manager.Instances))
             {
@@ -57,10 +67,65 @@ namespace Game.UI
             return true;
         }
 
+        /// <summary>팀 아티팩트 시스템이 정한 후보 중 선택된 원본만 돌려준다. 효과 적용은 호출자 소유다.</summary>
+        public async UniTask<ArtifactData> SelectAsync(IReadOnlyList<ArtifactData> candidates, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!isActiveAndEnabled || _panel == null || _selectionCompletion != null ||
+                IsChoosing || _isApplying || _faulted)
+                throw new InvalidOperationException("Artifact selection UI is unavailable or already showing a reward.");
+            if (candidates == null || candidates.Count == 0)
+                throw new ArgumentException("At least one artifact candidate is required.", nameof(candidates));
+
+            var byId = new Dictionary<string, ArtifactData>(StringComparer.Ordinal);
+            var offers = new ArtifactRewardOffer[candidates.Count];
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var data = candidates[i];
+                if (data == null || string.IsNullOrWhiteSpace(data.Id) || byId.ContainsKey(data.Id))
+                    throw new ArgumentException("Candidates must have distinct, non-empty IDs.", nameof(candidates));
+                byId.Add(data.Id, data);
+                offers[i] = new ArtifactRewardOffer(data.Id, data.DisplayName, RarityName(data.Rarity),
+                    string.IsNullOrWhiteSpace(data.Description) ? "효과 설명 미등록" : data.Description.Replace("\\n", "\n"),
+                    data.Icon, RarityColor(data.Rarity));
+            }
+
+            string rewardId = Guid.NewGuid().ToString("N");
+            var viewData = new ArtifactRewardViewData(rewardId, false, offers);
+            var completion = new UniTaskCompletionSource<ArtifactData>();
+            _rewardId = rewardId;
+            _viewData = viewData;
+            _completed = false;
+            _candidates.Clear();
+            foreach (var candidate in byId) _candidates.Add(candidate.Key, candidate.Value);
+            _selectionCompletion = completion;
+            Subscribe();
+            try
+            {
+                _panel.ShowReward(viewData);
+                using (token.Register(() => completion.TrySetCanceled(token)))
+                    return await completion.Task;
+            }
+            finally
+            {
+                await UniTask.SwitchToMainThread();
+                if (ReferenceEquals(_selectionCompletion, completion))
+                {
+                    _selectionCompletion = null;
+                    _rewardId = null;
+                    _viewData = null;
+                    _completed = false;
+                    _candidates.Clear();
+                    _panel.ResetReward();
+                }
+            }
+        }
+
         /// <summary>awarded 값은 이미 지급한 재화다. 반복 호출은 최초 후보를 그대로 표시한다.</summary>
         public bool TryShowReward(string rewardId, int? awardedGold, int? awardedGems)
         {
             if (!isActiveAndEnabled || !HasCurrentInventory() || _isApplying || _faulted ||
+                _selectionCompletion != null ||
                 string.IsNullOrWhiteSpace(rewardId) || awardedGold < 0 || awardedGems < 0) return false;
             if (_completedIds.Contains(rewardId)) return true;
             if (_rewardId == rewardId)
@@ -110,6 +175,9 @@ namespace Game.UI
         public void ResetReward()
         {
             if (_isApplying) return;
+            var selection = _selectionCompletion;
+            _selectionCompletion = null;
+            selection?.TrySetCanceled();
             _rewardId = null;
             _viewData = null;
             _completed = false;
@@ -122,6 +190,19 @@ namespace Game.UI
         private void HandleChoiceRequested(ArtifactRewardRequest request)
         {
             if (!isActiveAndEnabled || !IsChoosing || request.RewardId != _rewardId || _isApplying) return;
+            if (_selectionCompletion != null)
+            {
+                ArtifactData selected = null;
+                if (!request.IsForfeit && !_candidates.TryGetValue(request.ArtifactId, out selected))
+                {
+                    _panel.TryResolveRequest(request.RequestId, false, "후보 목록이 변경되었습니다. 다시 선택해주세요.");
+                    return;
+                }
+                _completed = true;
+                _panel.TryResolveRequest(request.RequestId, true);
+                _selectionCompletion.TrySetResult(selected);
+                return;
+            }
             if (_faulted || !HasCurrentInventory())
             {
                 _panel.TryResolveRequest(request.RequestId, false, "보상 상태가 변경되었습니다. 플레이를 다시 시작해주세요.");
@@ -167,9 +248,10 @@ namespace Game.UI
 
         private void Subscribe()
         {
-            if (_listening || !isActiveAndEnabled || _panel == null || _manager == null) return;
+            if (_listening || !isActiveAndEnabled || _panel == null ||
+                (_manager == null && _selectionCompletion == null)) return;
             _panel.ChoiceRequested += HandleChoiceRequested;
-            _manager.Cleared += HandleCleared;
+            if (_manager != null) _manager.Cleared += HandleCleared;
             _listening = true;
         }
 

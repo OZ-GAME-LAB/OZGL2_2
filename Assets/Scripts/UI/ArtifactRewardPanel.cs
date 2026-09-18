@@ -228,6 +228,7 @@ namespace Game.UI
             if (opening && EventSystem.current != null)
                 _previousSelection = EventSystem.current.currentSelectedGameObject;
             _panelRoot.SetActive(true);
+            _rewardText.gameObject.SetActive(_data.ShowRewardCurrencies);
             _rewardText.text = _compactPresentation
                 ? "골드 " + FormatReward(_data.AwardedGold) + "     ·     보석 " + FormatReward(_data.AwardedGems)
                 : "획득 골드 " + FormatReward(_data.AwardedGold) + "\n획득 보석 " + FormatReward(_data.AwardedGems);
