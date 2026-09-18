@@ -22,6 +22,9 @@ MonoBehaviour:
   buildCost:
   - type: 0
     amount: 8
+  buildFromEmptySlot: 1
+  requiredCoreLevel: 0
+  coreLevel: 0
   production:
     enabled: 0
     resourceType: 0
@@ -29,7 +32,7 @@ MonoBehaviour:
     trigger: 0
   spawn:
     enabled: 1
-    unitType: 2
-    unitPrefab: {fileID: 4888450599714203798, guid: e99210bf724180742b51e4ed09316915, type: 3}
+    unitType: 3
     countPerWave: 3
     maxAlive: 3
+  upgrades: []
