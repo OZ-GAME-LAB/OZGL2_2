@@ -170,7 +170,7 @@ MonoBehaviour:
   _holdAcceleration: 10
   _environmentMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 1024
   _environmentCheckDistance: 0.5
   _unitMask:
     serializedVersion: 2
@@ -229,6 +229,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.Unit_AI
   _thinkInterval: 0.1
+  _targetReevaluationInterval: 0.5
 --- !u!114 &7165227518126308051
 MonoBehaviour:
   m_ObjectHideFlags: 0
