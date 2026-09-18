@@ -36,7 +36,7 @@ public class BootStrap : MonoBehaviour
         if (!ValidateReferences()) return;
 
         _testScript.Initialize(_gameFlowController, _waveController);
-        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager);
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _cameraController);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController);
         _artifactManager.Initialize(_waveController, _effectManager);

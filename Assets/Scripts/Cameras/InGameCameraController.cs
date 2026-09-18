@@ -73,6 +73,13 @@ namespace Game.Cameras
             _buildController = buildController;
             _buildController.SlotSelected += FocusAt;
             _buildController.SlotDeselected += FocusOut;
+
+            _worldCamera = Camera.main;
+            _brain = _worldCamera.GetComponent<CinemachineBrain>();
+            if (_brain == null)
+            {
+                Debug.LogError("[InGameCameraController] CinemachineBrain 컴포넌트가 MainCamera에 존재하지 않습니다.");
+            }
         }
         public void Toggle()
         {

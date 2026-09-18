@@ -108,6 +108,11 @@ namespace Game.Core
         {
             _runtimeUnitManager.StartBattlePhase();
         }
+
+        public void BattlePause()
+        {
+            _runtimeUnitManager.PauseBattle();
+        }
         /// <summary>
         /// 전투 결과를 확인하고 승/패를 판정한다.
         /// </summary>

@@ -53,30 +53,36 @@ namespace Game.Core
         public bool CanChooseRunDecision => IsWaitingForRunDecision && !_runDecision.HasValue;
         public bool IsWaitingForArtifactSelection { get; private set; }
 
-        [SerializeField] private InGameCameraController _cameraController;
         [SerializeField] private bool _autoContinue;
         public bool AutoContinue { get => _autoContinue; set => _autoContinue = value; }
 
         private TestWaitingScript _testScript;
         private WaveController _waveController;
         private ArtifactManager _artifactManager;
+        private InGameCameraController _cameraController;
         private GamePhase _curPhase;
-        private bool _isTransitioning;
-        private bool _isResetting;
+        private RunDecision? _runDecision;
         private UniTaskCompletionSource _spawnCompletion;
         private CancellationTokenSource _cts;
-        private RunDecision? _runDecision;
-
+        
+        private bool _isTransitioning;
+        private bool _isResetting;
+        
         public bool CanJumpToLastWave => CanEnterBuildMode() && CurrentNode != null && !IsLastNode;
         public bool CanJumpToLastQuarter => CanEnterBuildMode() && CurrentQuarter < NodeController.MainQuarters;
 
         // 초기화 및 수명 관리
         /// <summary>참조를 연결하고 기존 실행을 취소한다.</summary>
-        public void Initialize(WaveController waveController, TestWaitingScript testScript, ArtifactManager artifactManager)
+        public void Initialize(
+            WaveController waveController, 
+            TestWaitingScript testScript, 
+            ArtifactManager artifactManager, 
+            InGameCameraController cameraController = null)
         {
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
+            _cameraController = cameraController;
             _nodeController = new NodeController(waveController.WaveCatalog);
             ClearToken();
             ResetDecisionState();
@@ -219,7 +225,8 @@ namespace Game.Core
         {
             Node completedNode = CurrentNode;
             ChangePhase(GamePhase.BattleResolving);
-            // 실제 유닛 파트는 이 페이즈 진입 시 공격·이동·피해 처리를 중단해야 한다.
+            //전투를 중단하고 연출한다. 
+            _waveController.BattlePause();
             await PlayBattleResultAsync(result, token);
             token.ThrowIfCancellationRequested(); //token이 들어간 작업이 중단되면 취소 예외 발생
             
@@ -261,6 +268,7 @@ namespace Game.Core
                 //전장정리
                 await CleanupBattleAsync(token);
                 token.ThrowIfCancellationRequested();
+                //이벤트 진행
                 await ProcessEventAsync(completedNode, token);
                 token.ThrowIfCancellationRequested();
                 ChangePhase(GamePhase.QuarterComplete);
@@ -287,6 +295,7 @@ namespace Game.Core
                 if (!StartQuarter(CurrentQuarter + 1)) return;
             }
             token.ThrowIfCancellationRequested();
+            //다시 기지로 카메라 전환
             _cameraController.ShowBase();
             ChangePhase(GamePhase.Preparation);
         }
