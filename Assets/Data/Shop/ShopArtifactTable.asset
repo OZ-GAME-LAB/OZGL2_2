@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09a2841361f34d7e98006eca904d2a77, type: 3}
+  m_Name: ShopArtifactTable
+  m_EditorClassIdentifier: Assembly-CSharp::ShopArtifactTable
+  _raritySettings:
+  - _rarity: 0
+    _weight: 60
+    _minPrice: 100
+    _maxPrice: 200
+    _sellPrice: 40
+  - _rarity: 1
+    _weight: 30
+    _minPrice: 500
+    _maxPrice: 800
+    _sellPrice: 100
+  - _rarity: 2
+    _weight: 10
+    _minPrice: 1500
+    _maxPrice: 2000
+    _sellPrice: 200
+  - _rarity: 3
+    _weight: 0
+    _minPrice: 800
+    _maxPrice: 1200
+    _sellPrice: 400
