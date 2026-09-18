@@ -6,7 +6,7 @@ using Game.Core;
 using UnityEngine;
 
 // 아티팩트 후보 생성·보유 상태를 관리하고 공통 창구에 효과를 등록
-public class ArtifactManager : MonoBehaviour
+public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IArtifactInventory
 {
      // 보유 상태 변경 전에 준비한 중첩 수량과 효과
     private struct PreparedChange
