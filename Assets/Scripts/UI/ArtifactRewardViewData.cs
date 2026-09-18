@@ -37,7 +37,16 @@ namespace Game.UI
         public string RewardId { get; }
         public int? AwardedGold { get; }
         public int? AwardedGems { get; }
+        public bool ShowRewardCurrencies { get; }
         public IReadOnlyList<ArtifactRewardOffer> Candidates { get; }
+
+        /// <summary>후보 선택만 필요한 창. 재화 보상 줄은 표시하지 않는다.</summary>
+        public ArtifactRewardViewData(string rewardId, bool showRewardCurrencies,
+            params ArtifactRewardOffer[] candidates)
+            : this(rewardId, null, null, candidates)
+        {
+            ShowRewardCurrencies = showRewardCurrencies;
+        }
 
         /// <param name="rewardId">플레이/전투별로 유일한 보상 식별자. 재오픈에도 같은 ID를 유지한다.</param>
         /// <param name="awardedGold">이미 지급된 실제 보상. 알 수 없으면 null, 지급 없음은 0.</param>
@@ -61,6 +70,7 @@ namespace Game.UI
             RewardId = rewardId;
             AwardedGold = awardedGold;
             AwardedGems = awardedGems;
+            ShowRewardCurrencies = true;
             Candidates = Array.AsReadOnly(copy);
         }
     }
