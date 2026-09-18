@@ -31,10 +31,10 @@ MonoBehaviour:
     amount: 10
     trigger: 0
   spawn:
-    enabled: 0
+    enabled: 1
     unitType: 1
-    countPerWave: 1
-    maxAlive: 3
+    countPerWave: 2
+    maxAlive: 2
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 636c035baa190cd4eaa966366026b806, type: 2}
     cost:
