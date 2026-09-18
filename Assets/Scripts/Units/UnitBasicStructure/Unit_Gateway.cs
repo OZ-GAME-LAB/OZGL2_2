@@ -49,6 +49,9 @@ namespace Units
         // Properties
         // ============================================================
 
+        public Unit_Core Core
+            => _core;
+
         public UnitTeam Team
             => _core != null
                 ? _core.Team
@@ -320,6 +323,15 @@ namespace Units
         {
             _core?.TakeDamage(
                 result
+            );
+        }
+
+
+        public void Heal(
+            float amount)
+        {
+            _core?.Heal(
+                amount
             );
         }
 

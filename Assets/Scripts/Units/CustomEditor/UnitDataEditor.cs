@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using Units.Effects;
 using Units.UnitDatas;
 
 
@@ -23,6 +24,8 @@ namespace Units.Editor
 
         private SerializedProperty _stats;
 
+        private SerializedProperty _statusImmunities;
+
         private SerializedProperty _basicAttackData;
         private SerializedProperty _activeSkillData;
 
@@ -34,6 +37,7 @@ namespace Units.Editor
         private bool _basicFoldout = true;
         private bool _identityFoldout = true;
         private bool _statsFoldout = true;
+        private bool _statusImmunityFoldout = true;
         private bool _combatFoldout = true;
 
 
@@ -71,6 +75,11 @@ namespace Units.Editor
             _stats =
                 serializedObject.FindProperty(
                     "_stats"
+                );
+
+            _statusImmunities =
+                serializedObject.FindProperty(
+                    "_statusImmunities"
                 );
 
             _basicAttackData =
@@ -113,6 +122,10 @@ namespace Units.Editor
             EditorGUILayout.Space();
 
             DrawStatsSection();
+
+            EditorGUILayout.Space();
+
+            DrawStatusImmunitySection();
 
             EditorGUILayout.Space();
 
@@ -505,6 +518,169 @@ namespace Units.Editor
 
 
             return true;
+        }
+
+
+        // ============================================================
+        // Status Immunity
+        // ============================================================
+
+        private void DrawStatusImmunitySection()
+        {
+            EditorGUILayout.BeginVertical(
+                EditorStyles.helpBox
+            );
+
+
+            _statusImmunityFoldout =
+                EditorGUILayout.Foldout(
+                    _statusImmunityFoldout,
+                    "Status Immunity",
+                    true,
+                    EditorStyles.foldoutHeader
+                );
+
+
+            if (_statusImmunityFoldout)
+            {
+                EditorGUI.indentLevel++;
+
+
+                UnitStatusEffectType[] statusTypes =
+                    (UnitStatusEffectType[])Enum.GetValues(
+                        typeof(UnitStatusEffectType)
+                    );
+
+
+                for (int i = 0;
+                     i < statusTypes.Length;
+                     i++)
+                {
+                    UnitStatusEffectType statusType =
+                        statusTypes[i];
+
+
+                    bool isImmune =
+                        ContainsStatusImmunity(
+                            statusType
+                        );
+
+
+                    bool nextValue =
+                        EditorGUILayout.Toggle(
+                            ObjectNames.NicifyVariableName(
+                                statusType.ToString()
+                            ),
+                            isImmune
+                        );
+
+
+                    if (nextValue == isImmune)
+                        continue;
+
+
+                    if (nextValue)
+                    {
+                        AddStatusImmunity(
+                            statusType
+                        );
+                    }
+                    else
+                    {
+                        RemoveStatusImmunity(
+                            statusType
+                        );
+                    }
+                }
+
+
+                EditorGUI.indentLevel--;
+            }
+
+
+            EditorGUILayout.EndVertical();
+        }
+
+
+        private bool ContainsStatusImmunity(
+            UnitStatusEffectType statusType)
+        {
+            for (int i = 0;
+                 i < _statusImmunities.arraySize;
+                 i++)
+            {
+                SerializedProperty element =
+                    _statusImmunities.GetArrayElementAtIndex(
+                        i
+                    );
+
+
+                if (element.intValue ==
+                    (int)statusType)
+                {
+                    return true;
+                }
+            }
+
+
+            return false;
+        }
+
+
+        private void AddStatusImmunity(
+            UnitStatusEffectType statusType)
+        {
+            if (ContainsStatusImmunity(
+                    statusType))
+            {
+                return;
+            }
+
+
+            int index =
+                _statusImmunities.arraySize;
+
+
+            _statusImmunities.InsertArrayElementAtIndex(
+                index
+            );
+
+
+            SerializedProperty element =
+                _statusImmunities.GetArrayElementAtIndex(
+                    index
+                );
+
+
+            element.intValue =
+                (int)statusType;
+        }
+
+
+        private void RemoveStatusImmunity(
+            UnitStatusEffectType statusType)
+        {
+            for (int i = _statusImmunities.arraySize - 1;
+                 i >= 0;
+                 i--)
+            {
+                SerializedProperty element =
+                    _statusImmunities.GetArrayElementAtIndex(
+                        i
+                    );
+
+
+                if (element.intValue !=
+                    (int)statusType)
+                {
+                    continue;
+                }
+
+
+                _statusImmunities.DeleteArrayElementAtIndex(
+                    i
+                );
+            }
         }
 
 

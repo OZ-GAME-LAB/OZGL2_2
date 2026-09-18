@@ -3,7 +3,7 @@
 
 namespace Units.Skills
 {
-    public enum ActiveSkillExecutionType
+    public enum ActiveSkillDeliveryType
     {
         Direct,
 

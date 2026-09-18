@@ -1,6 +1,5 @@
+using System.Collections.Generic;
 using UnityEngine;
-
-
 
 namespace Units.Skills
 {
@@ -53,13 +52,13 @@ namespace Units.Skills
 
 
         // ============================================================
-        // Execution
+        // Delivery
         // ============================================================
 
-        [Header("Execution")]
+        [Header("Delivery")]
         [SerializeField]
-        private ActiveSkillExecutionType _executionType =
-            ActiveSkillExecutionType.Direct;
+        private ActiveSkillDeliveryType _deliveryType =
+            ActiveSkillDeliveryType.Direct;
 
 
         // ============================================================
@@ -73,8 +72,8 @@ namespace Units.Skills
             1;
 
         [SerializeField]
-        [Tooltip("광역 판정 1회에 피해를 적용할 최대 인원")]
-        private int _maxDamageableCount =
+        [Tooltip("광역 판정 1회에 Effect를 적용할 최대 대상 수")]
+        private int _maxEffectTargetCount =
             1;
 
 
@@ -94,6 +93,16 @@ namespace Units.Skills
         [SerializeField]
         private float _areaAngle =
             90f;
+
+
+        // ============================================================
+        // Effects
+        // ============================================================
+
+        [Header("Effects")]
+        [SerializeReference]
+        private List<SkillEffectData> _effects =
+            new();
 
 
         // ============================================================
@@ -159,17 +168,17 @@ namespace Units.Skills
             _castTime;
 
 
-        public ActiveSkillExecutionType ExecutionType =>
-            _executionType;
+        public ActiveSkillDeliveryType DeliveryType =>
+            _deliveryType;
 
 
         // Projectile을 발사할 최대 목표 수이다.
         public int MaxTargetCount =>
             _maxTargetCount;
 
-        // 광역 판정 1회에 피해를 적용할 최대 인원이다.
-        public int MaxDamageableCount =>
-            _maxDamageableCount;
+        // 광역 판정 1회에 Effect를 적용할 최대 대상 수이다.
+        public int MaxEffectTargetCount =>
+            _maxEffectTargetCount;
 
 
         public ActiveSkillAreaType AreaType =>
@@ -180,6 +189,10 @@ namespace Units.Skills
 
         public float AreaAngle =>
             _areaAngle;
+
+
+        public IReadOnlyList<SkillEffectData> Effects =>
+            _effects;
 
 
         public float ProjectileSpeed =>
@@ -227,10 +240,10 @@ namespace Units.Skills
                     _maxTargetCount
                 );
 
-            _maxDamageableCount =
+            _maxEffectTargetCount =
                 Mathf.Max(
                     1,
-                    _maxDamageableCount
+                    _maxEffectTargetCount
                 );
 
             _areaRadius =

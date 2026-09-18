@@ -2,21 +2,33 @@
 using UnityEngine;
 
 
-
-namespace Units
+namespace Units.Effects
 {
     [Serializable]
-    public class PeriodicDamageEffectActionData : EffectActionData
+    public class PeriodicDamageEffectActionData
+        : EffectActionData
     {
-        [SerializeField]
-        private float _interval;
+        // ============================================================
+        // Data
+        // ============================================================
 
         [SerializeField]
+        [Min(0.01f)]
+        private float _interval = 1f;
+
+        [SerializeField]
+        [Min(0f)]
         private float _damage;
 
 
-        public float Interval => _interval;
+        // ============================================================
+        // Properties
+        // ============================================================
 
-        public float Damage => _damage;
+        public float Interval =>
+            _interval;
+
+        public float Damage =>
+            _damage;
     }
 }

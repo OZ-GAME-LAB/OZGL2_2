@@ -2,7 +2,7 @@
 
 
 
-namespace Units
+namespace Units.Effects
 {
     [Serializable]
     public abstract class EffectActionData

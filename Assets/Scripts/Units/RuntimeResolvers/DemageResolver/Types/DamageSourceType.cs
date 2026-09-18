@@ -3,6 +3,7 @@
     public enum DamageSourceType
     {
         BasicAttack,
-        Skill
+        Skill,
+        Dot
     }
 }

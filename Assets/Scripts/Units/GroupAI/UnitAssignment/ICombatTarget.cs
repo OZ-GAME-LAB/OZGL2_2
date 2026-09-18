@@ -28,11 +28,15 @@ namespace Units
 
 
         // ============================================================
-        // Damage
+        // Life
         // ============================================================
 
         void TakeDamage(
             DamageResult result
+        );
+
+        void Heal(
+            float amount
         );
     }
 }

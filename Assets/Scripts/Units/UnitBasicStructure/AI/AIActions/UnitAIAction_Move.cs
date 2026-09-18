@@ -49,6 +49,13 @@ namespace Units
                 return;
 
 
+            if (_core == null
+                || !_core.CanMove)
+            {
+                return;
+            }
+
+
             _core.MoveTo(
                 assignment.Value.PreferredPosition
             );
@@ -59,6 +66,13 @@ namespace Units
             UnitAssignment? assignment)
         {
             if (!assignment.HasValue)
+            {
+                return UnitAIActionType.Idle;
+            }
+
+
+            if (_core == null
+                || !_core.CanMove)
             {
                 return UnitAIActionType.Idle;
             }
@@ -94,26 +108,7 @@ namespace Units
 
         public void Exit()
         {
-            _core.StopMovement();
-        }
-
-
-        // ============================================================
-        // Position
-        // ============================================================
-
-        private bool IsPreferredPositionReached(
-            UnitAssignment assignment)
-        {
-            float distance =
-                Vector2.Distance(
-                    _core.transform.position,
-                    assignment.PreferredPosition
-                );
-
-
-            return distance
-                <= assignment.PositionTolerance;
+            _core?.StopMovement();
         }
 
 

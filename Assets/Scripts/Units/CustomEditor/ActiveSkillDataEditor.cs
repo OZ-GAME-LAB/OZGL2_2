@@ -1,7 +1,6 @@
 using UnityEditor;
-using Units;
+using UnityEngine;
 using Units.Skills;
-
 
 namespace Units.Editor
 {
@@ -21,14 +20,16 @@ namespace Units.Editor
         private SerializedProperty _actionType;
         private SerializedProperty _castTime;
 
-        private SerializedProperty _executionType;
+        private SerializedProperty _deliveryType;
 
         private SerializedProperty _maxTargetCount;
-        private SerializedProperty _maxDamageableCount;
+        private SerializedProperty _maxEffectTargetCount;
 
         private SerializedProperty _areaType;
         private SerializedProperty _areaRadius;
         private SerializedProperty _areaAngle;
+
+        private SerializedProperty _effects;
 
         private SerializedProperty _projectileSpeed;
 
@@ -46,8 +47,9 @@ namespace Units.Editor
         private bool _basicFoldout = true;
         private bool _targetFoldout = true;
         private bool _actionFoldout = true;
-        private bool _executionFoldout = true;
+        private bool _deliveryFoldout = true;
         private bool _areaFoldout = true;
+        private bool _effectsFoldout = true;
         private bool _projectileFoldout = true;
         private bool _dashFoldout = true;
         private bool _fxFoldout = true;
@@ -92,9 +94,9 @@ namespace Units.Editor
                 );
 
 
-            _executionType =
+            _deliveryType =
                 serializedObject.FindProperty(
-                    "_executionType"
+                    "_deliveryType"
                 );
 
 
@@ -103,9 +105,9 @@ namespace Units.Editor
                     "_maxTargetCount"
                 );
 
-            _maxDamageableCount =
+            _maxEffectTargetCount =
                 serializedObject.FindProperty(
-                    "_maxDamageableCount"
+                    "_maxEffectTargetCount"
                 );
 
 
@@ -122,6 +124,12 @@ namespace Units.Editor
             _areaAngle =
                 serializedObject.FindProperty(
                     "_areaAngle"
+                );
+
+
+            _effects =
+                serializedObject.FindProperty(
+                    "_effects"
                 );
 
 
@@ -175,7 +183,7 @@ namespace Units.Editor
 
             EditorGUILayout.Space();
 
-            DrawExecutionSection();
+            DrawDeliverySection();
 
 
             if (ShouldDrawAreaSection())
@@ -184,6 +192,11 @@ namespace Units.Editor
 
                 DrawAreaSection();
             }
+
+
+            EditorGUILayout.Space();
+
+            DrawEffectsSection();
 
 
             if (ShouldDrawProjectileSection())
@@ -348,32 +361,32 @@ namespace Units.Editor
 
 
         // ============================================================
-        // Execution
+        // Delivery
         // ============================================================
 
-        private void DrawExecutionSection()
+        private void DrawDeliverySection()
         {
             EditorGUILayout.BeginVertical(
                 EditorStyles.helpBox
             );
 
 
-            _executionFoldout =
+            _deliveryFoldout =
                 EditorGUILayout.Foldout(
-                    _executionFoldout,
-                    "Execution",
+                    _deliveryFoldout,
+                    "Delivery",
                     true,
                     EditorStyles.foldoutHeader
                 );
 
 
-            if (_executionFoldout)
+            if (_deliveryFoldout)
             {
                 EditorGUI.indentLevel++;
 
 
                 EditorGUILayout.PropertyField(
-                    _executionType
+                    _deliveryType
                 );
 
                 EditorGUILayout.PropertyField(
@@ -381,8 +394,8 @@ namespace Units.Editor
                 );
 
 
-                if (GetExecutionType()
-                    == ActiveSkillExecutionType.Projectile)
+                if (GetDeliveryType()
+                    == ActiveSkillDeliveryType.Projectile)
                 {
                     EditorGUILayout.PropertyField(
                         _maxTargetCount
@@ -394,7 +407,7 @@ namespace Units.Editor
                     != ActiveSkillAreaType.Single)
                 {
                     EditorGUILayout.PropertyField(
-                        _maxDamageableCount
+                        _maxEffectTargetCount
                     );
                 }
 
@@ -457,6 +470,121 @@ namespace Units.Editor
 
                         break;
                 }
+
+
+                EditorGUI.indentLevel--;
+            }
+
+
+            EditorGUILayout.EndVertical();
+        }
+
+
+        // ============================================================
+        // Effects
+        // ============================================================
+
+        private void DrawEffectsSection()
+        {
+            EditorGUILayout.BeginVertical(
+                EditorStyles.helpBox
+            );
+
+
+            _effectsFoldout =
+                EditorGUILayout.Foldout(
+                    _effectsFoldout,
+                    "Effects",
+                    true,
+                    EditorStyles.foldoutHeader
+                );
+
+
+            if (_effectsFoldout)
+            {
+                EditorGUI.indentLevel++;
+
+
+                for (int i = 0;
+                     i < _effects.arraySize;
+                     i++)
+                {
+                    SerializedProperty effectProperty =
+                        _effects.GetArrayElementAtIndex(
+                            i
+                        );
+
+
+                    EditorGUILayout.BeginVertical(
+                        EditorStyles.helpBox
+                    );
+
+
+                    EditorGUILayout.PropertyField(
+                        effectProperty,
+                        new GUIContent(
+                            GetEffectLabel(
+                                effectProperty,
+                                i
+                            )
+                        ),
+                        true
+                    );
+
+
+                    if (GUILayout.Button(
+                        "Remove Effect"
+                    ))
+                    {
+                        _effects.DeleteArrayElementAtIndex(
+                            i
+                        );
+
+                        EditorGUILayout.EndVertical();
+
+                        break;
+                    }
+
+
+                    EditorGUILayout.EndVertical();
+                }
+
+
+                EditorGUILayout.Space();
+
+
+                EditorGUILayout.BeginHorizontal();
+
+
+                if (GUILayout.Button(
+                    "Add Damage"
+                ))
+                {
+                    AddEffect(
+                        new SkillDamageEffectData()
+                    );
+                }
+
+                if (GUILayout.Button(
+                    "Add Heal"
+                ))
+                {
+                    AddEffect(
+                        new SkillHealEffectData()
+                    );
+                }
+
+                if (GUILayout.Button(
+                    "Add Runtime Effect"
+                ))
+                {
+                    AddEffect(
+                        new SkillRuntimeEffectData()
+                    );
+                }
+
+
+                EditorGUILayout.EndHorizontal();
 
 
                 EditorGUI.indentLevel--;
@@ -590,6 +718,61 @@ namespace Units.Editor
 
 
         // ============================================================
+        // Effects
+        // ============================================================
+
+        private void AddEffect(
+            SkillEffectData effect)
+        {
+            int index =
+                _effects.arraySize;
+
+            _effects.InsertArrayElementAtIndex(
+                index
+            );
+
+            SerializedProperty effectProperty =
+                _effects.GetArrayElementAtIndex(
+                    index
+                );
+
+            effectProperty.managedReferenceValue =
+                effect;
+        }
+
+
+        private string GetEffectLabel(
+            SerializedProperty effectProperty,
+            int index)
+        {
+            object effect =
+                effectProperty.managedReferenceValue;
+
+
+            if (effect == null)
+            {
+                return $"Effect {index}";
+            }
+
+
+            return effect switch
+            {
+                SkillDamageEffectData =>
+                    $"Effect {index} - Damage",
+
+                SkillHealEffectData =>
+                    $"Effect {index} - Heal",
+
+                SkillRuntimeEffectData =>
+                    $"Effect {index} - Runtime Effect",
+
+                _ =>
+                    $"Effect {index}"
+            };
+        }
+
+
+        // ============================================================
         // Conditions
         // ============================================================
 
@@ -602,8 +785,8 @@ namespace Units.Editor
 
         private bool ShouldDrawProjectileSection()
         {
-            return GetExecutionType()
-                == ActiveSkillExecutionType.Projectile;
+            return GetDeliveryType()
+                == ActiveSkillDeliveryType.Projectile;
         }
 
 
@@ -632,10 +815,10 @@ namespace Units.Editor
         }
 
 
-        private ActiveSkillExecutionType GetExecutionType()
+        private ActiveSkillDeliveryType GetDeliveryType()
         {
-            return (ActiveSkillExecutionType)
-                _executionType.enumValueIndex;
+            return (ActiveSkillDeliveryType)
+                _deliveryType.enumValueIndex;
         }
 
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Units.Effects;
 using Units.Skills;
 using UnityEngine;
 
@@ -49,6 +50,15 @@ namespace Units.UnitDatas
 
         [SerializeField]
         private List<UnitStatEntry> _stats = new();
+
+
+        // ============================================================
+        // Status Immunity
+        // ============================================================
+
+        [SerializeField]
+        private List<UnitStatusEffectType> _statusImmunities =
+            new();
 
 
         // ============================================================
@@ -139,6 +149,19 @@ namespace Units.UnitDatas
             }
 
             return 0f;
+        }
+
+
+        // ============================================================
+        // Public Methods - Status Immunity
+        // ============================================================
+
+        public bool IsImmuneToStatus(
+            UnitStatusEffectType statusType)
+        {
+            return _statusImmunities.Contains(
+                statusType
+            );
         }
     }
 

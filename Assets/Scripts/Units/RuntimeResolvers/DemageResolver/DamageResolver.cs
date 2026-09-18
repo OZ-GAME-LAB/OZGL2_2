@@ -80,6 +80,29 @@ namespace Units
         }
 
 
+        public void ResolveDotDamage(
+            DotDamageRequest request)
+        {
+            if (!IsValidDotDamageRequest(
+                    request))
+            {
+                return;
+            }
+
+            DamageResult result =
+                new DamageResult(
+                    request.Attacker,
+                    request.Target,
+                    request.Damage,
+                    request.SourceType
+                );
+
+            request.Target.TakeDamage(
+                result
+            );
+        }
+
+
         // ============================================================
         // Validation
         // ============================================================
@@ -129,6 +152,31 @@ namespace Units
                 return false;
             }
 
+
+            return true;
+        }
+
+
+        private bool IsValidDotDamageRequest(
+           DotDamageRequest request)
+        {
+            if (request.Attacker == null)
+                return false;
+
+            if (request.Target == null)
+                return false;
+
+            if (!request.Target.IsTargetable)
+                return false;
+
+            if (request.Target.Team ==
+                request.Attacker.Team)
+            {
+                return false;
+            }
+
+            if (request.Damage <= 0f)
+                return false;
 
             return true;
         }

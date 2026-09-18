@@ -1,4 +1,5 @@
 using System;
+using Units.Effects;
 using UnityEngine;
 
 
@@ -58,13 +59,17 @@ namespace Units
             => _life != null
             && !_life.IsDead;
 
+        public bool CanMove
+            => _movement != null
+            && _movement.CanMove;
+
         public bool CanUseBasicAttack
             => _combat != null
-                && _combat.CanUseBasicAttack;
+            && _combat.CanUseBasicAttack;
 
         public bool CanUseActiveSkill
             => _combat != null
-                && _combat.CanUseActiveSkill;
+            && _combat.CanUseActiveSkill;
 
 
         public float PreferredCombatRange
@@ -76,6 +81,7 @@ namespace Units
             => _life != null
                 ? _life.CurrentHp
                 : 0f;
+
 
         // ============================================================
         // Events
@@ -111,18 +117,24 @@ namespace Units
         }
 
 
-        public void NotifyActiveSkillCompleted(bool reevaluateAfterMovement = false)
+        public void NotifyActiveSkillCompleted(
+            bool reevaluateAfterMovement = false)
         {
             if (reevaluateAfterMovement)
+            {
                 _ai?.QueueTargetReevaluation();
+            }
 
             ActiveSkillCompleted?.Invoke();
         }
 
-        public SkillEngagementResult RequestSkillEngagement(ICombatTarget target)
+        public SkillEngagementResult RequestSkillEngagement(
+            ICombatTarget target)
         {
             return _gateway != null
-                ? _gateway.RequestSkillEngagement(target)
+                ? _gateway.RequestSkillEngagement(
+                    target
+                )
                 : SkillEngagementResult.Invalid;
         }
 
@@ -133,7 +145,9 @@ namespace Units
                 : RejectSkillTarget;
         }
 
-        private static bool RejectSkillTarget(ICombatTarget target) => false;
+        private static bool RejectSkillTarget(
+            ICombatTarget target)
+            => false;
 
 
         // ============================================================
@@ -157,6 +171,7 @@ namespace Units
 
             UnbindComponentEvents();
 
+
             if (_gateway != null)
             {
                 _gateway.Initialize(
@@ -164,14 +179,18 @@ namespace Units
                 );
             }
 
+
             _runtimeStatus.Initialize(
                 spawnModifier
             );
 
+
             if (_runtimeStatus.UnitData != null)
             {
-                _team = _runtimeStatus.UnitData.Team;
+                _team =
+                    _runtimeStatus.UnitData.Team;
             }
+
 
             if (_life != null)
             {
@@ -180,12 +199,14 @@ namespace Units
                 );
             }
 
+
             if (_movement != null)
             {
                 _movement.Initialize(
                     this
                 );
             }
+
 
             if (_combat != null)
             {
@@ -194,12 +215,14 @@ namespace Units
                 );
             }
 
+
             if (_animation != null)
             {
                 _animation.Initialize(
                     this
                 );
             }
+
 
             if (_detection != null)
             {
@@ -208,6 +231,7 @@ namespace Units
                 );
             }
 
+
             if (_ai != null)
             {
                 _ai.Initialize(
@@ -215,7 +239,10 @@ namespace Units
                 );
             }
 
+
             BindComponentEvents();
+
+            RefreshStatusRestrictions();
         }
 
 
@@ -227,11 +254,13 @@ namespace Units
                     GetComponent<Unit_Gateway>();
             }
 
+
             if (_runtimeStatus == null)
             {
                 _runtimeStatus =
                     GetComponent<Unit_RuntimeStatus>();
             }
+
 
             if (_life == null)
             {
@@ -239,11 +268,13 @@ namespace Units
                     GetComponent<Unit_Life>();
             }
 
+
             if (_movement == null)
             {
                 _movement =
                     GetComponent<Unit_Movement>();
             }
+
 
             if (_combat == null)
             {
@@ -251,17 +282,20 @@ namespace Units
                     GetComponent<Unit_Combat>();
             }
 
+
             if (_animation == null)
             {
                 _animation =
                     GetComponent<Unit_Animation>();
             }
 
+
             if (_detection == null)
             {
                 _detection =
                     GetComponent<Unit_Detection>();
             }
+
 
             if (_ai == null)
             {
@@ -282,6 +316,13 @@ namespace Units
                 _life.Damaged +=
                     OnDamaged;
             }
+
+
+            if (_runtimeStatus != null)
+            {
+                _runtimeStatus.StatusChanged +=
+                    OnStatusChanged;
+            }
         }
 
 
@@ -292,6 +333,70 @@ namespace Units
                 _life.Damaged -=
                     OnDamaged;
             }
+
+
+            if (_runtimeStatus != null)
+            {
+                _runtimeStatus.StatusChanged -=
+                    OnStatusChanged;
+            }
+        }
+
+
+        // ============================================================
+        // Status Restriction
+        // ============================================================
+
+        private void OnStatusChanged(
+            UnitStatusEffectType statusType,
+            bool isActive)
+        {
+            RefreshStatusRestrictions();
+        }
+
+
+        private void RefreshStatusRestrictions()
+        {
+            if (_runtimeStatus == null)
+                return;
+
+
+            bool isStunned =
+                _runtimeStatus.HasStatus(
+                    UnitStatusEffectType.Stun
+                );
+
+
+            bool isRooted =
+                _runtimeStatus.HasStatus(
+                    UnitStatusEffectType.Root
+                );
+
+
+            bool isSilenced =
+                _runtimeStatus.HasStatus(
+                    UnitStatusEffectType.Silence
+                );
+
+
+            // Stun과 Root는 모두 이동을 차단한다.
+            _movement?.SetMovementBlocked(
+                isStunned
+                || isRooted
+            );
+
+
+            // 현재 정의에서 BasicAttack을 차단하는 상태는 Stun이다.
+            _combat?.SetBasicAttackBlocked(
+                isStunned
+            );
+
+
+            // Stun과 Silence는 ActiveSkill을 차단한다.
+            _combat?.SetActiveSkillBlocked(
+                isStunned
+                || isSilenced
+            );
         }
 
 
@@ -305,6 +410,7 @@ namespace Units
             if (_movement == null)
                 return;
 
+
             _movement.MoveTo(
                 targetPosition
             );
@@ -316,8 +422,10 @@ namespace Units
             if (_movement == null)
                 return;
 
+
             _movement.Stop();
         }
+
 
         public void HoldMovementPosition(
             Vector2 position)
@@ -352,6 +460,7 @@ namespace Units
             if (_combat == null)
                 return false;
 
+
             return _combat.TryBasicAttack(
                 target
             );
@@ -364,10 +473,12 @@ namespace Units
             if (_combat == null)
                 return false;
 
+
             return _combat.TryActiveSkill(
                 target
             );
         }
+
 
         public void NotifyCombatPositionChanged()
         {
@@ -384,10 +495,14 @@ namespace Units
             if (_runtimeStatus == null)
                 return 0f;
 
+
             if (_runtimeStatus.BasicAttackData == null)
                 return 0f;
 
-            return _runtimeStatus.BasicAttackData.BasicAttackRange;
+
+            return _runtimeStatus
+                .BasicAttackData
+                .BasicAttackRange;
         }
 
 
@@ -396,10 +511,14 @@ namespace Units
             if (_runtimeStatus == null)
                 return 0f;
 
+
             if (_runtimeStatus.ActiveSkillData == null)
                 return 0f;
 
-            return _runtimeStatus.ActiveSkillData.SkillRange;
+
+            return _runtimeStatus
+                .ActiveSkillData
+                .SkillRange;
         }
 
 
@@ -413,6 +532,7 @@ namespace Units
             if (_life == null)
                 return;
 
+
             _life.TakeDamage(
                 result
             );
@@ -424,6 +544,7 @@ namespace Units
         {
             if (_life == null)
                 return;
+
 
             _life.Heal(
                 amount
@@ -437,10 +558,12 @@ namespace Units
             if (_life == null)
                 return;
 
+
             _life.AddShield(
                 amount
             );
         }
+
 
         public void NotifyDeath()
         {
@@ -455,7 +578,9 @@ namespace Units
             _gateway?.NotifyDeath();
         }
 
-        private void OnDamaged(DamageResult result)
+
+        private void OnDamaged(
+            DamageResult result)
         {
             NotifyTargetReevaluation();
         }
@@ -465,11 +590,11 @@ namespace Units
         // Animation
         // ============================================================
 
-
         public void PlayAnimation_Move()
         {
             if (_animation == null)
                 return;
+
 
             _animation.PlayAnimation_Move();
         }
@@ -480,6 +605,7 @@ namespace Units
             if (_animation == null)
                 return;
 
+
             _animation.PlayAnimation_Attack();
         }
 
@@ -488,6 +614,7 @@ namespace Units
         {
             if (_animation == null)
                 return;
+
 
             _animation.PlayAnimation_Skill();
         }
@@ -498,6 +625,7 @@ namespace Units
             if (_animation == null)
                 return;
 
+
             _animation.PlayAnimation_Hit();
         }
 
@@ -506,6 +634,7 @@ namespace Units
         {
             if (_animation == null)
                 return;
+
 
             _animation.PlayAnimation_Death();
         }
@@ -521,6 +650,7 @@ namespace Units
             if (_detection == null)
                 return float.MaxValue;
 
+
             return _detection.GetDistanceToTarget(
                 target
             );
@@ -532,6 +662,7 @@ namespace Units
         {
             if (_detection == null)
                 return false;
+
 
             return _detection.CanMoveStraightToTarget(
                 target
@@ -548,10 +679,12 @@ namespace Units
             _ai?.StartAI();
         }
 
+
         public void PauseAI()
         {
             _ai?.PauseAI();
         }
+
 
         public void SetUnitAssignment(
             UnitAssignment assignment)
@@ -575,20 +708,24 @@ namespace Units
             _ai.ClearUnitAssignment();
         }
 
+
         private void NotifyTargetReevaluation()
         {
             _ai?.NotifyTargetReevaluation();
         }
+
 
         public void RequestFullAssignment()
         {
             _gateway?.RequestFullAssignment();
         }
 
+
         public void RequestTargetReevaluation()
         {
             _gateway?.RequestTargetReevaluation();
         }
+
 
         public void RequestPositionAssignment()
         {
@@ -608,6 +745,7 @@ namespace Units
 
             _combat?.Pause();
         }
+
 
         public void Resume()
         {

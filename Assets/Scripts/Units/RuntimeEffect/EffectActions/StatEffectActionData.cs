@@ -2,12 +2,16 @@
 using UnityEngine;
 
 
-
-namespace Units
+namespace Units.Effects
 {
     [Serializable]
-    public class StatEffectActionData : EffectActionData
+    public class StatEffectActionData
+        : EffectActionData
     {
+        // ============================================================
+        // Data
+        // ============================================================
+
         [SerializeField]
         private UnitStatType _statType;
 
@@ -18,10 +22,17 @@ namespace Units
         private float _value;
 
 
-        public UnitStatType StatType => _statType;
+        // ============================================================
+        // Properties
+        // ============================================================
 
-        public UnitStatModifierType ModifierType => _modifierType;
+        public UnitStatType StatType =>
+            _statType;
 
-        public float Value => _value;
+        public UnitStatModifierType ModifierType =>
+            _modifierType;
+
+        public float Value =>
+            _value;
     }
 }

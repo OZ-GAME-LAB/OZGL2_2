@@ -1,7 +1,7 @@
 ﻿
 
 
-namespace Units
+namespace Units.Effects
 {
     public enum EffectAlignment
     {

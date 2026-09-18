@@ -87,6 +87,25 @@ namespace Units
                 return false;
             }
 
+
+            bool hasDamageRequest =
+                request.DamageRequest.HasValue;
+
+            bool hasSkillEffectRequest =
+                request.SkillEffectRequest.HasValue;
+
+
+            // Projectile은 하나의 Impact Request만 가져야 한다.
+            if (hasDamageRequest == hasSkillEffectRequest)
+            {
+                Debug.LogError(
+                    "[ProjectileManager] ProjectileRequest의 Impact Request가 유효하지 않습니다."
+                );
+
+                return false;
+            }
+
+
             var prefab =
                 _projectilePrefab != null
                     ? _projectilePrefab
