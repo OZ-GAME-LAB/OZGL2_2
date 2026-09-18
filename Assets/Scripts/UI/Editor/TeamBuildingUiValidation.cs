@@ -312,6 +312,9 @@ namespace Game.UI.Editor
                     "Finished clears prepared reward and rejects late payout");
 
                 Check(wallet.TryEndRun(), "test owner ends wallet run");
+
+                //wallet.Initialize(waves, flow, null);
+
                 wallet.Initialize(waves, flow, null, UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>());
                 flow.ResetRun();
                 startup.Refresh();
