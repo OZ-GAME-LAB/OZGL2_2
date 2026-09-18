@@ -1155,6 +1155,58 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &420801789
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 420801791}
+  - component: {fileID: 420801790}
+  m_Layer: 0
+  m_Name: InGameCameraController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &420801790
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 420801789}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2660ac6fc92400548baa1376810e89c3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Cameras.InGameCameraController
+  _brain: {fileID: 0}
+  _worldCamera: {fileID: 1102990318}
+  _baseCamera: {fileID: 0}
+  _battlefieldCamera: {fileID: 0}
+  _focusCamera: {fileID: 0}
+  _gameFlowController: {fileID: 0}
+  _buildController: {fileID: 0}
+  _focusTarget: {fileID: 0}
+--- !u!4 &420801791
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 420801789}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.16374, y: -0.19369, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &442771070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2650,6 +2702,52 @@ RectTransform:
   m_AnchoredPosition: {x: 733, y: 286}
   m_SizeDelta: {x: 400, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1037219420
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1037219422}
+  - component: {fileID: 1037219421}
+  m_Layer: 0
+  m_Name: ArtifactManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1037219421
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037219420}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e38527cc85d488d990a43bbd9d432e6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactManager
+  _artifactCatalog: {fileID: 11400000, guid: 3ebed6d65185cb64589cccdad17e9086, type: 2}
+  _rewardTable: {fileID: 11400000, guid: 8db60b0e4b20fc949a7e5bbdf4ca0dc3, type: 2}
+--- !u!4 &1037219422
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037219420}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.16374, y: -0.19369, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1039593220
 GameObject:
   m_ObjectHideFlags: 0
@@ -2682,6 +2780,14 @@ MonoBehaviour:
   _testScript: {fileID: 288519119}
   _gameFlowController: {fileID: 1692919390}
   _waveController: {fileID: 1347968429}
+  _artifactManager: {fileID: 1037219421}
+  _effectManager: {fileID: 1501298036}
+  _spawnManager: {fileID: 379906311}
+  _runtimeUnitManager: {fileID: 1790501616}
+  _runCurrencyManager: {fileID: 1835863131}
+  _cameraController: {fileID: 420801790}
+  _buildController: {fileID: 1125819695}
+  _buildingCoreProgress: {fileID: 1125819697}
 --- !u!4 &1039593222
 Transform:
   m_ObjectHideFlags: 0
@@ -2834,6 +2940,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1125819695 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8945716348887747133, guid: 4f1782dd9fb08af4e99ef4886575b458, type: 3}
+  m_PrefabInstance: {fileID: 3204631290229382825}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5fc1848a0b787048b7573c8170b5220, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingBuildController
+--- !u!114 &1125819697 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2813086061672694063, guid: 4f1782dd9fb08af4e99ef4886575b458, type: 3}
+  m_PrefabInstance: {fileID: 3204631290229382825}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97bce2d299c460447b234d598034d897, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingCoreProgress
 --- !u!1 &1159966927
 GameObject:
   m_ObjectHideFlags: 0
@@ -3973,6 +4101,50 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1431587656}
   m_CullTransparentMesh: 1
+--- !u!1 &1501298035
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1501298037}
+  - component: {fileID: 1501298036}
+  m_Layer: 0
+  m_Name: EffectManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1501298036
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1501298035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ae2b5b399cf4016ba4015f017846b25, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectManager
+--- !u!4 &1501298037
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1501298035}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -1.16374, y: -0.19369, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1515563147
 GameObject:
   m_ObjectHideFlags: 0
@@ -4510,6 +4682,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Core.GameFlowController
   StagingTime: 0.5
+  _twoEliteChance: 0.5
+  _cameraController: {fileID: 0}
   _autoContinue: 0
 --- !u!4 &1692919391
 Transform:
@@ -4856,6 +5030,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 21ef7488364941d4a99b291580654e50, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.RuntimeUnitManager
+  _engagementExpansionPolicy:
+    _maxJoinDistance: 6
+    _maxCombinedExtent: 15
+    _maxCombinedGroups: 10
 --- !u!4 &1790501617
 Transform:
   m_ObjectHideFlags: 0
@@ -5296,12 +5474,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CurrencyTestPanel
   _run: {fileID: 1835863131}
   _waveController: {fileID: 1347968429}
-  _effectManager: {fileID: 0}
+  _useInitializedWaveController: 1
+  _buildingCoreProgress: {fileID: 1125819697}
+  _effectManager: {fileID: 1501298036}
   _artifactTestPanel: {fileID: 0}
   _persistent: {fileID: 386840905}
   _gold: {fileID: 11400000, guid: 98b14e85a47180f4aaef28830f492355, type: 2}
   _gem: {fileID: 11400000, guid: ba91d5a429c5b244db782935e39a16a2, type: 2}
   _bloodstone: {fileID: 11400000, guid: 652b535a23e144b42a29a04a1d3c4409, type: 2}
+  _shopTestPanel: {fileID: 0}
 --- !u!4 &1979951859
 Transform:
   m_ObjectHideFlags: 0
@@ -5761,14 +5942,17 @@ SceneRoots:
   - {fileID: 1102990319}
   - {fileID: 1039593222}
   - {fileID: 288519123}
+  - {fileID: 1501298037}
   - {fileID: 1347968430}
   - {fileID: 379906312}
+  - {fileID: 1037219422}
   - {fileID: 1770587178}
   - {fileID: 1979951859}
   - {fileID: 1692919391}
   - {fileID: 1790501617}
   - {fileID: 1835863130}
   - {fileID: 3204631290229382825}
+  - {fileID: 420801791}
   - {fileID: 686695082}
   - {fileID: 386840906}
   - {fileID: 1993633999}

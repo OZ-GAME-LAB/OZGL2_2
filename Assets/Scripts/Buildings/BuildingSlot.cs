@@ -16,6 +16,7 @@ namespace OZGL.KDH
         [SerializeField] private SpriteRenderer emptyMarker;
 
         private Collider2D _collider;
+        private BuildingData _preplacedData;
 
         public bool IsOccupied => CurrentBuilding != null;
         public Building CurrentBuilding { get; private set; }
@@ -51,7 +52,55 @@ namespace OZGL.KDH
                 return;
 
             if (!TryOccupy(building))
+            {
                 Debug.LogWarning("[BuildingSlot] 미리 배치된 건물을 칸에 연결하지 못했습니다.", this);
+                return;
+            }
+
+            _preplacedData = building.Data;
+        }
+
+        // Current date KDH 2026-09-18
+        // 리셋 때 플레이어가 지은 건물은 지우고, 미리 둔 코어는 1단계 데이터로 되돌립니다.
+        // CoreBuilding 프리팹 전체를 Instantiate하지 않습니다. 슬롯이 안에 또 생기면 안 됩니다.
+        public void RestorePreplacedState()
+        {
+            if (IsOriginalPreplaced())
+                return;
+
+            if (IsOccupied)
+            {
+                Building extra = ReleaseCurrent();
+                if (extra != null)
+                    Destroy(extra.gameObject);
+            }
+
+            if (_preplacedData == null)
+                return;
+
+            Building restored = CreatePreplacedBuilding();
+            if (!TryOccupy(restored))
+            {
+                Debug.LogWarning("[BuildingSlot] 미리 배치된 건물을 되돌리지 못했습니다.", this);
+                Destroy(restored.gameObject);
+            }
+        }
+
+        private bool IsOriginalPreplaced()
+        {
+            if (_preplacedData == null || CurrentBuilding == null || CurrentBuilding.Data == null)
+                return false;
+
+            return CurrentBuilding.Data.IsSameBuilding(_preplacedData);
+        }
+
+        private Building CreatePreplacedBuilding()
+        {
+            GameObject go = new GameObject(_preplacedData.DisplayName);
+            go.transform.position = BuildPosition;
+            Building building = go.AddComponent<Building>();
+            building.Initialize(_preplacedData);
+            return building;
         }
 
         public void CollectCandidates(List<BuildingData> results, BuildingDatabase database, int currentCoreLevel)
