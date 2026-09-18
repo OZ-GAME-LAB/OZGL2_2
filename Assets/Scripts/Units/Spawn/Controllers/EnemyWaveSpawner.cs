@@ -731,7 +731,8 @@ namespace Units
 
             IReadOnlyList<Vector2> rallyPositions =
                 AllocateRallyPositions(
-                    count
+                    count,
+                    group
                 );
 
 
@@ -1164,11 +1165,13 @@ namespace Units
         // ============================================================
 
         private IReadOnlyList<Vector2> AllocateRallyPositions(
-            int count)
+            int count,
+            Unit_GroupAI group)
         {
             IReadOnlyList<Vector2> rallyPositions =
                 _rallyGridAllocator.Allocate(
-                    count
+                    count,
+                    group
                 );
 
 
@@ -1445,6 +1448,7 @@ namespace Units
                     new List<EnemyUnitType>();
             }
         }
+
 
         private readonly struct EnemyGroupSpawnData
         {

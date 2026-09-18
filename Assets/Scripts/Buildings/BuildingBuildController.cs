@@ -15,8 +15,8 @@ namespace OZGL.KDH
         private const int HitBufferSize = 8;
 
         [SerializeField] private BuildingDatabase database;
-        [SerializeField] private RunCurrencyManager wallet;
-        [SerializeField] private GameFlowController gameFlow;
+        private RunCurrencyManager wallet;
+        private GameFlowController gameFlow;
         [SerializeField] private Camera worldCamera;
         [SerializeField] private LayerMask slotMask = ~0;
         [Range(0f, 1f)]
@@ -40,19 +40,13 @@ namespace OZGL.KDH
 
         private void Awake()
         {
-            CacheRefs(); //내부적인 참조를 만드는 부분은 삭제할 필요 없습니다. GameFlowController 및 RunCurrencyManager 참조부분만 삭제하시면 됩니다. 
+            CacheRefs();
             SetupFilter();
 
             if (_menu == null)
                 _menu = gameObject.AddComponent<BuildingBuildMenu>();
 
             _menu.Bind(this);
-            //해당 이벤트 연결부분은 Initialize에 이관해서 삭제하시면 됩니다
-            if (wallet != null)
-                wallet.BalanceChanged += OnWalletChanged;
-
-            if (gameFlow != null)
-                gameFlow.PhaseChanged += OnPhaseChanged;
         }
 
         private void OnDestroy()
@@ -73,22 +67,42 @@ namespace OZGL.KDH
             HandleClick();
         }
 
-        public void Initialize(RunCurrencyManager runCurrencyManager, GameFlowController gameFlowController)
+        // Current date KDH 2026-09-18
+        // 지갑과 게임 진행은 Find하지 않고 BootStrap.Initialize로만 받습니다.
+        public void Initialize(RunCurrencyManager runCurrencyManager, GameFlowController gameFlowController, BuildingCoreProgress buildingCoreProgress)
         {
             if (wallet != null)
-            {
                 wallet.BalanceChanged -= OnWalletChanged;
-            }
 
             if (gameFlow != null)
-            {
                 gameFlow.PhaseChanged -= OnPhaseChanged;
-            }
+
             wallet = runCurrencyManager;
-            wallet.BalanceChanged += OnWalletChanged;
             gameFlow = gameFlowController;
-            gameFlow.PhaseChanged += OnPhaseChanged;
+            _coreProgress = buildingCoreProgress;
+
+            if (wallet == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] Initialize에 RunCurrencyManager가 null입니다.", this);
+            }
+            else
+            {
+                wallet.BalanceChanged += OnWalletChanged;
+            }
+
+            if (gameFlow == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] Initialize에 GameFlowController가 null입니다.", this);
+            }
+            else
+            {
+                gameFlow.PhaseChanged += OnPhaseChanged;
+            }
+
+            if (_coreProgress == null)
+                Debug.LogWarning("[BuildingBuildController] Initialize에 BuildingCoreProgress가 null입니다.", this);
         }
+
         public bool TryBuild(BuildingSlot slot, BuildingData data)
         {
             if (slot == null)
@@ -583,14 +597,27 @@ namespace OZGL.KDH
                 _menu.RefreshAffordability();
         }
 
-        // Current date KDH 2026-09-14
-        // 준비 페이즈가 아니면 메뉴를 닫아, 전투 중 버튼으로 짓지 못하게 합니다.
+        // Current date KDH 2026-09-18
+        // 리셋 버튼은 None으로 들어옵니다. 메뉴를 닫고 칸을 짓기 전으로 되돌립니다.
         private void OnPhaseChanged(GamePhase phase)
         {
+            if (phase == GamePhase.None)
+                ResetPlacedBuildings();
+
             if (gameFlow != null && gameFlow.CanEnterBuildMode())
                 return;
 
             HideMenu();
+        }
+
+        private void ResetPlacedBuildings()
+        {
+            BuildingSlot[] slots = FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None);
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i] != null)
+                    slots[i].RestorePreplacedState();
+            }
         }
 
         // Current date KDH 2026-09-16
@@ -639,36 +666,21 @@ namespace OZGL.KDH
                 _camera = worldCamera;
             else
                 _camera = Camera.main;
-            //참조부분 삭제
-            if (wallet == null)
-                wallet = GetComponent<RunCurrencyManager>();
 
-            if (wallet == null)
-                wallet = FindFirstObjectByType<RunCurrencyManager>();
-
-            if (gameFlow == null)
-                gameFlow = FindFirstObjectByType<GameFlowController>();
-            //여기까지
             if (_menu == null)
                 _menu = GetComponent<BuildingBuildMenu>();
 
-            if (_coreProgress == null)
-                _coreProgress = GetComponent<BuildingCoreProgress>();
-
-            if (_coreProgress == null)
-                _coreProgress = FindFirstObjectByType<BuildingCoreProgress>();
-
-            if (_coreProgress == null)
-                _coreProgress = gameObject.AddComponent<BuildingCoreProgress>();
-            //삭제
-            if (gameFlow == null)
-                Debug.LogWarning("[BuildingBuildController] GameFlowController를 찾지 못했습니다. 준비 페이즈 검사를 할 수 없습니다.", this);
+            //if (_coreProgress == null)
+            //    _coreProgress = GetComponent<BuildingCoreProgress>();
+            //
+            //if (_coreProgress == null)
+            //    _coreProgress = FindFirstObjectByType<BuildingCoreProgress>();
+            //
+            //if (_coreProgress == null)
+            //    _coreProgress = gameObject.AddComponent<BuildingCoreProgress>();
 
             if (database == null)
                 Debug.LogWarning("[BuildingBuildController] BuildingDatabase가 비어 있습니다. 인스펙터에 연결하세요.", this);
-            //삭제
-            if (wallet == null)
-                Debug.LogWarning("[BuildingBuildController] RunCurrencyManager를 찾지 못했습니다. 인스펙터에 연결하세요.", this);
         }
 
         // Current date KDH 2026-09-14

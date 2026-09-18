@@ -49,6 +49,9 @@ namespace Units
         [Header("Rally")]
 
         [SerializeField]
+        private RallySector _rallySectorPrefab;
+
+        [SerializeField]
         private Vector2 _rallySectorSize =
             new Vector2(
                 5f,
@@ -67,10 +70,13 @@ namespace Units
         [Header("Ally Rally")]
 
         [SerializeField]
-        private Vector2 _allyRallyAreaMin;
+        private Transform _allyRallyAreaPointA;
 
         [SerializeField]
-        private Vector2 _allyRallyAreaMax;
+        private Transform _allyRallyAreaPointB;
+
+        [SerializeField]
+        private Transform _allyRallySectorRoot;
 
 
         // ============================================================
@@ -91,10 +97,13 @@ namespace Units
         [Header("Enemy Rally")]
 
         [SerializeField]
-        private Vector2 _enemyRallyAreaMin;
+        private Transform _enemyRallyAreaPointA;
 
         [SerializeField]
-        private Vector2 _enemyRallyAreaMax;
+        private Transform _enemyRallyAreaPointB;
+
+        [SerializeField]
+        private Transform _enemyRallySectorRoot;
 
 
         // ============================================================
@@ -190,19 +199,22 @@ namespace Units
         {
             _allyRallyGridAllocator =
                 new RallyGridAllocator(
-                    _allyRallyAreaMin,
-                    _allyRallyAreaMax,
+                    _allyRallyAreaPointA,
+                    _allyRallyAreaPointB,
                     _rallySectorSize,
-                    _rallyFormationSpacing
+                    _rallyFormationSpacing,
+                    _rallySectorPrefab,
+                    _allyRallySectorRoot
                 );
-
 
             _enemyRallyGridAllocator =
                 new RallyGridAllocator(
-                    _enemyRallyAreaMin,
-                    _enemyRallyAreaMax,
+                    _enemyRallyAreaPointA,
+                    _enemyRallyAreaPointB,
                     _rallySectorSize,
-                    _rallyFormationSpacing
+                    _rallyFormationSpacing,
+                    _rallySectorPrefab,
+                    _enemyRallySectorRoot
                 );
         }
 
@@ -314,6 +326,23 @@ namespace Units
             }
 
 
+            // ========================================================
+            // Rally Allocation Reset
+            //
+            // 이전 Ally Spawn Cycle에서 사용한 Sector 할당은
+            // 다음 Spawn Cycle이 시작되는 시점에 초기화한다.
+            //
+            // 같은 Spawn Cycle의 여러 Group Spawn 요청은
+            // 짧은 시간 안에 연속으로 들어오므로
+            // 첫 번째 요청에서만 초기화한다.
+            // ========================================================
+
+            if (_activeAllySpawnCount == 0)
+            {
+                _allyRallyGridAllocator.Clear();
+            }
+
+
             _activeAllySpawnCount++;
 
 
@@ -355,17 +384,11 @@ namespace Units
 
                     _runtimeUnitManager.NotifyAllySpawnCompleted();
 
-                    _allyRallyGridAllocator.Clear();
-
                     AllySpawnCompleted?.Invoke();
                 }
             }
         }
 
-
-        // ============================================================
-        // Enemy Spawn
-        // ============================================================
 
         // ============================================================
         // Enemy Spawn
@@ -390,6 +413,20 @@ namespace Units
             cancellationToken.ThrowIfCancellationRequested();
 
 
+            // ========================================================
+            // Rally Allocation Reset
+            //
+            // Enemy는 SpawnEnemyWaveAsync 한 번이
+            // 하나의 Spawn Cycle 전체를 담당한다.
+            //
+            // 따라서 새로운 Wave Spawn이 시작되는 시점에
+            // 이전 Wave의 Sector 할당을 초기화한다.
+            // Sector 객체 자체는 유지된다.
+            // ========================================================
+
+            _enemyRallyGridAllocator.Clear();
+
+
             await _enemyWaveSpawner.SpawnWaveAsync(
                 cost,
                 context,
@@ -407,8 +444,6 @@ namespace Units
 
 
             _runtimeUnitManager.NotifyEnemySpawnCompleted();
-
-            _enemyRallyGridAllocator.Clear();
 
             EnemySpawnCompleted?.Invoke();
         }
@@ -497,6 +532,42 @@ namespace Units
             }
 
 
+            if (_rallySectorPrefab == null)
+            {
+                Debug.LogError(
+                    "[SpawnManager] " +
+                    "Rally Sector Prefab이 없습니다."
+                );
+
+                isValid =
+                    false;
+            }
+
+
+            if (_allyRallySectorRoot == null)
+            {
+                Debug.LogError(
+                    "[SpawnManager] " +
+                    "Ally Rally Sector Root가 없습니다."
+                );
+
+                isValid =
+                    false;
+            }
+
+
+            if (_enemyRallySectorRoot == null)
+            {
+                Debug.LogError(
+                    "[SpawnManager] " +
+                    "Enemy Rally Sector Root가 없습니다."
+                );
+
+                isValid =
+                    false;
+            }
+
+
             if (_rallySectorSize.x <= 0f ||
                 _rallySectorSize.y <= 0f)
             {
@@ -524,33 +595,83 @@ namespace Units
             }
 
 
-            if (_allyRallyAreaMax.x <=
-                    _allyRallyAreaMin.x ||
-                _allyRallyAreaMax.y <=
-                    _allyRallyAreaMin.y)
+            if (_allyRallyAreaPointA == null ||
+                _allyRallyAreaPointB == null)
             {
                 Debug.LogError(
                     "[SpawnManager] " +
-                    "Ally Rally Area가 올바르지 않습니다."
+                    "Ally Rally Area Point가 없습니다."
                 );
 
                 isValid =
                     false;
             }
+            else
+            {
+                Vector2 pointA =
+                    _allyRallyAreaPointA.position;
+
+                Vector2 pointB =
+                    _allyRallyAreaPointB.position;
 
 
-            if (_enemyRallyAreaMax.x <=
-                    _enemyRallyAreaMin.x ||
-                _enemyRallyAreaMax.y <=
-                    _enemyRallyAreaMin.y)
+                if (Mathf.Approximately(
+                        pointA.x,
+                        pointB.x
+                    ) ||
+                    Mathf.Approximately(
+                        pointA.y,
+                        pointB.y
+                    ))
+                {
+                    Debug.LogError(
+                        "[SpawnManager] " +
+                        "Ally Rally Area의 크기가 올바르지 않습니다."
+                    );
+
+                    isValid =
+                        false;
+                }
+            }
+
+
+            if (_enemyRallyAreaPointA == null ||
+                _enemyRallyAreaPointB == null)
             {
                 Debug.LogError(
                     "[SpawnManager] " +
-                    "Enemy Rally Area가 올바르지 않습니다."
+                    "Enemy Rally Area Point가 없습니다."
                 );
 
                 isValid =
                     false;
+            }
+            else
+            {
+                Vector2 pointA =
+                    _enemyRallyAreaPointA.position;
+
+                Vector2 pointB =
+                    _enemyRallyAreaPointB.position;
+
+
+                if (Mathf.Approximately(
+                        pointA.x,
+                        pointB.x
+                    ) ||
+                    Mathf.Approximately(
+                        pointA.y,
+                        pointB.y
+                    ))
+                {
+                    Debug.LogError(
+                        "[SpawnManager] " +
+                        "Enemy Rally Area의 크기가 올바르지 않습니다."
+                    );
+
+                    isValid =
+                        false;
+                }
             }
 
 

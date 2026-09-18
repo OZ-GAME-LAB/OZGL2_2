@@ -5,7 +5,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 상점 품목을 보관하고 재화·아티팩트 매니저에 거래 요청
-public class ShopManager : MonoBehaviour
+public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
 {
     public bool IsInitialized => _selector != null && _artifactManager != null &&
         _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized;
