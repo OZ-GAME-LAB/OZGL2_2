@@ -1,5 +1,6 @@
 ﻿#if UNITY_EDITOR
 
+using Units;
 using Units.Effects;
 using UnityEditor;
 using UnityEngine;
@@ -252,10 +253,8 @@ public class EffectDataEditor : Editor
 
             if (actionProperty.managedReferenceValue != null)
             {
-                EditorGUILayout.PropertyField(
-                    actionProperty,
-                    GUIContent.none,
-                    true
+                DrawAction(
+                    actionProperty
                 );
             }
             else
@@ -272,6 +271,64 @@ public class EffectDataEditor : Editor
             EditorGUILayout.Space(
                 3f
             );
+        }
+    }
+
+
+    private void DrawAction(
+        SerializedProperty actionProperty)
+    {
+        object action =
+            actionProperty.managedReferenceValue;
+
+
+        switch (action)
+        {
+            case StatEffectActionData:
+
+                DrawStatAction(
+                    actionProperty
+                );
+
+                break;
+
+
+            case PeriodicHealEffectActionData:
+
+                DrawPeriodicHealAction(
+                    actionProperty
+                );
+
+                break;
+
+
+            case PeriodicDamageEffectActionData:
+
+                DrawPeriodicDamageAction(
+                    actionProperty
+                );
+
+                break;
+
+
+            case StatusEffectActionData:
+
+                DrawStatusAction(
+                    actionProperty
+                );
+
+                break;
+
+
+            default:
+
+                EditorGUILayout.PropertyField(
+                    actionProperty,
+                    GUIContent.none,
+                    true
+                );
+
+                break;
         }
     }
 
@@ -312,6 +369,267 @@ public class EffectDataEditor : Editor
 
 
         EditorGUILayout.EndHorizontal();
+    }
+
+
+    // ============================================================
+    // Stat Action
+    // ============================================================
+
+    private void DrawStatAction(
+        SerializedProperty action)
+    {
+        SerializedProperty statType =
+            action.FindPropertyRelative(
+                "_statType"
+            );
+
+        SerializedProperty modifierType =
+            action.FindPropertyRelative(
+                "_modifierType"
+            );
+
+        SerializedProperty value =
+            action.FindPropertyRelative(
+                "_value"
+            );
+
+
+        EditorGUILayout.PropertyField(
+            statType
+        );
+
+        EditorGUILayout.PropertyField(
+            modifierType
+        );
+
+
+        UnitStatModifierType type =
+            (UnitStatModifierType)
+            modifierType.enumValueIndex;
+
+
+        switch (type)
+        {
+            case UnitStatModifierType.Flat:
+
+                DrawFlatValueField(
+                    value,
+                    "Value",
+                    -100000000f,
+                    100000000f
+                );
+
+                break;
+
+
+            case UnitStatModifierType.Percent:
+
+                DrawPercentageValueField(
+                    value,
+                    "Value",
+                    -1f,
+                    10f
+                );
+
+                break;
+        }
+    }
+
+
+    // ============================================================
+    // Status Action
+    // ============================================================
+
+    private void DrawStatusAction(
+        SerializedProperty action)
+    {
+        SerializedProperty statusType =
+            action.FindPropertyRelative(
+                "_statusType"
+            );
+
+
+        EditorGUILayout.PropertyField(
+            statusType
+        );
+    }
+
+
+    // ============================================================
+    // Periodic Damage Action
+    // ============================================================
+
+    private void DrawPeriodicDamageAction(
+        SerializedProperty action)
+    {
+        SerializedProperty interval =
+            action.FindPropertyRelative(
+                "_interval"
+            );
+
+        SerializedProperty damage =
+            action.FindPropertyRelative(
+                "_damage"
+            );
+
+
+        DrawFloatValueField(
+            interval,
+            "Interval",
+            0.01f,
+            float.MaxValue
+        );
+
+
+        DrawFloatValueField(
+            damage,
+            "Damage",
+            0f,
+            100000000f
+        );
+    }
+
+
+    // ============================================================
+    // Periodic Heal Action
+    // ============================================================
+
+    private void DrawPeriodicHealAction(
+        SerializedProperty action)
+    {
+        SerializedProperty interval =
+            action.FindPropertyRelative(
+                "_interval"
+            );
+
+        SerializedProperty healRatio =
+            action.FindPropertyRelative(
+                "_healRatio"
+            );
+
+
+        DrawFloatValueField(
+            interval,
+            "Interval",
+            0.01f,
+            float.MaxValue
+        );
+
+
+        DrawPercentageValueField(
+            healRatio,
+            "Heal Ratio",
+            0f,
+            10f
+        );
+    }
+
+
+    // ============================================================
+    // Value Fields
+    // ============================================================
+
+    private void DrawFloatValueField(
+        SerializedProperty property,
+        string label,
+        float minValue,
+        float maxValue)
+    {
+        EditorGUI.BeginChangeCheck();
+
+
+        float nextValue =
+            EditorGUILayout.FloatField(
+                label,
+                property.floatValue
+            );
+
+
+        if (!EditorGUI.EndChangeCheck())
+        {
+            return;
+        }
+
+
+        property.floatValue =
+            Mathf.Clamp(
+                nextValue,
+                minValue,
+                maxValue
+            );
+    }
+
+
+    private void DrawFlatValueField(
+        SerializedProperty property,
+        string label,
+        float minValue,
+        float maxValue)
+    {
+        DrawFloatValueField(
+            property,
+            label,
+            minValue,
+            maxValue
+        );
+    }
+
+
+    private void DrawPercentageValueField(
+        SerializedProperty property,
+        string label,
+        float minValue,
+        float maxValue)
+    {
+        float displayValue =
+            property.floatValue * 100f;
+
+
+        EditorGUI.BeginChangeCheck();
+
+
+        EditorGUILayout.BeginHorizontal();
+
+
+        EditorGUILayout.PrefixLabel(
+            label
+        );
+
+
+        float nextDisplayValue =
+            EditorGUILayout.FloatField(
+                displayValue
+            );
+
+
+        GUILayout.Label(
+            "%",
+            GUILayout.Width(
+                15f
+            )
+        );
+
+
+        EditorGUILayout.EndHorizontal();
+
+
+        if (!EditorGUI.EndChangeCheck())
+        {
+            return;
+        }
+
+
+        float nextValue =
+            nextDisplayValue / 100f;
+
+
+        property.floatValue =
+            Mathf.Clamp(
+                nextValue,
+                minValue,
+                maxValue
+            );
     }
 
 
@@ -441,6 +759,16 @@ public class EffectDataEditor : Editor
         {
             return;
         }
+
+
+        SerializedProperty actionProperty =
+            _actionsProperty.GetArrayElementAtIndex(
+                index
+            );
+
+
+        actionProperty.managedReferenceValue =
+            null;
 
 
         _actionsProperty.DeleteArrayElementAtIndex(

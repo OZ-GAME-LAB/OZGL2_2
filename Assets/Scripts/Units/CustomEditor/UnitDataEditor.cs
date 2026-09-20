@@ -28,6 +28,7 @@ namespace Units.Editor
 
         private SerializedProperty _basicAttackData;
         private SerializedProperty _activeSkillData;
+        private SerializedProperty _passiveSkillDatas;
 
 
         // ============================================================
@@ -90,6 +91,11 @@ namespace Units.Editor
             _activeSkillData =
                 serializedObject.FindProperty(
                     "_activeSkillData"
+                );
+
+            _passiveSkillDatas =
+                serializedObject.FindProperty(
+                    "_passiveSkillDatas"
                 );
 
 
@@ -335,6 +341,12 @@ namespace Units.Editor
                 (UnitStatType)statType.intValue;
 
 
+            UnitStatDefinition definition =
+                UnitStatDefinitions.Get(
+                    type
+                );
+
+
             EditorGUILayout.BeginHorizontal();
 
 
@@ -345,14 +357,120 @@ namespace Units.Editor
             );
 
 
-            EditorGUILayout.PropertyField(
-                value,
-                GUIContent.none,
-                GUILayout.Width(120f)
-            );
+            float displayValue =
+                GetDisplayValue(
+                    value.floatValue,
+                    definition
+                );
+
+
+            EditorGUI.BeginChangeCheck();
+
+
+            float nextDisplayValue =
+                DrawStatValueField(
+                    displayValue,
+                    definition
+                );
+
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                float nextValue =
+                    GetStoredValue(
+                        nextDisplayValue,
+                        definition
+                    );
+
+
+                value.floatValue =
+                    Mathf.Clamp(
+                        nextValue,
+                        definition.MinValue,
+                        definition.MaxValue
+                    );
+            }
 
 
             EditorGUILayout.EndHorizontal();
+        }
+
+
+        private float DrawStatValueField(
+            float displayValue,
+            UnitStatDefinition definition)
+        {
+            if (definition.DisplayType ==
+                UnitStatDisplayType.Percentage)
+            {
+                EditorGUILayout.BeginHorizontal(
+                    GUILayout.Width(120f)
+                );
+
+
+                float nextValue =
+                    EditorGUILayout.FloatField(
+                        displayValue
+                    );
+
+
+                GUILayout.Label(
+                    "%",
+                    GUILayout.Width(15f)
+                );
+
+
+                EditorGUILayout.EndHorizontal();
+
+
+                return nextValue;
+            }
+
+
+            return EditorGUILayout.FloatField(
+                displayValue,
+                GUILayout.Width(120f)
+            );
+        }
+
+
+        private float GetDisplayValue(
+            float storedValue,
+            UnitStatDefinition definition)
+        {
+            switch (definition.DisplayType)
+            {
+                case UnitStatDisplayType.Percentage:
+
+                    return storedValue * 100f;
+
+
+                case UnitStatDisplayType.Value:
+                case UnitStatDisplayType.Multiplier:
+                default:
+
+                    return storedValue;
+            }
+        }
+
+
+        private float GetStoredValue(
+            float displayValue,
+            UnitStatDefinition definition)
+        {
+            switch (definition.DisplayType)
+            {
+                case UnitStatDisplayType.Percentage:
+
+                    return displayValue / 100f;
+
+
+                case UnitStatDisplayType.Value:
+                case UnitStatDisplayType.Multiplier:
+                default:
+
+                    return displayValue;
+            }
         }
 
 
@@ -427,7 +545,9 @@ namespace Units.Editor
                 else
                 {
                     valueProperty.floatValue =
-                        0f;
+                        UnitData.GetDefaultStatValue(
+                            statType
+                        );
                 }
             }
         }
@@ -715,6 +835,11 @@ namespace Units.Editor
 
                 EditorGUILayout.PropertyField(
                     _activeSkillData
+                );
+
+                EditorGUILayout.PropertyField(
+                    _passiveSkillDatas,
+                    true
                 );
 
 

@@ -754,7 +754,7 @@ namespace Units
                 new SkillEffectRequest(
                     _core,
                     null,
-                    _data
+                    _data.Effects
                 );
 
 
@@ -900,7 +900,7 @@ namespace Units
                     new SkillEffectRequest(
                         _core,
                         target,
-                        _data
+                        _data.Effects
                     );
 
 

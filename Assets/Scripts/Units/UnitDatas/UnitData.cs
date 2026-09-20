@@ -71,6 +71,10 @@ namespace Units.UnitDatas
         [SerializeField]
         private ActiveSkillData _activeSkillData;
 
+        [SerializeField]
+        private List<PassiveSkillData> _passiveSkillDatas =
+            new();
+
 
         // ============================================================
         // Properties
@@ -94,6 +98,9 @@ namespace Units.UnitDatas
         public ActiveSkillData ActiveSkillData =>
             _activeSkillData;
 
+        public IReadOnlyList<PassiveSkillData> PassiveSkillDatas =>
+            _passiveSkillDatas;
+
 
         // ============================================================
         // Public Methods - Identity
@@ -103,6 +110,7 @@ namespace Units.UnitDatas
         {
             return _allyIdentity.UnitTier;
         }
+
 
         public AllyUnitClass GetAllyClass()
         {
@@ -120,6 +128,7 @@ namespace Units.UnitDatas
         {
             return _enemyIdentity.UnitFaction;
         }
+
 
         public EnemyUnitClass GetEnemyClass()
         {
@@ -148,7 +157,19 @@ namespace Units.UnitDatas
                 }
             }
 
-            return 0f;
+
+            return GetDefaultStatValue(
+                statType
+            );
+        }
+
+
+        public static float GetDefaultStatValue(
+            UnitStatType statType)
+        {
+            return UnitStatDefinitions
+                .Get(statType)
+                .DefaultValue;
         }
 
 

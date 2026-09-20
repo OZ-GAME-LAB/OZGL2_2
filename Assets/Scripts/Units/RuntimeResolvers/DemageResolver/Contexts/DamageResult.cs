@@ -1,10 +1,9 @@
-﻿using System.Collections.Generic;
-
+﻿
 
 
 namespace Units
 {
-    public readonly struct DamageRequest
+    public readonly struct DamageResult
     {
         // ============================================================
         // Source
@@ -14,37 +13,48 @@ namespace Units
 
         public DamageSourceType SourceType { get; }
 
-        public float DamageMultiplier { get; }
-
 
         // ============================================================
         // Target
         // ============================================================
 
-        public IReadOnlyList<ICombatTarget> Targets { get; }
+        public ICombatTarget Target { get; }
+
+
+        // ============================================================
+        // Damage
+        // ============================================================
+
+        public float Damage { get; }
+
+        public bool IsCritical { get; }
 
 
         // ============================================================
         // Constructor
         // ============================================================
 
-        public DamageRequest(
+        public DamageResult(
             Unit_Core attacker,
-            IReadOnlyList<ICombatTarget> targets,
+            ICombatTarget target,
+            float damage,
             DamageSourceType sourceType,
-            float damageMultiplier)
+            bool isCritical)
         {
             Attacker =
                 attacker;
 
-            Targets =
-                targets;
+            Target =
+                target;
+
+            Damage =
+                damage;
 
             SourceType =
                 sourceType;
 
-            DamageMultiplier =
-                damageMultiplier;
+            IsCritical =
+                isCritical;
         }
     }
 }

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Units.Effects;
+using Units.Skills;
 using UnityEngine;
 
 
@@ -35,6 +37,9 @@ namespace Units
 
         [SerializeField]
         private Unit_AI _ai;
+
+        [SerializeField]
+        private Unit_Passive _passive;
 
 
         // ============================================================
@@ -105,6 +110,7 @@ namespace Units
             MovementCompleted?.Invoke();
         }
 
+
         public void NotifyMovementFailed()
         {
             MovementFailed?.Invoke();
@@ -128,6 +134,7 @@ namespace Units
             ActiveSkillCompleted?.Invoke();
         }
 
+
         public SkillEngagementResult RequestSkillEngagement(
             ICombatTarget target)
         {
@@ -138,12 +145,14 @@ namespace Units
                 : SkillEngagementResult.Invalid;
         }
 
+
         public Predicate<ICombatTarget> CaptureSkillTargetFilter()
         {
             return _gateway != null
                 ? _gateway.CaptureSkillTargetFilter()
                 : RejectSkillTarget;
         }
+
 
         private static bool RejectSkillTarget(
             ICombatTarget target)
@@ -240,6 +249,16 @@ namespace Units
             }
 
 
+            if (_passive != null)
+            {
+                _passive.Initialize(
+                    this,
+                    _gateway,
+                    _runtimeStatus.PassiveSkillDatas
+                );
+            }
+
+
             BindComponentEvents();
 
             RefreshStatusRestrictions();
@@ -302,6 +321,13 @@ namespace Units
                 _ai =
                     GetComponent<Unit_AI>();
             }
+
+
+            if (_passive == null)
+            {
+                _passive =
+                    GetComponent<Unit_Passive>();
+            }
         }
 
 
@@ -313,6 +339,9 @@ namespace Units
         {
             if (_life != null)
             {
+                _life.HpChanged +=
+                    OnHpChanged;
+
                 _life.Damaged +=
                     OnDamaged;
             }
@@ -330,6 +359,9 @@ namespace Units
         {
             if (_life != null)
             {
+                _life.HpChanged -=
+                    OnHpChanged;
+
                 _life.Damaged -=
                     OnDamaged;
             }
@@ -575,7 +607,17 @@ namespace Units
 
             _animation?.PlayAnimation_Death();
 
+            _passive?.Stop();
+
             _gateway?.NotifyDeath();
+        }
+
+
+        private void OnHpChanged(
+            float previousHp,
+            float currentHp)
+        {
+            _passive?.NotifyHealthChanged();
         }
 
 
@@ -583,6 +625,27 @@ namespace Units
             DamageResult result)
         {
             NotifyTargetReevaluation();
+
+
+            // 피격자 패시브
+            _passive?.NotifyDamageTaken(
+                result.Attacker != null
+                    ? result.Attacker._gateway
+                    : null
+            );
+
+
+            // DoT 피해는 공격자 패시브를 발동시키지 않는다.
+            if (result.SourceType == DamageSourceType.Dot)
+            {
+                return;
+            }
+
+            // 공격자 패시브
+            result.Attacker?._passive
+                ?.NotifyDamageDealt(
+                    _gateway
+                );
         }
 
 
@@ -734,6 +797,50 @@ namespace Units
 
 
         // ============================================================
+        // Passive
+        // ============================================================
+
+        public void CollectDamageModifiers(
+            PassiveDamageOwnerType ownerType,
+            List<PassiveDamageModifier> results)
+        {
+            _passive?.CollectDamageModifiers(
+                ownerType,
+                results
+            );
+        }
+
+
+        public bool EvaluateDamageModifierConditions(
+            RuntimePassiveSkill runtimePassive,
+            ICombatTarget target)
+        {
+            return _passive != null &&
+                   _passive.EvaluateDamageModifierConditions(
+                       runtimePassive,
+                       target
+                   );
+        }
+
+
+        public bool EvaluateTargetDamageModifierConditions(
+            ICombatTarget owner,
+            RuntimePassiveSkill runtimePassive)
+        {
+            if (owner == null ||
+                _gateway == null)
+            {
+                return false;
+            }
+
+            return owner.EvaluateDamageModifierConditions(
+                runtimePassive,
+                _gateway
+            );
+        }
+
+
+        // ============================================================
         // Unit Control
         // ============================================================
 
@@ -744,12 +851,16 @@ namespace Units
             _movement?.Stop();
 
             _combat?.Pause();
+
+            _passive?.Pause();
         }
 
 
         public void Resume()
         {
             _combat?.Resume();
+
+            _passive?.Resume();
 
             _ai?.StartAI();
         }

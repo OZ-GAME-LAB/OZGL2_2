@@ -134,6 +134,7 @@ namespace Units
                     pendingRequest.Attacker,
                     targets,
                     pendingRequest.SourceType,
+                    pendingRequest.DamageType,
                     pendingRequest.DamageMultiplier
                 )
             );
@@ -175,7 +176,7 @@ namespace Units
                     new SkillEffectRequest(
                         pendingRequest.Caster,
                         target,
-                        pendingRequest.SkillData
+                        pendingRequest.Effects
                     )
                 );
             }

@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using Units.Skills;
+using UnityEngine;
 
 
 
@@ -11,6 +13,13 @@ namespace Units
         // ============================================================
 
         Transform Transform { get; }
+
+
+        // ============================================================
+        // Component
+        // ============================================================
+
+        Unit_RuntimeStatus RuntimeStatus { get; }
 
 
         // ============================================================
@@ -31,12 +40,29 @@ namespace Units
         // Life
         // ============================================================
 
+        float CurrentHp { get; }
+
         void TakeDamage(
             DamageResult result
         );
 
         void Heal(
             float amount
+        );
+
+
+        // ============================================================
+        // Passive
+        // ============================================================
+
+        void CollectDamageModifiers(
+            PassiveDamageOwnerType ownerType,
+            List<PassiveDamageModifier> results
+        );
+
+        bool EvaluateDamageModifierConditions(
+            RuntimePassiveSkill runtimePassive,
+            ICombatTarget target
         );
     }
 }

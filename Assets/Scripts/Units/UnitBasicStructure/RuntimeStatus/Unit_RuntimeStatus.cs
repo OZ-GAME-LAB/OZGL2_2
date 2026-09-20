@@ -44,16 +44,38 @@ namespace Units
                 ? _unitData.ActiveSkillData
                 : null;
 
+        public IReadOnlyList<PassiveSkillData> PassiveSkillDatas =>
+            _unitData != null
+            ? _unitData.PassiveSkillDatas
+            : Array.Empty<PassiveSkillData>();
+
 
         // ============================================================
         // Stat Properties
         // ============================================================
 
+        // Life
+
         public float MaxHp =>
             GetStat(UnitStatType.MaxHp);
 
+        public float Defense =>
+            GetStat(UnitStatType.Defense);
+
+        public float DamageTakenMultiplier =>
+            GetStat(UnitStatType.DamageTakenMultiplier);
+
+        public float HealingTakenMultiplier =>
+            GetStat(UnitStatType.HealingTakenMultiplier);
+
+
+        // Combat
+
         public float AttackPower =>
             GetStat(UnitStatType.AttackPower);
+
+        public float DamageMultiplier =>
+            GetStat(UnitStatType.DamageMultiplier);
 
         public float BasicAttackMultiplier =>
             GetStat(UnitStatType.BasicAttackMultiplier);
@@ -61,8 +83,14 @@ namespace Units
         public float SkillDamageMultiplier =>
             GetStat(UnitStatType.SkillDamageMultiplier);
 
-        public float Defense =>
-            GetStat(UnitStatType.Defense);
+        public float DefenseIgnore =>
+            GetStat(UnitStatType.DefenseIgnore);
+
+        public float LifeSteal =>
+            GetStat(UnitStatType.LifeSteal);
+
+        public float HealingMultiplier =>
+            GetStat(UnitStatType.HealingMultiplier);
 
         public float AttackSpeed =>
             GetStat(UnitStatType.AttackSpeed);
@@ -70,14 +98,23 @@ namespace Units
         public float CooldownReduction =>
             GetStat(UnitStatType.CooldownReduction);
 
+
+        // Critical
+
         public float CriticalChance =>
             GetStat(UnitStatType.CriticalChance);
 
         public float CriticalDamage =>
             GetStat(UnitStatType.CriticalDamage);
 
+
+        // Movement
+
         public float MoveSpeed =>
             GetStat(UnitStatType.MoveSpeed);
+
+
+        // Detection
 
         public float DetectionRange =>
             GetStat(UnitStatType.DetectionRange);

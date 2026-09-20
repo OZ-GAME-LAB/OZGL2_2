@@ -397,7 +397,8 @@ namespace Units
                 _core,
                 null,
                 DamageSourceType.BasicAttack,
-                _core.RuntimeStatus.BasicAttackMultiplier
+                _data.DamageType,
+                1f
             );
 
 
@@ -481,7 +482,8 @@ namespace Units
                     _core,
                     targets,
                     DamageSourceType.BasicAttack,
-                    _core.RuntimeStatus.BasicAttackMultiplier
+                    _data.DamageType,
+                    1f
                 );
 
 

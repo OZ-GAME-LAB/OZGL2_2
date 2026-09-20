@@ -65,7 +65,7 @@ namespace Units.Skills
 
 
             IReadOnlyList<SkillEffectData> effects =
-                request.SkillData.Effects;
+                request.Effects;
 
 
             for (int i = 0;
@@ -143,17 +143,14 @@ namespace Units.Skills
                 request.Target
             };
 
-            float damageMultiplier =
-                effect.DamageMultiplier
-                * request.Caster.RuntimeStatus.SkillDamageMultiplier;
-
 
             DamageRequest damageRequest =
                 new DamageRequest(
                     request.Caster,
                     targets,
                     DamageSourceType.Skill,
-                    damageMultiplier
+                    effect.DamageType,
+                    effect.DamageMultiplier
                 );
 
 
@@ -253,11 +250,11 @@ namespace Units.Skills
             if (!request.Target.IsTargetable)
                 return false;
 
-            if (request.SkillData == null)
+            if (request.Effects == null ||
+                request.Effects.Count == 0)
+            {
                 return false;
-
-            if (request.SkillData.Effects == null)
-                return false;
+            }
 
 
             return true;

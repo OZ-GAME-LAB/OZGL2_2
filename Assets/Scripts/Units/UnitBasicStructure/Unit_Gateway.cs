@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Units.Skills;
 using UnityEngine;
 
 
@@ -61,7 +62,6 @@ namespace Units
             => _core != null
                 ? _core.RuntimeStatus
                 : default;
-
 
         public Unit_GroupAI GroupAI
             => _groupAI;
@@ -341,6 +341,33 @@ namespace Units
             Died?.Invoke(
                 this
             );
+        }
+
+
+        // ============================================================
+        // Passive
+        // ============================================================
+
+        public void CollectDamageModifiers(
+            PassiveDamageOwnerType ownerType,
+            List<PassiveDamageModifier> results)
+        {
+            _core?.CollectDamageModifiers(
+                ownerType,
+                results
+            );
+        }
+
+
+        public bool EvaluateDamageModifierConditions(
+            RuntimePassiveSkill runtimePassive,
+            ICombatTarget target)
+        {
+            return _core != null &&
+                   _core.EvaluateDamageModifierConditions(
+                       runtimePassive,
+                       target
+                   );
         }
 
 

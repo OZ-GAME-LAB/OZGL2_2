@@ -1,6 +1,6 @@
 ﻿using System;
-using Units.Skills;
 using UnityEngine;
+
 
 namespace Units.Effects
 {
@@ -9,19 +9,33 @@ namespace Units.Effects
         : EffectActionData
     {
         // ============================================================
+        // Constants
+        // ============================================================
+
+        private const float MinInterval =
+            0.01f;
+
+        private const float MinHealRatio =
+            0f;
+
+        private const float MaxHealRatio =
+            10f;
+
+
+        // ============================================================
         // Data
         // ============================================================
 
         [SerializeField]
-        [Min(0.01f)]
+        [Min(MinInterval)]
         private float _interval =
             1f;
 
 
         [SerializeField]
-        [Tooltip("대상의 현재 최대 체력을 기준으로 한 Tick당 회복 비율 (%)")]
+        [Tooltip("대상의 현재 최대 체력을 기준으로 한 Tick당 회복 비율")]
         private float _healRatio =
-            100f;
+            1f;
 
 
         // ============================================================
@@ -34,5 +48,28 @@ namespace Units.Effects
 
         public float HealRatio =>
             _healRatio;
+
+
+        // ============================================================
+        // Validation
+        // ============================================================
+
+#if UNITY_EDITOR
+        public override void Validate()
+        {
+            _interval =
+                Mathf.Max(
+                    MinInterval,
+                    _interval
+                );
+
+            _healRatio =
+                Mathf.Clamp(
+                    _healRatio,
+                    MinHealRatio,
+                    MaxHealRatio
+                );
+        }
+#endif
     }
 }

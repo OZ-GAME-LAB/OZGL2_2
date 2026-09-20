@@ -1,4 +1,8 @@
-﻿namespace Units.Skills
+﻿using System.Collections.Generic;
+
+
+
+namespace Units.Skills
 {
     public readonly struct SkillEffectRequest
     {
@@ -17,10 +21,10 @@
 
 
         // ============================================================
-        // Skill
+        // Effects
         // ============================================================
 
-        public ActiveSkillData SkillData { get; }
+        public IReadOnlyList<SkillEffectData> Effects { get; }
 
 
         // ============================================================
@@ -30,7 +34,7 @@
         public SkillEffectRequest(
             Unit_Core caster,
             ICombatTarget target,
-            ActiveSkillData skillData)
+            IReadOnlyList<SkillEffectData> effects)
         {
             Caster =
                 caster;
@@ -38,8 +42,8 @@
             Target =
                 target;
 
-            SkillData =
-                skillData;
+            Effects =
+                effects;
         }
     }
 }

@@ -1,6 +1,10 @@
-﻿namespace Units
+﻿using System.Collections.Generic;
+
+
+
+namespace Units
 {
-    public readonly struct DamageResult
+    public readonly struct DamageRequest
     {
         // ============================================================
         // Source
@@ -10,42 +14,43 @@
 
         public DamageSourceType SourceType { get; }
 
+        public DamageType DamageType { get; }
+
+        public float DamageMultiplier { get; }
+
 
         // ============================================================
         // Target
         // ============================================================
 
-        public ICombatTarget Target { get; }
-
-
-        // ============================================================
-        // Damage
-        // ============================================================
-
-        public float Damage { get; }
+        public IReadOnlyList<ICombatTarget> Targets { get; }
 
 
         // ============================================================
         // Constructor
         // ============================================================
 
-        public DamageResult(
+        public DamageRequest(
             Unit_Core attacker,
-            ICombatTarget target,
-            float damage,
-            DamageSourceType sourceType)
+            IReadOnlyList<ICombatTarget> targets,
+            DamageSourceType sourceType,
+            DamageType damageType,
+            float damageMultiplier)
         {
             Attacker =
                 attacker;
 
-            Target =
-                target;
-
-            Damage =
-                damage;
+            Targets =
+                targets;
 
             SourceType =
                 sourceType;
+
+            DamageType =
+                damageType;
+
+            DamageMultiplier =
+                damageMultiplier;
         }
     }
 }
