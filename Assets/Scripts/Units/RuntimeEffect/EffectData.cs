@@ -1,70 +1,116 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using Units;
 
 
-[CreateAssetMenu(
-    fileName = "EffectData",
-    menuName = "Units/Effects/EffectData"
-)]
-public class EffectData : ScriptableObject
+namespace Units.Effects
 {
-    // ============================================================
-    // Identity
-    // ============================================================
+    [CreateAssetMenu(
+        fileName = "EffectData",
+        menuName = "Units/Effects/EffectData"
+    )]
+    public class EffectData : ScriptableObject
+    {
+        // ============================================================
+        // Identity
+        // ============================================================
 
-    [SerializeField]
-    private string _effectId;
+        [SerializeField]
+        private string _effectId;
 
-    [SerializeField]
-    private EffectAlignment _alignment;
-
-
-    // ============================================================
-    // Duration
-    // ============================================================
-
-    [SerializeField]
-    private EffectDurationType _durationType;
-
-    [SerializeField]
-    private float _duration;
+        [SerializeField]
+        private EffectAlignment _alignment;
 
 
-    // ============================================================
-    // Stack
-    // ============================================================
+        // ============================================================
+        // Duration
+        // ============================================================
 
-    [SerializeField]
-    private EffectStackType _stackType;
+        [SerializeField]
+        private EffectDurationType _durationType;
 
-    [SerializeField]
-    private int _maxStack = 1;
-
-
-    // ============================================================
-    // Actions
-    // ============================================================
-
-    [SerializeReference]
-    private List<EffectActionData> _actions;
+        [SerializeField]
+        private float _duration;
 
 
-    // ============================================================
-    // Properties
-    // ============================================================
+        // ============================================================
+        // Stack
+        // ============================================================
 
-    public string EffectId => _effectId;
+        [SerializeField]
+        private EffectStackType _stackType;
 
-    public EffectAlignment Alignment => _alignment;
+        [SerializeField]
+        private int _maxStack = 1;
 
-    public EffectDurationType DurationType => _durationType;
 
-    public float Duration => _duration;
+        // ============================================================
+        // Actions
+        // ============================================================
 
-    public EffectStackType StackType => _stackType;
+        [SerializeReference]
+        private List<EffectActionData> _actions =
+            new();
 
-    public int MaxStack => _maxStack;
 
-    public IReadOnlyList<EffectActionData> Actions => _actions;
+        // ============================================================
+        // Properties
+        // ============================================================
+
+        public string EffectId =>
+            _effectId;
+
+        public EffectAlignment Alignment =>
+            _alignment;
+
+        public EffectDurationType DurationType =>
+            _durationType;
+
+        public float Duration =>
+            _duration;
+
+        public EffectStackType StackType =>
+            _stackType;
+
+        public int MaxStack =>
+            _maxStack;
+
+        public IReadOnlyList<EffectActionData> Actions =>
+            _actions;
+
+
+        // ============================================================
+        // Validation
+        // ============================================================
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            _duration =
+                Mathf.Max(
+                    0f,
+                    _duration
+                );
+
+            _maxStack =
+                Mathf.Max(
+                    1,
+                    _maxStack
+                );
+
+
+            ValidateActions();
+        }
+
+
+        private void ValidateActions()
+        {
+            for (int i = 0;
+                 i < _actions.Count;
+                 i++)
+            {
+                _actions[i]?.Validate();
+            }
+        }
+#endif
+    }
 }

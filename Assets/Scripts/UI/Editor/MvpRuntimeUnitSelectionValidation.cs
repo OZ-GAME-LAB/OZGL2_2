@@ -121,7 +121,7 @@ namespace Game.UI.Editor
                     "; filter=" + closeGraphic.Raycast(Point(close), null));
                 Click(events, Point(close));
                 Check(!panel.HasSelection, "normal close button clears selected binding");
-                allyCore.TakeDamage(new DamageResult(null, null, 30, DamageSourceType.BasicAttack));
+                allyCore.TakeDamage(new DamageResult(null, null, 30, DamageSourceType.BasicAttack, false));
                 Check(!panel.HasSelection, "health event after close does not reopen view");
                 Click(events, allyPoint);
                 Check(health.text == "체력 85 / 100", "reselect reads shield absorption and current health");
@@ -180,7 +180,7 @@ namespace Game.UI.Editor
                 }
                 Check(!panel.HasSelection, "repeated selection/switch/clear stays consistent");
                 Click(events, allyPoint);
-                allyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack));
+                allyCore.TakeDamage(new DamageResult(null, null, 999, DamageSourceType.BasicAttack, false));
                 Check(health.text == "체력 0 / 100" && panel.HasSelection, "dead selected unit remains inspectable");
                 ally.gameObject.SetActive(false);
                 Check(!panel.HasSelection, "despawn clears selection");

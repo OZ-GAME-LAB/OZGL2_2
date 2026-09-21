@@ -26,6 +26,10 @@ namespace Units.Skills
         [SerializeField]
         private float _basicAttackDelay = 1f;
 
+        [SerializeField]
+        private DamageType _damageType =
+            DamageType.Physical;
+
 
         // ============================================================
         // Execution
@@ -106,6 +110,9 @@ namespace Units.Skills
         public float BasicAttackDelay =>
             _basicAttackDelay;
 
+        public DamageType DamageType =>
+            _damageType;
+
         public BasicAttackExecutionType ExecutionType =>
             _executionType;
 
@@ -167,6 +174,7 @@ namespace Units.Skills
                     0f,
                     360f
                 );
+
 
             _projectileSpeed =
                 Mathf.Max(0f, _projectileSpeed);

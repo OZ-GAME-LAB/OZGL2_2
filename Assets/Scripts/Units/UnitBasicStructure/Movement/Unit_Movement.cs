@@ -164,6 +164,13 @@ namespace Units
 
 
         // ============================================================
+        // Restriction Runtime State
+        // ============================================================
+
+        private bool _isMovementBlocked;
+
+
+        // ============================================================
         // Properties
         // ============================================================
 
@@ -172,6 +179,9 @@ namespace Units
 
         public bool IsHoldingPosition
             => _isHoldingPosition;
+
+        public bool CanMove
+            => !_isMovementBlocked;
 
 
         // ============================================================
@@ -199,6 +209,10 @@ namespace Units
             }
 
 
+            _isMovementBlocked =
+                false;
+
+
             Stop();
         }
 
@@ -211,6 +225,19 @@ namespace Units
         {
             if (_rigidbody == null)
                 return;
+
+
+            if (_isMovementBlocked)
+            {
+                if (_rigidbody.linearVelocity !=
+                    Vector2.zero)
+                {
+                    _rigidbody.linearVelocity =
+                        Vector2.zero;
+                }
+
+                return;
+            }
 
 
             if (_isMoving)
@@ -232,6 +259,10 @@ namespace Units
             Vector2 targetPosition)
         {
             if (_rigidbody == null)
+                return;
+
+
+            if (!CanMove)
                 return;
 
 
@@ -265,6 +296,32 @@ namespace Units
                 _rigidbody.linearVelocity =
                     Vector2.zero;
             }
+        }
+
+
+        // ============================================================
+        // Movement Restriction
+        // ============================================================
+
+        public void SetMovementBlocked(
+            bool isBlocked)
+        {
+            if (_isMovementBlocked ==
+                isBlocked)
+            {
+                return;
+            }
+
+
+            _isMovementBlocked =
+                isBlocked;
+
+
+            if (!isBlocked)
+                return;
+
+
+            Stop();
         }
 
 
@@ -344,6 +401,10 @@ namespace Units
             Vector2 position)
         {
             if (_rigidbody == null)
+                return;
+
+
+            if (!CanMove)
                 return;
 
 
@@ -621,6 +682,7 @@ namespace Units
             {
                 _steeringSideUntil =
                     0f;
+
 
                 return desired
                     * speed
@@ -963,8 +1025,8 @@ namespace Units
 
 
             for (int i = 0;
-                i < _neighbourCount;
-                i++)
+                 i < _neighbourCount;
+                 i++)
             {
                 Collider2D other =
                     _neighbours[i];

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Units.Effects;
 using Units.Skills;
 using UnityEngine;
 
@@ -52,6 +53,15 @@ namespace Units.UnitDatas
 
 
         // ============================================================
+        // Status Immunity
+        // ============================================================
+
+        [SerializeField]
+        private List<UnitStatusEffectType> _statusImmunities =
+            new();
+
+
+        // ============================================================
         // Combat
         // ============================================================
 
@@ -60,6 +70,10 @@ namespace Units.UnitDatas
 
         [SerializeField]
         private ActiveSkillData _activeSkillData;
+
+        [SerializeField]
+        private List<PassiveSkillData> _passiveSkillDatas =
+            new();
 
 
         // ============================================================
@@ -84,6 +98,9 @@ namespace Units.UnitDatas
         public ActiveSkillData ActiveSkillData =>
             _activeSkillData;
 
+        public IReadOnlyList<PassiveSkillData> PassiveSkillDatas =>
+            _passiveSkillDatas;
+
 
         // ============================================================
         // Public Methods - Identity
@@ -93,6 +110,7 @@ namespace Units.UnitDatas
         {
             return _allyIdentity.UnitTier;
         }
+
 
         public AllyUnitClass GetAllyClass()
         {
@@ -110,6 +128,7 @@ namespace Units.UnitDatas
         {
             return _enemyIdentity.UnitFaction;
         }
+
 
         public EnemyUnitClass GetEnemyClass()
         {
@@ -138,7 +157,32 @@ namespace Units.UnitDatas
                 }
             }
 
-            return 0f;
+
+            return GetDefaultStatValue(
+                statType
+            );
+        }
+
+
+        public static float GetDefaultStatValue(
+            UnitStatType statType)
+        {
+            return UnitStatDefinitions
+                .Get(statType)
+                .DefaultValue;
+        }
+
+
+        // ============================================================
+        // Public Methods - Status Immunity
+        // ============================================================
+
+        public bool IsImmuneToStatus(
+            UnitStatusEffectType statusType)
+        {
+            return _statusImmunities.Contains(
+                statusType
+            );
         }
     }
 

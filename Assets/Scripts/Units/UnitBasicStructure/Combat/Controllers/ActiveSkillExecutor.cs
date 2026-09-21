@@ -1,8 +1,7 @@
+using System;
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
-using System;
-
 
 
 namespace Units
@@ -29,7 +28,8 @@ namespace Units
         // Action Controllers
         // ============================================================
 
-        private readonly CastController _castController = new CastController();
+        private readonly CastController _castController =
+            new CastController();
 
         private readonly DashController _dashController;
 
@@ -45,6 +45,7 @@ namespace Units
         private int _executionId;
 
         private bool _isExecuting;
+
         private Predicate<ICombatTarget> _targetFilter;
 
 
@@ -52,9 +53,11 @@ namespace Units
         // Properties
         // ============================================================
 
-        public bool IsCasting => _castController.IsCasting;
+        public bool IsCasting =>
+            _castController.IsCasting;
 
-        public bool IsDashing => _dashController.IsDashing;
+        public bool IsDashing =>
+            _dashController.IsDashing;
 
 
         // ============================================================
@@ -105,26 +108,54 @@ namespace Units
         // Execute
         // ============================================================
 
-        public bool CanExecute(ICombatTarget target)
+        public bool CanExecute(
+            ICombatTarget target)
         {
-            if (_core == null || !_core.IsAlive || !_core.isActiveAndEnabled
-                || _core.RuntimeStatus == null || _data == null
-                || !CombatTargetUtility.IsValid(target) || !target.IsTargetable)
+            if (_core == null
+                || !_core.IsAlive
+                || !_core.isActiveAndEnabled
+                || _core.RuntimeStatus == null
+                || _data == null
+                || !CombatTargetUtility.IsValid(target)
+                || !target.IsTargetable)
+            {
                 return false;
+            }
+
+
             if (_data.ActionType != ActiveSkillActionType.Instant
                 && _data.ActionType != ActiveSkillActionType.Cast
                 && _data.ActionType != ActiveSkillActionType.Dash)
+            {
                 return false;
-            if (_data.ExecutionType != ActiveSkillExecutionType.Direct
-                && _data.ExecutionType != ActiveSkillExecutionType.Projectile)
+            }
+
+
+            if (_data.DeliveryType != ActiveSkillDeliveryType.Direct
+                && _data.DeliveryType != ActiveSkillDeliveryType.Projectile)
+            {
                 return false;
+            }
+
+
             if (_data.ActionType == ActiveSkillActionType.Dash
-                && (_data.DashDistance <= 0f || _data.DashSpeed <= 0f))
+                && (_data.DashDistance <= 0f
+                    || _data.DashSpeed <= 0f))
+            {
                 return false;
-            if (_data.ExecutionType == ActiveSkillExecutionType.Projectile && _data.ProjectileSpeed <= 0f)
+            }
+
+
+            if (_data.DeliveryType == ActiveSkillDeliveryType.Projectile
+                && _data.ProjectileSpeed <= 0f)
+            {
                 return false;
-            return DamageResolver.Instance != null;
+            }
+
+
+            return SkillEffectResolver.Instance != null;
         }
+
 
         public void Execute(
             ICombatTarget target,
@@ -134,7 +165,9 @@ namespace Units
             Cancel();
 
 
-            if (!CanExecute(target) || (targetFilter != null && !targetFilter(target)))
+            if (!CanExecute(target)
+                || (targetFilter != null
+                    && !targetFilter(target)))
             {
                 onCompleted?.Invoke();
 
@@ -142,7 +175,8 @@ namespace Units
             }
 
 
-            _targetFilter = targetFilter;
+            _targetFilter =
+                targetFilter;
 
             _target =
                 target;
@@ -200,7 +234,11 @@ namespace Units
             float deltaTime)
         {
             if (ValidateExecution())
-                _castController.Tick(deltaTime);
+            {
+                _castController.Tick(
+                    deltaTime
+                );
+            }
         }
 
 
@@ -208,14 +246,20 @@ namespace Units
             float deltaTime)
         {
             if (ValidateExecution())
-                _dashController.FixedTick(deltaTime);
+            {
+                _dashController.FixedTick(
+                    deltaTime
+                );
+            }
         }
 
 
         public void Cancel()
         {
             _executionId++;
-            _targetFilter = null;
+
+            _targetFilter =
+                null;
 
             _isExecuting =
                 false;
@@ -225,6 +269,7 @@ namespace Units
 
             _target =
                 null;
+
 
             _castController.Cancel();
 
@@ -238,7 +283,9 @@ namespace Units
                 return false;
 
 
-            if (_core == null || !_core.isActiveAndEnabled || !_core.IsAlive)
+            if (_core == null
+                || !_core.isActiveAndEnabled
+                || !_core.IsAlive)
             {
                 CompleteExecution();
 
@@ -246,8 +293,10 @@ namespace Units
             }
 
 
-            if (!CombatTargetUtility.IsValid(_target)
-                || (_targetFilter != null && !_targetFilter(_target)))
+            if (!CombatTargetUtility.IsValid(
+                    _target)
+                || (_targetFilter != null
+                    && !_targetFilter(_target)))
             {
                 // Target이 무효화되면 지연 공격 없이 현재 행동을 완료한다.
                 CompleteExecution();
@@ -276,7 +325,8 @@ namespace Units
                 if (_core != null
                     && _core.IsAlive
                     && CombatTargetUtility.IsValid(target)
-                    && (_targetFilter == null || _targetFilter(target)))
+                    && (_targetFilter == null
+                        || _targetFilter(target)))
                 {
                     ExecuteAttack(
                         target
@@ -286,7 +336,9 @@ namespace Units
             finally
             {
                 if (executionId == _executionId)
+                {
                     CompleteExecution();
+                }
             }
         }
 
@@ -331,9 +383,14 @@ namespace Units
                 () =>
                 {
                     if (executionId == _executionId)
-                        FinishAttack(target);
+                    {
+                        FinishAttack(
+                            target
+                        );
+                    }
                 }
             );
+
 
             // Cast 완료 후 현재 실행이 유효한 경우
             // FinishAttack을 통해 실제 공격을 실행하고 Skill Action을 완료한다.
@@ -361,9 +418,14 @@ namespace Units
                 () =>
                 {
                     if (executionId == _executionId)
-                        FinishAttack(target);
+                    {
+                        FinishAttack(
+                            target
+                        );
+                    }
                 }
             );
+
 
             // Dash는 일반 Movement와 분리해서 처리하며
             // MovementCompleted는 발생시키지 않는다.
@@ -380,9 +442,9 @@ namespace Units
         private void ExecuteAttack(
             ICombatTarget target)
         {
-            switch (_data.ExecutionType)
+            switch (_data.DeliveryType)
             {
-                case ActiveSkillExecutionType.Direct:
+                case ActiveSkillDeliveryType.Direct:
 
                     ExecuteDirect(
                         target
@@ -391,7 +453,7 @@ namespace Units
                     break;
 
 
-                case ActiveSkillExecutionType.Projectile:
+                case ActiveSkillDeliveryType.Projectile:
 
                     ExecuteProjectile(
                         target
@@ -462,7 +524,7 @@ namespace Units
             );
 
 
-            RequestDamage(
+            RequestSkillEffects(
                 _singleTargetBuffer
             );
 
@@ -496,7 +558,7 @@ namespace Units
                     Vector2.zero,
                     _data.AreaRadius,
                     0f,
-                    _data.MaxDamageableCount,
+                    _data.MaxEffectTargetCount,
                     HitAreaType.Circle,
                     target.Team,
                     _targetFilter
@@ -509,7 +571,7 @@ namespace Units
                 );
 
 
-            RequestDamage(
+            RequestSkillEffects(
                 targets
             );
 
@@ -542,7 +604,7 @@ namespace Units
                     Vector2.zero,
                     _data.AreaRadius,
                     0f,
-                    _data.MaxDamageableCount,
+                    _data.MaxEffectTargetCount,
                     HitAreaType.Circle,
                     GetTargetTeam(),
                     _targetFilter
@@ -555,7 +617,7 @@ namespace Units
                 );
 
 
-            RequestDamage(
+            RequestSkillEffects(
                 targets
             );
 
@@ -596,7 +658,7 @@ namespace Units
                     direction,
                     _data.AreaRadius,
                     _data.AreaAngle,
-                    _data.MaxDamageableCount,
+                    _data.MaxEffectTargetCount,
                     HitAreaType.Cone,
                     GetTargetTeam(),
                     _targetFilter
@@ -609,7 +671,7 @@ namespace Units
                 );
 
 
-            RequestDamage(
+            RequestSkillEffects(
                 targets
             );
 
@@ -668,9 +730,9 @@ namespace Units
 
 
                 for (int i = 0;
-                    i < candidates.Count
-                    && _projectileTargetBuffer.Count < _data.MaxTargetCount;
-                    i++)
+                     i < candidates.Count
+                     && _projectileTargetBuffer.Count < _data.MaxTargetCount;
+                     i++)
                 {
                     ICombatTarget candidate =
                         candidates[i];
@@ -687,8 +749,19 @@ namespace Units
             }
 
 
-            // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
-            for (int i = 0; i < _projectileTargetBuffer.Count; i++)
+            // 실제 명중 대상은 Projectile 충돌 시점에 확정한다.
+            SkillEffectRequest skillEffectRequest =
+                new SkillEffectRequest(
+                    _core,
+                    null,
+                    _data.Effects
+                );
+
+
+            // 목표마다 1발씩 발사하고, 각 투사체의 효과 적용 인원은 별도로 제한한다.
+            for (int i = 0;
+                 i < _projectileTargetBuffer.Count;
+                 i++)
             {
                 ProjectileRequest request =
                     new ProjectileRequest(
@@ -701,9 +774,8 @@ namespace Units
                         _data.AreaAngle,
                         impactType == ProjectileImpactType.Single
                             ? 1
-                            : _data.MaxDamageableCount,
-                        DamageSourceType.Skill,
-                        _core.RuntimeStatus.SkillDamageMultiplier,
+                            : _data.MaxEffectTargetCount,
+                        skillEffectRequest,
                         _targetFilter
                     );
 
@@ -713,14 +785,16 @@ namespace Units
                 );
             }
 
+
             // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
-            // 실제 피해 처리는 Projectile 충돌 시 ImpactType에 따라 처리된다.
+            // SkillEffectRequest는 발사 시점의 Skill Effect 정보를 보관하고,
+            // 실제 효과 대상은 Projectile 충돌 시 ImpactType에 따라 확정된다.
             //
             // Single
-            // → 충돌 대상에게 피해 적용
+            // → 충돌 대상을 SkillEffectRequest의 대상으로 사용
             //
             // Circle / Cone
-            // → 충돌 위치 기준 범위 판정 후 피해 적용
+            // → 충돌 위치 기준 범위 판정 후 SkillEffectRequest의 대상으로 사용
 
 
             // TODO:
@@ -784,10 +858,10 @@ namespace Units
 
 
         // ============================================================
-        // Damage
+        // Skill Effect
         // ============================================================
 
-        private void RequestDamage(
+        private void RequestSkillEffects(
             IReadOnlyList<ICombatTarget> targets)
         {
             if (targets == null)
@@ -797,28 +871,43 @@ namespace Units
                 return;
 
 
-            if (DamageResolver.Instance == null)
+            if (SkillEffectResolver.Instance == null)
             {
                 Debug.LogError(
-                    "[ActiveSkillExecutor] DamageResolver가 존재하지 않습니다."
+                    "[ActiveSkillExecutor] SkillEffectResolver가 존재하지 않습니다."
                 );
 
                 return;
             }
 
 
-            DamageRequest request =
-                new DamageRequest(
-                    _core,
-                    targets,
-                    DamageSourceType.Skill,
-                    _core.RuntimeStatus.SkillDamageMultiplier
+            for (int i = 0;
+                 i < targets.Count;
+                 i++)
+            {
+                ICombatTarget target =
+                    targets[i];
+
+
+                if (!CombatTargetUtility.IsValid(
+                        target))
+                {
+                    continue;
+                }
+
+
+                SkillEffectRequest request =
+                    new SkillEffectRequest(
+                        _core,
+                        target,
+                        _data.Effects
+                    );
+
+
+                SkillEffectResolver.Instance.Resolve(
+                    request
                 );
-
-
-            DamageResolver.Instance.Resolve(
-                request
-            );
+            }
         }
     }
 }

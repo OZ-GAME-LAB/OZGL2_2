@@ -18,14 +18,28 @@ MonoBehaviour:
   _targetPolicy: 1
   _actionType: 0
   _castTime: 0
-  _executionType: 1
-  _maxTargetCount: 5
-  _maxDamageableCount: 1
+  _deliveryType: 1
+  _maxTargetCount: 3
+  _maxEffectTargetCount: 1
   _areaType: 0
   _areaRadius: 1
   _areaAngle: 90
+  _effects:
+  - rid: 4844432152660541524
+  - rid: 4844432152660541525
   _projectileSpeed: 10
   _dashDistance: 3
   _dashSpeed: 10
   _skillFXType: 0
   _hitFXType: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432152660541524
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _damageMultiplier: 1.5
+    - rid: 4844432152660541525
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 84a1339210d0d674f895f4a100d275de, type: 2}

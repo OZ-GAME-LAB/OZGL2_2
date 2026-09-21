@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: Enemy_Dragoon_PassiveSkill
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _triggerType: 1
+  _tickInterval: 1
+  _conditions:
+  - rid: 4844432195048177756
+  _effectMode: 1
+  _actions:
+  - rid: 4844432195048177757
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432195048177756
+      type: {class: PassiveUnitCountConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetRelation: 0
+        _range: 7
+        _comparisonType: 3
+        _count: 3
+    - rid: 4844432195048177757
+      type: {class: PassiveDefenseModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _ownerType: 1
+        _value: -0.2

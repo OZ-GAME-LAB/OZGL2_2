@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Units.Skills;
 using UnityEngine;
 
 namespace Units
@@ -48,6 +49,7 @@ namespace Units
             if (attackerGateway != null && attackerGateway.LifetimeVersion != request.AttackerLifetimeVersion)
                 return;
 
+
             IReadOnlyList<ICombatTarget> targets;
 
 
@@ -77,7 +79,7 @@ namespace Units
                             direction,
                             request.AreaRadius,
                             request.AreaAngle,
-                            request.MaxDamageableCount,
+                            request.MaxImpactTargetCount,
                             request.ImpactType == ProjectileImpactType.Cone
                                 ? HitAreaType.Cone
                                 : HitAreaType.Circle,
@@ -88,6 +90,35 @@ namespace Units
             }
 
 
+            if (request.DamageRequest.HasValue)
+            {
+                ResolveDamage(
+                    request.DamageRequest.Value,
+                    targets
+                );
+
+                return;
+            }
+
+
+            if (request.SkillEffectRequest.HasValue)
+            {
+                ResolveSkillEffects(
+                    request.SkillEffectRequest.Value,
+                    targets
+                );
+            }
+        }
+
+
+        // ============================================================
+        // Damage
+        // ============================================================
+
+        private void ResolveDamage(
+            DamageRequest pendingRequest,
+            IReadOnlyList<ICombatTarget> targets)
+        {
             if (DamageResolver.Instance == null)
             {
                 Debug.LogError(
@@ -100,12 +131,55 @@ namespace Units
 
             DamageResolver.Instance.Resolve(
                 new DamageRequest(
-                    request.Attacker,
+                    pendingRequest.Attacker,
                     targets,
-                    request.DamageSourceType,
-                    request.DamageMultiplier
+                    pendingRequest.SourceType,
+                    pendingRequest.DamageType,
+                    pendingRequest.DamageMultiplier
                 )
             );
+        }
+
+
+        // ============================================================
+        // Skill Effect
+        // ============================================================
+
+        private void ResolveSkillEffects(
+            SkillEffectRequest pendingRequest,
+            IReadOnlyList<ICombatTarget> targets)
+        {
+            if (SkillEffectResolver.Instance == null)
+            {
+                Debug.LogError(
+                    "[ProjectileImpactResolver] SkillEffectResolver가 존재하지 않습니다."
+                );
+
+                return;
+            }
+
+
+            if (targets == null)
+                return;
+
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                ICombatTarget target =
+                    targets[i];
+
+                if (!CombatTargetUtility.IsValid(target))
+                    continue;
+
+
+                SkillEffectResolver.Instance.Resolve(
+                    new SkillEffectRequest(
+                        pendingRequest.Caster,
+                        target,
+                        pendingRequest.Effects
+                    )
+                );
+            }
         }
     }
 }

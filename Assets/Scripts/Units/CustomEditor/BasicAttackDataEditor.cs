@@ -13,6 +13,7 @@ namespace Units.Editor
 
         private SerializedProperty _basicAttackRange;
         private SerializedProperty _basicAttackDelay;
+        private SerializedProperty _damageType;
 
         private SerializedProperty _executionType;
 
@@ -55,6 +56,11 @@ namespace Units.Editor
             _basicAttackDelay =
                 serializedObject.FindProperty(
                     "_basicAttackDelay"
+                );
+
+            _damageType =
+                serializedObject.FindProperty(
+                    "_damageType"
                 );
 
 
@@ -185,6 +191,10 @@ namespace Units.Editor
 
                 EditorGUILayout.PropertyField(
                     _basicAttackDelay
+                );
+
+                EditorGUILayout.PropertyField(
+                    _damageType
                 );
 
 

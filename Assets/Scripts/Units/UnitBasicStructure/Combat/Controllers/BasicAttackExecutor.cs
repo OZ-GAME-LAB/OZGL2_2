@@ -392,9 +392,19 @@ namespace Units
             }
 
 
+            DamageRequest damageRequest =
+                new DamageRequest(
+                _core,
+                null,
+                DamageSourceType.BasicAttack,
+                _data.DamageType,
+                1f
+            );
+
+
             // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
             for (int i = 0; i < _projectileTargetBuffer.Count; i++)
-            {
+            { 
                 ProjectileRequest request =
                     new ProjectileRequest(
                         _core,
@@ -404,10 +414,12 @@ namespace Units
                         impactType,
                         _data.AreaRadius,
                         _data.AreaAngle,
-                        impactType == ProjectileImpactType.Single ? 1 : _data.MaxDamageableCount,
-                        DamageSourceType.BasicAttack,
-                        _core.RuntimeStatus.BasicAttackMultiplier
+                        impactType == ProjectileImpactType.Single
+                            ? 1
+                            : _data.MaxDamageableCount,
+                        damageRequest
                     );
+
 
                 ProjectileManager.GetOrCreate().Fire(
                     request
@@ -415,13 +427,14 @@ namespace Units
             }
 
             // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
-            // 실제 피해 처리는 Projectile 충돌 시 ImpactType에 따라 처리된다.
+            // DamageRequest는 발사 시점의 공격 정보를 보관하고,
+            // 실제 피해 대상은 Projectile 충돌 시 ImpactType에 따라 확정된다.
             //
             // Single
-            // → 충돌 대상에게 피해 적용
+            // → 충돌 대상을 DamageRequest의 대상으로 사용
             //
             // Circle / Cone
-            // → 충돌 위치 기준 범위 판정 후 피해 적용
+            // → 충돌 위치 기준 범위 판정 후 DamageRequest의 대상으로 사용
 
 
             // TODO:
@@ -469,7 +482,8 @@ namespace Units
                     _core,
                     targets,
                     DamageSourceType.BasicAttack,
-                    _core.RuntimeStatus.BasicAttackMultiplier
+                    _data.DamageType,
+                    1f
                 );
 
 
