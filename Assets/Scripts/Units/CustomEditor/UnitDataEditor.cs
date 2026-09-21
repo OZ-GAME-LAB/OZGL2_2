@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using Units.Effects;
 using Units.UnitDatas;
 
 
@@ -23,8 +24,11 @@ namespace Units.Editor
 
         private SerializedProperty _stats;
 
+        private SerializedProperty _statusImmunities;
+
         private SerializedProperty _basicAttackData;
         private SerializedProperty _activeSkillData;
+        private SerializedProperty _passiveSkillDatas;
 
 
         // ============================================================
@@ -34,6 +38,7 @@ namespace Units.Editor
         private bool _basicFoldout = true;
         private bool _identityFoldout = true;
         private bool _statsFoldout = true;
+        private bool _statusImmunityFoldout = true;
         private bool _combatFoldout = true;
 
 
@@ -73,6 +78,11 @@ namespace Units.Editor
                     "_stats"
                 );
 
+            _statusImmunities =
+                serializedObject.FindProperty(
+                    "_statusImmunities"
+                );
+
             _basicAttackData =
                 serializedObject.FindProperty(
                     "_basicAttackData"
@@ -81,6 +91,11 @@ namespace Units.Editor
             _activeSkillData =
                 serializedObject.FindProperty(
                     "_activeSkillData"
+                );
+
+            _passiveSkillDatas =
+                serializedObject.FindProperty(
+                    "_passiveSkillDatas"
                 );
 
 
@@ -113,6 +128,10 @@ namespace Units.Editor
             EditorGUILayout.Space();
 
             DrawStatsSection();
+
+            EditorGUILayout.Space();
+
+            DrawStatusImmunitySection();
 
             EditorGUILayout.Space();
 
@@ -322,6 +341,12 @@ namespace Units.Editor
                 (UnitStatType)statType.intValue;
 
 
+            UnitStatDefinition definition =
+                UnitStatDefinitions.Get(
+                    type
+                );
+
+
             EditorGUILayout.BeginHorizontal();
 
 
@@ -332,14 +357,120 @@ namespace Units.Editor
             );
 
 
-            EditorGUILayout.PropertyField(
-                value,
-                GUIContent.none,
-                GUILayout.Width(120f)
-            );
+            float displayValue =
+                GetDisplayValue(
+                    value.floatValue,
+                    definition
+                );
+
+
+            EditorGUI.BeginChangeCheck();
+
+
+            float nextDisplayValue =
+                DrawStatValueField(
+                    displayValue,
+                    definition
+                );
+
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                float nextValue =
+                    GetStoredValue(
+                        nextDisplayValue,
+                        definition
+                    );
+
+
+                value.floatValue =
+                    Mathf.Clamp(
+                        nextValue,
+                        definition.MinValue,
+                        definition.MaxValue
+                    );
+            }
 
 
             EditorGUILayout.EndHorizontal();
+        }
+
+
+        private float DrawStatValueField(
+            float displayValue,
+            UnitStatDefinition definition)
+        {
+            if (definition.DisplayType ==
+                UnitStatDisplayType.Percentage)
+            {
+                EditorGUILayout.BeginHorizontal(
+                    GUILayout.Width(120f)
+                );
+
+
+                float nextValue =
+                    EditorGUILayout.FloatField(
+                        displayValue
+                    );
+
+
+                GUILayout.Label(
+                    "%",
+                    GUILayout.Width(15f)
+                );
+
+
+                EditorGUILayout.EndHorizontal();
+
+
+                return nextValue;
+            }
+
+
+            return EditorGUILayout.FloatField(
+                displayValue,
+                GUILayout.Width(120f)
+            );
+        }
+
+
+        private float GetDisplayValue(
+            float storedValue,
+            UnitStatDefinition definition)
+        {
+            switch (definition.DisplayType)
+            {
+                case UnitStatDisplayType.Percentage:
+
+                    return storedValue * 100f;
+
+
+                case UnitStatDisplayType.Value:
+                case UnitStatDisplayType.Multiplier:
+                default:
+
+                    return storedValue;
+            }
+        }
+
+
+        private float GetStoredValue(
+            float displayValue,
+            UnitStatDefinition definition)
+        {
+            switch (definition.DisplayType)
+            {
+                case UnitStatDisplayType.Percentage:
+
+                    return displayValue / 100f;
+
+
+                case UnitStatDisplayType.Value:
+                case UnitStatDisplayType.Multiplier:
+                default:
+
+                    return displayValue;
+            }
         }
 
 
@@ -414,7 +545,9 @@ namespace Units.Editor
                 else
                 {
                     valueProperty.floatValue =
-                        0f;
+                        UnitData.GetDefaultStatValue(
+                            statType
+                        );
                 }
             }
         }
@@ -509,6 +642,169 @@ namespace Units.Editor
 
 
         // ============================================================
+        // Status Immunity
+        // ============================================================
+
+        private void DrawStatusImmunitySection()
+        {
+            EditorGUILayout.BeginVertical(
+                EditorStyles.helpBox
+            );
+
+
+            _statusImmunityFoldout =
+                EditorGUILayout.Foldout(
+                    _statusImmunityFoldout,
+                    "Status Immunity",
+                    true,
+                    EditorStyles.foldoutHeader
+                );
+
+
+            if (_statusImmunityFoldout)
+            {
+                EditorGUI.indentLevel++;
+
+
+                UnitStatusEffectType[] statusTypes =
+                    (UnitStatusEffectType[])Enum.GetValues(
+                        typeof(UnitStatusEffectType)
+                    );
+
+
+                for (int i = 0;
+                     i < statusTypes.Length;
+                     i++)
+                {
+                    UnitStatusEffectType statusType =
+                        statusTypes[i];
+
+
+                    bool isImmune =
+                        ContainsStatusImmunity(
+                            statusType
+                        );
+
+
+                    bool nextValue =
+                        EditorGUILayout.Toggle(
+                            ObjectNames.NicifyVariableName(
+                                statusType.ToString()
+                            ),
+                            isImmune
+                        );
+
+
+                    if (nextValue == isImmune)
+                        continue;
+
+
+                    if (nextValue)
+                    {
+                        AddStatusImmunity(
+                            statusType
+                        );
+                    }
+                    else
+                    {
+                        RemoveStatusImmunity(
+                            statusType
+                        );
+                    }
+                }
+
+
+                EditorGUI.indentLevel--;
+            }
+
+
+            EditorGUILayout.EndVertical();
+        }
+
+
+        private bool ContainsStatusImmunity(
+            UnitStatusEffectType statusType)
+        {
+            for (int i = 0;
+                 i < _statusImmunities.arraySize;
+                 i++)
+            {
+                SerializedProperty element =
+                    _statusImmunities.GetArrayElementAtIndex(
+                        i
+                    );
+
+
+                if (element.intValue ==
+                    (int)statusType)
+                {
+                    return true;
+                }
+            }
+
+
+            return false;
+        }
+
+
+        private void AddStatusImmunity(
+            UnitStatusEffectType statusType)
+        {
+            if (ContainsStatusImmunity(
+                    statusType))
+            {
+                return;
+            }
+
+
+            int index =
+                _statusImmunities.arraySize;
+
+
+            _statusImmunities.InsertArrayElementAtIndex(
+                index
+            );
+
+
+            SerializedProperty element =
+                _statusImmunities.GetArrayElementAtIndex(
+                    index
+                );
+
+
+            element.intValue =
+                (int)statusType;
+        }
+
+
+        private void RemoveStatusImmunity(
+            UnitStatusEffectType statusType)
+        {
+            for (int i = _statusImmunities.arraySize - 1;
+                 i >= 0;
+                 i--)
+            {
+                SerializedProperty element =
+                    _statusImmunities.GetArrayElementAtIndex(
+                        i
+                    );
+
+
+                if (element.intValue !=
+                    (int)statusType)
+                {
+                    continue;
+                }
+
+
+                _statusImmunities.DeleteArrayElementAtIndex(
+                    i
+                );
+            }
+        }
+
+
+        // ============================================================
         // Combat Data
         // ============================================================
 
@@ -539,6 +835,11 @@ namespace Units.Editor
 
                 EditorGUILayout.PropertyField(
                     _activeSkillData
+                );
+
+                EditorGUILayout.PropertyField(
+                    _passiveSkillDatas,
+                    true
                 );
 
 

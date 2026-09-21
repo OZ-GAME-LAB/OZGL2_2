@@ -19,6 +19,7 @@ GameObject:
   - component: {fileID: 1706190401985738640}
   - component: {fileID: 2652862941426840934}
   - component: {fileID: 6198245451378740418}
+  - component: {fileID: 8187977158604747111}
   - component: {fileID: 6487692032148936677}
   - component: {fileID: 3712000363861774538}
   m_Layer: 13
@@ -122,6 +123,7 @@ MonoBehaviour:
   _animation: {fileID: 0}
   _detection: {fileID: 0}
   _ai: {fileID: 0}
+  _passive: {fileID: 0}
   _team: 0
 --- !u!114 &7001220889793589877
 MonoBehaviour:
@@ -245,6 +247,18 @@ MonoBehaviour:
   _obstacleLayer:
     serializedVersion: 2
     m_Bits: 0
+--- !u!114 &8187977158604747111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1283601080074174613}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 498648e5ff30b64499c3b347d03f04b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Unit_Passive
 --- !u!50 &6487692032148936677
 Rigidbody2D:
   serializedVersion: 5

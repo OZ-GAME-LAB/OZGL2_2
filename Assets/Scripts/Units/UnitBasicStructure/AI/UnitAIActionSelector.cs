@@ -34,6 +34,7 @@ namespace Units
             if (_core == null)
                 return UnitAIActionType.Idle;
 
+
             if (!IsTargetValid(
                 assignment.Target))
             {
@@ -82,11 +83,14 @@ namespace Units
             if (!_core.CanUseActiveSkill)
                 return false;
 
+
             if (_core.RuntimeStatus == null)
                 return false;
 
+
             if (_core.RuntimeStatus.ActiveSkillData == null)
                 return false;
+
 
             return distance <=
                 _core.RuntimeStatus.ActiveSkillData.SkillRange;
@@ -103,16 +107,18 @@ namespace Units
             if (!_core.CanUseBasicAttack)
                 return false;
 
+
             if (_core.RuntimeStatus == null)
                 return false;
+
 
             if (_core.RuntimeStatus.BasicAttackData == null)
                 return false;
 
+
             return distance <=
                 _core.RuntimeStatus.BasicAttackData.BasicAttackRange;
         }
-
 
 
         // ============================================================
@@ -122,6 +128,10 @@ namespace Units
         private bool ShouldMove(
             float distance)
         {
+            if (!_core.CanMove)
+                return false;
+
+
             return distance >
                 _core.PreferredCombatRange;
         }
@@ -137,12 +147,15 @@ namespace Units
             Vector2 unitPosition =
                 _core.transform.position;
 
+
             Vector2 targetPosition =
                 target.Transform.position;
 
+
             return Vector2.Distance(
                 unitPosition,
-                targetPosition);
+                targetPosition
+            );
         }
 
 

@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using Units.Effects;
+using Units.Skills;
 using UnityEngine;
 
 
@@ -35,6 +38,9 @@ namespace Units
         [SerializeField]
         private Unit_AI _ai;
 
+        [SerializeField]
+        private Unit_Passive _passive;
+
 
         // ============================================================
         // Team
@@ -58,13 +64,17 @@ namespace Units
             => _life != null
             && !_life.IsDead;
 
+        public bool CanMove
+            => _movement != null
+            && _movement.CanMove;
+
         public bool CanUseBasicAttack
             => _combat != null
-                && _combat.CanUseBasicAttack;
+            && _combat.CanUseBasicAttack;
 
         public bool CanUseActiveSkill
             => _combat != null
-                && _combat.CanUseActiveSkill;
+            && _combat.CanUseActiveSkill;
 
 
         public float PreferredCombatRange
@@ -76,6 +86,7 @@ namespace Units
             => _life != null
                 ? _life.CurrentHp
                 : 0f;
+
 
         // ============================================================
         // Events
@@ -99,6 +110,7 @@ namespace Units
             MovementCompleted?.Invoke();
         }
 
+
         public void NotifyMovementFailed()
         {
             MovementFailed?.Invoke();
@@ -111,20 +123,28 @@ namespace Units
         }
 
 
-        public void NotifyActiveSkillCompleted(bool reevaluateAfterMovement = false)
+        public void NotifyActiveSkillCompleted(
+            bool reevaluateAfterMovement = false)
         {
             if (reevaluateAfterMovement)
+            {
                 _ai?.QueueTargetReevaluation();
+            }
 
             ActiveSkillCompleted?.Invoke();
         }
 
-        public SkillEngagementResult RequestSkillEngagement(ICombatTarget target)
+
+        public SkillEngagementResult RequestSkillEngagement(
+            ICombatTarget target)
         {
             return _gateway != null
-                ? _gateway.RequestSkillEngagement(target)
+                ? _gateway.RequestSkillEngagement(
+                    target
+                )
                 : SkillEngagementResult.Invalid;
         }
+
 
         public Predicate<ICombatTarget> CaptureSkillTargetFilter()
         {
@@ -133,7 +153,10 @@ namespace Units
                 : RejectSkillTarget;
         }
 
-        private static bool RejectSkillTarget(ICombatTarget target) => false;
+
+        private static bool RejectSkillTarget(
+            ICombatTarget target)
+            => false;
 
 
         // ============================================================
@@ -157,6 +180,7 @@ namespace Units
 
             UnbindComponentEvents();
 
+
             if (_gateway != null)
             {
                 _gateway.Initialize(
@@ -164,14 +188,18 @@ namespace Units
                 );
             }
 
+
             _runtimeStatus.Initialize(
                 spawnModifier
             );
 
+
             if (_runtimeStatus.UnitData != null)
             {
-                _team = _runtimeStatus.UnitData.Team;
+                _team =
+                    _runtimeStatus.UnitData.Team;
             }
+
 
             if (_life != null)
             {
@@ -180,12 +208,14 @@ namespace Units
                 );
             }
 
+
             if (_movement != null)
             {
                 _movement.Initialize(
                     this
                 );
             }
+
 
             if (_combat != null)
             {
@@ -194,12 +224,14 @@ namespace Units
                 );
             }
 
+
             if (_animation != null)
             {
                 _animation.Initialize(
                     this
                 );
             }
+
 
             if (_detection != null)
             {
@@ -208,6 +240,7 @@ namespace Units
                 );
             }
 
+
             if (_ai != null)
             {
                 _ai.Initialize(
@@ -215,7 +248,20 @@ namespace Units
                 );
             }
 
+
+            if (_passive != null)
+            {
+                _passive.Initialize(
+                    this,
+                    _gateway,
+                    _runtimeStatus.PassiveSkillDatas
+                );
+            }
+
+
             BindComponentEvents();
+
+            RefreshStatusRestrictions();
         }
 
 
@@ -227,11 +273,13 @@ namespace Units
                     GetComponent<Unit_Gateway>();
             }
 
+
             if (_runtimeStatus == null)
             {
                 _runtimeStatus =
                     GetComponent<Unit_RuntimeStatus>();
             }
+
 
             if (_life == null)
             {
@@ -239,11 +287,13 @@ namespace Units
                     GetComponent<Unit_Life>();
             }
 
+
             if (_movement == null)
             {
                 _movement =
                     GetComponent<Unit_Movement>();
             }
+
 
             if (_combat == null)
             {
@@ -251,11 +301,13 @@ namespace Units
                     GetComponent<Unit_Combat>();
             }
 
+
             if (_animation == null)
             {
                 _animation =
                     GetComponent<Unit_Animation>();
             }
+
 
             if (_detection == null)
             {
@@ -263,10 +315,18 @@ namespace Units
                     GetComponent<Unit_Detection>();
             }
 
+
             if (_ai == null)
             {
                 _ai =
                     GetComponent<Unit_AI>();
+            }
+
+
+            if (_passive == null)
+            {
+                _passive =
+                    GetComponent<Unit_Passive>();
             }
         }
 
@@ -279,8 +339,18 @@ namespace Units
         {
             if (_life != null)
             {
+                _life.HpChanged +=
+                    OnHpChanged;
+
                 _life.Damaged +=
                     OnDamaged;
+            }
+
+
+            if (_runtimeStatus != null)
+            {
+                _runtimeStatus.StatusChanged +=
+                    OnStatusChanged;
             }
         }
 
@@ -289,9 +359,76 @@ namespace Units
         {
             if (_life != null)
             {
+                _life.HpChanged -=
+                    OnHpChanged;
+
                 _life.Damaged -=
                     OnDamaged;
             }
+
+
+            if (_runtimeStatus != null)
+            {
+                _runtimeStatus.StatusChanged -=
+                    OnStatusChanged;
+            }
+        }
+
+
+        // ============================================================
+        // Status Restriction
+        // ============================================================
+
+        private void OnStatusChanged(
+            UnitStatusEffectType statusType,
+            bool isActive)
+        {
+            RefreshStatusRestrictions();
+        }
+
+
+        private void RefreshStatusRestrictions()
+        {
+            if (_runtimeStatus == null)
+                return;
+
+
+            bool isStunned =
+                _runtimeStatus.HasStatus(
+                    UnitStatusEffectType.Stun
+                );
+
+
+            bool isRooted =
+                _runtimeStatus.HasStatus(
+                    UnitStatusEffectType.Root
+                );
+
+
+            bool isSilenced =
+                _runtimeStatus.HasStatus(
+                    UnitStatusEffectType.Silence
+                );
+
+
+            // Stun과 Root는 모두 이동을 차단한다.
+            _movement?.SetMovementBlocked(
+                isStunned
+                || isRooted
+            );
+
+
+            // 현재 정의에서 BasicAttack을 차단하는 상태는 Stun이다.
+            _combat?.SetBasicAttackBlocked(
+                isStunned
+            );
+
+
+            // Stun과 Silence는 ActiveSkill을 차단한다.
+            _combat?.SetActiveSkillBlocked(
+                isStunned
+                || isSilenced
+            );
         }
 
 
@@ -305,6 +442,7 @@ namespace Units
             if (_movement == null)
                 return;
 
+
             _movement.MoveTo(
                 targetPosition
             );
@@ -316,8 +454,10 @@ namespace Units
             if (_movement == null)
                 return;
 
+
             _movement.Stop();
         }
+
 
         public void HoldMovementPosition(
             Vector2 position)
@@ -352,6 +492,7 @@ namespace Units
             if (_combat == null)
                 return false;
 
+
             return _combat.TryBasicAttack(
                 target
             );
@@ -364,10 +505,12 @@ namespace Units
             if (_combat == null)
                 return false;
 
+
             return _combat.TryActiveSkill(
                 target
             );
         }
+
 
         public void NotifyCombatPositionChanged()
         {
@@ -384,10 +527,14 @@ namespace Units
             if (_runtimeStatus == null)
                 return 0f;
 
+
             if (_runtimeStatus.BasicAttackData == null)
                 return 0f;
 
-            return _runtimeStatus.BasicAttackData.BasicAttackRange;
+
+            return _runtimeStatus
+                .BasicAttackData
+                .BasicAttackRange;
         }
 
 
@@ -396,10 +543,14 @@ namespace Units
             if (_runtimeStatus == null)
                 return 0f;
 
+
             if (_runtimeStatus.ActiveSkillData == null)
                 return 0f;
 
-            return _runtimeStatus.ActiveSkillData.SkillRange;
+
+            return _runtimeStatus
+                .ActiveSkillData
+                .SkillRange;
         }
 
 
@@ -413,6 +564,7 @@ namespace Units
             if (_life == null)
                 return;
 
+
             _life.TakeDamage(
                 result
             );
@@ -424,6 +576,7 @@ namespace Units
         {
             if (_life == null)
                 return;
+
 
             _life.Heal(
                 amount
@@ -437,10 +590,12 @@ namespace Units
             if (_life == null)
                 return;
 
+
             _life.AddShield(
                 amount
             );
         }
+
 
         public void NotifyDeath()
         {
@@ -452,12 +607,45 @@ namespace Units
 
             _animation?.PlayAnimation_Death();
 
+            _passive?.Stop();
+
             _gateway?.NotifyDeath();
         }
 
-        private void OnDamaged(DamageResult result)
+
+        private void OnHpChanged(
+            float previousHp,
+            float currentHp)
+        {
+            _passive?.NotifyHealthChanged();
+        }
+
+
+        private void OnDamaged(
+            DamageResult result)
         {
             NotifyTargetReevaluation();
+
+
+            // 피격자 패시브
+            _passive?.NotifyDamageTaken(
+                result.Attacker != null
+                    ? result.Attacker._gateway
+                    : null
+            );
+
+
+            // DoT 피해는 공격자 패시브를 발동시키지 않는다.
+            if (result.SourceType == DamageSourceType.Dot)
+            {
+                return;
+            }
+
+            // 공격자 패시브
+            result.Attacker?._passive
+                ?.NotifyDamageDealt(
+                    _gateway
+                );
         }
 
 
@@ -465,11 +653,11 @@ namespace Units
         // Animation
         // ============================================================
 
-
         public void PlayAnimation_Move()
         {
             if (_animation == null)
                 return;
+
 
             _animation.PlayAnimation_Move();
         }
@@ -480,6 +668,7 @@ namespace Units
             if (_animation == null)
                 return;
 
+
             _animation.PlayAnimation_Attack();
         }
 
@@ -488,6 +677,7 @@ namespace Units
         {
             if (_animation == null)
                 return;
+
 
             _animation.PlayAnimation_Skill();
         }
@@ -498,6 +688,7 @@ namespace Units
             if (_animation == null)
                 return;
 
+
             _animation.PlayAnimation_Hit();
         }
 
@@ -506,6 +697,7 @@ namespace Units
         {
             if (_animation == null)
                 return;
+
 
             _animation.PlayAnimation_Death();
         }
@@ -521,6 +713,7 @@ namespace Units
             if (_detection == null)
                 return float.MaxValue;
 
+
             return _detection.GetDistanceToTarget(
                 target
             );
@@ -532,6 +725,7 @@ namespace Units
         {
             if (_detection == null)
                 return false;
+
 
             return _detection.CanMoveStraightToTarget(
                 target
@@ -548,10 +742,12 @@ namespace Units
             _ai?.StartAI();
         }
 
+
         public void PauseAI()
         {
             _ai?.PauseAI();
         }
+
 
         public void SetUnitAssignment(
             UnitAssignment assignment)
@@ -575,24 +771,72 @@ namespace Units
             _ai.ClearUnitAssignment();
         }
 
+
         private void NotifyTargetReevaluation()
         {
             _ai?.NotifyTargetReevaluation();
         }
+
 
         public void RequestFullAssignment()
         {
             _gateway?.RequestFullAssignment();
         }
 
+
         public void RequestTargetReevaluation()
         {
             _gateway?.RequestTargetReevaluation();
         }
 
+
         public void RequestPositionAssignment()
         {
             _gateway?.RequestPositionAssignment();
+        }
+
+
+        // ============================================================
+        // Passive
+        // ============================================================
+
+        public void CollectDamageModifiers(
+            PassiveDamageOwnerType ownerType,
+            List<PassiveDamageModifier> results)
+        {
+            _passive?.CollectDamageModifiers(
+                ownerType,
+                results
+            );
+        }
+
+
+        public bool EvaluateDamageModifierConditions(
+            RuntimePassiveSkill runtimePassive,
+            ICombatTarget target)
+        {
+            return _passive != null &&
+                   _passive.EvaluateDamageModifierConditions(
+                       runtimePassive,
+                       target
+                   );
+        }
+
+
+        public bool EvaluateTargetDamageModifierConditions(
+            ICombatTarget owner,
+            RuntimePassiveSkill runtimePassive)
+        {
+            if (owner == null ||
+                _gateway == null)
+            {
+                return false;
+            }
+
+            return owner.EvaluateDamageModifierConditions(
+                runtimePassive,
+                _gateway
+            );
         }
 
 
@@ -607,11 +851,16 @@ namespace Units
             _movement?.Stop();
 
             _combat?.Pause();
+
+            _passive?.Pause();
         }
+
 
         public void Resume()
         {
             _combat?.Resume();
+
+            _passive?.Resume();
 
             _ai?.StartAI();
         }

@@ -60,9 +60,22 @@ namespace Units
         private float _skillCooldownRemaining;
 
         private bool _isPreparingSkill;
+
         private float _skillRetryRemaining;
+
         private bool _reevaluateAfterSkillMovement;
-        private readonly List<ICombatTarget> _skillCandidates = new List<ICombatTarget>();
+
+        private readonly List<ICombatTarget> _skillCandidates =
+            new List<ICombatTarget>();
+
+
+        // ============================================================
+        // Restriction Runtime State
+        // ============================================================
+
+        private bool _isBasicAttackBlocked;
+
+        private bool _isActiveSkillBlocked;
 
 
         // ============================================================
@@ -72,10 +85,12 @@ namespace Units
         public bool IsBusy
             => _isBusy;
 
+
         public bool IsBasicAttackReady
             => !_isBusy
             && !_isPreparingSkill
             && _basicAttackDelayRemaining <= 0f;
+
 
         public bool IsActiveSkillReady
             => !_isBusy
@@ -91,26 +106,34 @@ namespace Units
                 if (_isPaused)
                     return false;
 
-                if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
+
+                if (_isActiveSkillBlocked)
                     return false;
+
+
+                if (_core == null
+                    || !_core.IsAlive
+                    || !isActiveAndEnabled)
+                {
+                    return false;
+                }
+
 
                 if (_activeSkillData == null)
                     return false;
 
+
                 if (_activeSkillExecutor == null)
                     return false;
+
 
                 if (_skillTargetSelector == null)
                     return false;
 
+
                 if (!IsActiveSkillReady)
                     return false;
 
-                // TODO:
-                // 상태이상 등으로 인한 Skill 사용 불가 조건 추가
-                //
-                // if (_core.RuntimeStatus.IsSilenced)
-                //     return false;
 
                 return true;
             }
@@ -124,17 +147,30 @@ namespace Units
                 if (_isPaused)
                     return false;
 
-                if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
+
+                if (_isBasicAttackBlocked)
                     return false;
+
+
+                if (_core == null
+                    || !_core.IsAlive
+                    || !isActiveAndEnabled)
+                {
+                    return false;
+                }
+
 
                 if (_basicAttackData == null)
                     return false;
 
+
                 if (_basicAttackExecutor == null)
                     return false;
 
+
                 if (!IsBasicAttackReady)
                     return false;
+
 
                 return true;
             }
@@ -148,14 +184,18 @@ namespace Units
                 if (_core == null)
                     return 0f;
 
+
                 if (_core.RuntimeStatus == null)
                     return 0f;
+
 
                 if (CanUseActiveSkill)
                     return _activeSkillData.SkillRange;
 
+
                 if (_basicAttackData == null)
                     return 0f;
+
 
                 return _basicAttackData.BasicAttackRange;
             }
@@ -170,6 +210,7 @@ namespace Units
         {
             if (_isPaused)
                 return;
+
 
             _activeSkillExecutor?.FixedTick(
                 Time.fixedDeltaTime
@@ -194,8 +235,17 @@ namespace Units
             if (_isPaused)
                 return;
 
-            _skillRetryRemaining = Mathf.Max(0f, _skillRetryRemaining - Time.deltaTime);
+
+            _skillRetryRemaining =
+                Mathf.Max(
+                    0f,
+                    _skillRetryRemaining
+                    - Time.deltaTime
+                );
+
+
             UpdateTimers();
+
 
             _activeSkillExecutor?.Tick(
                 Time.deltaTime
@@ -222,6 +272,7 @@ namespace Units
 
             Stop();
 
+
             _core =
                 core;
 
@@ -242,11 +293,14 @@ namespace Units
                     $"[Unit_Combat] {name} : RuntimeStatus가 없습니다."
                 );
 
+
                 _basicAttackData =
                     null;
 
+
                 _activeSkillData =
                     null;
+
 
                 return;
             }
@@ -254,6 +308,7 @@ namespace Units
 
             _basicAttackData =
                 _core.RuntimeStatus.BasicAttackData;
+
 
             _activeSkillData =
                 _core.RuntimeStatus.ActiveSkillData;
@@ -316,19 +371,40 @@ namespace Units
 
         private void ResetRuntimeState()
         {
-            _isPaused = false;
+            _isPaused =
+                false;
 
-            _isPreparingSkill = false;
 
-            _skillRetryRemaining = 0f;
+            _isPreparingSkill =
+                false;
 
-            _reevaluateAfterSkillMovement = false;
 
-            _isBusy = false;
+            _skillRetryRemaining =
+                0f;
 
-            _basicAttackDelayRemaining = 0f;
 
-            _skillCooldownRemaining = 0f;
+            _reevaluateAfterSkillMovement =
+                false;
+
+
+            _isBusy =
+                false;
+
+
+            _basicAttackDelayRemaining =
+                0f;
+
+
+            _skillCooldownRemaining =
+                0f;
+
+
+            _isBasicAttackBlocked =
+                false;
+
+
+            _isActiveSkillBlocked =
+                false;
         }
 
 
@@ -382,8 +458,10 @@ namespace Units
             if (_core == null)
                 return;
 
+
             if (_core.RuntimeStatus == null)
                 return;
+
 
             if (_basicAttackData == null)
                 return;
@@ -420,73 +498,197 @@ namespace Units
         // Active Skill
         // ============================================================
 
-        public bool TryActiveSkill(ICombatTarget currentTarget)
+        public bool TryActiveSkill(
+            ICombatTarget currentTarget)
         {
             if (!CanUseActiveSkill)
                 return false;
 
-            _isPreparingSkill = true;
-            bool started = false;
+
+            _isPreparingSkill =
+                true;
+
+
+            bool started =
+                false;
+
+
             try
             {
                 CollectSkillCandidates();
-                ICombatTarget target = _skillTargetSelector.SelectTarget(currentTarget, _skillCandidates);
-                if (!IsValidSkillTarget(target) || !_activeSkillExecutor.CanExecute(target))
-                    return false;
 
-                Predicate<ICombatTarget> targetFilter = null;
-                if (_activeSkillData.TargetSide == SkillTargetRelation.Hostile)
+
+                ICombatTarget target =
+                    _skillTargetSelector.SelectTarget(
+                        currentTarget,
+                        _skillCandidates
+                    );
+
+
+                if (!IsValidSkillTarget(
+                        target)
+                    || !_activeSkillExecutor.CanExecute(
+                        target))
+                {
+                    return false;
+                }
+
+
+                Predicate<ICombatTarget> targetFilter =
+                    null;
+
+
+                if (_activeSkillData.TargetSide ==
+                    SkillTargetRelation.Hostile)
                 {
                     // 이 사용 시도에서 상위 검토 요청은 정확히 한 곳에서만 발생한다.
-                    SkillEngagementResult result = _core.RequestSkillEngagement(target);
-                    if (result == SkillEngagementResult.Invalid)
-                        return false;
+                    SkillEngagementResult result =
+                        _core.RequestSkillEngagement(
+                            target
+                        );
 
-                    targetFilter = _core.CaptureSkillTargetFilter();
-                    if (result == SkillEngagementResult.Denied)
+
+                    if (result ==
+                        SkillEngagementResult.Invalid)
                     {
-                        _skillCandidates.RemoveAll(candidate => !targetFilter(candidate));
-                        target = _skillTargetSelector.SelectTarget(currentTarget, _skillCandidates);
+                        return false;
+                    }
+
+
+                    targetFilter =
+                        _core.CaptureSkillTargetFilter();
+
+
+                    if (result ==
+                        SkillEngagementResult.Denied)
+                    {
+                        _skillCandidates.RemoveAll(
+                            candidate =>
+                                !targetFilter(
+                                    candidate
+                                )
+                        );
+
+
+                        target =
+                            _skillTargetSelector.SelectTarget(
+                                currentTarget,
+                                _skillCandidates
+                            );
+
+
                         // 거절 후에는 내부 후보만 사용하고 두 번째 확대 요청을 하지 않는다.
                     }
 
-                    if (!IsValidSkillTarget(target) || !targetFilter(target))
+
+                    if (!IsValidSkillTarget(
+                            target)
+                        || !targetFilter(
+                            target))
+                    {
                         return false;
+                    }
                 }
 
-                if (!_core.IsAlive || !isActiveAndEnabled || !_activeSkillExecutor.CanExecute(target))
+
+                // Target 탐색과 Engagement 검토 사이에
+                // Status가 변경될 수 있으므로 실행 직전에 다시 확인한다.
+                // 이미 준비에 들어온 요청이므로 신규 진입 조건은 다시 검사하지 않는다.
+                if (!CanContinueActiveSkillPreparation())
                     return false;
 
-                _isBusy = true;
-                _reevaluateAfterSkillMovement = _activeSkillData.ActionType == ActiveSkillActionType.Dash;
+
+                if (!_activeSkillExecutor.CanExecute(
+                    target))
+                {
+                    return false;
+                }
+
+
+                _isBusy =
+                    true;
+
+
+                _reevaluateAfterSkillMovement =
+                    _activeSkillData.ActionType ==
+                    ActiveSkillActionType.Dash;
+
+
                 StartSkillCooldown();
-                started = true;
-                _activeSkillExecutor.Execute(target, CompleteActiveSkill, targetFilter);
+
+
+                started =
+                    true;
+
+
+                _activeSkillExecutor.Execute(
+                    target,
+                    CompleteActiveSkill,
+                    targetFilter
+                );
+
+
                 return true;
             }
             finally
             {
-                _isPreparingSkill = false;
+                _isPreparingSkill =
+                    false;
+
+
                 // 쿨타임은 소비하지 않는다. 실패 반복이 평타/이동 판단을 굶기지 않게 잠시 양보한다.
                 if (!started)
-                    _skillRetryRemaining = 0.25f;
+                {
+                    _skillRetryRemaining =
+                        0.25f;
+                }
             }
         }
+
 
         private void CollectSkillCandidates()
         {
             _skillCandidates.Clear();
-            if (_activeSkillData.TargetSide == SkillTargetRelation.Self)
-                return;
 
-            UnitTeam team = _activeSkillData.TargetSide == SkillTargetRelation.Friendly
-                ? _core.Team
-                : (_core.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally);
-            IReadOnlyList<ICombatTarget> candidates = _targetResolver.ResolveCandidates(
-                new TargetCandidateRequest(_core.transform.position, _activeSkillData.SkillRange, team));
+
+            if (_activeSkillData.TargetSide ==
+                SkillTargetRelation.Self)
+            {
+                return;
+            }
+
+
+            UnitTeam team =
+                _activeSkillData.TargetSide ==
+                SkillTargetRelation.Friendly
+                    ? _core.Team
+                    : (
+                        _core.Team ==
+                        UnitTeam.Ally
+                            ? UnitTeam.Enemy
+                            : UnitTeam.Ally
+                    );
+
+
+            IReadOnlyList<ICombatTarget> candidates =
+                _targetResolver.ResolveCandidates(
+                    new TargetCandidateRequest(
+                        _core.transform.position,
+                        _activeSkillData.SkillRange,
+                        team
+                    )
+                );
+
+
             // Resolver의 재사용 버퍼를 실행/재선택 과정에서 보관하지 않는다.
-            for (int i = 0; i < candidates.Count; i++)
-                _skillCandidates.Add(candidates[i]);
+            for (int i = 0;
+                 i < candidates.Count;
+                 i++)
+            {
+                _skillCandidates.Add(
+                    candidates[i]
+                );
+            }
         }
 
 
@@ -495,8 +697,10 @@ namespace Units
             if (_core == null)
                 return;
 
+
             if (_core.RuntimeStatus == null)
                 return;
+
 
             if (_activeSkillData == null)
                 return;
@@ -524,9 +728,17 @@ namespace Units
                 false;
 
 
-            bool reevaluate = _reevaluateAfterSkillMovement;
-            _reevaluateAfterSkillMovement = false;
-            _core?.NotifyActiveSkillCompleted(reevaluate);
+            bool reevaluate =
+                _reevaluateAfterSkillMovement;
+
+
+            _reevaluateAfterSkillMovement =
+                false;
+
+
+            _core?.NotifyActiveSkillCompleted(
+                reevaluate
+            );
         }
 
 
@@ -573,6 +785,122 @@ namespace Units
 
 
         // ============================================================
+        // Combat Restriction
+        // ============================================================
+
+        public void SetBasicAttackBlocked(
+            bool isBlocked)
+        {
+            if (_isBasicAttackBlocked ==
+                isBlocked)
+            {
+                return;
+            }
+
+
+            _isBasicAttackBlocked =
+                isBlocked;
+
+
+            if (!isBlocked)
+                return;
+
+
+            InterruptBasicAttack();
+        }
+
+
+        public void SetActiveSkillBlocked(
+            bool isBlocked)
+        {
+            if (_isActiveSkillBlocked ==
+                isBlocked)
+            {
+                return;
+            }
+
+
+            _isActiveSkillBlocked =
+                isBlocked;
+
+
+            if (!isBlocked)
+                return;
+
+
+            InterruptActiveSkill();
+        }
+
+
+        private void InterruptBasicAttack()
+        {
+            if (_basicAttackExecutor == null)
+                return;
+
+
+            bool wasExecuting =
+                _isBusy;
+
+
+            _basicAttackExecutor.Cancel();
+
+
+            // Combat은 한 번에 하나의 실행만 허용하므로
+            // 현재 BasicAttack 취소 후 Busy 상태도 함께 해제한다.
+            if (!wasExecuting)
+                return;
+
+
+            _isBusy =
+                false;
+
+
+            _core?.NotifyBasicAttackCompleted();
+        }
+
+
+        private void InterruptActiveSkill()
+        {
+            _isPreparingSkill =
+                false;
+
+
+            bool wasExecuting =
+                _isBusy;
+
+
+            bool reevaluate =
+                _reevaluateAfterSkillMovement;
+
+
+            _reevaluateAfterSkillMovement =
+                false;
+
+
+            if (_activeSkillExecutor == null)
+                return;
+
+
+            _activeSkillExecutor.Cancel();
+
+
+            // 진행 중인 Cast / Dash를 중단한다.
+            // 이미 발사된 투사체는 ProjectileManager의 생명주기를 따른다.
+            if (!wasExecuting)
+                return;
+
+
+            _isBusy =
+                false;
+
+
+            _core?.NotifyActiveSkillCompleted(
+                reevaluate
+            );
+        }
+
+
+        // ============================================================
         // Combat Control
         // ============================================================
 
@@ -603,11 +931,14 @@ namespace Units
             _isPaused =
                 false;
 
+
             _isPreparingSkill =
                 false;
 
+
             _reevaluateAfterSkillMovement =
                 false;
+
 
             _skillRetryRemaining =
                 0f;
@@ -671,13 +1002,49 @@ namespace Units
         private bool IsValidTarget(
             ICombatTarget target)
         {
-            if (!CombatTargetUtility.IsValid(target))
+            if (!CombatTargetUtility.IsValid(
+                target
+            ))
+            {
                 return false;
+            }
+
 
             if (!target.IsTargetable)
                 return false;
 
+
             if (target.Transform == null)
+                return false;
+
+
+            return true;
+        }
+
+
+        private bool CanContinueActiveSkillPreparation()
+        {
+            if (_isPaused)
+                return false;
+
+
+            if (_isActiveSkillBlocked)
+                return false;
+
+
+            if (_core == null
+                || !_core.IsAlive
+                || !isActiveAndEnabled)
+            {
+                return false;
+            }
+
+
+            if (_activeSkillData == null)
+                return false;
+
+
+            if (_activeSkillExecutor == null)
                 return false;
 
 

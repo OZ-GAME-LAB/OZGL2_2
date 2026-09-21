@@ -40,9 +40,19 @@ namespace Units
         public void Enter(
             UnitAssignment? assignment)
         {
-            _started = false;
+            _started =
+                false;
+
+
             if (!assignment.HasValue)
                 return;
+
+
+            if (_core == null
+                || !_core.CanUseActiveSkill)
+            {
+                return;
+            }
 
 
             ICombatTarget target =
@@ -58,16 +68,19 @@ namespace Units
 
             _core.StopMovement();
 
-            _started = _core.TryActiveSkill(
-                target
-            );
+
+            _started =
+                _core.TryActiveSkill(
+                    target
+                );
         }
 
 
         public UnitAIActionType? Evaluate(
             UnitAssignment? assignment)
         {
-            if (!_started || !assignment.HasValue)
+            if (!_started
+                || !assignment.HasValue)
             {
                 return UnitAIActionType.Idle;
             }
@@ -86,6 +99,8 @@ namespace Units
 
         public void Exit()
         {
+            _started =
+                false;
         }
 
 

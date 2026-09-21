@@ -50,7 +50,7 @@ namespace Game.UI.Samples
         private void HandleDamage()
         {
             if (!TryGetSelectedUnit(out var unit)) return;
-            unit.TakeDamage(new DamageResult(null, null, 25, DamageSourceType.BasicAttack));
+            unit.TakeDamage(new DamageResult(null, null, 25, DamageSourceType.BasicAttack, false));
             _statusText.text = "선택 유닛에 테스트 피해 25 적용 (보호막 우선).";
         }
 

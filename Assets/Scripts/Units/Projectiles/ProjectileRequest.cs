@@ -1,4 +1,5 @@
 using System;
+using Units.Skills;
 using UnityEngine;
 
 namespace Units
@@ -11,6 +12,7 @@ namespace Units
 
         Cone
     }
+
 
     public readonly struct ProjectileRequest
     {
@@ -42,17 +44,21 @@ namespace Units
         public float AreaAngle { get; }
 
 
-        public int MaxDamageableCount { get; }
+        public int MaxImpactTargetCount { get; }
 
-
-        public DamageSourceType DamageSourceType { get; }
-
-
-        public float DamageMultiplier { get; }
 
         public Predicate<ICombatTarget> TargetFilter { get; }
 
+
         public int AttackerLifetimeVersion { get; }
+
+
+        // 실제 명중 대상은 Projectile 충돌 시점에 확정한다.
+        // 발사 시점에는 Target이 비어 있는 Request를 저장한다.
+        public DamageRequest? DamageRequest { get; }
+
+
+        public SkillEffectRequest? SkillEffectRequest { get; }
 
 
         // ============================================================
@@ -67,48 +73,141 @@ namespace Units
             ProjectileImpactType impactType,
             float areaRadius,
             float areaAngle,
-            int maxDamageableCount,
-            DamageSourceType damageSourceType,
-            float damageMultiplier,
+            int maxImpactTargetCount,
+            DamageRequest damageRequest,
             Predicate<ICombatTarget> targetFilter = null)
         {
-            Attacker = attacker;
+            Attacker =
+                attacker;
 
-            Target = target;
+            Target =
+                target;
 
             TargetTeam =
                 target != null
                     ? target.Team
                     : default;
 
-            Origin = origin;
+            Origin =
+                origin;
 
-            ProjectileSpeed = projectileSpeed;
+            ProjectileSpeed =
+                projectileSpeed;
 
-            ImpactType = impactType;
+            ImpactType =
+                impactType;
 
-            AreaRadius = Mathf.Max(
-                0f,
-                areaRadius
-            );
+            AreaRadius =
+                Mathf.Max(
+                    0f,
+                    areaRadius
+                );
 
-            AreaAngle = Mathf.Clamp(
-                areaAngle,
-                0f,
-                360f
-            );
+            AreaAngle =
+                Mathf.Clamp(
+                    areaAngle,
+                    0f,
+                    360f
+                );
 
-            MaxDamageableCount = Mathf.Max(
-                1,
-                maxDamageableCount
-            );
+            MaxImpactTargetCount =
+                Mathf.Max(
+                    1,
+                    maxImpactTargetCount
+                );
 
-            DamageSourceType = damageSourceType;
+            TargetFilter =
+                targetFilter;
 
-            DamageMultiplier = damageMultiplier;
-            TargetFilter = targetFilter;
-            Unit_Gateway gateway = attacker != null ? attacker.GetComponent<Unit_Gateway>() : null;
-            AttackerLifetimeVersion = gateway != null ? gateway.LifetimeVersion : 0;
+            DamageRequest =
+                damageRequest;
+
+            SkillEffectRequest =
+                null;
+
+
+            Unit_Gateway gateway =
+                attacker != null
+                    ? attacker.GetComponent<Unit_Gateway>()
+                    : null;
+
+            AttackerLifetimeVersion =
+                gateway != null
+                    ? gateway.LifetimeVersion
+                    : 0;
+        }
+
+
+        public ProjectileRequest(
+            Unit_Core attacker,
+            ICombatTarget target,
+            Vector2 origin,
+            float projectileSpeed,
+            ProjectileImpactType impactType,
+            float areaRadius,
+            float areaAngle,
+            int maxImpactTargetCount,
+            SkillEffectRequest skillEffectRequest,
+            Predicate<ICombatTarget> targetFilter = null)
+        {
+            Attacker =
+                attacker;
+
+            Target =
+                target;
+
+            TargetTeam =
+                target != null
+                    ? target.Team
+                    : default;
+
+            Origin =
+                origin;
+
+            ProjectileSpeed =
+                projectileSpeed;
+
+            ImpactType =
+                impactType;
+
+            AreaRadius =
+                Mathf.Max(
+                    0f,
+                    areaRadius
+                );
+
+            AreaAngle =
+                Mathf.Clamp(
+                    areaAngle,
+                    0f,
+                    360f
+                );
+
+            MaxImpactTargetCount =
+                Mathf.Max(
+                    1,
+                    maxImpactTargetCount
+                );
+
+            TargetFilter =
+                targetFilter;
+
+            DamageRequest =
+                null;
+
+            SkillEffectRequest =
+                skillEffectRequest;
+
+
+            Unit_Gateway gateway =
+                attacker != null
+                    ? attacker.GetComponent<Unit_Gateway>()
+                    : null;
+
+            AttackerLifetimeVersion =
+                gateway != null
+                    ? gateway.LifetimeVersion
+                    : 0;
         }
     }
 }
