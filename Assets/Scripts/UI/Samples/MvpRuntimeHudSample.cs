@@ -1,6 +1,7 @@
 using System;
 using Cysharp.Threading.Tasks;
 using Game.Core;
+using OZGL.KDH;
 using TMPro;
 using Units;
 using UnityEngine;
@@ -18,6 +19,9 @@ namespace Game.UI.Samples
         [SerializeField] private CurrencyData _gold;
         [SerializeField] private GameFlowController _flow;
         [SerializeField] private WaveController _waves;
+        [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
+        [SerializeField] private BuildingBuildController _buildingController;
+        [SerializeField] private MvpRuntimeCombatFixture _runtimeCombat;
         [SerializeField] private TestWaitingScript _rewardGate;
         [SerializeField] private CoreHudBinding _coreBinding;
         [SerializeField] private RunGoldHudBinding _goldBinding;
@@ -75,7 +79,11 @@ namespace Game.UI.Samples
         {
             _ui.Initialize();
             _rewardGate.Initialize(_flow, _waves);
+            if (_runtimeCombat == null)
+                _runtimeCombat = GetComponent<MvpRuntimeCombatFixture>() ??
+                    gameObject.AddComponent<MvpRuntimeCombatFixture>();
             _flow.Initialize(_waves, _rewardGate, _artifactManager); //
+            _waves.Initialize(_flow, _runtimeCombat, _runtimeCombat);
             _goldBinding.Initialize(_ui, _currencyManager);
             _coreBinding.Initialize(_ui, _flow, _waves);
             if (_runDecisionBinding != null) _runDecisionBinding.Initialize(_flow, _waves);
@@ -233,6 +241,16 @@ namespace Game.UI.Samples
 
         private void InitializeRewardSystems()
         {
+            if (_buildingCoreProgress == null)
+                _buildingCoreProgress = GetComponent<BuildingCoreProgress>() ??
+                    gameObject.AddComponent<BuildingCoreProgress>();
+            if (!_currencyManager.IsInitialized)
+                _currencyManager.Initialize(_waves, null, _effectManager, _buildingCoreProgress);
+            if (_buildingController == null)
+                _buildingController = FindFirstObjectByType<BuildingBuildController>();
+            if (_buildingController != null)
+                _buildingController.Initialize(_currencyManager, _flow, _buildingCoreProgress);
+
             bool artifactsReady = _artifactManager != null && _effectManager != null;
             if (artifactsReady && !_artifactManager.IsInitialized)
                 _artifactManager.Initialize(_waves, _effectManager);
@@ -241,7 +259,6 @@ namespace Game.UI.Samples
                 artifactsReady = _artifactRewards.TryInitialize(_artifactManager);
             // 이 샘플은 지급 실패/재시도를 검사하는 유일한 지급 주체다.
             // flow=null로 자동 지급을 구독하지 않는다. 실제 팀 씬은 flow를 전달하고 UI에서 지급하지 않는다.
-            // _currencyManager.Initialize(_waves, null, _effectManager);
             IsReady = _currencyManager.IsInitialized && artifactsReady;
         }
 
