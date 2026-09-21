@@ -20,7 +20,7 @@ namespace Units
         // Properties
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
 
 
         public ICombatTarget Target { get; }
@@ -66,7 +66,7 @@ namespace Units
         // ============================================================
 
         public ProjectileRequest(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             ICombatTarget target,
             Vector2 origin,
             float projectileSpeed,
@@ -126,20 +126,15 @@ namespace Units
                 null;
 
 
-            Unit_Gateway gateway =
-                attacker != null
-                    ? attacker.GetComponent<Unit_Gateway>()
-                    : null;
-
             AttackerLifetimeVersion =
-                gateway != null
-                    ? gateway.LifetimeVersion
+                attacker != null
+                    ? attacker.LifetimeVersion
                     : 0;
         }
 
 
         public ProjectileRequest(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             ICombatTarget target,
             Vector2 origin,
             float projectileSpeed,
@@ -199,14 +194,9 @@ namespace Units
                 skillEffectRequest;
 
 
-            Unit_Gateway gateway =
-                attacker != null
-                    ? attacker.GetComponent<Unit_Gateway>()
-                    : null;
-
             AttackerLifetimeVersion =
-                gateway != null
-                    ? gateway.LifetimeVersion
+                attacker != null
+                    ? attacker.LifetimeVersion
                     : 0;
         }
     }

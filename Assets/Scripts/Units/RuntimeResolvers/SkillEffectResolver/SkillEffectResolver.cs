@@ -202,26 +202,11 @@ namespace Units.Skills
                 return;
 
 
-            Unit_Gateway source =
-                request.Caster.GetComponent<Unit_Gateway>();
-
-
-            if (source == null)
-                return;
-
-
-            if (request.Target
-                is not Unit_Gateway target)
-            {
-                return;
-            }
-
-
             EffectRequest effectRequest =
                 new EffectRequest(
                     effect.EffectData,
-                    source,
-                    target
+                    request.Caster,
+                    request.Target
                 );
 
 

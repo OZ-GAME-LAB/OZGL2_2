@@ -1,10 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 
 
 namespace Units
 {
-    public class UnitStatModifierManager : MonoBehaviour
+    public class UnitStatModifierManager : MonoBehaviour, IUnitStatModifierRegister
     {
         // ============================================================
         // Data
@@ -32,6 +33,38 @@ namespace Units
         // ============================================================
         // Public Methods
         // ============================================================
+
+        public void AddBothModifiers(
+            IReadOnlyList<AllyStatModifier> allyModifiers,
+            IReadOnlyList<EnemyStatModifier> enemyModifiers)
+        {
+            _organizer.AddAllyModifiers(
+                allyModifiers
+            );
+
+            _organizer.AddEnemyModifiers(
+                enemyModifiers
+            );
+        }
+
+
+        public void AddAllyModifiers(
+            IReadOnlyList<AllyStatModifier> modifiers)
+        {
+            _organizer.AddAllyModifiers(
+                modifiers
+            );
+        }
+
+
+        public void AddEnemyModifiers(
+            IReadOnlyList<EnemyStatModifier> modifiers)
+        {
+            _organizer.AddEnemyModifiers(
+                modifiers
+            );
+        }
+
 
         public void AddAllyModifier(
             AllyStatModifier modifier)

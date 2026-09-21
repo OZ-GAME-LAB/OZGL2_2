@@ -11,9 +11,9 @@ namespace Units.Effects
 
         public EffectData EffectData { get; }
 
-        public Unit_Gateway Source { get; }
+        public ICombatTarget Source { get; }
 
-        public Unit_Gateway Target { get; }
+        public ICombatTarget Target { get; }
 
 
         // ============================================================
@@ -22,8 +22,8 @@ namespace Units.Effects
 
         public EffectRequest(
             EffectData effectData,
-            Unit_Gateway source,
-            Unit_Gateway target)
+            ICombatTarget source,
+            ICombatTarget target)
         {
             EffectData = effectData;
             Source = source;

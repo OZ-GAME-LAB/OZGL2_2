@@ -485,7 +485,7 @@ namespace Units.Skills
         {
             SkillEffectRequest request =
                 new SkillEffectRequest(
-                    _core,
+                    _core.CombatTarget,
                     target,
                     effects
                 );

@@ -371,6 +371,15 @@ namespace Units
         }
 
 
+        public void NotifyDamageDealt(
+            ICombatTarget target)
+        {
+            _core?.NotifyDamageDealt(
+                target
+            );
+        }
+
+
         // ============================================================
         // Advance
         // ============================================================

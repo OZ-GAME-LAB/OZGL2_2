@@ -8,7 +8,7 @@ namespace Units
         // Source
         // ============================================================
 
-        public Unit_Core Healer { get; }
+        public ICombatTarget Healer { get; }
 
 
         // ============================================================
@@ -32,7 +32,7 @@ namespace Units
         // ============================================================
 
         public HealRequest(
-            Unit_Core healer,
+            ICombatTarget healer,
             ICombatTarget target,
             HealScalingStatType scalingStatType,
             float healRatio)

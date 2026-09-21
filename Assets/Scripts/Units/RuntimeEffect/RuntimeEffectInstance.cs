@@ -12,9 +12,13 @@ namespace Units.Effects
 
         private readonly EffectData _data;
 
-        private readonly Unit_Gateway _source;
+        private readonly ICombatTarget _source;
 
-        private readonly Unit_Gateway _target;
+        private readonly ICombatTarget _target;
+
+        private readonly int _sourceLifetimeVersion;
+
+        private readonly int _targetLifetimeVersion;
 
 
         // ============================================================
@@ -37,11 +41,17 @@ namespace Units.Effects
         public EffectData Data =>
             _data;
 
-        public Unit_Gateway Source =>
+        public ICombatTarget Source =>
             _source;
 
-        public Unit_Gateway Target =>
+        public ICombatTarget Target =>
             _target;
+
+        public int SourceLifetimeVersion =>
+            _sourceLifetimeVersion;
+
+        public int TargetLifetimeVersion =>
+            _targetLifetimeVersion;
 
         public int StackCount =>
             _stackCount;
@@ -69,8 +79,8 @@ namespace Units.Effects
 
         public RuntimeEffectInstance(
             EffectData data,
-            Unit_Gateway source,
-            Unit_Gateway target,
+            ICombatTarget source,
+            ICombatTarget target,
             float currentTime)
         {
             _data =
@@ -81,6 +91,16 @@ namespace Units.Effects
 
             _target =
                 target;
+
+            _sourceLifetimeVersion =
+                source != null
+                    ? source.LifetimeVersion
+                    : 0;
+
+            _targetLifetimeVersion =
+                target != null
+                    ? target.LifetimeVersion
+                    : 0;
 
 
             _stackCount =

@@ -79,32 +79,53 @@ namespace Units
             Action onCompleted)
         {
             int executionId = ++_executionId;
+
             try
             {
-                if (_core == null || _core.RuntimeStatus == null || _data == null
-                    || !CombatTargetUtility.IsValid(target)) return;
+                if (_core == null ||
+                    _core.RuntimeStatus == null ||
+                    _data == null ||
+                    !CombatTargetUtility.IsValid(target))
+                {
+                    return;
+                }
 
                 switch (_data.ExecutionType)
                 {
                     case BasicAttackExecutionType.Direct:
-                        ExecuteDirect(target);
+
+                        ExecuteDirect(
+                            target
+                        );
+
                         break;
+
+
                     case BasicAttackExecutionType.Projectile:
-                        ExecuteProjectile(target);
+
+                        ExecuteProjectile(
+                            target
+                        );
+
                         break;
                 }
             }
             finally
             {
                 // 공격 행동은 투사체 명중을 기다리지 않고 발사 직후 완료한다.
-                if (executionId == _executionId) onCompleted?.Invoke();
+                if (executionId == _executionId)
+                {
+                    onCompleted?.Invoke();
+                }
             }
         }
+
 
         public void Cancel()
         {
             _executionId++;
         }
+
 
         // ============================================================
         // Direct
@@ -373,9 +394,9 @@ namespace Units
 
 
                 for (int i = 0;
-                    i < candidates.Count
-                    && _projectileTargetBuffer.Count < _data.MaxTargetCount;
-                    i++)
+                     i < candidates.Count
+                     && _projectileTargetBuffer.Count < _data.MaxTargetCount;
+                     i++)
                 {
                     ICombatTarget candidate =
                         candidates[i];
@@ -394,20 +415,22 @@ namespace Units
 
             DamageRequest damageRequest =
                 new DamageRequest(
-                _core,
-                null,
-                DamageSourceType.BasicAttack,
-                _data.DamageType,
-                1f
-            );
+                    _core.CombatTarget,
+                    null,
+                    DamageSourceType.BasicAttack,
+                    _data.DamageType,
+                    1f
+                );
 
 
             // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
-            for (int i = 0; i < _projectileTargetBuffer.Count; i++)
-            { 
+            for (int i = 0;
+                 i < _projectileTargetBuffer.Count;
+                 i++)
+            {
                 ProjectileRequest request =
                     new ProjectileRequest(
-                        _core,
+                        _core.CombatTarget,
                         _projectileTargetBuffer[i],
                         origin,
                         _data.ProjectileSpeed,
@@ -425,6 +448,7 @@ namespace Units
                     request
                 );
             }
+
 
             // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
             // DamageRequest는 발사 시점의 공격 정보를 보관하고,
@@ -479,7 +503,7 @@ namespace Units
 
             DamageRequest request =
                 new DamageRequest(
-                    _core,
+                    _core.CombatTarget,
                     targets,
                     DamageSourceType.BasicAttack,
                     _data.DamageType,

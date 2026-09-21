@@ -2,7 +2,6 @@
 using Units.Skills;
 
 
-
 namespace Units
 {
     public class DamageContextBuilder
@@ -45,7 +44,7 @@ namespace Units
         private AttackerContext BuildAttackerContext(
             DamageRequest request)
         {
-            Unit_Core attacker =
+            ICombatTarget attacker =
                 request.Attacker;
 
             Unit_RuntimeStatus runtimeStatus =

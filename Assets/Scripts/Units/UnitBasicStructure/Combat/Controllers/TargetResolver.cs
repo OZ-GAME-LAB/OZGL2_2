@@ -12,13 +12,6 @@ namespace Units
 
 
         // ============================================================
-        // Reference
-        // ============================================================
-
-        private readonly Unit_Core _core;
-
-
-        // ============================================================
         // Physics
         // ============================================================
 
@@ -39,13 +32,8 @@ namespace Units
         // ============================================================
 
         public TargetResolver(
-            Unit_Core core,
             int bufferSize = DefaultBufferSize)
         {
-            _core =
-                core;
-
-
             int finalBufferSize =
                 Mathf.Max(
                     1,
@@ -78,9 +66,6 @@ namespace Units
         {
             _targets.Clear();
 
-
-            if (_core == null)
-                return _targets;
 
             if (request.MaxTargetCount <= 0)
                 return _targets;
@@ -135,10 +120,6 @@ namespace Units
             TargetCandidateRequest request)
         {
             _targets.Clear();
-
-
-            if (_core == null)
-                return _targets;
 
             if (request.Range <= 0f)
                 return _targets;

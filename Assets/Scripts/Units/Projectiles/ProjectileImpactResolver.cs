@@ -20,13 +20,10 @@ namespace Units
         // Constructor
         // ============================================================
 
-        public ProjectileImpactResolver(
-            Unit_Core attacker)
+        public ProjectileImpactResolver()
         {
             _targetResolver =
-                new TargetResolver(
-                    attacker
-                );
+                new TargetResolver();
         }
 
 
@@ -45,9 +42,11 @@ namespace Units
 
 
             // 사망한 시전자의 투사체는 유지하되, 풀에서 재사용된 다른 생애의 공격으로 처리하지 않는다.
-            Unit_Gateway attackerGateway = request.Attacker.GetComponent<Unit_Gateway>();
-            if (attackerGateway != null && attackerGateway.LifetimeVersion != request.AttackerLifetimeVersion)
+            if (request.Attacker.LifetimeVersion !=
+                request.AttackerLifetimeVersion)
+            {
                 return;
+            }
 
 
             IReadOnlyList<ICombatTarget> targets;

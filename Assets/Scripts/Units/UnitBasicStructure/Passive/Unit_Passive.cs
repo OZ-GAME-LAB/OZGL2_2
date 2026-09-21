@@ -101,9 +101,7 @@ namespace Units
             }
 
             _targetResolver =
-                new TargetResolver(
-                    _core
-                );
+                new TargetResolver();
 
             _effectExecutor =
                 new PassiveEffectExecutor(

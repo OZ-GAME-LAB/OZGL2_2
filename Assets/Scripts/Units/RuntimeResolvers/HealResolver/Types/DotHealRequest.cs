@@ -1,19 +1,34 @@
-﻿
-
-
-namespace Units
+﻿namespace Units
 {
     public readonly struct DotHealRequest
     {
-        public Unit_Core Healer { get; }
+        // ============================================================
+        // Source
+        // ============================================================
+
+        public ICombatTarget Healer { get; }
+
+
+        // ============================================================
+        // Target
+        // ============================================================
 
         public ICombatTarget Target { get; }
+
+
+        // ============================================================
+        // Heal
+        // ============================================================
 
         public float HealAmount { get; }
 
 
+        // ============================================================
+        // Constructor
+        // ============================================================
+
         public DotHealRequest(
-            Unit_Core healer,
+            ICombatTarget healer,
             ICombatTarget target,
             float healAmount)
         {

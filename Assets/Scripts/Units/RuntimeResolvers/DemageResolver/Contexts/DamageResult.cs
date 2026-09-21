@@ -1,7 +1,4 @@
-﻿
-
-
-namespace Units
+﻿namespace Units
 {
     public readonly struct DamageResult
     {
@@ -9,7 +6,7 @@ namespace Units
         // Source
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
 
         public DamageSourceType SourceType { get; }
 
@@ -35,7 +32,7 @@ namespace Units
         // ============================================================
 
         public DamageResult(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             ICombatTarget target,
             float damage,
             DamageSourceType sourceType,

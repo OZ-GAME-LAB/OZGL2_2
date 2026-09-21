@@ -6,7 +6,7 @@
         // Source
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
 
         public DamageSourceType SourceType { get; }
 
@@ -30,7 +30,7 @@
         // ============================================================
 
         public DotDamageRequest(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             ICombatTarget target,
             float damage,
             DamageSourceType sourceType)

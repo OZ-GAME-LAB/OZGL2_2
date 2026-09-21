@@ -733,10 +733,10 @@ namespace Units
             DamageContext context,
             PassiveDamageModifier modifier)
         {
-            return context.Attacker.Attacker
-                .EvaluateTargetDamageModifierConditions(
-                    context.Target.Target,
-                    modifier.RuntimePassive
+            return context.Target.Target
+                .EvaluateDamageModifierConditions(
+                    modifier.RuntimePassive,
+                    context.Attacker.Attacker
                 );
         }
 

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 
 
-
 namespace Units.Skills
 {
     public readonly struct SkillEffectRequest
@@ -10,7 +9,7 @@ namespace Units.Skills
         // Source
         // ============================================================
 
-        public Unit_Core Caster { get; }
+        public ICombatTarget Caster { get; }
 
 
         // ============================================================
@@ -32,7 +31,7 @@ namespace Units.Skills
         // ============================================================
 
         public SkillEffectRequest(
-            Unit_Core caster,
+            ICombatTarget caster,
             ICombatTarget target,
             IReadOnlyList<SkillEffectData> effects)
         {

@@ -33,7 +33,11 @@ namespace Units
         // State
         // ============================================================
 
+        bool IsAlive { get; }
+
         bool IsTargetable { get; }
+
+        int LifetimeVersion { get; }
 
 
         // ============================================================
@@ -62,6 +66,10 @@ namespace Units
 
         bool EvaluateDamageModifierConditions(
             RuntimePassiveSkill runtimePassive,
+            ICombatTarget target
+        );
+
+        void NotifyDamageDealt(
             ICombatTarget target
         );
     }

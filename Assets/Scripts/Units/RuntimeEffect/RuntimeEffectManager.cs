@@ -178,7 +178,7 @@ namespace Units.Effects
 
 
         public void RemoveEffects(
-            Unit_Gateway target)
+            ICombatTarget target)
         {
             if (target == null)
                 return;
@@ -571,21 +571,21 @@ namespace Units.Effects
             if (DamageResolver.Instance == null)
                 return;
 
-            if (instance.Source == null ||
-                instance.Target == null)
+            if (!CombatTargetUtility.Exists(
+                    instance.Source))
             {
                 return;
             }
 
-            Unit_Core attacker =
-                instance.Source.Core;
-
-            if (attacker == null)
+            if (!CombatTargetUtility.Exists(
+                    instance.Target))
+            {
                 return;
+            }
 
             DotDamageRequest request =
                 new DotDamageRequest(
-                    attacker,
+                    instance.Source,
                     instance.Target,
                     damage,
                     DamageSourceType.Dot
@@ -604,21 +604,21 @@ namespace Units.Effects
             if (HealResolver.Instance == null)
                 return;
 
-            if (instance.Source == null ||
-                instance.Target == null)
+            if (!CombatTargetUtility.Exists(
+                    instance.Source))
             {
                 return;
             }
 
-            Unit_Core healer =
-                instance.Source.Core;
-
-            if (healer == null)
+            if (!CombatTargetUtility.Exists(
+                    instance.Target))
+            {
                 return;
+            }
 
             DotHealRequest request =
                 new DotHealRequest(
-                    healer,
+                    instance.Source,
                     instance.Target,
                     healAmount
                 );
@@ -661,7 +661,7 @@ namespace Units.Effects
         // ============================================================
 
         private RuntimeEffectInstance FindEffect(
-            Unit_Gateway target,
+            ICombatTarget target,
             EffectData effectData)
         {
             for (int i = 0;
@@ -703,7 +703,8 @@ namespace Units.Effects
                 return false;
             }
 
-            if (request.Target == null)
+            if (!CombatTargetUtility.Exists(
+                request.Target))
             {
                 Debug.LogWarning(
                     "[RuntimeEffectManager] Target이 없는 EffectRequest입니다."
@@ -718,7 +719,7 @@ namespace Units.Effects
             if (request.Target.RuntimeStatus == null)
             {
                 Debug.LogWarning(
-                    $"[RuntimeEffectManager] {request.Target.name}에 RuntimeStatus가 없습니다."
+                    $"[RuntimeEffectManager] {request.Target.Transform.name}에 RuntimeStatus가 없습니다."
                 );
 
                 return false;
@@ -737,8 +738,17 @@ namespace Units.Effects
             if (instance.Data == null)
                 return false;
 
-            if (instance.Target == null)
+            if (!CombatTargetUtility.Exists(
+                    instance.Target))
+            {
                 return false;
+            }
+
+            if (instance.Target.LifetimeVersion !=
+                instance.TargetLifetimeVersion)
+            {
+                return false;
+            }
 
             if (!instance.Target.IsAlive)
                 return false;

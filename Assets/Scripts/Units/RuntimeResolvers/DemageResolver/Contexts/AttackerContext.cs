@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 
 
-
 namespace Units
 {
     public readonly struct AttackerContext
@@ -10,7 +9,7 @@ namespace Units
         // Source
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
 
         public DamageSourceType SourceType { get; }
 
@@ -64,7 +63,7 @@ namespace Units
         // ============================================================
 
         public AttackerContext(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             DamageSourceType sourceType,
             DamageType damageType,
             float attackPower,

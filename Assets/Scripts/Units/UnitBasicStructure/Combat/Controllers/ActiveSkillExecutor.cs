@@ -752,7 +752,7 @@ namespace Units
             // 실제 명중 대상은 Projectile 충돌 시점에 확정한다.
             SkillEffectRequest skillEffectRequest =
                 new SkillEffectRequest(
-                    _core,
+                    _core.CombatTarget,
                     null,
                     _data.Effects
                 );
@@ -765,19 +765,19 @@ namespace Units
             {
                 ProjectileRequest request =
                     new ProjectileRequest(
-                        _core,
-                        _projectileTargetBuffer[i],
-                        origin,
-                        _data.ProjectileSpeed,
-                        impactType,
-                        _data.AreaRadius,
-                        _data.AreaAngle,
-                        impactType == ProjectileImpactType.Single
-                            ? 1
-                            : _data.MaxEffectTargetCount,
-                        skillEffectRequest,
-                        _targetFilter
-                    );
+                    _core.CombatTarget,
+                    _projectileTargetBuffer[i],
+                    origin,
+                    _data.ProjectileSpeed,
+                    impactType,
+                    _data.AreaRadius,
+                    _data.AreaAngle,
+                    impactType == ProjectileImpactType.Single
+                        ? 1
+                        : _data.MaxEffectTargetCount,
+                    skillEffectRequest,
+                    _targetFilter
+                );
 
 
                 ProjectileManager.GetOrCreate().Fire(
@@ -898,7 +898,7 @@ namespace Units
 
                 SkillEffectRequest request =
                     new SkillEffectRequest(
-                        _core,
+                        _core.CombatTarget,
                         target,
                         _data.Effects
                     );

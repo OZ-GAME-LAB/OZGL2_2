@@ -65,9 +65,7 @@ namespace Units
             );
 
             _impactResolver =
-                new ProjectileImpactResolver(
-                    request.Attacker
-                );
+                new ProjectileImpactResolver();
 
             transform.position =
                 request.Origin;

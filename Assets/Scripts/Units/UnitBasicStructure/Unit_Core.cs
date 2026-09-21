@@ -57,6 +57,9 @@ namespace Units
         public UnitTeam Team
             => _team;
 
+        public ICombatTarget CombatTarget
+            => _gateway;
+
         public Unit_RuntimeStatus RuntimeStatus
             => _runtimeStatus;
 
@@ -629,9 +632,7 @@ namespace Units
 
             // 피격자 패시브
             _passive?.NotifyDamageTaken(
-                result.Attacker != null
-                    ? result.Attacker._gateway
-                    : null
+                result.Attacker
             );
 
 
@@ -641,11 +642,11 @@ namespace Units
                 return;
             }
 
+
             // 공격자 패시브
-            result.Attacker?._passive
-                ?.NotifyDamageDealt(
-                    _gateway
-                );
+            result.Attacker?.NotifyDamageDealt(
+                _gateway
+            );
         }
 
 
@@ -823,19 +824,11 @@ namespace Units
         }
 
 
-        public bool EvaluateTargetDamageModifierConditions(
-            ICombatTarget owner,
-            RuntimePassiveSkill runtimePassive)
+        public void NotifyDamageDealt(
+            ICombatTarget target)
         {
-            if (owner == null ||
-                _gateway == null)
-            {
-                return false;
-            }
-
-            return owner.EvaluateDamageModifierConditions(
-                runtimePassive,
-                _gateway
+            _passive?.NotifyDamageDealt(
+                target
             );
         }
 

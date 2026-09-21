@@ -334,9 +334,7 @@ namespace Units
         private void InitializeCombatModules()
         {
             _targetResolver =
-                new TargetResolver(
-                    _core
-                );
+                new TargetResolver();
 
 
             _skillTargetSelector =
