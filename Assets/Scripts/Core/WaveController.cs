@@ -28,13 +28,16 @@ namespace Game.Core
         public const int MAX_WAVE = NodeController.WavesPerQuarter;
         public const int MAIN_QUARTERS = NodeController.MainQuarters;
         [SerializeField] private WaveSODictionary _waveCatalog;
-        internal WaveSODictionary WaveCatalog => _waveCatalog;
+        public WaveSODictionary WaveCatalog => _waveCatalog;
         public WaveSO CurrentPreset => _controller?.CurrentNode?.Preset;
         public EnemyUnitFaction CurrentFaction => _controller?.CurrentNode?.Faction ?? default;
         public int CurWave => _controller?.CurrentWave ?? 0;
         public int CurQuarter => _controller?.CurrentQuarter ?? 0;
         public bool IsLastWave => _controller != null && _controller.IsLastNode;
-        public event Action<WaveChangedInfo> WaveChanged;
+        public event Action<WaveInfo> WaveChanged;
+        public event Action<WaveInfo> WaveCleared;
+
+        
         private ISpawnManager _spawner;
         private IRuntimeUnitManager _runtimeUnitManager;
         private GameFlowController _controller;
@@ -43,7 +46,17 @@ namespace Game.Core
 
         public bool CanJumpToLastWave => _controller != null && _controller.CanJumpToLastWave;
         public bool CanJumpToLastQuarter => _controller != null && _controller.CanJumpToLastQuarter;
-
+        
+        private void OnDestroy()
+        {
+            _isWaitingForPreparation = false;
+            if (_runtimeUnitManager != null)
+            {
+                _runtimeUnitManager.UnitDied -= HandleMonsterDead;
+                _runtimeUnitManager.PreparationCompleted -= HandleMonsterSpawnCompleted;
+            }
+        }
+        
         // 초기화 및 수명 관리
         /// <summary>
         /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
@@ -63,16 +76,6 @@ namespace Game.Core
             _runtimeUnitManager.PreparationCompleted += HandleMonsterSpawnCompleted;
         }
 
-        private void OnDestroy()
-        {
-            _isWaitingForPreparation = false;
-            if (_runtimeUnitManager != null)
-            {
-                _runtimeUnitManager.UnitDied -= HandleMonsterDead;
-                _runtimeUnitManager.PreparationCompleted -= HandleMonsterSpawnCompleted;
-            }
-        }
-
         // 전투 준비 및 승패 판정
         public UniTask PrepareEnemy(CancellationToken runToken, CancellationToken spawnToken)
         {
@@ -85,7 +88,10 @@ namespace Game.Core
             
             return _spawner.SpawnEnemyWaveAsync(10, context, spawnToken);
         }
-
+        internal void NotifyWaveCleared(WaveInfo info)
+        {
+            WaveCleared?.Invoke(info);
+        }
         /// <summary>
         /// 유닛 파트에서 발행하는 몬스터 사망 이벤트와 연결해 클리어 조건을 확인
         /// </summary>
@@ -141,7 +147,7 @@ namespace Game.Core
         // 진행 변경 알림
         internal void NotifyNodeChanged()
         {
-            WaveChangedInfo info = new WaveChangedInfo(
+            WaveInfo info = new WaveInfo(
                 quarterNumber:CurQuarter, 
                 waveNumber:CurWave, 
                 battleType:CurrentPreset.BattleType,

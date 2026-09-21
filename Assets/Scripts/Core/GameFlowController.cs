@@ -60,6 +60,7 @@ namespace Game.Core
         private WaveController _waveController;
         private ArtifactManager _artifactManager;
         private InGameCameraController _cameraController;
+        private ISummary _summary;
         private GamePhase _curPhase;
         private RunDecision? _runDecision;
         private UniTaskCompletionSource _spawnCompletion;
@@ -77,11 +78,13 @@ namespace Game.Core
             WaveController waveController, 
             TestWaitingScript testScript, 
             ArtifactManager artifactManager, 
+            ISummary summary = null,
             InGameCameraController cameraController = null)
         {
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
+            _summary = summary;
             _cameraController = cameraController;
             _nodeController = new NodeController(waveController.WaveCatalog);
             ClearToken();
@@ -127,6 +130,7 @@ namespace Game.Core
         {
             var pendingSpawn = _spawnCompletion?.Task ?? UniTask.CompletedTask;
             _isTransitioning = true;
+            _cameraController.ShowBase();
             ClearToken();
             var token = _cts.Token;
             ResetDecisionState();
@@ -240,6 +244,17 @@ namespace Game.Core
                 FinishRun(result);
                 return;
             }
+            
+            // 웨이브 클리어 정보 발행
+            var clearedInfo = new WaveInfo(
+                CurrentQuarter,
+                completedNode.WaveNumber,
+                completedNode.BattleType,
+                completedNode.PostBattleEvent
+            );
+
+            _waveController.NotifyWaveCleared(clearedInfo);
+            
             //분기 마지막 웨이브가 아닐경우 그대로 보상처리 후 진행
             if (!IsLastNode)
             {
@@ -344,8 +359,11 @@ namespace Game.Core
         private void FinishRun(ResultType type)
         {
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
+            _summary?.CompleteRun();
             ResetDecisionState();
             ChangePhase(GamePhase.Finished);
+            //PersistentCurrencyManager 호출
+            //씬 전환
         }
 
         private void ChangePhase(GamePhase phase)

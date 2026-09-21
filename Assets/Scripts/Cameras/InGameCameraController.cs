@@ -63,7 +63,7 @@ namespace Game.Cameras
             _buildController.SlotDeselected -= FocusOut;
         }
 
-        public void Initialize(BuildingBuildController buildController)
+        public void Initialize(Camera worldCamera, GameFlowController flowController, BuildingBuildController buildController)
         {
             if (_buildController != null)
             {
@@ -74,7 +74,7 @@ namespace Game.Cameras
             _buildController.SlotSelected += FocusAt;
             _buildController.SlotDeselected += FocusOut;
 
-            _worldCamera = Camera.main;
+            _worldCamera = worldCamera;
             _brain = _worldCamera.GetComponent<CinemachineBrain>();
             if (_brain == null)
             {
@@ -107,7 +107,6 @@ namespace Game.Cameras
 
         public void FocusAt(BuildingSlot slot)
         {
-            Debug.Log("포커스 이벤트 발행");
             if (!_gameFlowController.CanEnterBuildMode()) return;
 
             // 기지 화면에서만 확대 허용

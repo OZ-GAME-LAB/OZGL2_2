@@ -21,6 +21,7 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private TestWaitingScript _testScript; //테스트용으로 , 실제 구현시 삭제할것
     [SerializeField] private GameFlowController _gameFlowController;
     [SerializeField] private WaveController _waveController;
+    [SerializeField] private ArchiveManager _archive;
     [SerializeField] private ArtifactManager _artifactManager;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private SpawnManager _spawnManager;
@@ -29,19 +30,26 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private InGameCameraController _cameraController;
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
+
+    [SerializeField] private TestScriptReader _testReader; //테스트 종료 시 삭제
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
     void Start()
     {
         if (!ValidateReferences()) return;
 
-        _testScript.Initialize(_gameFlowController, _waveController);
-        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _cameraController);
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _archive, _cameraController);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress);
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _cameraController.Initialize(_buildController);
+        _archive.Initialize(_artifactManager, _runtimeUnitManager, _waveController);
+        _cameraController.Initialize(Camera.main, _gameFlowController, _buildController);
+        
+        _testScript.Initialize(_gameFlowController, _waveController);
+        _testReader.Initialize(_runCurrencyManager);
+        
+        _archive.BeginRun();
         _gameFlowController.BeginRun();
     }
 
