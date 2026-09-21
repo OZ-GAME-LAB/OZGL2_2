@@ -6538,6 +6538,8 @@ GameObject:
   - component: {fileID: 293271678}
   - component: {fileID: 293271677}
   - component: {fileID: 293271676}
+  - component: {fileID: 920000003}
+  - component: {fileID: 920000004}
   m_Layer: 0
   m_Name: UI Preview Systems - test combat only
   m_TagString: Untagged
@@ -6608,6 +6610,9 @@ MonoBehaviour:
   _gold: {fileID: 11400000, guid: 98b14e85a47180f4aaef28830f492355, type: 2}
   _flow: {fileID: 293271673}
   _waves: {fileID: 293271674}
+  _buildingCoreProgress: {fileID: 920000003}
+  _buildingController: {fileID: 0}
+  _runtimeCombat: {fileID: 920000004}
   _rewardGate: {fileID: 293271681}
   _coreBinding: {fileID: 804319941}
   _goldBinding: {fileID: 804319940}
@@ -6724,9 +6729,85 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 920000002}
   - {fileID: 1919074480}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &920000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 920000002}
+  - component: {fileID: 920000005}
+  m_Layer: 0
+  m_Name: UI Core Level Fixture
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &920000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 920000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 293271682}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &920000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 293271672}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97bce2d299c460447b234d598034d897, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingCoreProgress
+--- !u!114 &920000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 293271672}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c19045ac9341164ebd843ff042eaee9, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::Game.UI.Samples.MvpRuntimeCombatFixture
+  _coreProgress: {fileID: 920000003}
+  _coreFixture: {fileID: 920000005}
+--- !u!114 &920000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 920000001}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d92a0a7c074556343b2c43f99849b00b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.Building
+  data: {fileID: 11400000, guid: f7bfacd083cc97447802fced25747884, type: 2}
+  spriteRenderer: {fileID: 0}
+  spawnPoint: {fileID: 0}
+  frontOffset: {x: 0, y: -1}
+  defaultRally: {fileID: 0}
 --- !u!114 &299844016
 MonoBehaviour:
   m_ObjectHideFlags: 0
