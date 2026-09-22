@@ -29,6 +29,7 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private InGameCameraController _cameraController;
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
+    [SerializeField] private BuildingCensus _buildingCensus;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
     void Start()
@@ -38,7 +39,7 @@ public class BootStrap : MonoBehaviour
         _testScript.Initialize(_gameFlowController, _waveController);
         _gameFlowController.Initialize(_waveController, _testScript, _artifactManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
-        _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress);
+        _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
         _cameraController.Initialize(_buildController);

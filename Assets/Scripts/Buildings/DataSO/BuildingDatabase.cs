@@ -39,7 +39,7 @@ namespace OZGL.KDH
         }
 
         // 호출 쪽이 List를 재사용하면 클릭할 때마다 new List가 나지 않습니다.
-        public void CollectBuildable(List<BuildingData> results, int currentCoreLevel)
+        public void CollectBuildable(List<BuildingData> results, int currentCoreLevel, BuildingCensus census = null)
         {
             if (results == null)
             {
@@ -74,7 +74,9 @@ namespace OZGL.KDH
 
                 // Current date KDH 2026-09-17
                 // T2는 빈 칸이 아니라 업그레이드로만, requiredCoreLevel은 코어 해금용입니다.
-                if (!data.CanBuildFromEmptySlot(currentCoreLevel))
+                // Current date KDH 2026-09-22
+                // requiredFamilyIds는 지금 필드에 그 가문이 있는지로 봅니다.
+                if (!data.CanBuildFromEmptySlot(currentCoreLevel, census))
                     continue;
 
                 results.Add(data);
