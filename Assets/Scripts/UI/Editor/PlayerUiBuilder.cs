@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Game.Core;
 using Game.UI.Samples;
+using OZGL.KDH;
 using TMPro;
 using Units;
 using Units.UnitDatas;
@@ -23,6 +24,7 @@ namespace Game.UI.Editor
         public const string ScenePath = "Assets/Scenes/UI/PlayerUI.unity";
         public const string FontPath = "Assets/Data/UI/Player/PlayerUIFont.asset";
         public const string UnitPath = "Assets/Data/UI/Player/PreviewWarrior.asset";
+        private const string CoreFixtureDataPath = "Assets/Tests/KDH/Building/Test_Building_core1.asset";
         private static readonly Color Ink = new Color32(19, 24, 28, 255);
         private static readonly Color Panel = new Color32(29, 36, 40, 255);
         private static readonly Color Tile = new Color32(39, 48, 51, 255);
@@ -59,6 +61,9 @@ namespace Game.UI.Editor
                 var gate = systemRoot.AddComponent<TestWaitingScript>();
                 var effects = systemRoot.AddComponent<EffectManager>();
                 var artifacts = systemRoot.AddComponent<ArtifactManager>();
+                var coreProgress = systemRoot.AddComponent<BuildingCoreProgress>();
+                var runtimeCombat = systemRoot.AddComponent<MvpRuntimeCombatFixture>();
+                CreateCoreFixture(systemRoot.transform, coreProgress, runtimeCombat);
                 var artifactBinding = systemRoot.AddComponent<ArtifactRewardBinding>();
                 var catalogAsset = AssetDatabase.LoadAssetAtPath<CurrencyCatalog>("Assets/Data/Economy/S.O/CurrencyCatalog.asset");
                 if (catalogAsset == null || !catalogAsset.TryGetByType(CurrencyType.Gold, out var gold))
@@ -113,6 +118,7 @@ namespace Game.UI.Editor
                 var hidden = CanvasRoot("DeveloperOnly", -100); hidden.transform.SetParent(systemRoot.transform, false);
                 var sample = systemRoot.AddComponent<MvpRuntimeHudSample>();
                 Assign(sample, "_ui", hud, "_currencyManager", currency, "_gold", gold, "_flow", flow, "_waves", waves,
+                    "_buildingCoreProgress", coreProgress, "_runtimeCombat", runtimeCombat,
                     "_rewardGate", gate, "_coreBinding", hud.GetComponent<CoreHudBinding>(), "_goldBinding", hud.GetComponent<RunGoldHudBinding>(),
                     "_runDecisionBinding", quarter, "_artifactRewards", artifactBinding, "_artifactManager", artifacts, "_effectManager", effects,
                     "_statusText", Text(hidden.transform, "DiagnosticStatus", "", 0, 0, 800, 40));
@@ -134,6 +140,22 @@ namespace Game.UI.Editor
                 if (!Application.isBatchMode && scene.IsValid()) EditorSceneManager.CloseScene(scene, true);
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
+        }
+
+        private static Building CreateCoreFixture(Transform parent, BuildingCoreProgress coreProgress,
+            MvpRuntimeCombatFixture runtimeCombat)
+        {
+            var coreData = AssetDatabase.LoadAssetAtPath<BuildingData>(CoreFixtureDataPath);
+            if (coreData == null)
+                throw new InvalidOperationException("UI core fixture data is required: " + CoreFixtureDataPath);
+
+            var coreObject = new GameObject("UI Core Level Fixture");
+            coreObject.transform.SetParent(parent, false);
+            var coreFixture = coreObject.AddComponent<Building>();
+            Assign(coreFixture, "data", coreData);
+            coreFixture.enabled = false;
+            Assign(runtimeCombat, "_coreProgress", coreProgress, "_coreFixture", coreFixture);
+            return coreFixture;
         }
 
         private static TMP_FontAsset GetFont()

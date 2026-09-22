@@ -120,7 +120,7 @@ namespace Game.UI.Editor
                 rewardCard.onClick.Invoke(); await Capture("07-victory-reward", 1920, 1080); await Capture("08-victory-reward-small", 1280, 720);
                 Check(reward.SelectedArtifactId != null && PlayerUiBuilder.Ref<TMP_Text>(reward, "_confirmText").text == "획득하기", "selected reward uses concise player copy");
                 PlayerUiBuilder.Ref<Button>(reward, "_confirmButton").onClick.Invoke();
-                await Wait(() => flow.CurPhase == GamePhase.Preparation, "next preparation");
+                await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                 if (UnityEngine.Object.FindFirstObjectByType<ArtifactInventoryPanel>() != null)
                     await RunWireframeChecks(hud, wallet, reward, navigation);
                 hud.ShowRunResult(true, 100); await Capture("09-result-presentation", 1280, 720); hud.HideRunResult();

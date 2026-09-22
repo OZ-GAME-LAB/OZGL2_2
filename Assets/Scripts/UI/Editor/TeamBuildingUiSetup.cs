@@ -68,7 +68,8 @@ namespace Game.UI.Editor
                 Team<EventSystem>().SetSelectedGameObject(null);
                 camera.tag = "MainCamera";
                 if (camera.GetComponent<Physics2DRaycaster>() == null) camera.gameObject.AddComponent<Physics2DRaycaster>();
-                Assign(controller, "worldCamera", camera, "wallet", wallet, "gameFlow", flow);
+                // 최신 팀 계약에서는 BootStrap이 Initialize로 재화·게임 흐름·코어 진행을 주입한다.
+                Assign(controller, "worldCamera", camera);
                 SetInt(controller, "slotMask", 0); // 원본 임시 클릭 메뉴와 플레이어 팝업의 이중 입력 방지.
 
                 template = EditorSceneManager.OpenScene(RuntimeBuildingWorldUiSetup.ScenePath, OpenSceneMode.Additive);
