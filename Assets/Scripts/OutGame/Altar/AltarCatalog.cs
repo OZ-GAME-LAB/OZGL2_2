@@ -10,8 +10,8 @@ public class AltarCatalog : ScriptableObject
 
     [SerializeField] private List<AltarData> _altars = new List<AltarData>();
 
-    private readonly Dictionary<string, AltarData> _altarById =
-        new Dictionary<string, AltarData>();
+    private readonly Dictionary<AltarId, AltarData> _altarById =
+        new Dictionary<AltarId, AltarData>();
     private List<AltarData> _registeredAltars = new List<AltarData>();
 
     private void OnEnable()
@@ -24,10 +24,10 @@ public class AltarCatalog : ScriptableObject
         BuildLookup();
     }
 
-    public bool TryGetById(string id, out AltarData altar)
+    public bool TryGetById(AltarId id, out AltarData altar)
     {
         altar = null;
-        return !string.IsNullOrWhiteSpace(id) && _altarById.TryGetValue(id, out altar);
+        return id != AltarId.None && _altarById.TryGetValue(id, out altar);
     }
 
     public bool Contains(AltarData altar)
@@ -57,7 +57,7 @@ public class AltarCatalog : ScriptableObject
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(altar.Id))
+            if (altar.Id == AltarId.None)
             {
                 Debug.LogError($"[OutGame/AltarCatalog] 제단 ID가 비어 있습니다. Asset: {altar.name}", altar);
                 continue;

@@ -21,7 +21,7 @@ public class AltarManager : MonoBehaviour
     public event Action<AltarData> SelectionChanged;
     public event Action<AltarInstance> Applied;
     public event Action Cleared;
-
+    
     [SerializeField] private AltarCatalog _catalog;
 
     private EffectManager _effectManager;
@@ -460,7 +460,7 @@ public class AltarManager : MonoBehaviour
             return "(없음)";
         }
 
-        return string.IsNullOrWhiteSpace(instance.Data.Id) ? instance.Data.name : instance.Data.Id;
+        return instance.Data.Id == AltarId.None ? instance.Data.name : instance.Data.Id.ToString();
     }
 
     private void OnDestroy()
