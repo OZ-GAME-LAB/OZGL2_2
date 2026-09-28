@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: Enemy_Angel_PassiveSkill
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
   _triggerType: 0
   _tickInterval: 1
   _conditions:
@@ -19,6 +20,7 @@ MonoBehaviour:
   _effectMode: 1
   _actions:
   - rid: 4844432195048177752
+  _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:

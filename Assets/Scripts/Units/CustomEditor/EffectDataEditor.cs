@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 
 using Units;
 using Units.Effects;
@@ -34,40 +34,19 @@ public class EffectDataEditor : Editor
 
     private void OnEnable()
     {
-        _effectIdProperty =
-            serializedObject.FindProperty(
-                "_effectId"
-            );
+        _effectIdProperty = serializedObject.FindProperty("_effectId");
 
-        _alignmentProperty =
-            serializedObject.FindProperty(
-                "_alignment"
-            );
+        _alignmentProperty = serializedObject.FindProperty("_alignment");
 
-        _durationTypeProperty =
-            serializedObject.FindProperty(
-                "_durationType"
-            );
+        _durationTypeProperty = serializedObject.FindProperty("_durationType");
 
-        _durationProperty =
-            serializedObject.FindProperty(
-                "_duration"
-            );
+        _durationProperty = serializedObject.FindProperty("_duration");
 
-        _stackTypeProperty =
-            serializedObject.FindProperty(
-                "_stackType"
-            );
+        _stackTypeProperty = serializedObject.FindProperty("_stackType");
 
-        _maxStackProperty =
-            serializedObject.FindProperty(
-                "_maxStack"
-            );
+        _maxStackProperty = serializedObject.FindProperty("_maxStack");
 
-        _actionsProperty =
-            serializedObject.FindProperty(
-                "_actions"
-            );
+        _actionsProperty = serializedObject.FindProperty("_actions");
     }
 
 
@@ -79,32 +58,47 @@ public class EffectDataEditor : Editor
     {
         serializedObject.Update();
 
+        Units.Editor.SkillInspectorUI.Header("상태 효과", "지속 시간·중첩 규칙과 적용할 효과를 설정합니다.");
 
-        DrawIdentity();
+        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+        {
+            DrawIdentity();
 
-        EditorGUILayout.Space(
-            10f
-        );
+            if (Units.Editor.SkillInspectorUI.Foldout(serializedObject, "categories", "분류 태그"))
+            {
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("_categories"), true);
 
+                EditorGUILayout.LabelField("비어 있으면 기존 설정에서 분류를 추론합니다.", EditorStyles.wordWrappedMiniLabel);
+            }
 
-        DrawDuration();
+            EditorGUILayout.Space(6);
 
-        EditorGUILayout.Space(
-            10f
-        );
+            DrawDuration();
 
+            DrawStack();
+        }
 
-        DrawStack();
-
-        EditorGUILayout.Space(
-            10f
-        );
-
+        EditorGUILayout.Space(6);
 
         DrawActions();
 
+        Units.Editor.SkillInspectorUI.Commit(serializedObject);
 
-        serializedObject.ApplyModifiedProperties();
+        Units.Editor.SkillInspectorUI.Diagnostics(serializedObject);
+
+        if (Units.Editor.SkillInspectorUI.Foldout(serializedObject, "projectCheck", "프로젝트 검사"))
+        {
+            if (GUILayout.Button("전체 EffectId 중복 검사"))
+            {
+                var errors = Units.Editor.SkillAuthoringGUI.ValidateEffectIds();
+
+                if (errors.Count == 0)
+                    Debug.Log("EffectId 검사 통과");
+
+                foreach (var error in errors)
+                    Debug.LogError(error);
+            }
+        }
     }
 
 
@@ -114,19 +108,11 @@ public class EffectDataEditor : Editor
 
     private void DrawIdentity()
     {
-        EditorGUILayout.LabelField(
-            "Identity",
-            EditorStyles.boldLabel
-        );
+        EditorGUILayout.LabelField("Identity", EditorStyles.boldLabel);
 
+        EditorGUILayout.PropertyField(_effectIdProperty);
 
-        EditorGUILayout.PropertyField(
-            _effectIdProperty
-        );
-
-        EditorGUILayout.PropertyField(
-            _alignmentProperty
-        );
+        EditorGUILayout.PropertyField(_alignmentProperty);
     }
 
 
@@ -136,28 +122,15 @@ public class EffectDataEditor : Editor
 
     private void DrawDuration()
     {
-        EditorGUILayout.LabelField(
-            "Duration",
-            EditorStyles.boldLabel
-        );
+        EditorGUILayout.LabelField("Duration", EditorStyles.boldLabel);
 
+        EditorGUILayout.PropertyField(_durationTypeProperty);
 
-        EditorGUILayout.PropertyField(
-            _durationTypeProperty
-        );
+        EffectDurationType durationType = (EffectDurationType)_durationTypeProperty.enumValueIndex;
 
-
-        EffectDurationType durationType =
-            (EffectDurationType)
-            _durationTypeProperty.enumValueIndex;
-
-
-        if (durationType !=
-            EffectDurationType.Infinite)
+        if (durationType != EffectDurationType.Infinite)
         {
-            EditorGUILayout.PropertyField(
-                _durationProperty
-            );
+            EditorGUILayout.PropertyField(_durationProperty);
         }
     }
 
@@ -168,28 +141,15 @@ public class EffectDataEditor : Editor
 
     private void DrawStack()
     {
-        EditorGUILayout.LabelField(
-            "Stack",
-            EditorStyles.boldLabel
-        );
+        EditorGUILayout.LabelField("Stack", EditorStyles.boldLabel);
 
+        EditorGUILayout.PropertyField(_stackTypeProperty);
 
-        EditorGUILayout.PropertyField(
-            _stackTypeProperty
-        );
+        EffectStackType stackType = (EffectStackType)_stackTypeProperty.enumValueIndex;
 
-
-        EffectStackType stackType =
-            (EffectStackType)
-            _stackTypeProperty.enumValueIndex;
-
-
-        if (stackType ==
-            EffectStackType.Stack)
+        if (stackType == EffectStackType.Stack)
         {
-            EditorGUILayout.PropertyField(
-                _maxStackProperty
-            );
+            EditorGUILayout.PropertyField(_maxStackProperty);
         }
     }
 
@@ -200,128 +160,86 @@ public class EffectDataEditor : Editor
 
     private void DrawActions()
     {
-        EditorGUILayout.LabelField(
-            "Actions",
-            EditorStyles.boldLabel
-        );
-
-
-        if (_actionsProperty == null)
-        {
-            EditorGUILayout.HelpBox(
-                "Actions SerializedProperty를 찾을 수 없습니다.",
-                MessageType.Error
-            );
-
-            return;
-        }
-
-
-        DrawActionList();
-
-        EditorGUILayout.Space(
-            5f
-        );
-
-
-        DrawAddActionButtons();
+        Units.Editor.SkillInspectorUI.Cards(_actionsProperty, (element, _) => DrawAction(element),
+            ShowAddActionMenu, "적용 효과");
     }
 
+    private void ShowAddActionMenu()
+    {
+        var menu = new GenericMenu();
+
+        menu.AddItem(new GUIContent("능력치 변경"), false, () => AddAction(new StatEffectActionData()));
+
+        menu.AddItem(new GUIContent("상태 부여"), false, () => AddAction(new StatusEffectActionData()));
+
+        if (HasPeriodicAction())
+        {
+            menu.AddDisabledItem(new GUIContent("주기 피해 (주기 효과는 1개만 가능)"));
+
+            menu.AddDisabledItem(new GUIContent("주기 회복 (주기 효과는 1개만 가능)"));
+        }
+        else
+        {
+            menu.AddItem(new GUIContent("주기 피해"), false, () => AddAction(new PeriodicDamageEffectActionData()));
+
+            menu.AddItem(new GUIContent("주기 회복"), false, () => AddAction(new PeriodicHealEffectActionData()));
+        }
+
+        menu.ShowAsContext();
+    }
 
     private void DrawActionList()
     {
-        for (int i = 0;
-             i < _actionsProperty.arraySize;
-             i++)
+        for (int i = 0; i < _actionsProperty.arraySize; i++)
         {
-            SerializedProperty actionProperty =
-                _actionsProperty.GetArrayElementAtIndex(
-                    i
-                );
+            SerializedProperty actionProperty = _actionsProperty.GetArrayElementAtIndex(i);
 
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
-            );
-
-
-            DrawActionHeader(
-                actionProperty,
-                i
-            );
-
+            DrawActionHeader(actionProperty, i);
 
             if (actionProperty.managedReferenceValue != null)
             {
-                DrawAction(
-                    actionProperty
-                );
+                DrawAction(actionProperty);
             }
             else
             {
-                EditorGUILayout.HelpBox(
-                    "Action 데이터가 비어 있습니다.",
-                    MessageType.Warning
-                );
+                EditorGUILayout.HelpBox("Action 데이터가 비어 있습니다.", MessageType.Warning);
             }
-
 
             EditorGUILayout.EndVertical();
 
-            EditorGUILayout.Space(
-                3f
-            );
+            EditorGUILayout.Space(3f);
         }
     }
 
-
-    private void DrawAction(
-        SerializedProperty actionProperty)
+    private void DrawAction(SerializedProperty actionProperty)
     {
-        object action =
-            actionProperty.managedReferenceValue;
-
+        object action = actionProperty.managedReferenceValue;
 
         switch (action)
         {
             case StatEffectActionData:
-
-                DrawStatAction(
-                    actionProperty
-                );
+                DrawStatAction(actionProperty);
 
                 break;
-
 
             case PeriodicHealEffectActionData:
-
-                DrawPeriodicHealAction(
-                    actionProperty
-                );
+                DrawPeriodicHealAction(actionProperty);
 
                 break;
-
 
             case PeriodicDamageEffectActionData:
-
-                DrawPeriodicDamageAction(
-                    actionProperty
-                );
+                DrawPeriodicDamageAction(actionProperty);
 
                 break;
-
 
             case StatusEffectActionData:
-
-                DrawStatusAction(
-                    actionProperty
-                );
+                DrawStatusAction(actionProperty);
 
                 break;
 
-
             default:
-
                 EditorGUILayout.PropertyField(
                     actionProperty,
                     GUIContent.none,
@@ -332,41 +250,22 @@ public class EffectDataEditor : Editor
         }
     }
 
-
     private void DrawActionHeader(
         SerializedProperty actionProperty,
         int index)
     {
-        object action =
-            actionProperty.managedReferenceValue;
+        object action = actionProperty.managedReferenceValue;
 
-
-        string actionName =
-            action != null
-                ? action.GetType().Name
-                : "Missing Action";
-
+        string actionName = action != null ? action.GetType().Name : "Missing Action";
 
         EditorGUILayout.BeginHorizontal();
 
+        EditorGUILayout.LabelField(actionName, EditorStyles.boldLabel);
 
-        EditorGUILayout.LabelField(
-            actionName,
-            EditorStyles.boldLabel
-        );
-
-
-        if (GUILayout.Button(
-                "Remove",
-                GUILayout.Width(
-                    70f
-                )))
+        if (GUILayout.Button("Remove", GUILayout.Width(70f)))
         {
-            RemoveAction(
-                index
-            );
+            RemoveAction(index);
         }
-
 
         EditorGUILayout.EndHorizontal();
     }
@@ -376,43 +275,23 @@ public class EffectDataEditor : Editor
     // Stat Action
     // ============================================================
 
-    private void DrawStatAction(
-        SerializedProperty action)
+    private void DrawStatAction(SerializedProperty action)
     {
-        SerializedProperty statType =
-            action.FindPropertyRelative(
-                "_statType"
-            );
+        SerializedProperty statType = action.FindPropertyRelative("_statType");
 
-        SerializedProperty modifierType =
-            action.FindPropertyRelative(
-                "_modifierType"
-            );
+        SerializedProperty modifierType = action.FindPropertyRelative("_modifierType");
 
-        SerializedProperty value =
-            action.FindPropertyRelative(
-                "_value"
-            );
+        SerializedProperty value = action.FindPropertyRelative("_value");
 
+        EditorGUILayout.PropertyField(statType);
 
-        EditorGUILayout.PropertyField(
-            statType
-        );
+        EditorGUILayout.PropertyField(modifierType);
 
-        EditorGUILayout.PropertyField(
-            modifierType
-        );
-
-
-        UnitStatModifierType type =
-            (UnitStatModifierType)
-            modifierType.enumValueIndex;
-
+        UnitStatModifierType type = (UnitStatModifierType)modifierType.enumValueIndex;
 
         switch (type)
         {
             case UnitStatModifierType.Flat:
-
                 DrawFlatValueField(
                     value,
                     "Value",
@@ -422,9 +301,7 @@ public class EffectDataEditor : Editor
 
                 break;
 
-
             case UnitStatModifierType.Percent:
-
                 DrawPercentageValueField(
                     value,
                     "Value",
@@ -441,18 +318,11 @@ public class EffectDataEditor : Editor
     // Status Action
     // ============================================================
 
-    private void DrawStatusAction(
-        SerializedProperty action)
+    private void DrawStatusAction(SerializedProperty action)
     {
-        SerializedProperty statusType =
-            action.FindPropertyRelative(
-                "_statusType"
-            );
+        SerializedProperty statusType = action.FindPropertyRelative("_statusType");
 
-
-        EditorGUILayout.PropertyField(
-            statusType
-        );
+        EditorGUILayout.PropertyField(statusType);
     }
 
 
@@ -460,19 +330,11 @@ public class EffectDataEditor : Editor
     // Periodic Damage Action
     // ============================================================
 
-    private void DrawPeriodicDamageAction(
-        SerializedProperty action)
+    private void DrawPeriodicDamageAction(SerializedProperty action)
     {
-        SerializedProperty interval =
-            action.FindPropertyRelative(
-                "_interval"
-            );
+        SerializedProperty interval = action.FindPropertyRelative("_interval");
 
-        SerializedProperty damage =
-            action.FindPropertyRelative(
-                "_damage"
-            );
-
+        SerializedProperty damage = action.FindPropertyRelative("_damage");
 
         DrawFloatValueField(
             interval,
@@ -480,7 +342,6 @@ public class EffectDataEditor : Editor
             0.01f,
             float.MaxValue
         );
-
 
         DrawFloatValueField(
             damage,
@@ -495,19 +356,11 @@ public class EffectDataEditor : Editor
     // Periodic Heal Action
     // ============================================================
 
-    private void DrawPeriodicHealAction(
-        SerializedProperty action)
+    private void DrawPeriodicHealAction(SerializedProperty action)
     {
-        SerializedProperty interval =
-            action.FindPropertyRelative(
-                "_interval"
-            );
+        SerializedProperty interval = action.FindPropertyRelative("_interval");
 
-        SerializedProperty healRatio =
-            action.FindPropertyRelative(
-                "_healRatio"
-            );
-
+        SerializedProperty healRatio = action.FindPropertyRelative("_healRatio");
 
         DrawFloatValueField(
             interval,
@@ -515,7 +368,6 @@ public class EffectDataEditor : Editor
             0.01f,
             float.MaxValue
         );
-
 
         DrawPercentageValueField(
             healRatio,
@@ -538,28 +390,19 @@ public class EffectDataEditor : Editor
     {
         EditorGUI.BeginChangeCheck();
 
-
-        float nextValue =
-            EditorGUILayout.FloatField(
-                label,
-                property.floatValue
-            );
-
+        float nextValue = EditorGUILayout.FloatField(label, property.floatValue);
 
         if (!EditorGUI.EndChangeCheck())
         {
             return;
         }
 
-
-        property.floatValue =
-            Mathf.Clamp(
-                nextValue,
-                minValue,
-                maxValue
-            );
+        property.floatValue = Mathf.Clamp(
+            nextValue,
+            minValue,
+            maxValue
+        );
     }
-
 
     private void DrawFlatValueField(
         SerializedProperty property,
@@ -575,61 +418,38 @@ public class EffectDataEditor : Editor
         );
     }
 
-
     private void DrawPercentageValueField(
         SerializedProperty property,
         string label,
         float minValue,
         float maxValue)
     {
-        float displayValue =
-            property.floatValue * 100f;
-
+        float displayValue = property.floatValue * 100f;
 
         EditorGUI.BeginChangeCheck();
 
-
         EditorGUILayout.BeginHorizontal();
 
+        EditorGUILayout.PrefixLabel(label);
 
-        EditorGUILayout.PrefixLabel(
-            label
-        );
+        float nextDisplayValue = EditorGUILayout.FloatField(displayValue);
 
-
-        float nextDisplayValue =
-            EditorGUILayout.FloatField(
-                displayValue
-            );
-
-
-        GUILayout.Label(
-            "%",
-            GUILayout.Width(
-                15f
-            )
-        );
-
+        GUILayout.Label("%", GUILayout.Width(15f));
 
         EditorGUILayout.EndHorizontal();
-
 
         if (!EditorGUI.EndChangeCheck())
         {
             return;
         }
 
+        float nextValue = nextDisplayValue / 100f;
 
-        float nextValue =
-            nextDisplayValue / 100f;
-
-
-        property.floatValue =
-            Mathf.Clamp(
-                nextValue,
-                minValue,
-                maxValue
-            );
+        property.floatValue = Mathf.Clamp(
+            nextValue,
+            minValue,
+            maxValue
+        );
     }
 
 
@@ -639,111 +459,58 @@ public class EffectDataEditor : Editor
 
     private void DrawAddActionButtons()
     {
-        bool hasPeriodicAction =
-            HasPeriodicAction();
-
+        bool hasPeriodicAction = HasPeriodicAction();
 
         EditorGUILayout.BeginHorizontal();
 
-
-        if (GUILayout.Button(
-                "Add Stat"))
+        if (GUILayout.Button("Add Stat"))
         {
-            AddAction(
-                new StatEffectActionData()
-            );
+            AddAction(new StatEffectActionData());
         }
 
-
-        if (GUILayout.Button(
-                "Add Status"))
+        if (GUILayout.Button("Add Status"))
         {
-            AddAction(
-                new StatusEffectActionData()
-            );
+            AddAction(new StatusEffectActionData());
         }
-
 
         EditorGUILayout.EndHorizontal();
-
 
         EditorGUILayout.BeginHorizontal();
 
-
-        using (new EditorGUI.DisabledScope(
-                   hasPeriodicAction))
+        using (new EditorGUI.DisabledScope(hasPeriodicAction))
         {
-            if (GUILayout.Button(
-                    "Add Periodic Damage"))
+            if (GUILayout.Button("Add Periodic Damage"))
             {
-                AddAction(
-                    new PeriodicDamageEffectActionData()
-                );
+                AddAction(new PeriodicDamageEffectActionData());
             }
 
-
-            if (GUILayout.Button(
-                    "Add Periodic Heal"))
+            if (GUILayout.Button("Add Periodic Heal"))
             {
-                AddAction(
-                    new PeriodicHealEffectActionData()
-                );
+                AddAction(new PeriodicHealEffectActionData());
             }
         }
 
-
         EditorGUILayout.EndHorizontal();
-
 
         if (hasPeriodicAction)
         {
-            EditorGUILayout.HelpBox(
-                "하나의 EffectData에는 Periodic Action을 하나만 사용할 수 있습니다.",
-                MessageType.Info
-            );
+            EditorGUILayout.HelpBox("하나의 EffectData에는 Periodic Action을 하나만 사용할 수 있습니다.", MessageType.Info);
         }
     }
 
-
-    private void AddAction(
-        EffectActionData action)
+    private void AddAction(EffectActionData action)
     {
         if (action == null)
             return;
 
-
-        if (IsPeriodicAction(
-                action) &&
-            HasPeriodicAction())
+        if (IsPeriodicAction(action) && HasPeriodicAction())
         {
-            Debug.LogWarning(
-                "[EffectDataEditor] 하나의 EffectData에는 Periodic Action을 하나만 추가할 수 있습니다."
-            );
+            Debug.LogWarning("[EffectDataEditor] 하나의 EffectData에는 Periodic Action을 하나만 추가할 수 있습니다.");
 
             return;
         }
 
-
-        int index =
-            _actionsProperty.arraySize;
-
-
-        _actionsProperty.InsertArrayElementAtIndex(
-            index
-        );
-
-
-        SerializedProperty actionProperty =
-            _actionsProperty.GetArrayElementAtIndex(
-                index
-            );
-
-
-        actionProperty.managedReferenceValue =
-            action;
-
-
-        serializedObject.ApplyModifiedProperties();
+        Units.Editor.SkillInspectorUI.Add(_actionsProperty, action);
     }
 
 
@@ -751,30 +518,18 @@ public class EffectDataEditor : Editor
     // Remove Action
     // ============================================================
 
-    private void RemoveAction(
-        int index)
+    private void RemoveAction(int index)
     {
-        if (index < 0 ||
-            index >= _actionsProperty.arraySize)
+        if (index < 0 || index >= _actionsProperty.arraySize)
         {
             return;
         }
 
+        SerializedProperty actionProperty = _actionsProperty.GetArrayElementAtIndex(index);
 
-        SerializedProperty actionProperty =
-            _actionsProperty.GetArrayElementAtIndex(
-                index
-            );
+        actionProperty.managedReferenceValue = null;
 
-
-        actionProperty.managedReferenceValue =
-            null;
-
-
-        _actionsProperty.DeleteArrayElementAtIndex(
-            index
-        );
-
+        _actionsProperty.DeleteArrayElementAtIndex(index);
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -786,38 +541,24 @@ public class EffectDataEditor : Editor
 
     private bool HasPeriodicAction()
     {
-        for (int i = 0;
-             i < _actionsProperty.arraySize;
-             i++)
+        for (int i = 0; i < _actionsProperty.arraySize; i++)
         {
-            SerializedProperty actionProperty =
-                _actionsProperty.GetArrayElementAtIndex(
-                    i
-                );
+            SerializedProperty actionProperty = _actionsProperty.GetArrayElementAtIndex(i);
 
+            object action = actionProperty.managedReferenceValue;
 
-            object action =
-                actionProperty.managedReferenceValue;
-
-
-            if (IsPeriodicAction(
-                    action))
+            if (IsPeriodicAction(action))
             {
                 return true;
             }
         }
 
-
         return false;
     }
 
-
-    private bool IsPeriodicAction(
-        object action)
+    private bool IsPeriodicAction(object action)
     {
-        return action
-            is PeriodicDamageEffectActionData
-            or PeriodicHealEffectActionData;
+        return action is PeriodicDamageEffectActionData or PeriodicHealEffectActionData;
     }
 }
 

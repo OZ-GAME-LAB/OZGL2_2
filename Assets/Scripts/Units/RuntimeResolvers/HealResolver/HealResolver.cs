@@ -1,4 +1,4 @@
-﻿using Units.Skills;
+using Units.Skills;
 using UnityEngine;
 
 namespace Units
@@ -18,32 +18,23 @@ namespace Units
 
         private void Awake()
         {
-            if (Instance != null
-                && Instance != this)
+            if (Instance != null && Instance != this)
             {
-                Debug.LogError(
-                    "[HealResolver] HealResolver가 중복 생성되어 자동 삭제됩니다."
-                );
+                Debug.LogError("[HealResolver] HealResolver가 중복 생성되어 자동 삭제됩니다.");
 
-                Destroy(
-                    gameObject
-                );
+                Destroy(gameObject);
 
                 return;
             }
 
-
-            Instance =
-                this;
+            Instance = this;
         }
-
 
         private void OnDestroy()
         {
             if (Instance == this)
             {
-                Instance =
-                    null;
+                Instance = null;
             }
         }
 
@@ -52,47 +43,40 @@ namespace Units
         // Resolve
         // ============================================================
 
-        public void Resolve(
-            HealRequest request)
+        public void Resolve(HealRequest request)
         {
-            if (!IsValidRequest(
-                request))
-            {
-                return;
-            }
-
-
-            float healAmount =
-                CalculateHeal(
-                    request
-                );
-
-
-            if (healAmount <= 0f)
-                return;
-
-
-            ApplyHeal(
-                request.Target,
-                healAmount
-            );
+            ResolveWithResult(request);
         }
 
-
-        public void ResolveDotHeal(
-            DotHealRequest request)
+        public CombatApplicationResult ResolveWithResult(HealRequest request)
         {
-            if (!IsValidDotHealRequest(
-                request))
-            {
-                return;
-            }
+            if (!IsValidRequest(request) || !request.TargetSnapshot.IsTargetable || (request.SourceSnapshot == null && !request.Metadata.Owner.MatchesLifetime))
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Heal,
+                    request.Target,
+                    request.Metadata,
+                    "Invalid heal request"
+                );
 
+            return request.Target.HealWithResult(CalculateHeal(request), request.Metadata);
+        }
 
-            ApplyHeal(
-                request.Target,
-                request.HealAmount
-            );
+        public void ResolveDotHeal(DotHealRequest request)
+        {
+            ResolveDotHealWithResult(request);
+        }
+
+        public CombatApplicationResult ResolveDotHealWithResult(DotHealRequest request)
+        {
+            if (!IsValidDotHealRequest(request) || !request.TargetSnapshot.IsTargetable)
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Heal,
+                    request.Target,
+                    request.Metadata,
+                    "Invalid periodic heal request"
+                );
+
+            return request.Target.HealWithResult(CalculateDotHeal(request), request.Metadata);
         }
 
 
@@ -100,23 +84,24 @@ namespace Units
         // Validation
         // ============================================================
 
-        private bool IsValidRequest(
-            HealRequest request)
+        private bool IsValidRequest(HealRequest request)
         {
             if (request.Healer == null)
                 return false;
 
-            if (request.Healer.RuntimeStatus == null)
+            if (request.SourceSnapshot == null && request.Healer.RuntimeStatus == null)
                 return false;
 
             if (request.Target == null)
                 return false;
 
+            if (request.Target.RuntimeStatus == null)
+                return false;
+
             if (!request.Target.IsTargetable)
                 return false;
 
-            if (request.Target.Team
-                != request.Healer.Team)
+            if (request.Target.Team != request.Metadata.Owner.Team)
             {
                 return false;
             }
@@ -124,13 +109,10 @@ namespace Units
             if (request.HealRatio <= 0f)
                 return false;
 
-
             return true;
         }
 
-
-        private bool IsValidDotHealRequest(
-            DotHealRequest request)
+        private bool IsValidDotHealRequest(DotHealRequest request)
         {
             if (request.Healer == null)
                 return false;
@@ -138,18 +120,19 @@ namespace Units
             if (request.Target == null)
                 return false;
 
+            if (request.Target.RuntimeStatus == null)
+                return false;
+
             if (!request.Target.IsTargetable)
                 return false;
 
-            if (request.Target.Team
-                != request.Healer.Team)
+            if (request.Target.Team != request.Metadata.Owner.Team)
             {
                 return false;
             }
 
             if (request.HealAmount <= 0f)
                 return false;
-
 
             return true;
         }
@@ -159,64 +142,42 @@ namespace Units
         // Calculation
         // ============================================================
 
-        private float CalculateHeal(
-            HealRequest request)
+        private float CalculateHeal(HealRequest request)
         {
-            float scalingValue =
-                GetScalingValue(
-                    request
-                );
-
+            float scalingValue = GetScalingValue(request);
 
             if (scalingValue <= 0f)
                 return 0f;
 
+            float healingMultiplier = (request.SourceSnapshot?.HealingMultiplier ?? request.Healer.RuntimeStatus.HealingMultiplier);
 
-            float healRatio =
-                request.HealRatio
-                / 100f;
+            float healingTakenMultiplier = request.Target.RuntimeStatus.HealingTakenMultiplier;
 
+            float finalHeal = scalingValue * request.HealRatio * healingMultiplier * healingTakenMultiplier;
 
-            float skillDamageMultiplier =
-                request.Healer
-                    .RuntimeStatus
-                    .SkillDamageMultiplier;
-
-
-            float finalHeal =
-                scalingValue
-                * healRatio
-                * skillDamageMultiplier;
-
-
-            return Mathf.Max(
-                0f,
-                finalHeal
-            );
+            return Mathf.Max(0f, finalHeal);
         }
 
+        private float CalculateDotHeal(DotHealRequest request)
+        {
+            float healingTakenMultiplier = request.Target.RuntimeStatus.HealingTakenMultiplier;
 
-        private float GetScalingValue(
-            HealRequest request)
+            float finalHeal = request.HealAmount * healingTakenMultiplier;
+
+            return Mathf.Max(0f, finalHeal);
+        }
+
+        private float GetScalingValue(HealRequest request)
         {
             switch (request.ScalingStatType)
             {
                 case HealScalingStatType.MaxHp:
-
-                    return request.Healer
-                        .RuntimeStatus
-                        .MaxHp;
-
+                    return (request.SourceSnapshot?.MaxHp ?? request.Healer.RuntimeStatus.MaxHp);
 
                 case HealScalingStatType.AttackPower:
-
-                    return request.Healer
-                        .RuntimeStatus
-                        .AttackPower;
-
+                    return (request.SourceSnapshot?.AttackPower ?? request.Healer.RuntimeStatus.AttackPower);
 
                 default:
-
                     return 0f;
             }
         }
@@ -230,9 +191,7 @@ namespace Units
             ICombatTarget target,
             float healAmount)
         {
-            target.Heal(
-                healAmount
-            );
+            target.Heal(healAmount);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Units.Effects;
 using UnityEngine;
 
@@ -16,8 +16,7 @@ namespace Units.Skills
 
         [Header("Subject")]
         [SerializeField]
-        private PassiveConditionSubjectType _subjectType =
-            PassiveConditionSubjectType.Owner;
+        private PassiveConditionSubjectType _subjectType = PassiveConditionSubjectType.Owner;
 
 
         // ============================================================
@@ -26,8 +25,7 @@ namespace Units.Skills
 
         [Header("Effect")]
         [SerializeField]
-        private PassiveRuntimeEffectConditionType _conditionType =
-            PassiveRuntimeEffectConditionType.Effect;
+        private PassiveRuntimeEffectConditionType _conditionType = PassiveRuntimeEffectConditionType.Effect;
 
         [SerializeField]
         private string _effectId;
@@ -42,55 +40,51 @@ namespace Units.Skills
 
         [Header("Condition")]
         [SerializeField]
-        private bool _shouldExist =
-            true;
+        private bool _shouldExist = true;
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public PassiveConditionSubjectType SubjectType =>
-            _subjectType;
+        public PassiveConditionSubjectType SubjectType => _subjectType;
 
-        public PassiveRuntimeEffectConditionType ConditionType =>
-            _conditionType;
+        public PassiveRuntimeEffectConditionType ConditionType => _conditionType;
 
-        public string EffectId =>
-            _effectId;
+        public string EffectId => _effectId;
 
-        public UnitStatusEffectType StatusType =>
-            _statusType;
+        public UnitStatusEffectType StatusType => _statusType;
 
-        public bool ShouldExist =>
-            _shouldExist;
+        public bool ShouldExist => _shouldExist;
 
 
         // ============================================================
         // Evaluate
         // ============================================================
 
-        public override bool Evaluate(
-            PassiveContext context)
-        {
-            ICombatTarget subject =
-                GetSubject(
-                    context
-                );
+        public override CombatStateChange OwnerDependencies => SubjectType == PassiveConditionSubjectType.Owner ? CombatStateChange.Effects | CombatStateChange.Status : CombatStateChange.None;
 
-            if (subject == null ||
-                subject.RuntimeStatus == null)
+        public override CombatStateChange TargetDependencies => SubjectType == PassiveConditionSubjectType.Target ? CombatStateChange.Effects | CombatStateChange.Status : CombatStateChange.None;
+
+        public override bool Evaluate(PassiveContext context)
+        {
+            if (_subjectType == PassiveConditionSubjectType.Target && context.FrozenTarget != null)
+            {
+                bool value = _conditionType == PassiveRuntimeEffectConditionType.Effect ? context.FrozenTarget.HasEffect(_effectId) : context.FrozenTarget.HasStatus(_statusType);
+
+                return value == _shouldExist;
+            }
+
+            ICombatTarget subject = GetSubject(context);
+
+            if (subject == null || subject.RuntimeStatus == null)
             {
                 return false;
             }
 
-            bool exists =
-                EvaluateEffect(
-                    subject.RuntimeStatus
-                );
+            bool exists = EvaluateEffect(subject.RuntimeStatus);
 
-            return exists ==
-                   _shouldExist;
+            return exists == _shouldExist;
         }
 
 
@@ -98,8 +92,7 @@ namespace Units.Skills
         // Subject
         // ============================================================
 
-        private ICombatTarget GetSubject(
-            PassiveContext context)
+        private ICombatTarget GetSubject(PassiveContext context)
         {
             switch (_subjectType)
             {
@@ -119,30 +112,20 @@ namespace Units.Skills
         // Effect
         // ============================================================
 
-        private bool EvaluateEffect(
-            Unit_RuntimeStatus runtimeStatus)
+        private bool EvaluateEffect(Unit_RuntimeStatus runtimeStatus)
         {
             switch (_conditionType)
             {
                 case PassiveRuntimeEffectConditionType.Effect:
-
-                    if (string.IsNullOrEmpty(
-                            _effectId))
+                    if (string.IsNullOrEmpty(_effectId))
                     {
                         return false;
                     }
 
-                    return runtimeStatus.HasEffect(
-                        _effectId
-                    );
-
+                    return runtimeStatus.HasEffect(_effectId);
 
                 case PassiveRuntimeEffectConditionType.Status:
-
-                    return runtimeStatus.HasStatus(
-                        _statusType
-                    );
-
+                    return runtimeStatus.HasStatus(_statusType);
 
                 default:
                     return false;

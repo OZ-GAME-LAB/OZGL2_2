@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -25,8 +25,7 @@ namespace Units
 
         private PassiveEffectExecutor _effectExecutor;
 
-        private readonly List<RuntimePassiveSkill> _runtimePassives =
-            new();
+        private readonly List<RuntimePassiveSkill> _runtimePassives = new();
 
 
         // ============================================================
@@ -42,8 +41,27 @@ namespace Units
         // Properties
         // ============================================================
 
-        public IReadOnlyList<RuntimePassiveSkill> RuntimePassives =>
-            _runtimePassives;
+        public IReadOnlyList<RuntimePassiveSkill> RuntimePassives => _runtimePassives;
+
+        public event System.Action<SkillFXRequest> FXRequested;
+
+        private void DispatchFX(SkillFXRequest request)
+        {
+            if (FXRequested == null)
+                return;
+
+            foreach (System.Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
+            {
+                try
+                {
+                    listener(request);
+                }
+                catch (System.Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+        }
 
 
         // ============================================================
@@ -55,17 +73,15 @@ namespace Units
             if (!CanEvaluate())
                 return;
 
-            UpdateTickPassives(
-                Time.deltaTime
-            );
-        }
+            UpdateConditionWatches(Time.deltaTime);
 
+            UpdateTickPassives(Time.deltaTime);
+        }
 
         private void OnDisable()
         {
             Stop();
         }
-
 
         private void OnDestroy()
         {
@@ -84,71 +100,47 @@ namespace Units
         {
             Stop();
 
-            _core =
-                core;
+            _core = core;
 
-            _owner =
-                owner;
+            _owner = owner;
 
-            if (_core == null ||
-                _owner == null)
+            if (_core == null || _owner == null)
             {
-                Debug.LogError(
-                    $"[Unit_Passive] {name} : 초기화에 필요한 참조가 없습니다."
-                );
+                Debug.LogError($"[Unit_Passive] {name} : 초기화에 필요한 참조가 없습니다.");
 
                 return;
             }
 
-            _targetResolver =
-                new TargetResolver();
+            _targetResolver = new TargetResolver();
 
-            _effectExecutor =
-                new PassiveEffectExecutor(
-                    _core,
-                    _targetResolver
-                );
+            _effectExecutor = new PassiveEffectExecutor(_core, _targetResolver, DispatchFX);
 
-            InitializeRuntimePassives(
-                passiveSkillDatas
-            );
+            InitializeRuntimePassives(passiveSkillDatas);
 
-            _isInitialized =
-                true;
+            _isInitialized = true;
 
-            _isPaused =
-                false;
+            _isPaused = false;
 
             ExecuteInitializePassives();
         }
 
-
-        private void InitializeRuntimePassives(
-            IReadOnlyList<PassiveSkillData> passiveSkillDatas)
+        private void InitializeRuntimePassives(IReadOnlyList<PassiveSkillData> passiveSkillDatas)
         {
             _runtimePassives.Clear();
 
             if (passiveSkillDatas == null)
                 return;
 
-            for (int i = 0;
-                 i < passiveSkillDatas.Count;
-                 i++)
+            for (int i = 0; i < passiveSkillDatas.Count; i++)
             {
-                PassiveSkillData data =
-                    passiveSkillDatas[i];
+                PassiveSkillData data = passiveSkillDatas[i];
 
                 if (data == null)
                     continue;
 
-                RuntimePassiveSkill runtimePassive =
-                    new RuntimePassiveSkill(
-                        data
-                    );
+                RuntimePassiveSkill runtimePassive = new RuntimePassiveSkill(data);
 
-                _runtimePassives.Add(
-                    runtimePassive
-                );
+                _runtimePassives.Add(runtimePassive);
             }
         }
 
@@ -159,10 +151,7 @@ namespace Units
 
         private void ExecuteInitializePassives()
         {
-            EvaluateTrigger(
-                PassiveSkillTriggerType.Initialize,
-                null
-            );
+            EvaluateTrigger(PassiveSkillTriggerType.Initialize, null);
         }
 
 
@@ -170,35 +159,26 @@ namespace Units
         // Tick Trigger
         // ============================================================
 
-        private void UpdateTickPassives(
-            float deltaTime)
+        private void UpdateTickPassives(float deltaTime)
         {
-            for (int i = 0;
-                 i < _runtimePassives.Count;
-                 i++)
+            var owner = new CombatTargetSnapshot(_owner);
+
+            foreach (var runtimePassive in _runtimePassives.ToArray())
             {
-                RuntimePassiveSkill runtimePassive =
-                    _runtimePassives[i];
+                if (!owner.IsTargetable || !CanEvaluate())
+                    break;
 
-                if (runtimePassive.Data.TriggerType !=
-                    PassiveSkillTriggerType.Tick)
-                {
+                if (runtimePassive.Data.TriggerType != PassiveSkillTriggerType.Tick)
                     continue;
-                }
 
-                runtimePassive.AddTickTime(
-                    deltaTime
-                );
+                runtimePassive.AddTickTime(deltaTime);
 
                 if (!runtimePassive.IsTickReady())
                     continue;
 
                 runtimePassive.ResetTickTime();
 
-                EvaluatePassive(
-                    runtimePassive,
-                    null
-                );
+                EvaluatePassive(runtimePassive, null);
             }
         }
 
@@ -212,60 +192,63 @@ namespace Units
             if (!CanEvaluate())
                 return;
 
-            EvaluateTrigger(
-                PassiveSkillTriggerType.HealthChanged,
-                null
-            );
+            EvaluateTrigger(PassiveSkillTriggerType.HealthChanged, null);
         }
 
+        public void NotifyShieldChanged()
+        {
+            if (!CanEvaluate())
+                return;
 
-        public void NotifyDamageDealt(
-            ICombatTarget target)
+            EvaluateTrigger(PassiveSkillTriggerType.ShieldChanged, null);
+        }
+
+        public void NotifyDamageDealt(ICombatTarget target)
+        {
+            if (!CanEvaluate())
+                return;
+
+            EvaluateTrigger(PassiveSkillTriggerType.DamageDealt, target);
+        }
+
+        public void NotifyDamageTaken(ICombatTarget attacker)
+        {
+            if (!CanEvaluate())
+                return;
+
+            EvaluateTrigger(PassiveSkillTriggerType.DamageTaken, attacker);
+        }
+
+        public void NotifySkillEvent(CombatSkillEvent notification)
         {
             if (!CanEvaluate())
                 return;
 
             EvaluateTrigger(
-                PassiveSkillTriggerType.DamageDealt,
-                target
+                notification.EventType,
+                notification.Target.IsTargetable ? notification.Target.Target : null,
+                notification
             );
         }
-
-
-        public void NotifyDamageTaken(
-            ICombatTarget attacker)
-        {
-            if (!CanEvaluate())
-                return;
-
-            EvaluateTrigger(
-                PassiveSkillTriggerType.DamageTaken,
-                attacker
-            );
-        }
-
 
         private void EvaluateTrigger(
             PassiveSkillTriggerType triggerType,
-            ICombatTarget target)
+            ICombatTarget target,
+            CombatSkillEvent notification = null)
         {
-            for (int i = 0;
-                 i < _runtimePassives.Count;
-                 i++)
+            var owner = new CombatTargetSnapshot(_owner);
+
+            foreach (var runtimePassive in _runtimePassives.ToArray())
             {
-                RuntimePassiveSkill runtimePassive =
-                    _runtimePassives[i];
+                if (!owner.IsTargetable || !CanEvaluate())
+                    break;
 
-                if (runtimePassive.Data.TriggerType !=
-                    triggerType)
-                {
-                    continue;
-                }
-
-                EvaluatePassive(
-                    runtimePassive,
-                    target
-                );
+                if (runtimePassive.Data.TriggerType == triggerType)
+                    EvaluatePassive(
+                        runtimePassive,
+                        target,
+                        notification
+                    );
             }
         }
 
@@ -276,55 +259,55 @@ namespace Units
 
         private void EvaluatePassive(
             RuntimePassiveSkill runtimePassive,
-            ICombatTarget target)
+            ICombatTarget target,
+            CombatSkillEvent notification = null)
         {
-            if (runtimePassive == null ||
-                runtimePassive.Data == null)
-            {
+            if (runtimePassive == null || runtimePassive.Data == null || !CanEvaluate() || !runtimePassive.TryBeginExecution())
                 return;
+
+            try
+            {
+                var context = new PassiveContext(
+                    _owner,
+                    target,
+                    _targetResolver,
+                    notification
+                );
+
+                bool passed = EvaluateConditions(runtimePassive.Data.Conditions, context);
+
+                UpdatePassiveState(
+                    runtimePassive,
+                    context,
+                    passed
+                );
             }
+            finally
+            {
+                runtimePassive.EndExecution();
 
-            PassiveContext context =
-                CreateContext(
-                    target
-                );
-
-            bool conditionPassed =
-                EvaluateConditions(
-                    runtimePassive.Data.Conditions,
-                    context
-                );
-
-            UpdatePassiveState(
-                runtimePassive,
-                context,
-                conditionPassed
-            );
+                if (runtimePassive.MaintenancePending)
+                    ReevaluateMaintenance(runtimePassive);
+            }
         }
-
 
         private bool EvaluateConditions(
             IReadOnlyList<PassiveSkillConditionData> conditions,
             PassiveContext context)
         {
-            if (conditions == null ||
-                conditions.Count == 0)
+            if (conditions == null || conditions.Count == 0)
             {
                 return true;
             }
 
-            for (int i = 0;
-                 i < conditions.Count;
-                 i++)
+            for (int i = 0; i < conditions.Count; i++)
             {
-                PassiveSkillConditionData condition =
-                    conditions[i];
+                PassiveSkillConditionData condition = conditions[i];
 
                 if (condition == null)
                     continue;
 
-                if (!condition.Evaluate(
-                        context))
+                if (!condition.Evaluate(context))
                 {
                     return false;
                 }
@@ -346,7 +329,6 @@ namespace Units
             switch (runtimePassive.Data.EffectMode)
             {
                 case PassiveSkillEffectMode.Trigger:
-
                     ExecuteTriggerPassive(
                         runtimePassive,
                         context,
@@ -355,9 +337,7 @@ namespace Units
 
                     break;
 
-
                 case PassiveSkillEffectMode.WhileCondition:
-
                     UpdateWhileConditionPassive(
                         runtimePassive,
                         context,
@@ -366,9 +346,7 @@ namespace Units
 
                     break;
 
-
                 case PassiveSkillEffectMode.Once:
-
                     ExecuteOncePassive(
                         runtimePassive,
                         context,
@@ -379,7 +357,6 @@ namespace Units
             }
         }
 
-
         private void ExecuteTriggerPassive(
             RuntimePassiveSkill runtimePassive,
             PassiveContext context,
@@ -388,71 +365,80 @@ namespace Units
             if (!conditionPassed)
                 return;
 
-            _effectExecutor.Execute(
-                runtimePassive,
-                context
-            );
+            _effectExecutor.Execute(runtimePassive, context);
         }
-
 
         private void UpdateWhileConditionPassive(
             RuntimePassiveSkill runtimePassive,
             PassiveContext context,
             bool conditionPassed)
         {
+            runtimePassive.Watch?.Dispose();
+
+            runtimePassive.ActivationMetadata = context.Metadata.WithAdditionalAttack(runtimePassive.IsActive && runtimePassive.ActivationMetadata.IsAdditionalAttack);
+
+            runtimePassive.Watch = new PassiveConditionWatch(
+                runtimePassive.Data,
+                context,
+                () => ReevaluateMaintenance(runtimePassive)
+            );
+
             if (!conditionPassed)
             {
+                runtimePassive.Watch.Dispose();
+
+                runtimePassive.Watch = null;
+
                 if (!runtimePassive.IsActive)
                     return;
 
-                _effectExecutor.Deactivate(
-                    runtimePassive,
-                    context
-                );
+                runtimePassive.SetActive(false);
 
-                runtimePassive.SetActive(
-                    false
-                );
+                _effectExecutor.Deactivate(runtimePassive, context);
 
                 return;
             }
 
             if (!runtimePassive.IsActive)
             {
-                runtimePassive.SetActive(
-                    true
-                );
+                runtimePassive.SetActive(true);
 
-                _effectExecutor.Activate(
-                    runtimePassive,
-                    context
-                );
+                _effectExecutor.Activate(runtimePassive, context);
             }
 
-            _effectExecutor.Execute(
-                runtimePassive,
-                context
-            );
+            _effectExecutor.Execute(runtimePassive, context);
         }
-
 
         private void ExecuteOncePassive(
             RuntimePassiveSkill runtimePassive,
             PassiveContext context,
             bool conditionPassed)
         {
-            if (!conditionPassed)
+            if (!conditionPassed || runtimePassive.HasExecutedOnce)
                 return;
 
-            if (runtimePassive.HasExecutedOnce)
+            var executor = _effectExecutor;
+
+            var lifetime = new CombatTargetSnapshot(context.Owner);
+
+            if (executor == null || !lifetime.IsTargetable)
                 return;
 
-            runtimePassive.MarkExecutedOnce();
+            // 보정 등록의 알림 중 Stop이 재진입해도 이 소유자의 보정을 정리할 수 있게 먼저 표시한다.
+            runtimePassive.ActivationMetadata = context.Metadata;
 
-            _effectExecutor.Execute(
-                runtimePassive,
-                context
-            );
+            runtimePassive.SetActive(true);
+
+            bool applied = executor.ActivateWithResult(runtimePassive, context);
+
+            if (!applied)
+                runtimePassive.SetActive(false);
+
+            if (lifetime.IsTargetable)
+                applied |= executor.ExecuteWithResult(runtimePassive, context);
+
+            if (applied && lifetime.MatchesLifetime)
+                runtimePassive.MarkExecutedOnce();
         }
 
 
@@ -472,21 +458,16 @@ namespace Units
             PassiveDamageOwnerType ownerType,
             List<PassiveDamageModifier> results)
         {
-            if (!_isInitialized ||
-                results == null)
+            if (!_isInitialized || results == null)
             {
                 return;
             }
 
-            for (int i = 0;
-                 i < _runtimePassives.Count;
-                 i++)
+            for (int i = 0; i < _runtimePassives.Count; i++)
             {
-                RuntimePassiveSkill runtimePassive =
-                    _runtimePassives[i];
+                RuntimePassiveSkill runtimePassive = _runtimePassives[i];
 
-                if (runtimePassive == null ||
-                    runtimePassive.Data == null)
+                if (runtimePassive == null || runtimePassive.Data == null)
                 {
                     continue;
                 }
@@ -499,40 +480,29 @@ namespace Units
             }
         }
 
-
         private void CollectDamageModifiers(
             RuntimePassiveSkill runtimePassive,
             PassiveDamageOwnerType ownerType,
             List<PassiveDamageModifier> results)
         {
-            IReadOnlyList<PassiveSkillActionData> actions =
-                runtimePassive.Data.Actions;
+            IReadOnlyList<PassiveSkillActionData> actions = runtimePassive.Data.Actions;
 
             if (actions == null)
                 return;
 
-            for (int i = 0;
-                 i < actions.Count;
-                 i++)
+            for (int i = 0; i < actions.Count; i++)
             {
-                if (actions[i]
-                    is not PassiveDamageModifierActionData damageModifier)
+                if (actions[i] is not PassiveDamageModifierActionData damageModifier)
                 {
                     continue;
                 }
 
-                if (damageModifier.OwnerType !=
-                    ownerType)
+                if (damageModifier.OwnerType != ownerType)
                 {
                     continue;
                 }
 
-                results.Add(
-                    new PassiveDamageModifier(
-                        runtimePassive,
-                        damageModifier
-                    )
-                );
+                results.Add(new PassiveDamageModifier(runtimePassive, damageModifier));
             }
         }
 
@@ -547,24 +517,22 @@ namespace Units
         // 해당 Runtime Passive의 Condition을 직접 평가한다.
         public bool EvaluateDamageModifierConditions(
             RuntimePassiveSkill runtimePassive,
-            ICombatTarget target)
+            ICombatTarget target,
+            CombatSourceSnapshot frozenTarget = null)
         {
-            if (!_isInitialized ||
-                runtimePassive == null ||
-                runtimePassive.Data == null)
+            if (!_isInitialized || runtimePassive == null || runtimePassive.Data == null)
             {
                 return false;
             }
 
-            PassiveContext context =
-                CreateContext(
-                    target
-                );
-
-            return EvaluateConditions(
-                runtimePassive.Data.Conditions,
-                context
+            PassiveContext context = new PassiveContext(
+                _owner,
+                target,
+                _targetResolver,
+                frozenTarget: frozenTarget
             );
+
+            return EvaluateConditions(runtimePassive.Data.Conditions, context);
         }
 
 
@@ -572,8 +540,7 @@ namespace Units
         // Context
         // ============================================================
 
-        private PassiveContext CreateContext(
-            ICombatTarget target)
+        private PassiveContext CreateContext(ICombatTarget target)
         {
             return new PassiveContext(
                 _owner,
@@ -587,12 +554,47 @@ namespace Units
         // State
         // ============================================================
 
+        // ============================================================
+        // WhileCondition Maintenance
+        // ============================================================
+        private void UpdateConditionWatches(float deltaTime)
+        {
+            foreach (var runtime in _runtimePassives.ToArray())
+                if (CanEvaluate() && runtime.IsActive)
+                    runtime.Watch?.Tick(deltaTime, runtime.Data.ConditionCheckInterval);
+        }
+
+        private void ReevaluateMaintenance(RuntimePassiveSkill runtime)
+        {
+            if (!CanEvaluate() || !runtime.IsActive || runtime.Watch == null)
+                return;
+
+            if (runtime.IsExecuting)
+            {
+                runtime.MaintenancePending = true;
+
+                return;
+            }
+
+            runtime.MaintenancePending = false;
+
+            var watch = runtime.Watch;
+
+            if (watch.IsValid && EvaluateConditions(runtime.Data.Conditions, watch.Context))
+                return;
+
+            runtime.SetActive(false);
+
+            watch.Dispose();
+
+            runtime.Watch = null;
+
+            _effectExecutor?.Deactivate(runtime, watch.Context);
+        }
+
         private bool CanEvaluate()
         {
-            return _isInitialized
-                && !_isPaused
-                && _owner != null
-                && _owner.IsTargetable;
+            return _isInitialized && !_isPaused && _owner != null && _owner.IsTargetable;
         }
 
 
@@ -605,79 +607,86 @@ namespace Units
             if (!_isInitialized)
                 return;
 
-            _isPaused =
-                true;
+            _isPaused = true;
         }
-
 
         public void Resume()
         {
             if (!_isInitialized)
                 return;
 
-            _isPaused =
-                false;
-        }
+            _isPaused = false;
 
+            foreach (var runtime in _runtimePassives.ToArray())
+                ReevaluateMaintenance(runtime);
+        }
 
         public void Stop()
         {
-            DeactivateAllPassives();
+            // 먼저 이전 실행의 소유권을 분리한다. 해제 알림 중 재초기화된 새 패시브를 지우지 않는다.
+            var executor = _effectExecutor;
+
+            var passives = _runtimePassives.ToArray();
+
+            var owner = new CombatTargetSnapshot(_owner);
+
+            var context = new PassiveContext(
+                _owner,
+                null,
+                _targetResolver
+            );
 
             _runtimePassives.Clear();
 
-            _effectExecutor =
-                null;
+            _effectExecutor = null;
 
-            _targetResolver =
-                null;
+            _targetResolver = null;
 
-            _owner =
-                null;
+            _owner = null;
 
-            _core =
-                null;
+            _core = null;
 
-            _isInitialized =
-                false;
+            _isInitialized = false;
 
-            _isPaused =
-                false;
-        }
+            _isPaused = false;
 
-
-        private void DeactivateAllPassives()
-        {
-            if (_effectExecutor == null ||
-                _owner == null ||
-                _targetResolver == null)
+            foreach (var runtime in passives)
             {
-                return;
+                runtime.StopExecution();
+
+                runtime.Watch?.Dispose();
+
+                runtime.Watch = null;
             }
 
-            PassiveContext context =
-                CreateContext(
-                    null
-                );
+            DeactivateAllPassives(
+                executor,
+                passives,
+                context,
+                owner
+            );
+        }
 
-            for (int i = 0;
-                 i < _runtimePassives.Count;
-                 i++)
+        private void DeactivateAllPassives(
+            PassiveEffectExecutor executor,
+            RuntimePassiveSkill[] passives,
+            PassiveContext context,
+            CombatTargetSnapshot owner)
+        {
+            if (executor == null)
+                return;
+
+            foreach (var runtime in passives)
             {
-                RuntimePassiveSkill runtimePassive =
-                    _runtimePassives[i];
+                if (!owner.MatchesLifetime)
+                    break;
 
-                if (!runtimePassive.IsActive)
+                if (!runtime.IsActive)
                     continue;
 
-                _effectExecutor.Deactivate(
-                    runtimePassive,
-                    context
-                );
+                runtime.SetActive(false);
 
-                runtimePassive.SetActive(
-                    false
-                );
+                executor.Deactivate(runtime, context);
             }
         }
     }

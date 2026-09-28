@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Effects;
 using UnityEngine;
 
@@ -20,32 +20,23 @@ namespace Units.Skills
 
         private void Awake()
         {
-            if (Instance != null
-                && Instance != this)
+            if (Instance != null && Instance != this)
             {
-                Debug.LogError(
-                    "[SkillEffectResolver] SkillEffectResolver가 중복 생성되어 자동 삭제됩니다."
-                );
+                Debug.LogError("[SkillEffectResolver] SkillEffectResolver가 중복 생성되어 자동 삭제됩니다.");
 
-                Destroy(
-                    gameObject
-                );
+                Destroy(gameObject);
 
                 return;
             }
 
-
-            Instance =
-                this;
+            Instance = this;
         }
-
 
         private void OnDestroy()
         {
             if (Instance == this)
             {
-                Instance =
-                    null;
+                Instance = null;
             }
         }
 
@@ -54,74 +45,73 @@ namespace Units.Skills
         // Resolve
         // ============================================================
 
-        public void Resolve(
-            SkillEffectRequest request)
+        public void Resolve(SkillEffectRequest request)
         {
-            if (!IsValidRequest(
-                    request))
-            {
-                return;
-            }
-
-
-            IReadOnlyList<SkillEffectData> effects =
-                request.Effects;
-
-
-            for (int i = 0;
-                 i < effects.Count;
-                 i++)
-            {
-                SkillEffectData effect =
-                    effects[i];
-
-
-                if (effect == null)
-                    continue;
-
-
-                ResolveEffect(
-                    request,
-                    effect
-                );
-            }
+            ResolveWithResults(request);
         }
 
+        public IReadOnlyList<CombatApplicationResult> ResolveWithResults(SkillEffectRequest request)
+        {
+            var results = new List<CombatApplicationResult>();
 
-        private void ResolveEffect(
+            if (!IsValidRequest(request) || !request.TargetSnapshot.IsTargetable || (request.SourceSnapshot == null && !request.Metadata.Owner.MatchesLifetime))
+            {
+                results.Add(CombatApplicationResult.Invalid(CombatApplicationKind.RuntimeEffect, request.Target, request.Metadata, "Invalid skill effect request"));
+
+                return results.AsReadOnly();
+            }
+
+            var effects = new List<SkillEffectData>(request.Effects);
+
+            using (CombatEventContext.Enter(request.Metadata))
+            {
+                for (int i = 0; i < effects.Count; i++)
+                {
+                    if (request.CanContinue != null && !request.CanContinue())
+                        break;
+
+                    if (effects[i] == null)
+                        continue;
+
+                    if (!request.TargetSnapshot.IsTargetable || (request.SourceSnapshot == null && !request.Metadata.Owner.IsTargetable))
+                    {
+                        results.Add(CombatApplicationResult.Invalid(CombatApplicationKind.RuntimeEffect, request.Target, request.Metadata, "Target or caster lifetime changed"));
+
+                        continue;
+                    }
+
+                    results.Add(ResolveEffect(request, effects[i]));
+                }
+            }
+
+            return results.AsReadOnly();
+        }
+
+        private CombatApplicationResult ResolveEffect(
             SkillEffectRequest request,
             SkillEffectData effect)
         {
             switch (effect)
             {
                 case SkillDamageEffectData damageEffect:
-
-                    ResolveDamage(
-                        request,
-                        damageEffect
-                    );
-
-                    break;
-
+                    return ResolveDamage(request, damageEffect);
 
                 case SkillHealEffectData healEffect:
+                    return ResolveHeal(request, healEffect);
 
-                    ResolveHeal(
-                        request,
-                        healEffect
-                    );
-
-                    break;
-
+                case SkillShieldEffectData shieldEffect:
+                    return ResolveShield(request, shieldEffect);
 
                 case SkillRuntimeEffectData runtimeEffect:
+                    return ResolveRuntimeEffect(request, runtimeEffect);
 
-                    ResolveRuntimeEffect(
-                        request,
-                        runtimeEffect
+                default:
+                    return CombatApplicationResult.Invalid(
+                        CombatApplicationKind.RuntimeEffect,
+                        request.Target,
+                        request.Metadata,
+                        "Unsupported effect type"
                     );
-
-                    break;
             }
         }
 
@@ -130,33 +120,21 @@ namespace Units.Skills
         // Damage
         // ============================================================
 
-        private void ResolveDamage(
+        private CombatApplicationResult ResolveDamage(
             SkillEffectRequest request,
             SkillDamageEffectData effect)
         {
             if (DamageResolver.Instance == null)
-                return;
-
-
-            ICombatTarget[] targets =
-            {
-                request.Target
-            };
-
-
-            DamageRequest damageRequest =
-                new DamageRequest(
-                    request.Caster,
-                    targets,
-                    DamageSourceType.Skill,
-                    effect.DamageType,
-                    effect.DamageMultiplier
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Damage,
+                    request.Target,
+                    request.Metadata,
+                    "DamageResolver unavailable"
                 );
 
+            var results = DamageResolver.Instance.ResolveWithResults(new DamageRequest(request.Caster, new[] { request.Target }, DamageSourceType.Skill, effect.DamageType, effect.DamageMultiplier, request.Metadata, request.SourceSnapshot));
 
-            DamageResolver.Instance.Resolve(
-                damageRequest
-            );
+            return results[0];
         }
 
 
@@ -164,26 +142,39 @@ namespace Units.Skills
         // Heal
         // ============================================================
 
-        private void ResolveHeal(
+        private CombatApplicationResult ResolveHeal(
             SkillEffectRequest request,
             SkillHealEffectData effect)
         {
             if (HealResolver.Instance == null)
-                return;
-
-
-            HealRequest healRequest =
-                new HealRequest(
-                    request.Caster,
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Heal,
                     request.Target,
-                    effect.ScalingStatType,
-                    effect.HealRatio
+                    request.Metadata,
+                    "HealResolver unavailable"
                 );
 
+            return HealResolver.Instance.ResolveWithResult(new HealRequest(request.Caster, request.Target, effect.ScalingStatType, effect.HealRatio, request.Metadata, request.SourceSnapshot));
+        }
 
-            HealResolver.Instance.Resolve(
-                healRequest
-            );
+
+        // ============================================================
+        // Shield
+        // ============================================================
+
+        private CombatApplicationResult ResolveShield(
+            SkillEffectRequest request,
+            SkillShieldEffectData effect)
+        {
+            if (ShieldResolver.Instance == null)
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Shield,
+                    request.Target,
+                    request.Metadata,
+                    "ShieldResolver unavailable"
+                );
+
+            return ShieldResolver.Instance.ResolveWithResult(new ShieldRequest(request.Caster, request.Target, effect.ScalingStatType, effect.ShieldRatio, request.Metadata, request.SourceSnapshot));
         }
 
 
@@ -191,28 +182,19 @@ namespace Units.Skills
         // Runtime Effect
         // ============================================================
 
-        private void ResolveRuntimeEffect(
+        private CombatApplicationResult ResolveRuntimeEffect(
             SkillEffectRequest request,
             SkillRuntimeEffectData effect)
         {
-            if (RuntimeEffectManager.Instance == null)
-                return;
-
-            if (effect.EffectData == null)
-                return;
-
-
-            EffectRequest effectRequest =
-                new EffectRequest(
-                    effect.EffectData,
-                    request.Caster,
-                    request.Target
+            if (RuntimeEffectManager.Instance == null || effect.EffectData == null)
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.RuntimeEffect,
+                    request.Target,
+                    request.Metadata,
+                    "Runtime effect unavailable"
                 );
 
-
-            RuntimeEffectManager.Instance.ApplyEffect(
-                effectRequest
-            );
+            return RuntimeEffectManager.Instance.ApplyEffectWithResult(new EffectRequest(effect.EffectData, request.Caster, request.Target, request.Metadata, effect.FrozenDefinition));
         }
 
 
@@ -220,8 +202,7 @@ namespace Units.Skills
         // Validation
         // ============================================================
 
-        private bool IsValidRequest(
-            SkillEffectRequest request)
+        private bool IsValidRequest(SkillEffectRequest request)
         {
             if (request.Caster == null)
                 return false;
@@ -229,18 +210,16 @@ namespace Units.Skills
             if (request.Target == null)
                 return false;
 
-            if (!request.Caster.IsAlive)
+            if (request.SourceSnapshot == null && !request.Caster.IsAlive)
                 return false;
 
             if (!request.Target.IsTargetable)
                 return false;
 
-            if (request.Effects == null ||
-                request.Effects.Count == 0)
+            if (request.Effects == null || request.Effects.Count == 0)
             {
                 return false;
             }
-
 
             return true;
         }

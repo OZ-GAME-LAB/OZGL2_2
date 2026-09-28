@@ -1,6 +1,8 @@
 ﻿using System;
 using UnityEngine;
 
+
+
 namespace Units.Skills
 {
     [Serializable]
@@ -12,9 +14,9 @@ namespace Units.Skills
             HealScalingStatType.AttackPower;
 
         [SerializeField]
-        [Tooltip("시전자 능력치를 기준으로 적용할 회복 계수 (%)")]
+        [Tooltip("시전자 능력치를 기준으로 적용할 회복 계수 (1 = 100%)")]
         private float _healRatio =
-            100f;
+            1f;
 
 
         public HealScalingStatType ScalingStatType =>

@@ -31,10 +31,78 @@ MonoBehaviour:
   _dashSpeed: 12
   _skillFXType: 0
   _hitFXType: 0
+  _actions:
+  - rid: 4844432359097368584
+  - rid: 4844432359097368585
+  _skillSchemaVersion: 1
+  _usesLegacyTargetSelection: 1
   references:
     version: 2
     RefIds:
     - rid: 4844432152660541522
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _damageType: 0
         _damageMultiplier: 2
+    - rid: 4844432359097368584
+      type: {class: SkillDashActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _target:
+          _source: 2
+          _relation: 0
+          _includeSelf: 1
+          _range: 10
+          _maxTargetCount: 1
+          _clusterRadius: 1.5
+          _filters: []
+          _priorities: []
+        _targetLostPolicy: 0
+        _failurePolicy: 0
+        _origin: 0
+        _conditions: []
+        _baseEffects: []
+        _conditionalEffects: []
+        _fxEntries: []
+        _distance: 10
+        _speed: 12
+    - rid: 4844432359097368585
+      type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _target:
+          _source: 2
+          _relation: 0
+          _includeSelf: 1
+          _range: 10
+          _maxTargetCount: 5
+          _clusterRadius: 1.5
+          _filters: []
+          _priorities: []
+        _targetLostPolicy: 0
+        _failurePolicy: 0
+        _origin: 0
+        _conditions: []
+        _baseEffects:
+        - _entryId: 1
+          _timing: 1
+          _subject: 0
+          _frequency: 0
+          _snapshotAreaTarget:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 1
+            _maxTargetCount: 10
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _effects:
+          - rid: 4844432152660541522
+        _conditionalEffects: []
+        _fxEntries: []
+        _delivery: 0
+        _area: 2
+        _radius: 1.5
+        _angle: 360
+        _maxEffectTargets: 5
+        _projectileSpeed: 10
+        _isLegacy: 1

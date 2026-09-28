@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -16,8 +16,7 @@ namespace Units.Skills
 
         [Header("Target")]
         [SerializeField]
-        private SkillTargetRelation _targetRelation =
-            SkillTargetRelation.Hostile;
+        private SkillTargetRelation _targetRelation = SkillTargetRelation.Hostile;
 
 
         // ============================================================
@@ -27,8 +26,7 @@ namespace Units.Skills
         [Header("Range")]
         [SerializeField]
         [Min(0f)]
-        private float _range =
-            5f;
+        private float _range = 5f;
 
 
         // ============================================================
@@ -37,70 +35,50 @@ namespace Units.Skills
 
         [Header("Condition")]
         [SerializeField]
-        private PassiveValueComparisonType _comparisonType =
-            PassiveValueComparisonType.GreaterOrEqual;
+        private PassiveValueComparisonType _comparisonType = PassiveValueComparisonType.GreaterOrEqual;
 
         [SerializeField]
         [Min(0)]
-        private int _count =
-            1;
+        private int _count = 1;
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public SkillTargetRelation TargetRelation =>
-            _targetRelation;
+        public SkillTargetRelation TargetRelation => _targetRelation;
 
-        public float Range =>
-            _range;
+        public float Range => _range;
 
-        public PassiveValueComparisonType ComparisonType =>
-            _comparisonType;
+        public PassiveValueComparisonType ComparisonType => _comparisonType;
 
-        public int Count =>
-            _count;
+        public int Count => _count;
 
 
         // ============================================================
         // Evaluate
         // ============================================================
 
-        public override bool Evaluate(
-            PassiveContext context)
+        public override CombatStateChange OwnerDependencies => CombatStateChange.None;
+
+        public override CombatStateChange TargetDependencies => CombatStateChange.None;
+
+        public override bool UsesSpatialQuery => true;
+
+        public override bool Evaluate(PassiveContext context)
         {
-            if (context.Owner == null ||
-                context.Owner.Transform == null ||
-                context.TargetResolver == null)
+            if (context.Owner == null || context.Owner.Transform == null || context.TargetResolver == null)
             {
                 return false;
             }
 
-            UnitTeam targetTeam =
-                GetTargetTeam(
-                    context.Owner.Team
-                );
+            UnitTeam targetTeam = GetTargetTeam(context.Owner.Team);
 
-            IReadOnlyList<ICombatTarget> targets =
-                context.TargetResolver.ResolveCandidates(
-                    new TargetCandidateRequest(
-                        context.Owner.Transform.position,
-                        _range,
-                        targetTeam
-                    )
-                );
+            IReadOnlyList<ICombatTarget> targets = context.TargetResolver.ResolveCandidates(new TargetCandidateRequest(context.Owner.Transform.position, _range, targetTeam));
 
-            int targetCount =
-                CountTargets(
-                    targets,
-                    context.Owner
-                );
+            int targetCount = CountTargets(targets, context.Owner);
 
-            return Compare(
-                targetCount,
-                _count
-            );
+            return Compare(targetCount, _count);
         }
 
 
@@ -108,8 +86,7 @@ namespace Units.Skills
         // Target
         // ============================================================
 
-        private UnitTeam GetTargetTeam(
-            UnitTeam ownerTeam)
+        private UnitTeam GetTargetTeam(UnitTeam ownerTeam)
         {
             switch (_targetRelation)
             {
@@ -117,41 +94,28 @@ namespace Units.Skills
                     return ownerTeam;
 
                 case SkillTargetRelation.Hostile:
-                    return ownerTeam ==
-                           UnitTeam.Ally
-                        ? UnitTeam.Enemy
-                        : UnitTeam.Ally;
+                    return ownerTeam == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally;
 
                 default:
                     return ownerTeam;
             }
         }
 
-
         private int CountTargets(
             IReadOnlyList<ICombatTarget> targets,
             ICombatTarget owner)
         {
-            int count =
-                0;
+            int count = 0;
 
-            for (int i = 0;
-                 i < targets.Count;
-                 i++)
+            for (int i = 0; i < targets.Count; i++)
             {
-                ICombatTarget target =
-                    targets[i];
+                ICombatTarget target = targets[i];
 
                 if (target == null)
                     continue;
 
                 // 주변 아군 수에서는 패시브 보유자 자신을 제외한다.
-                if (_targetRelation ==
-                    SkillTargetRelation.Friendly &&
-                    ReferenceEquals(
-                        target,
-                        owner
-                    ))
+                if (_targetRelation == SkillTargetRelation.Friendly && ReferenceEquals(target, owner))
                 {
                     continue;
                 }
@@ -174,24 +138,19 @@ namespace Units.Skills
             switch (_comparisonType)
             {
                 case PassiveValueComparisonType.Less:
-                    return currentValue <
-                           targetValue;
+                    return currentValue < targetValue;
 
                 case PassiveValueComparisonType.LessOrEqual:
-                    return currentValue <=
-                           targetValue;
+                    return currentValue <= targetValue;
 
                 case PassiveValueComparisonType.Greater:
-                    return currentValue >
-                           targetValue;
+                    return currentValue > targetValue;
 
                 case PassiveValueComparisonType.GreaterOrEqual:
-                    return currentValue >=
-                           targetValue;
+                    return currentValue >= targetValue;
 
                 case PassiveValueComparisonType.Equal:
-                    return currentValue ==
-                           targetValue;
+                    return currentValue == targetValue;
 
                 default:
                     return false;
@@ -206,17 +165,9 @@ namespace Units.Skills
 #if UNITY_EDITOR
         public void Validate()
         {
-            _range =
-                Mathf.Max(
-                    0f,
-                    _range
-                );
+            _range = Mathf.Max(0f, _range);
 
-            _count =
-                Mathf.Max(
-                    0,
-                    _count
-                );
+            _count = Mathf.Max(0, _count);
         }
 #endif
     }

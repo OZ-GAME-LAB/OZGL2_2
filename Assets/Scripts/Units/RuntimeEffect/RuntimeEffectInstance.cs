@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -10,7 +10,27 @@ namespace Units.Effects
         // Data
         // ============================================================
 
+        private CombatEventMetadata _metadata;
+
+        public CombatEventMetadata Metadata => _metadata;
+
+        private static long _nextOrder;
+
+        public long AppliedOrder { get; } = System.Threading.Interlocked.Increment(ref _nextOrder);
+
+        internal void MergeLineage(CombatEventMetadata incoming)
+        {
+            _metadata = _metadata.WithAdditionalAttack(incoming.IsAdditionalAttack);
+        }
+
+        internal void ConsumeStacks(int count)
+        {
+            _stackCount = Mathf.Max(0, _stackCount - count);
+        }
+
         private readonly EffectData _data;
+
+        public EffectDefinitionSnapshot Definition { get; }
 
         private readonly ICombatTarget _source;
 
@@ -38,39 +58,27 @@ namespace Units.Effects
         // Properties
         // ============================================================
 
-        public EffectData Data =>
-            _data;
+        public EffectData Data => _data;
 
-        public ICombatTarget Source =>
-            _source;
+        public ICombatTarget Source => _source;
 
-        public ICombatTarget Target =>
-            _target;
+        public ICombatTarget Target => _target;
 
-        public int SourceLifetimeVersion =>
-            _sourceLifetimeVersion;
+        public int SourceLifetimeVersion => _sourceLifetimeVersion;
 
-        public int TargetLifetimeVersion =>
-            _targetLifetimeVersion;
+        public int TargetLifetimeVersion => _targetLifetimeVersion;
 
-        public int StackCount =>
-            _stackCount;
+        public int StackCount => _stackCount;
 
-        public float AppliedTime =>
-            _appliedTime;
+        public float AppliedTime => _appliedTime;
 
-        public float ExpireTime =>
-            _expireTime;
+        public float ExpireTime => _expireTime;
 
-        public float NextTickTime =>
-            _nextTickTime;
+        public float NextTickTime => _nextTickTime;
 
-        public bool IsInfinite =>
-            _data.DurationType ==
-            EffectDurationType.Infinite;
+        public bool IsInfinite => Definition.DurationType == EffectDurationType.Infinite;
 
-        public bool HasPeriodicTick =>
-            _nextTickTime > 0f;
+        public bool HasPeriodicTick => _nextTickTime > 0f;
 
 
         // ============================================================
@@ -81,42 +89,31 @@ namespace Units.Effects
             EffectData data,
             ICombatTarget source,
             ICombatTarget target,
-            float currentTime)
+            float currentTime,
+            CombatEventMetadata metadata = default,
+            EffectDefinitionSnapshot definition = null)
         {
-            _data =
-                data;
+            Definition = definition ?? new EffectDefinitionSnapshot(data);
 
-            _source =
-                source;
+            _metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(source);
 
-            _target =
-                target;
+            _data = data;
 
-            _sourceLifetimeVersion =
-                source != null
-                    ? source.LifetimeVersion
-                    : 0;
+            _source = source;
 
-            _targetLifetimeVersion =
-                target != null
-                    ? target.LifetimeVersion
-                    : 0;
+            _target = target;
 
+            _sourceLifetimeVersion = _metadata.Owner.LifetimeVersion;
 
-            _stackCount =
-                1;
+            _targetLifetimeVersion = target != null ? target.LifetimeVersion : 0;
 
-            _appliedTime =
-                currentTime;
+            _stackCount = 1;
 
+            _appliedTime = currentTime;
 
-            InitializeDuration(
-                currentTime
-            );
+            InitializeDuration(currentTime);
 
-            InitializePeriodic(
-                currentTime
-            );
+            InitializePeriodic(currentTime);
         }
 
 
@@ -124,49 +121,36 @@ namespace Units.Effects
         // Duration
         // ============================================================
 
-        public bool IsExpired(
-            float currentTime)
+        public bool IsExpired(float currentTime)
         {
             if (IsInfinite)
                 return false;
 
-            return currentTime >=
-                _expireTime;
+            return currentTime >= _expireTime;
         }
 
-
-        public float GetRemainingDuration(
-            float currentTime)
+        public float GetRemainingDuration(float currentTime)
         {
             if (IsInfinite)
                 return float.PositiveInfinity;
 
-            return Mathf.Max(
-                0f,
-                _expireTime - currentTime
-            );
+            return Mathf.Max(0f, _expireTime - currentTime);
         }
 
-
-        public void RefreshDuration(
-            float currentTime)
+        public void RefreshDuration(float currentTime)
         {
             if (IsInfinite)
                 return;
 
-            _expireTime =
-                currentTime +
-                _data.Duration;
+            _expireTime = currentTime + Definition.Duration;
         }
-
 
         public void ExtendDuration()
         {
             if (IsInfinite)
                 return;
 
-            _expireTime +=
-                _data.Duration;
+            _expireTime += Definition.Duration;
         }
 
 
@@ -176,8 +160,7 @@ namespace Units.Effects
 
         public bool TryAddStack()
         {
-            if (_stackCount >=
-                _data.MaxStack)
+            if (_stackCount >= Definition.MaxStack)
             {
                 return false;
             }
@@ -192,38 +175,28 @@ namespace Units.Effects
         // Periodic
         // ============================================================
 
-        public bool CanTick(
-            float currentTime)
+        public bool CanTick(float currentTime)
         {
             if (!HasPeriodicTick)
                 return false;
 
-            return currentTime >=
-                _nextTickTime;
+            return currentTime >= _nextTickTime;
         }
 
-
-        public float GetTickProcessUntilTime(
-            float currentTime)
+        public float GetTickProcessUntilTime(float currentTime)
         {
             if (IsInfinite)
                 return currentTime;
 
-            return Mathf.Min(
-                currentTime,
-                _expireTime
-            );
+            return Mathf.Min(currentTime, _expireTime);
         }
 
-
-        public void AdvanceTick(
-            float interval)
+        public void AdvanceTick(float interval)
         {
             if (interval <= 0f)
                 return;
 
-            _nextTickTime +=
-                interval;
+            _nextTickTime += interval;
         }
 
 
@@ -231,60 +204,44 @@ namespace Units.Effects
         // Initialize
         // ============================================================
 
-        private void InitializeDuration(
-            float currentTime)
+        private void InitializeDuration(float currentTime)
         {
             if (IsInfinite)
             {
-                _expireTime =
-                    float.PositiveInfinity;
+                _expireTime = float.PositiveInfinity;
 
                 return;
             }
 
-            _expireTime =
-                currentTime +
-                _data.Duration;
+            _expireTime = currentTime + Definition.Duration;
         }
 
-
-        private void InitializePeriodic(
-            float currentTime)
+        private void InitializePeriodic(float currentTime)
         {
-            float interval =
-                GetPeriodicInterval();
+            float interval = GetPeriodicInterval();
 
             if (interval <= 0f)
             {
-                _nextTickTime =
-                    0f;
+                _nextTickTime = 0f;
 
                 return;
             }
 
-            _nextTickTime =
-                currentTime +
-                interval;
+            _nextTickTime = currentTime + interval;
         }
-
 
         private float GetPeriodicInterval()
         {
-            IReadOnlyList<EffectActionData> actions =
-                _data.Actions;
+            IReadOnlyList<EffectActionData> actions = Definition.Actions;
 
-            for (int i = 0;
-                 i < actions.Count;
-                 i++)
+            for (int i = 0; i < actions.Count; i++)
             {
-                if (actions[i]
-                    is PeriodicDamageEffectActionData periodicDamage)
+                if (actions[i] is PeriodicDamageEffectActionData periodicDamage)
                 {
                     return periodicDamage.Interval;
                 }
 
-                if (actions[i]
-                    is PeriodicHealEffectActionData periodicHeal)
+                if (actions[i] is PeriodicHealEffectActionData periodicHeal)
                 {
                     return periodicHeal.Interval;
                 }

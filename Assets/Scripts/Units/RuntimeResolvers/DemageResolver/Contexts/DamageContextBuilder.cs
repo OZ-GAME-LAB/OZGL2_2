@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 
 
@@ -14,26 +14,16 @@ namespace Units
             DamageRequest request,
             ICombatTarget target)
         {
-            if (request.Attacker == null ||
-                target == null)
+            if (request.Attacker == null || target == null)
             {
                 return default;
             }
 
-            AttackerContext attackerContext =
-                BuildAttackerContext(
-                    request
-                );
+            AttackerContext attackerContext = BuildAttackerContext(request);
 
-            TargetContext targetContext =
-                BuildTargetContext(
-                    target
-                );
+            TargetContext targetContext = BuildTargetContext(target);
 
-            return new DamageContext(
-                attackerContext,
-                targetContext
-            );
+            return new DamageContext(attackerContext, targetContext);
         }
 
 
@@ -41,28 +31,20 @@ namespace Units
         // Attacker Context
         // ============================================================
 
-        private AttackerContext BuildAttackerContext(
-            DamageRequest request)
+        private AttackerContext BuildAttackerContext(DamageRequest request)
         {
-            ICombatTarget attacker =
-                request.Attacker;
+            if (request.SourceSnapshot != null)
+                return request.SourceSnapshot.Build(request);
 
-            Unit_RuntimeStatus runtimeStatus =
-                attacker.RuntimeStatus;
+            ICombatTarget attacker = request.Attacker;
 
-            List<PassiveDamageModifier> damageModifiers =
-                new();
+            Unit_RuntimeStatus runtimeStatus = attacker.RuntimeStatus;
 
-            attacker.CollectDamageModifiers(
-                PassiveDamageOwnerType.Attacker,
-                damageModifiers
-            );
+            List<PassiveDamageModifier> damageModifiers = new();
 
-            float sourceDamageMultiplier =
-                GetSourceDamageMultiplier(
-                    runtimeStatus,
-                    request.SourceType
-                );
+            attacker.CollectDamageModifiers(PassiveDamageOwnerType.Attacker, damageModifiers);
+
+            float sourceDamageMultiplier = GetSourceDamageMultiplier(runtimeStatus, request.SourceType);
 
             return new AttackerContext(
                 attacker,
@@ -84,19 +66,13 @@ namespace Units
         // Target Context
         // ============================================================
 
-        private TargetContext BuildTargetContext(
-            ICombatTarget target)
+        private TargetContext BuildTargetContext(ICombatTarget target)
         {
-            Unit_RuntimeStatus runtimeStatus =
-                target.RuntimeStatus;
+            Unit_RuntimeStatus runtimeStatus = target.RuntimeStatus;
 
-            List<PassiveDamageModifier> damageModifiers =
-                new();
+            List<PassiveDamageModifier> damageModifiers = new();
 
-            target.CollectDamageModifiers(
-                PassiveDamageOwnerType.Target,
-                damageModifiers
-            );
+            target.CollectDamageModifiers(PassiveDamageOwnerType.Target, damageModifiers);
 
             return new TargetContext(
                 target,
@@ -121,19 +97,12 @@ namespace Units
             switch (sourceType)
             {
                 case DamageSourceType.BasicAttack:
-
-                    return runtimeStatus
-                        .BasicAttackMultiplier;
-
+                    return runtimeStatus.BasicAttackMultiplier;
 
                 case DamageSourceType.Skill:
-
-                    return runtimeStatus
-                        .SkillDamageMultiplier;
-
+                    return runtimeStatus.SkillDamageMultiplier;
 
                 default:
-
                     return 1f;
             }
         }

@@ -12,12 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: Enemy_Inquisitor_PassiveSkill
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
-  _triggerType: 2
+  _skillSchemaVersion: 1
+  _triggerType: 3
   _tickInterval: 1
   _conditions: []
   _effectMode: 1
   _actions:
   - rid: 4844432195048177753
+  _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
