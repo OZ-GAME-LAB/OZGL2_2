@@ -1,4 +1,4 @@
-// 콘텐츠는 저장 구현 대신 이 계약으로 사본을 가져오고 저장을 요청합니다.
+// 저장소에서 저장 및 불러오는 인터페이스
 public interface IPersistentSaveWriter
 {
     bool IsReady { get; }

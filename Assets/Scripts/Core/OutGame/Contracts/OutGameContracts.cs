@@ -51,6 +51,8 @@ public class TotemLevelEntry
 [Serializable]
 public class OutGameStartContext
 {
+    public static OutGameStartContext Pending;
+    
     public AltarId SelectedAltar; //선택된 제단
     public List<TraitLevelEntry> Traits = new List<TraitLevelEntry>(); //해금된 특성 리스트
     public List<TotemLevelEntry> Totems = new List<TotemLevelEntry>(); //선택된 토템 리스트

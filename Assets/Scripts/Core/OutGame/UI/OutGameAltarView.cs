@@ -49,12 +49,14 @@ public class OutGameAltarView : MonoBehaviour
         if (!ValidateReferences() || selection == null) return;
         _selection = selection;
         _inspectedAltar = AltarId.Abundance;
+        //각 제단 버튼을 초기화하고 해당 버튼입력 이벤트를 연결한다
         for (int i = 0; i < _slots.Length; i++)
         {
             _slots[i].Button.Initialize();
             _slots[i].Button.Clicked += OnAltarClicked;
         }
         _previousButton.interactable = false;
+        //이동 버튼과 실제 이동요청 이벤트 연결
         _traitButton.onClick.AddListener(OnTraitClicked);
         _nextButton.onClick.AddListener(OnNextClicked);
         Refresh();
@@ -115,6 +117,7 @@ public class OutGameAltarView : MonoBehaviour
         return null;
     }
 
+    /// <summary> 특정 제단이 클릭되었을 때 해당 제단 ID를 Selected 이벤트로 발행 </summary>
     private void OnAltarClicked(OutGameChoiceButton button)
     {
         for (int i = 0; i < _slots.Length; i++)

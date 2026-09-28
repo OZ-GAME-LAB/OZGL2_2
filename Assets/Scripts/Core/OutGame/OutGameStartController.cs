@@ -1,5 +1,6 @@
 using System.Text;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 // 선택 결과를 모아 게임 시작을 처리합니다. UI 표시와 화면 이동은 UIController가 담당합니다.
 public class OutGameStartController : MonoBehaviour
@@ -41,8 +42,10 @@ public class OutGameStartController : MonoBehaviour
         if (context == null) return;
 
         LastStartContext = context;
+        OutGameStartContext.Pending = context;
         Debug.Log(BuildStartLog(context), this);
-        // 현재 단계에서는 씬을 이동하지 않습니다. 토템을 바꿔 다시 시작 로그를 확인할 수 있습니다.
+
+        SceneManager.LoadScene("Test");
     }
 
     private string BuildStartLog(OutGameStartContext context)
