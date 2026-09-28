@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -40,6 +41,7 @@ namespace Game.UI
         [SerializeField] private GameObject _panelRoot;
         [SerializeField] private TMP_Text _rewardText;
         [SerializeField] private TMP_Text _statusText;
+        [SerializeField] private Sprite _fallbackIcon;
         [SerializeField] private Card[] _cards;
         [SerializeField] private Button _confirmButton;
         [SerializeField] private TMP_Text _confirmText;
@@ -69,6 +71,12 @@ namespace Game.UI
         private bool _completed;
         private bool _listening;
         private string _message;
+        private readonly Vector2[] _defaultCardPositions = new Vector2[CardsPerPage];
+        private bool _cardPositionsCached;
+        private Vector2 _defaultConfirmPosition;
+        private Vector2 _defaultConfirmSize;
+        private ColorBlock _defaultConfirmColors;
+        private bool _actionPresentationCached;
 
         private void OnEnable()
         {
@@ -228,13 +236,14 @@ namespace Game.UI
             if (opening && EventSystem.current != null)
                 _previousSelection = EventSystem.current.currentSelectedGameObject;
             _panelRoot.SetActive(true);
-            _rewardText.text = _compactPresentation
-                ? "골드 " + FormatReward(_data.AwardedGold) + "     ·     보석 " + FormatReward(_data.AwardedGems)
-                : "획득 골드 " + FormatReward(_data.AwardedGold) + "\n획득 보석 " + FormatReward(_data.AwardedGems);
-            _instructionText.text = _compactPresentation ? "유물 하나를 선택하세요" : $"총 {_data.Candidates.Count}개 중 1개 선택 → 확정     /     미선택 시 모두 포기";
+            _rewardText.text = BuildRewardSummary(_data.AwardedGold, _data.AwardedGems);
+            _instructionText.text = _data.Candidates.Count == 1
+                ? "유물을 확인하세요"
+                : $"{_data.Candidates.Count}개의 유물 중 하나를 선택하세요";
             bool unlocked = !IsRequestPending;
             int offset = _pageIndex * CardsPerPage;
             int visibleCount = Math.Min(CardsPerPage, _data.Candidates.Count - offset);
+            LayoutVisibleCards(visibleCount);
             for (int i = 0; i < _cards.Length; i++)
             {
                 var card = _cards[i];
@@ -250,16 +259,18 @@ namespace Game.UI
                 card.Rarity.text = offer.RarityName;
                 card.Rarity.color = offer.RarityColor;
                 card.Effect.text = offer.EffectDescription;
-                card.Icon.sprite = offer.Icon;
-                card.Icon.enabled = offer.Icon != null;
-                card.MissingIcon.SetActive(offer.Icon == null);
+                var icon = offer.Icon != null ? offer.Icon : _fallbackIcon;
+                card.Icon.sprite = icon;
+                card.Icon.enabled = icon != null;
+                card.MissingIcon.SetActive(icon == null);
                 card.Selection.SetActive(offset + i == _selectedIndex);
                 card.Button.interactable = unlocked;
             }
+            _clearButton.gameObject.SetActive(_selectedIndex >= 0);
             _clearButton.interactable = unlocked && _selectedIndex >= 0;
             _confirmButton.interactable = unlocked && _choiceRequested != null;
-            _confirmText.text = _compactPresentation ? (_selectedIndex >= 0 ? "획득하기" : "유물 없이 계속") :
-                _selectedIndex >= 0 ? "선택 확정" : "모두 포기하고 계속";
+            _confirmText.text = IsRequestPending ? "처리 중…" : _selectedIndex >= 0 ? "선택하기" : "건너뛰기";
+            ConfigureActionPresentation(_selectedIndex >= 0);
             bool hasPages = PageCount > 1;
             _previousPageButton.gameObject.SetActive(hasPages);
             _nextPageButton.gameObject.SetActive(hasPages);
@@ -268,14 +279,12 @@ namespace Game.UI
             _previousPageButton.interactable = unlocked && _pageIndex > 0;
             _nextPageButton.interactable = unlocked && _pageIndex < PageCount - 1;
             ConfigureNavigation(visibleCount);
-            _statusText.text = IsRequestPending ? "선택 처리 중…" : _message ?? (_choiceRequested == null
-                ? "보상 시스템 연결 대기" : _selectedIndex >= 0
-                ? $"선택: {_data.Candidates[_selectedIndex].DisplayName} · 확정하면 이 아티팩트를 요청합니다."
-                : "아티팩트 1개를 선택하세요. 선택하지 않으면 모두 포기합니다.");
-            if (_compactPresentation && !IsRequestPending && _message == null)
-                _statusText.text = _choiceRequested == null ? "보상 시스템 연결 대기" : _showCardEffects
-                    ? (_selectedIndex >= 0 ? "선택한 유물을 확인하고 획득하세요" : "선택하지 않고 계속할 수도 있습니다")
-                    : _selectedIndex >= 0 ? _data.Candidates[_selectedIndex].EffectDescription : "";
+            _statusText.text = IsRequestPending ? "선택을 적용하는 중…" : _message ?? (_choiceRequested == null
+                ? "잠시만 기다려주세요" : _selectedIndex >= 0
+                ? GetDisplayName(_data.Candidates[_selectedIndex]) + " 선택됨"
+                : "");
+            if (_compactPresentation && _showCardEffects && !IsRequestPending && _message == null && _selectedIndex >= 0)
+                _statusText.text = _data.Candidates[_selectedIndex].EffectDescription;
             int focusIndex = _selectedIndex >= offset && _selectedIndex < offset + visibleCount ? _selectedIndex - offset : 0;
             if (opening && EventSystem.current != null)
                 EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
@@ -303,6 +312,69 @@ namespace Game.UI
             return fallback;
         }
 
+        private void LayoutVisibleCards(int visibleCount)
+        {
+            CacheDefaultCardPositions();
+            if (!_cardPositionsCached || visibleCount <= 0) return;
+
+            float spacing = _defaultCardPositions[1].x - _defaultCardPositions[0].x;
+            float centerX = _defaultCardPositions[1].x;
+            float startX = centerX - spacing * (visibleCount - 1) * .5f;
+            for (int i = 0; i < CardsPerPage; i++)
+            {
+                var rect = (RectTransform)_cards[i].Button.transform;
+                Vector2 position = _defaultCardPositions[i];
+                if (i < visibleCount) position.x = startX + spacing * i;
+                rect.anchoredPosition = position;
+            }
+        }
+
+        private void CacheDefaultCardPositions()
+        {
+            if (_cardPositionsCached || _cards == null || _cards.Length != CardsPerPage) return;
+            for (int i = 0; i < CardsPerPage; i++)
+            {
+                if (_cards[i]?.Button == null) return;
+                _defaultCardPositions[i] = ((RectTransform)_cards[i].Button.transform).anchoredPosition;
+            }
+            _cardPositionsCached = true;
+        }
+
+        private void ConfigureActionPresentation(bool hasSelection)
+        {
+            CacheActionPresentation();
+            if (!_actionPresentationCached) return;
+
+            var rect = (RectTransform)_confirmButton.transform;
+            Vector2 size = _defaultConfirmSize;
+            Vector2 position = _defaultConfirmPosition;
+            ColorBlock colors = _defaultConfirmColors;
+            if (!hasSelection)
+            {
+                size.x = Mathf.Min(240, _defaultConfirmSize.x);
+                position.x += (.5f - rect.pivot.x) * (_defaultConfirmSize.x - size.x);
+                colors.normalColor = Color.Lerp(colors.normalColor, new Color32(55, 42, 53, 255), .82f);
+                colors.highlightedColor = Color.Lerp(colors.highlightedColor, new Color32(82, 58, 72, 255), .72f);
+                colors.selectedColor = colors.highlightedColor;
+                colors.pressedColor = Color.Lerp(colors.pressedColor, new Color32(43, 32, 43, 255), .75f);
+            }
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
+            _confirmButton.colors = colors;
+            _confirmText.fontSize = hasSelection ? 24 : 18;
+            _confirmText.fontSizeMax = _confirmText.fontSize;
+        }
+
+        private void CacheActionPresentation()
+        {
+            if (_actionPresentationCached || _confirmButton == null) return;
+            var rect = (RectTransform)_confirmButton.transform;
+            _defaultConfirmPosition = rect.anchoredPosition;
+            _defaultConfirmSize = rect.sizeDelta;
+            _defaultConfirmColors = _confirmButton.colors;
+            _actionPresentationCached = true;
+        }
+
         private void ConfigureNavigation(int visibleCount)
         {
             var first = _cards[0].Button;
@@ -324,7 +396,8 @@ namespace Game.UI
             _clearButton.navigation = new Navigation { mode = Navigation.Mode.Explicit,
                 selectOnRight = _confirmButton, selectOnUp = first };
             _confirmButton.navigation = new Navigation { mode = Navigation.Mode.Explicit,
-                selectOnLeft = _clearButton.interactable ? _clearButton : null, selectOnUp = first };
+                selectOnLeft = _clearButton.gameObject.activeSelf && _clearButton.interactable ? _clearButton : null,
+                selectOnUp = first };
         }
 
         private void HideView()
@@ -345,6 +418,13 @@ namespace Game.UI
             _previousSelection = null;
         }
 
-        private static string FormatReward(int? value) => value.HasValue ? "+" + value.Value : "--";
+        private static string BuildRewardSummary(int? gold, int? gems)
+        {
+            var rewards = new List<string>(2);
+            if (gold.GetValueOrDefault() > 0) rewards.Add("골드 +" + gold.Value);
+            if (gems.GetValueOrDefault() > 0) rewards.Add("보석 +" + gems.Value);
+            if (rewards.Count > 0) return string.Join("  ·  ", rewards);
+            return gold.HasValue && gems.HasValue ? "추가 재화 없음" : "보상 집계 중";
+        }
     }
 }

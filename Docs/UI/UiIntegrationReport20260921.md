@@ -1,5 +1,34 @@
 # UI 연동 점검 보고 — 2026-09-21
 
+## 2026-09-28 업무 시작 점검
+
+- 아티팩트 승리 보상 팝업을 플레이어용 마계 판타지 화면으로 한 차례 더 정리했다. 가변 후보 중앙 정렬, 선택 전 작은 `건너뛰기`, 선택 후 강조된 `선택하기`, 간결한 효과 문구를 적용했다.
+- Git으로 공유되지 않는 `Assets/ExternalAssets` 참조를 사용하지 않고, 추적 가능한 `Assets/Art/Sprites/UI/ArtifactUnknownRelic.png`를 기본 유물 이미지로 추가했다. 팀 데이터의 실제 `ArtifactData.Icon`이 있으면 해당 Sprite가 우선한다.
+- 기본 유물 이미지의 흑요석·진홍·금색 분위기에 맞춰 얇은 금색 이중 프레임, 중앙 문양, 제목 장식과 낮은 명도의 워터마크를 적용했다.
+- 분리 Unity 6000.3.23f1에서 C# 컴파일과 아티팩트 선택 UI Play Mode 1,229개 검사를 통과했다. 팀 소유 `ArtifactManager`, `GameFlowController`, 전투·건설·재화 코드는 수정하지 않았다.
+- 배치모드 복제 Canvas 캡처는 연속 해상도 전환 시 일부 배치가 간헐적으로 누락될 수 있어 최종 시각 승인은 열린 Editor에서 별도로 확인한다. 기능·레이아웃·실제 아이콘 우선 표시 검사는 통과했다.
+
+- `git fetch origin` 후 현재 브랜치 `feature/ui-team-integration-scene`, `origin/feature/ui-team-integration-scene`, `origin/dev`가 모두 `741ab28`로 동일함을 확인했다. 추가 pull·merge는 필요하지 않았다.
+- 기존 미커밋 UI·씬·폰트 변경과 `NodeController` 경로 정리 내역은 덮어쓰기나 stash 없이 그대로 보존했다.
+- Unity 6000.3.23f1에서 `MvpRuntimeHudValidation.RunArtifacts`를 실행해 스크립트 컴파일과 아티팩트 선택 UI Play Mode 검사 1,229개를 통과했다.
+- 검사 범위는 `IArtifactSelectionUI`의 열기, 선택, 포기, 취소, 중복 요청 차단, 반복 열기·닫기와 기존 아티팩트 팝업 회귀 동작이다.
+- 검사 전후 Git 변경 목록이 동일해 테스트 실행으로 팀 코드·씬·프리팹이 추가 변경되지 않았다.
+- 팀 소유 `ArtifactManager.SelectAndApplyAsync()`에는 여전히 실제 선택 UI 주입·호출 TODO가 남아 있다. UI 측 계약과 구현은 준비됐지만 실제 전투 보상 적용 완료로 보지는 않는다.
+- Unity 라이선스 토큰, DX12 정보 큐, 외부 `CartoonCoffee` fallback 셰이더 메시지는 확인됐지만 신규 C# 컴파일 오류나 검사 예외는 발생하지 않았다.
+- 최초 1920×1080 5개 후보 2페이지 캡처에서 해상도 전환 직후 일부 CanvasRenderer가 누락되는 검증기 문제가 발견됐다. Editor 검증기만 보강해 두 프레임 안정화와 팝업 배경·주 버튼 픽셀 검사를 추가했고, 재실행한 1,215개 검사가 모두 통과했다.
+- TMP 글리프 검사를 읽기 전용으로 변경한 최종 실행에서는 테스트 전후 세 폰트 에셋의 SHA-256 해시가 모두 동일했다. 이후 동일 검사가 소스 폰트를 자동 갱신하지 않음을 확인했다.
+
+## 2026-09-23 추가 확인
+
+- 현재 작업 브랜치는 `feature/ui-team-integration-scene`이다. PR 대상은 계속 `dev`이며 머지는 진행하지 않는다.
+- 외부 구매·다운로드 에셋은 `Assets/ExternalAssets`로 정리되어 있다.
+- 저장소의 `.gitignore`가 `Assets/ExternalAssets/` 내부를 제외하고, `Assets/ExternalAssets.meta`만 추적한다. 따라서 대용량 원본 에셋은 일반 Git 변경 목록과 PR에 포함되지 않는다.
+- `IArtifactSelectionUI`와 이를 구현한 `ArtifactRewardBinding`을 추가했다. 기존 패널로 선택·포기·취소·중복 요청 방지를 처리한다.
+- 팀 소유 `ArtifactManager.SelectAndApplyAsync()`의 실제 UI 주입 TODO와 `GameFlowController`의 임시 완료 버튼 대기는 수정하지 않았다. 담당자 계약 확정 후 연결한다.
+- 현재 브랜치는 최신 `origin/dev` 커밋 `741ab28`을 반영했다.
+- Unity 6000.3.23f1 분리 검증에서 C# 컴파일과 아티팩트 선택 UI 1,199개 Play Mode 검사를 통과했다.
+- 실제 전투 보상 연결은 팀 매니저가 `IArtifactSelectionUI`를 주입·호출할 공개 지점을 제공한 뒤 진행한다. UI에서 후보를 다시 추첨하거나 Core 진행을 우회하지 않는다.
+
 ## 작업 기준
 
 - 프로젝트: `D:/Documents/GitHub/OZGL2_2`
