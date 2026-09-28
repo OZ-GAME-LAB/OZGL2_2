@@ -229,7 +229,7 @@ namespace Game.UI
 
         private bool IsCurrentCandidate(BuildingData data)
         {
-            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel(), GetCensus());
             return _candidates.Contains(data);
         }
 
@@ -260,7 +260,7 @@ namespace Game.UI
 
         private void PopulateCatalog()
         {
-            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel(), GetCensus());
             _items.Clear(); _byId.Clear();
             var duplicates = new HashSet<string>();
             foreach (var data in _candidates)
@@ -288,6 +288,11 @@ namespace Game.UI
                 _coreProgress = _controller.GetComponent<BuildingCoreProgress>() ??
                     FindFirstObjectByType<BuildingCoreProgress>();
             return _coreProgress != null ? _coreProgress.CurrentLevel : 0;
+        }
+
+        private BuildingCensus GetCensus()
+        {
+            return _controller != null ? _controller.Census : null;
         }
 
         private void Bind()

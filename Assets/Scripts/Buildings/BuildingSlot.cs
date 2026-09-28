@@ -2,6 +2,7 @@
 // 미리 배치한 건설 칸. 빈 칸은 건설, 점유된 칸은 업그레이드입니다.
 // 씬에 미리 둔 코어는 Start에서 자식 Building을 칸에 연결합니다.
 // allowedBuildings를 채우면 칸마다 다른 목록, 비우면 Database 기본 목록을 씁니다.
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -22,6 +23,10 @@ namespace OZGL.KDH
         public Building CurrentBuilding { get; private set; }
         public Vector3 BuildPosition => buildAnchor != null ? buildAnchor.position : transform.position;
         public bool HasAllowedOverride => allowedBuildings != null && allowedBuildings.Length > 0;
+
+        // Current date KDH 2026-09-22
+        // 점유가 바뀔 때만 알립니다. Census가 매 프레임 칸을 검사하지 않게 하기 위함입니다.
+        public event Action<BuildingSlot> OccupationChanged;
 
         private void Reset()
         {
@@ -103,7 +108,11 @@ namespace OZGL.KDH
             return building;
         }
 
-        public void CollectCandidates(List<BuildingData> results, BuildingDatabase database, int currentCoreLevel)
+        public void CollectCandidates(
+            List<BuildingData> results,
+            BuildingDatabase database,
+            int currentCoreLevel,
+            BuildingCensus census = null)
         {
             if (results == null)
             {
@@ -115,7 +124,7 @@ namespace OZGL.KDH
 
             if (allowedBuildings != null && allowedBuildings.Length > 0)
             {
-                CollectFromAllowed(results, currentCoreLevel);
+                CollectFromAllowed(results, currentCoreLevel, census);
                 return;
             }
 
@@ -125,7 +134,7 @@ namespace OZGL.KDH
                 return;
             }
 
-            database.CollectBuildable(results, currentCoreLevel);
+            database.CollectBuildable(results, currentCoreLevel, census);
         }
 
         public bool TryOccupy(Building building)
@@ -145,6 +154,7 @@ namespace OZGL.KDH
             CurrentBuilding = building;
             building.transform.SetParent(transform, true);
             RefreshMarker();
+            NotifyOccupationChanged();
             return true;
         }
 
@@ -152,6 +162,7 @@ namespace OZGL.KDH
         {
             CurrentBuilding = null;
             RefreshMarker();
+            NotifyOccupationChanged();
         }
 
         // Current date KDH 2026-09-09
@@ -167,10 +178,19 @@ namespace OZGL.KDH
             Building released = CurrentBuilding;
             CurrentBuilding = null;
             RefreshMarker();
+            NotifyOccupationChanged();
             return released;
         }
 
-        private void CollectFromAllowed(List<BuildingData> results, int currentCoreLevel)
+        private void OnDestroy()
+        {
+            // Current date KDH 2026-09-22
+            // 칸이 사라질 때도 Census가 카운트를 빼도록, 점유만 비우고 알립니다.
+            CurrentBuilding = null;
+            NotifyOccupationChanged();
+        }
+
+        private void CollectFromAllowed(List<BuildingData> results, int currentCoreLevel, BuildingCensus census)
         {
             for (int i = 0; i < allowedBuildings.Length; i++)
             {
@@ -181,7 +201,7 @@ namespace OZGL.KDH
                     continue;
                 }
 
-                if (!data.CanBuildFromEmptySlot(currentCoreLevel))
+                if (!data.CanBuildFromEmptySlot(currentCoreLevel, census))
                     continue;
 
                 results.Add(data);
@@ -227,6 +247,11 @@ namespace OZGL.KDH
 
             SpriteRenderer parentRenderer = CurrentBuilding.GetComponentInParent<SpriteRenderer>();
             return parentRenderer == emptyMarker;
+        }
+
+        private void NotifyOccupationChanged()
+        {
+            OccupationChanged?.Invoke(this);
         }
     }
 }

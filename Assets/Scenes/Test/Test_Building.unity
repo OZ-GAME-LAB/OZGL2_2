@@ -1087,14 +1087,17 @@ MonoBehaviour:
   _enemyUnitDatabase: {fileID: 11400000, guid: 816bd20c814371840bc3881ed4b37ce4, type: 2}
   _groupPrefab: {fileID: 5722644802211633520, guid: 3cbd312c5694eca42ac5fd5fab75c937, type: 3}
   _groupSpawnDuration: 2
+  _rallySectorPrefab: {fileID: 0}
   _rallySectorSize: {x: 5, y: 10}
   _rallyFormationSpacing: 2
-  _allyRallyAreaMin: {x: 10, y: -15}
-  _allyRallyAreaMax: {x: 25, y: 15}
+  _allyRallyAreaPointA: {fileID: 0}
+  _allyRallyAreaPointB: {fileID: 0}
+  _allyRallySectorRoot: {fileID: 0}
   _enemySpawnPoints:
   - {fileID: 1770587178}
-  _enemyRallyAreaMin: {x: 30, y: -15}
-  _enemyRallyAreaMax: {x: 45, y: 15}
+  _enemyRallyAreaPointA: {fileID: 0}
+  _enemyRallyAreaPointB: {fileID: 0}
+  _enemyRallySectorRoot: {fileID: 0}
 --- !u!4 &379906312
 Transform:
   m_ObjectHideFlags: 0
@@ -2788,6 +2791,7 @@ MonoBehaviour:
   _cameraController: {fileID: 420801790}
   _buildController: {fileID: 1125819695}
   _buildingCoreProgress: {fileID: 1125819697}
+  _buildingCensus: {fileID: 1091848052}
 --- !u!4 &1039593222
 Transform:
   m_ObjectHideFlags: 0
@@ -2798,6 +2802,50 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 1.7017, y: 0, z: 18.88775}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1091848051
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1091848053}
+  - component: {fileID: 1091848052}
+  m_Layer: 0
+  m_Name: BuildingCensus
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1091848052
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1091848051}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df11d38eab8036b49b56dddab7dc1682, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingCensus
+--- !u!4 &1091848053
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1091848051}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.92785, y: 0.01344, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5964,3 +6012,4 @@ SceneRoots:
   - {fileID: 605125361}
   - {fileID: 442771074}
   - {fileID: 1974206833}
+  - {fileID: 1091848053}
