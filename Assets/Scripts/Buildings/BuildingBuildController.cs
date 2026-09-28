@@ -26,11 +26,13 @@ namespace OZGL.KDH
         private Camera _camera;
         private BuildingSlot _focusedSlot;
         private BuildingCoreProgress _coreProgress;
+        private BuildingCensus _census;
         private readonly List<BuildingData> _candidates = new List<BuildingData>(16);
         private readonly Collider2D[] _hits = new Collider2D[HitBufferSize];
         private ContactFilter2D _filter;
 
         public float RefundRate => refundRate;
+        public BuildingCensus Census => _census;
 
         // Current date KDH 2026-09-16
         // 카메라가 슬롯으로 확대/복귀할 수 있게, 칸 선택만 알려 줍니다. 확대 자체는 하지 않습니다.
@@ -69,7 +71,11 @@ namespace OZGL.KDH
 
         // Current date KDH 2026-09-18
         // 지갑과 게임 진행은 Find하지 않고 BootStrap.Initialize로만 받습니다.
-        public void Initialize(RunCurrencyManager runCurrencyManager, GameFlowController gameFlowController, BuildingCoreProgress buildingCoreProgress)
+        public void Initialize(
+            RunCurrencyManager runCurrencyManager,
+            GameFlowController gameFlowController,
+            BuildingCoreProgress buildingCoreProgress,
+            BuildingCensus buildingCensus = null)
         {
             if (wallet != null)
                 wallet.BalanceChanged -= OnWalletChanged;
@@ -80,6 +86,7 @@ namespace OZGL.KDH
             wallet = runCurrencyManager;
             gameFlow = gameFlowController;
             _coreProgress = buildingCoreProgress;
+            _census = buildingCensus;
 
             if (wallet == null)
             {
@@ -101,6 +108,16 @@ namespace OZGL.KDH
 
             if (_coreProgress == null)
                 Debug.LogWarning("[BuildingBuildController] Initialize에 BuildingCoreProgress가 null입니다.", this);
+
+            // Current date KDH 2026-09-22
+            // 씬에 Census가 없어도 같은 오브젝트에 붙여 슬롯을 모읍니다.
+            if (_census == null)
+                _census = GetComponent<BuildingCensus>();
+
+            if (_census == null)
+                _census = gameObject.AddComponent<BuildingCensus>();
+
+            _census.Initialize();
         }
 
         public bool TryBuild(BuildingSlot slot, BuildingData data)
@@ -137,7 +154,7 @@ namespace OZGL.KDH
                 return false;
             }
 
-            if (!data.CanBuildFromEmptySlot(GetCurrentCoreLevel()))
+            if (!data.CanBuildFromEmptySlot(GetCurrentCoreLevel(), _census))
             {
                 Debug.LogWarning($"[BuildingBuildController] 아직 해금되지 않았거나 빈 칸에서 지을 수 없는 건물입니다: {data.DisplayName}", this);
                 return false;
@@ -319,7 +336,7 @@ namespace OZGL.KDH
                 return false;
 
             if (slot == null || !slot.IsOccupied)
-                return data.CanBuildFromEmptySlot(GetCurrentCoreLevel()) && CanAffordCosts(data.BuildCost);
+                return data.CanBuildFromEmptySlot(GetCurrentCoreLevel(), _census) && CanAffordCosts(data.BuildCost);
 
             if (IsSameAsCurrent(slot, data))
                 return false;
@@ -377,6 +394,12 @@ namespace OZGL.KDH
             if (IsSameAsCurrent(slot, data))
             {
                 Debug.LogWarning("[BuildingBuildController] 같은 건물로는 교체하지 않습니다.", this);
+                return false;
+            }
+
+            if (!data.MeetsFamilyRequirements(_census))
+            {
+                Debug.LogWarning($"[BuildingBuildController] 선행 건물 가문이 없어 교체할 수 없습니다: {data.DisplayName}", this);
                 return false;
             }
 
@@ -496,7 +519,7 @@ namespace OZGL.KDH
                 return;
             }
 
-            slot.CollectCandidates(_candidates, database, GetCurrentCoreLevel());
+            slot.CollectCandidates(_candidates, database, GetCurrentCoreLevel(), _census);
             if (_candidates.Count == 0)
             {
                 Debug.LogWarning("[BuildingBuildController] 이 칸에 건설 가능한 건물이 없습니다.", this);
