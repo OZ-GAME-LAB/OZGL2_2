@@ -30,11 +30,22 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
+    private IOutGameDataSetter _data;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
     void Start()
     {
         if (!ValidateReferences()) return;
+
+        _data = new TestOutGameDataSetter();
+        OutGameStartContext context = OutGameStartContext.Pending;
+        if (context == null)
+        {
+            // 인게임 씬을 직접 실행하면 풍요의 제단만 선택합니다.
+            // 특성·토템 목록은 비어 있고 누적 보너스는 0입니다.
+            context = new OutGameStartContext();
+            context.SelectedAltar = AltarId.Abundance;
+        }
 
         _testScript.Initialize(_gameFlowController, _waveController);
         _gameFlowController.Initialize(_waveController, _testScript, _artifactManager);
@@ -43,6 +54,8 @@ public class BootStrap : MonoBehaviour
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
         _cameraController.Initialize(_buildController);
+        _data.SetOutGameData(context);
+        OutGameStartContext.Pending = null;
         _gameFlowController.BeginRun();
     }
 
