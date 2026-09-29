@@ -30,6 +30,17 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
+
+    // Current date KDH 2026-09-29
+    // 아웃게임 효과(특성·토템·제단)입니다. 연결하지 않아도 게임은 시작됩니다.
+    [Header("OutGame Effects (KDH)")]
+    [Tooltip("SpawnManager에 연결된 것과 같은 오브젝트여야 스폰 유닛에 반영됩니다.")]
+    [SerializeField] private UnitStatModifierManager _unitStatModifierManager;
+    [SerializeField] private TraitRunApplier _traitRunApplier;
+    [SerializeField] private TraitCatalog _traitCatalog;
+    [SerializeField] private TotemRunApplier _totemRunApplier;
+    [SerializeField] private TotemEffectCatalog _totemCatalog;
+    [SerializeField] private AltarManager _altarManager;
     private IOutGameDataSetter _data;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
@@ -38,6 +49,12 @@ public class BootStrap : MonoBehaviour
         if (!ValidateReferences()) return;
 
         _data = new TestOutGameDataSetter();
+
+        // Current date KDH 2026-09-29
+        // Pending을 비우기 전에 아웃게임에서 넘어왔는지 기억합니다.
+        // 씬을 직접 실행하면 목록이 빈 context가 만들어지므로, 이때는 각 Applier의 _testLevels를 씁니다.
+        bool fromOutGame = OutGameStartContext.Pending != null;
+
         OutGameStartContext context = OutGameStartContext.Pending;
         if (context == null)
         {
@@ -54,6 +71,11 @@ public class BootStrap : MonoBehaviour
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
         _cameraController.Initialize(_buildController);
+
+        // Current date KDH 2026-09-29
+        // GameFlow·RunCurrency 초기화 뒤, BeginRun 전에 연결해야 첫 Preparation 이벤트를 받습니다.
+        InitializeOutGameEffects(context, fromOutGame);
+
         _data.SetOutGameData(context);
         OutGameStartContext.Pending = null;
         _gameFlowController.BeginRun();
@@ -94,5 +116,38 @@ public class BootStrap : MonoBehaviour
         }
 
         return valid;
+    }
+
+    // Current date KDH 2026-09-29
+    // 각 Initialize가 null 참조를 직접 경고하므로, 여기서는 오브젝트가 있는지만 확인합니다.
+    // 효과 적용은 각 시스템이 PhaseChanged 이벤트로 처리하므로 Update에서 확인하지 않습니다.
+    private void InitializeOutGameEffects(OutGameStartContext context, bool fromOutGame)
+    {
+        // 특성: 첫 Preparation에서 스탯·재화 효과를 적용합니다.
+        if (_traitRunApplier != null)
+        {
+            _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
+                _runCurrencyManager, _gameFlowController);
+            if (fromOutGame)
+            {
+                _traitRunApplier.SetLevels(context.Traits);
+            }
+        }
+        // 토템: catalog가 없어도 기본 스탯 효과(TotemBuiltinEffects)는 적용됩니다.
+        if (_totemRunApplier != null)
+        {
+            _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
+            if (fromOutGame)
+            {
+                _totemRunApplier.SetLevels(context.Totems);
+            }
+        }
+        // 제단: 여기서는 선택만 하고, 적용은 AltarManager가 첫 Preparation에서 합니다.
+        if (_altarManager != null)
+        {
+            _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
+                _gameFlowController);
+            _altarManager.TrySelectById(context.SelectedAltar);
+        }
     }
 }
