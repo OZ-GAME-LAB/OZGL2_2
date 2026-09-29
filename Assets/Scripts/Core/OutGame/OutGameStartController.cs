@@ -11,6 +11,7 @@ public class OutGameStartController : MonoBehaviour
 
     public OutGameStartContext LastStartContext { get; private set; }
 
+    private bool _isRunning;
     public void Initialize(IAltarSelection altars, ITraitProgression traits, ITotemSelection totems)
     {
         _altars = altars;
@@ -38,6 +39,8 @@ public class OutGameStartController : MonoBehaviour
 
     public void StartRun()
     {
+        if (_isRunning) return;
+        _isRunning = true;
         OutGameStartContext context = CreateStartContext();
         if (context == null) return;
 

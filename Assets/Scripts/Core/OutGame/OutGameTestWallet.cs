@@ -33,6 +33,7 @@ public class OutGameTestWallet : MonoBehaviour, IPersistentWallet
         return true;
     }
 
+    //저장이 필요한 값들을 SaveData로 묶어서 반환하는 메서드(ISaveDataProvider 구현체)
     public PersistentWalletSaveData CaptureSaveData()
     {
         if (!_initialized) throw new InvalidOperationException("혈석 지갑을 먼저 초기화해주세요.");
@@ -59,7 +60,7 @@ public class OutGameTestWallet : MonoBehaviour, IPersistentWallet
     {
         RestoreSaveData(data, true);
     }
-
+    
     public void RestoreSaveData(PersistentWalletSaveData data, bool notifyChanged)
     {
         if (!TryValidateSaveData(data, out string error)) throw new ArgumentException(error);

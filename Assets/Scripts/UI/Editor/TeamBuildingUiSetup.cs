@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using Game.Cameras;
 using Game.Core;
 using OZGL.KDH;
 using TMPro;
+using Units;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -18,6 +20,8 @@ namespace Game.UI.Editor
     {
         public const string SourceScenePath = "Assets/Scenes/Test/Test_Building.unity";
         public const string ScenePath = "Assets/Scenes/UI/PlayerTeamBuildingIntegration.unity";
+        private const string SpawnManagerPrefabPath =
+            "Assets/Prefabs/Units/Entire Unit System For Merge/SpawnManager.prefab";
 
         [MenuItem("Game/UI/Create Team Building Integration Scene")]
         public static void CreateScene()
@@ -46,6 +50,13 @@ namespace Game.UI.Editor
                 var waves = Team<WaveController>();
                 var wallet = Team<RunCurrencyManager>();
                 var controller = Team<BuildingBuildController>();
+                var bootstrap = Team<BootStrap>();
+                var spawnManager = EnsureConfiguredSpawnManager(scene);
+                EnsureDamageResolver(scene);
+                Assign(bootstrap, "_spawnManager", spawnManager);
+                teamRoots = scene.GetRootGameObjects();
+                var incompleteCameraController = Team<InGameCameraController>();
+                UnityEngine.Object.DestroyImmediate(incompleteCameraController);
                 var coreProgress = controller.GetComponent<BuildingCoreProgress>();
                 if (coreProgress == null) coreProgress = controller.gameObject.AddComponent<BuildingCoreProgress>();
                 var database = Ref<BuildingDatabase>(controller, "database");
@@ -86,6 +97,7 @@ namespace Game.UI.Editor
                 }
                 T UI<T>() where T : Component => owner.GetComponentsInChildren<T>(true).Single();
                 var hud = UI<GameUIController>();
+                EnsureGameLoopLayout(hud);
                 var catalog = UI<BuildingCatalogPanel>();
                 var info = UI<BuildingInfoPanel>();
                 var actions = UI<BuildingActionPanel>();
@@ -95,12 +107,12 @@ namespace Game.UI.Editor
                 var core = UI<CoreHudBinding>();
                 Assign(gold, "_ui", hud, "_currencyManager", wallet);
                 Assign(core, "_ui", hud, "_flow", flow, "_waves", waves);
-                UnityEngine.Object.DestroyImmediate(UI<CoreRunDecisionBinding>());
+                var runDecision = UI<CoreRunDecisionBinding>();
+                Assign(runDecision, "_flow", flow, "_waves", waves);
                 UnityEngine.Object.DestroyImmediate(UI<RuntimeUnitCountHud>());
                 hud.transform.Find("QuarterDecision").gameObject.SetActive(false);
                 hud.transform.Find("UnitCounts").gameObject.SetActive(false);
-                hud.transform.Find("BottomBar/WaveStart").gameObject.SetActive(false);
-                // 실제 전투 스포너/결과 계약 전에는 테스트 전투를 플레이어 버튼으로 시작하지 않는다.
+                hud.transform.Find("BottomBar/WaveStart").gameObject.SetActive(true);
                 var hint = hud.transform.Find("BottomBar/Hint").GetComponent<TMP_Text>();
                 hint.text = "건설할 위치를 선택하세요";
                 var binding = owner.AddComponent<RuntimeBuildingUiBinding>();
@@ -119,19 +131,28 @@ namespace Game.UI.Editor
                 SetArray(nav, "_popups", new[] { catalog.Popup, Ref<PlayerPopup>(info, "_playerPopup") });
                 SetArray(nav, "_catalogButtons", Array.Empty<Button>());
                 SetArray(nav, "_blockingPanels", new[] { Ref<GameObject>(hud, "_waveRewardPanel"),
-                    Ref<GameObject>(hud, "_runResultPanel"), Ref<GameObject>(hud, "_messagePanel") });
+                    Ref<GameObject>(hud, "_runResultPanel"), Ref<GameObject>(hud, "_messagePanel"),
+                    Ref<GameObject>(runDecision, "_panelRoot") });
                 var gemText = UnityEngine.Object.Instantiate(hud.transform.Find("TopBar/Gold").GetComponent<TMP_Text>(), hud.transform.Find("TopBar"));
                 gemText.name = "Gems"; gemText.text = "보석 --"; gemText.fontSize = 22;
                 gemText.color = new Color32(117, 203, 174, 255);
                 Layout(hud, gemText);
+                var contentGate = Team<TestWaitingScript>();
+                var gameLoop = owner.AddComponent<CoreGameLoopUiBinding>();
+                Assign(gameLoop, "_ui", hud, "_flow", flow, "_waves", waves,
+                    "_wallet", wallet, "_contentGate", contentGate);
                 var startup = owner.AddComponent<TeamBuildingUiStartup>();
                 Assign(startup, "_ui", hud, "_wallet", wallet, "_waves", waves, "_flow", flow,
-                    "_gold", gold, "_core", core, "_coreProgress", coreProgress, "_gemText", gemText, "_hint", hint);
+                    "_gold", gold, "_core", core, "_gameLoop", gameLoop, "_runDecision", runDecision,
+                    "_contentGate", contentGate, "_coreProgress", coreProgress, "_gemText", gemText, "_hint", hint);
                 var effects = teamRoots.SelectMany(r => r.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
                 if (effects != null) Assign(startup, "_effects", effects);
                 EnsureArtifactBackend(scene, owner);
                 owner.SetActive(true);
                 UiCoreCameraRigSetup.Ensure(scene, flow, camera);
+                var cameraController = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<InGameCameraController>(true)).Single();
+                Assign(bootstrap, "_cameraController", cameraController);
                 if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException("UI integration scene save failed.");
                 Debug.Log($"[UI/TeamBuilding] Created {ScenePath}; slots={slots.Length}, original refund={controller.RefundRate}. Source assets unchanged.");
             }
@@ -179,6 +200,16 @@ namespace Game.UI.Editor
             var startup = owner.GetComponent<TeamBuildingUiStartup>();
             var binding = owner.GetComponent<RuntimeBuildingUiBinding>();
             var flow = roots.SelectMany(root => root.GetComponentsInChildren<GameFlowController>(true)).Single();
+            var bootstrap = roots.SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
+            var waves = roots.SelectMany(root => root.GetComponentsInChildren<WaveController>(true)).Single();
+            var wallet = roots.SelectMany(root => root.GetComponentsInChildren<RunCurrencyManager>(true)).Single();
+            var spawner = EnsureConfiguredSpawnManager(scene);
+            EnsureDamageResolver(scene);
+            var runtimeUnits = roots.SelectMany(root => root.GetComponentsInChildren<RuntimeUnitManager>(true)).Single();
+            var cameraController = Ref<InGameCameraController>(bootstrap, "_cameraController");
+            if (cameraController == null) cameraController = Ref<InGameCameraController>(flow, "_cameraController");
+            if (cameraController == null)
+                throw new InvalidOperationException("No camera controller is assigned to BootStrap or GameFlow.");
             var coreSlot = roots.SelectMany(root => root.GetComponentsInChildren<BuildingSlot>(true))
                 .Single(slot =>
                 {
@@ -190,7 +221,16 @@ namespace Game.UI.Editor
             bool changed = false;
             var progress = controller.GetComponent<BuildingCoreProgress>();
             if (progress == null) { progress = controller.gameObject.AddComponent<BuildingCoreProgress>(); changed = true; }
+            var census = roots.SelectMany(root => root.GetComponentsInChildren<BuildingCensus>(true)).SingleOrDefault();
+            if (census == null) { census = controller.gameObject.AddComponent<BuildingCensus>(); changed = true; }
             changed |= SetReferenceIfEmpty(startup, "_coreProgress", progress);
+            changed |= SetReferenceIfEmpty(bootstrap, "_spawnManager", spawner);
+            changed |= SetReferenceIfEmpty(bootstrap, "_runtimeUnitManager", runtimeUnits);
+            changed |= SetReferenceIfEmpty(bootstrap, "_runCurrencyManager", wallet);
+            changed |= SetReferenceIfEmpty(bootstrap, "_cameraController", cameraController);
+            changed |= SetReferenceIfEmpty(bootstrap, "_buildController", controller);
+            changed |= SetReferenceIfEmpty(bootstrap, "_buildingCoreProgress", progress);
+            changed |= SetReferenceIfEmpty(bootstrap, "_buildingCensus", census);
             var target = coreSlot.GetComponent<RuntimeBuildingSelectionTarget>();
             if (target == null)
             {
@@ -216,6 +256,85 @@ namespace Game.UI.Editor
             Debug.Log("[UI/TeamBuilding] Connected core selection, upgrade input, and currency dependency in UI-owned scene.");
         }
 
+        [MenuItem("Game/UI/Connect Team Game Loop UI")]
+        public static void ConnectExistingGameLoopUi()
+        {
+            if (!Application.isBatchMode || EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Run the UI scene migration only in a separate batch Editor.");
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    throw new InvalidOperationException("A loaded scene has unsaved changes.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+                throw new InvalidOperationException("Missing UI-owned team building scene: " + ScenePath);
+
+            var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            var roots = scene.GetRootGameObjects();
+            var owner = roots.Single(root => root.name == "Team Building Player UI");
+            var hud = owner.GetComponentInChildren<GameUIController>(true);
+            var nav = owner.GetComponentInChildren<PlayerUiNavigation>(true);
+            var startup = owner.GetComponent<TeamBuildingUiStartup>();
+            var flow = roots.SelectMany(root => root.GetComponentsInChildren<GameFlowController>(true)).Single();
+            var waves = roots.SelectMany(root => root.GetComponentsInChildren<WaveController>(true)).Single();
+            var wallet = roots.SelectMany(root => root.GetComponentsInChildren<RunCurrencyManager>(true)).Single();
+            var gate = roots.SelectMany(root => root.GetComponentsInChildren<TestWaitingScript>(true)).Single();
+            EnsureDamageResolver(scene);
+            EnsureGameLoopLayout(hud);
+
+            var decisionRoot = hud.transform.Find("QuarterDecision");
+            if (decisionRoot == null) throw new InvalidOperationException("Missing QuarterDecision view.");
+            var decision = owner.GetComponentInChildren<CoreRunDecisionBinding>(true);
+            if (decision == null) decision = owner.AddComponent<CoreRunDecisionBinding>();
+            var decisionDescription = decisionRoot.GetComponentsInChildren<TMP_Text>(true)
+                .Single(text => text.name == "Description");
+            var finish = decisionRoot.GetComponentsInChildren<Button>(true).Single(button => button.name == "Finish");
+            var next = decisionRoot.GetComponentsInChildren<Button>(true).Single(button => button.name == "Continue");
+            Assign(decision, "_flow", flow, "_waves", waves, "_panelRoot", decisionRoot.gameObject,
+                "_descriptionText", decisionDescription, "_finishButton", finish, "_continueButton", next);
+            decisionRoot.gameObject.SetActive(false);
+
+            var gameLoop = owner.GetComponent<CoreGameLoopUiBinding>();
+            if (gameLoop == null) gameLoop = owner.AddComponent<CoreGameLoopUiBinding>();
+            Assign(gameLoop, "_ui", hud, "_flow", flow, "_waves", waves,
+                "_wallet", wallet, "_contentGate", gate);
+            Assign(startup, "_gameLoop", gameLoop, "_runDecision", decision, "_contentGate", gate);
+
+            var waveStart = hud.transform.Find("BottomBar/WaveStart");
+            if (waveStart == null) throw new InvalidOperationException("Missing WaveStart button.");
+            waveStart.gameObject.SetActive(true);
+            SetArray(nav, "_blockingPanels", new[] { Ref<GameObject>(hud, "_waveRewardPanel"),
+                Ref<GameObject>(hud, "_runResultPanel"), Ref<GameObject>(hud, "_messagePanel"),
+                decisionRoot.gameObject });
+
+            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+                throw new IOException("Failed to save UI-owned game loop integration scene.");
+            Debug.Log("[UI/TeamBuilding] Connected wave start, reward continue, quarter decision, and result UI.");
+        }
+
+        private static void EnsureGameLoopLayout(GameUIController hud)
+        {
+            var rewardText = Ref<TMP_Text>(hud, "_waveRewardText");
+            rewardText.textWrappingMode = TextWrappingModes.Normal;
+            var rewardRect = (RectTransform)rewardText.transform;
+            rewardRect.anchoredPosition = new Vector2(rewardRect.anchoredPosition.x, -76f);
+            rewardRect.sizeDelta = new Vector2(rewardRect.sizeDelta.x, 82f);
+
+            var continueRect = (RectTransform)Ref<Button>(hud, "_continueButton").transform;
+            continueRect.anchoredPosition = new Vector2(continueRect.anchoredPosition.x, -168f);
+        }
+
+        private static void EnsureDamageResolver(Scene scene)
+        {
+            var resolvers = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<DamageResolver>(true)).ToArray();
+            if (resolvers.Length > 1)
+                throw new InvalidOperationException("The integration scene contains multiple DamageResolvers.");
+            if (resolvers.Length == 1) return;
+
+            var resolver = new GameObject(nameof(DamageResolver));
+            SceneManager.MoveGameObjectToScene(resolver, scene);
+            resolver.AddComponent<DamageResolver>();
+        }
+
         private static bool EnsureArtifactBackend(Scene scene, GameObject owner)
         {
             var roots = scene.GetRootGameObjects();
@@ -238,6 +357,37 @@ namespace Game.UI.Editor
             changed |= SetReferenceIfEmpty(bootstrap, "_effectManager", effects);
             changed |= SetReferenceIfEmpty(startup, "_effects", effects);
             return changed;
+        }
+
+        private static SpawnManager EnsureConfiguredSpawnManager(Scene scene)
+        {
+            var roots = scene.GetRootGameObjects();
+            var managers = roots.SelectMany(root => root.GetComponentsInChildren<SpawnManager>(true)).ToArray();
+            if (managers.Length != 1)
+                throw new InvalidOperationException("Expected exactly one SpawnManager before UI migration.");
+
+            var current = managers[0];
+            if (Ref<RallySector>(current, "_rallySectorPrefab") != null &&
+                Ref<Transform>(current, "_allyRallySectorRoot") != null &&
+                Ref<Transform>(current, "_enemyRallySectorRoot") != null)
+                return current;
+
+            var runtimeUnits = roots.SelectMany(root => root.GetComponentsInChildren<RuntimeUnitManager>(true)).Single();
+            var statModifiers = Ref<UnitStatModifierManager>(current, "_unitStatModifierManager");
+            if (statModifiers == null)
+                statModifiers = roots.SelectMany(root => root.GetComponentsInChildren<UnitStatModifierManager>(true)).Single();
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(SpawnManagerPrefabPath);
+            if (prefab == null || prefab.GetComponent<SpawnManager>() == null)
+                throw new InvalidOperationException("Configured SpawnManager prefab is unavailable.");
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab, scene) as GameObject;
+            if (instance == null) throw new InvalidOperationException("Failed to instantiate configured SpawnManager.");
+            instance.name = "SpawnManager";
+            var replacement = instance.GetComponent<SpawnManager>();
+            Assign(replacement, "_runtimeUnitManager", runtimeUnits,
+                "_unitStatModifierManager", statModifiers);
+            UnityEngine.Object.DestroyImmediate(current.gameObject);
+            return replacement;
         }
 
         private static bool SetReferenceIfEmpty(UnityEngine.Object target, string name, UnityEngine.Object value)
