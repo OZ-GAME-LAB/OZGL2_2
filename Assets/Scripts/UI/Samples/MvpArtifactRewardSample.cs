@@ -49,17 +49,17 @@ namespace Game.UI.Samples
             if (candidateCount < 1) throw new ArgumentOutOfRangeException(nameof(candidateCount));
             var examples = new[]
             {
-                new ArtifactRewardOffer("sample_guard", "수호의 조각 (샘플)", "희귀",
-                    "전열의 생존을 돕는 효과 예시.\n실제 효과와 수치는 담당 시스템에서 제공됩니다.", null, new Color32(117, 196, 255, 255)),
-                new ArtifactRewardOffer("sample_ember", "잔불의 인장 (샘플)", "일반",
-                    "공격을 강화하는 효과 예시.\n아티팩트의 실제 효과는 이 씬에서 적용하지 않습니다.", null, new Color32(193, 204, 217, 255)),
-                new ArtifactRewardOffer("sample_vow", "관문의 맹세 (샘플)", "전설",
-                    "아군을 지원하는 효과 예시.\n이미지와 최종 기획 데이터는 추후 연결합니다.", null, new Color32(248, 193, 93, 255))
+                new ArtifactRewardOffer("sample_guard", "수호의 조각", "희귀",
+                    "받는 피해 12% 감소", null, new Color32(117, 196, 255, 255)),
+                new ArtifactRewardOffer("sample_ember", "잔불의 인장", "일반",
+                    "공격 속도 10% 증가", null, new Color32(193, 204, 217, 255)),
+                new ArtifactRewardOffer("sample_vow", "관문의 맹세", "전설",
+                    "웨이브 시작 시 보호막 20 획득", null, new Color32(248, 193, 93, 255))
             };
             var candidates = new ArtifactRewardOffer[candidateCount];
             for (int i = 0; i < candidateCount; i++) candidates[i] = i < examples.Length ? examples[i]
-                : new ArtifactRewardOffer("sample_extra_" + (i + 1), $"추가 아티팩트 {i + 1} (샘플)", "일반",
-                    "후보 개수 확장 확인용입니다.\n실제 아티팩트 효과는 적용하지 않습니다.", null, new Color32(193, 204, 217, 255));
+                : new ArtifactRewardOffer("sample_extra_" + (i + 1), $"마력의 파편 {i + 1}", "일반",
+                    "공격력 5% 증가", null, new Color32(193, 204, 217, 255));
             return new ArtifactRewardViewData(rewardId, 30, 0, candidates);
         }
 
