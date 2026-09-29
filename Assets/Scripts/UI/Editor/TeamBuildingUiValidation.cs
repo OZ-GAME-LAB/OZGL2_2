@@ -86,6 +86,10 @@ namespace Game.UI.Editor
                 var info = UnityEngine.Object.FindFirstObjectByType<BuildingInfoPanel>();
                 var actions = UnityEngine.Object.FindFirstObjectByType<BuildingActionPanel>();
                 var hud = UnityEngine.Object.FindFirstObjectByType<GameUIController>();
+                var artifactManager = UnityEngine.Object.FindFirstObjectByType<ArtifactManager>();
+                var artifactBinding = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardBinding>();
+                var artifactPanel = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardPanel>();
+                var navigation = UnityEngine.Object.FindFirstObjectByType<PlayerUiNavigation>();
                 var allSlots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None);
                 var coreSlots = allSlots.Where(slot => slot.CurrentBuilding != null &&
                     slot.CurrentBuilding.Data != null && slot.CurrentBuilding.Data.IsCore).ToArray();
@@ -121,6 +125,16 @@ namespace Game.UI.Editor
                 var runDecision = UnityEngine.Object.FindFirstObjectByType<CoreRunDecisionBinding>();
                 Check(loop != null && loop.IsReady, "player game-loop UI binding is ready");
                 Check(runDecision != null, "quarter completion choice uses the player UI");
+                Check(artifactManager != null && artifactManager.IsInitialized,
+                    "team artifact manager is initialized by the original bootstrap");
+                Check(artifactBinding != null && artifactPanel != null &&
+                    Ref<ArtifactRewardPanel>(artifactBinding, "_panel") == artifactPanel,
+                    "player artifact selection binding uses the tracked reward panel");
+                Check(artifactBinding.TryInitialize(artifactManager),
+                    "player artifact selection UI accepts the team artifact authority");
+                Check(!artifactPanel.IsVisible && ArrayHasReference(navigation, "_blockingPanels",
+                        Ref<GameObject>(artifactPanel, "_panelRoot")),
+                    "artifact selection starts hidden and blocks other player popups when opened");
                 Check(waveStart.gameObject.activeSelf && waveStart.interactable,
                     "player can start a wave from the production HUD");
                 await Capture("01-team-slots", 1280, 720);
@@ -404,6 +418,18 @@ namespace Game.UI.Editor
 
         private static T Ref<T>(UnityEngine.Object obj, string field) where T : UnityEngine.Object =>
             new SerializedObject(obj).FindProperty(field).objectReferenceValue as T;
+        private static bool ArrayHasReference(
+            UnityEngine.Object obj,
+            string field,
+            UnityEngine.Object expected)
+        {
+            if (obj == null || expected == null) return false;
+            var array = new SerializedObject(obj).FindProperty(field);
+            if (array == null || !array.isArray) return false;
+            for (int i = 0; i < array.arraySize; i++)
+                if (array.GetArrayElementAtIndex(i).objectReferenceValue == expected) return true;
+            return false;
+        }
         private static Vector2 Point(Component component)
         {
             Canvas.ForceUpdateCanvases();
