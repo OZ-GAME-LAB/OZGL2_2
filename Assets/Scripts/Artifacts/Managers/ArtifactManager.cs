@@ -39,6 +39,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     private ArtifactCandidateSelector _candidateSelector;
     private EffectManager _effectManager;
     private bool _isChanging;
+    private List<ArtifactData> _testCandidates;
+    private CancellationTokenSource _selectionWait;
+    private List<ArtifactData> _selectionCandidates = new List<ArtifactData>();
+    private bool _rewardApplied;
+    public bool IsSelectingReward => _selectionWait != null;
+    public bool IsRewardApplied => _rewardApplied;
+    public IReadOnlyList<ArtifactData> SelectionCandidates => _selectionCandidates;
 
    
 
@@ -76,6 +83,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         }
 
         _effectManager = effectManager;
+
         _waveController = waveController;
         _inventory = new ArtifactInventory(_artifactCatalog);
         _candidateSelector = new ArtifactCandidateSelector(_artifactCatalog, _inventory, _rewardTable);
@@ -96,41 +104,83 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         return _candidateSelector.TryCreateCandidates(IsBossWave, out candidates);
     }
 
-    // 웨이브 보상 시 호출 : 아티팩트 선택 및 적용 (UI 미연결 또는 처리 실패 시 false)
-    public UniTask<bool> SelectAndApplyAsync(WaveBattleType battleType, CancellationToken token)
+    // 후보 생성 → UI 선택 및 지급 대기 → 완료. UI는 TrySelectReward로 선택 전달
+    public async UniTask<bool> SelectAndApplyAsync(WaveBattleType battleType, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-
-        if (!IsInitialized || _isChanging)
+        if (!IsInitialized || _isChanging || IsSelectingReward)
         {
-            Debug.LogWarning("[Artifacts/ArtifactManager] 초기화 및 획득 처리 완료 후 보상을 요청해주세요.", this);
-            return UniTask.FromResult(false);
+            return false;
         }
 
-        bool isBossWave = battleType == WaveBattleType.Boss;
-        if (!_candidateSelector.TryCreateCandidates(isBossWave, out IReadOnlyList<ArtifactData> candidates))
+        IReadOnlyList<ArtifactData> candidates = _testCandidates;
+        _testCandidates = null;
+        if (!_rewardApplied && candidates == null &&
+            !_candidateSelector.TryCreateCandidates(battleType == WaveBattleType.Boss, out candidates))
         {
-            return UniTask.FromResult(false);
+            return false;
         }
-
-        // 최대 중첩 등으로 받을 수 있는 후보가 없다면 지급 없이 완료
+        // 지급 직후 취소된 요청은 재지급 없이 완료
+        if (_rewardApplied)
+        {
+            _rewardApplied = false;
+            return true;
+        }
         if (candidates.Count == 0)
         {
-            return UniTask.FromResult(true);
+            return true;
         }
 
-        // TODO: UI 연결 시 async UniTask<bool>로 변경하고 아래 선택 흐름을 구현
-        // 선택 대기 중에는 중복 요청을 차단하고 Run 종료 시 대기를 취소
-        // ArtifactData selected = await _selectionUI.SelectAsync(candidates, token);
-        // token.ThrowIfCancellationRequested();
-        // selected가 이번 candidates에 포함되어 있는지 확인
-        
-        // bool applied = TryAdd(selected);
-        // 적용 성공 시 UI를 닫고 true 반환. 실패 시 완료 처리 X
-        // 취소 시에도 UI와 선택 대기 상태를 정리
+        _selectionCandidates = new List<ArtifactData>(candidates);
+        CancellationTokenSource wait = CancellationTokenSource.CreateLinkedTokenSource(token);
+        CancellationToken waitToken = wait.Token;
+        _selectionWait = wait;
+        // TODO: SelectionCandidates를 전달하여 아티팩트 선택 UI 열기
+        bool canceled = await UniTask.WaitUntil(() => _rewardApplied,
+            cancellationToken: waitToken).SuppressCancellationThrow();
 
-        Debug.LogWarning("[Artifacts/ArtifactManager] 후보 생성 완료. 아티팩트 선택 UI 연결이 필요합니다.", this);
-        return UniTask.FromResult(false);
+        if (_selectionWait == wait)
+        {
+            _selectionWait = null;
+            _selectionCandidates.Clear();
+            if (!waitToken.IsCancellationRequested)
+            {
+                _rewardApplied = false;
+            }
+            // TODO: 선택 UI 닫기. 취소된 경우에도 정리
+        }
+        wait.Dispose();
+        waitToken.ThrowIfCancellationRequested();
+        return !canceled;
+    }
+
+    // 테스트 진입점만 별도 제공. 준비된 후보를 전달한 뒤 실제 게임과 같은 함수 실행
+    public UniTask<bool> TestSelectAndApplyAsync(IReadOnlyList<ArtifactData> candidates, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!IsInitialized || _isChanging || IsSelectingReward || candidates == null)
+        {
+            return UniTask.FromResult(false);
+        }
+        _testCandidates = new List<ArtifactData>(candidates);
+        return SelectAndApplyAsync(default, token);
+    }
+
+    // 이번 후보 중 하나만 지급. 완료가 반환되기 전 중복 선택 차단
+    public bool TrySelectReward(ArtifactData selected)
+    {
+        if (!IsSelectingReward || _selectionWait.IsCancellationRequested || _rewardApplied ||
+            !_selectionCandidates.Contains(selected))
+        {
+            return false;
+        }
+        _rewardApplied = true;
+        if (!TryAdd(selected))
+        {
+            _rewardApplied = false;
+            return false;
+        }
+        return true;
     }
 
     public bool Contains(ArtifactData artifact)
@@ -272,7 +322,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
 
         int currentStacks = previousStacks + 1;
         if (!_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects,
-            artifact.CurrencyEffects, currentStacks, out ConvertedEffects effects))
+            artifact.CurrencyEffects, artifact.ConsumableSlotEffects, currentStacks, out ConvertedEffects effects))
         {
             return false;
         }
@@ -301,7 +351,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         int currentStacks = instance.StackCount - 1;
         ConvertedEffects effects = null;
         if (currentStacks > 0 && !_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects,
-            artifact.CurrencyEffects, currentStacks, out effects))
+            artifact.CurrencyEffects, artifact.ConsumableSlotEffects, currentStacks, out effects))
         {
             return false;
         }
@@ -325,6 +375,14 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         }
 
         ArtifactInventory inventory = _inventory;
+        if (_selectionWait != null)
+        {
+            CancellationTokenSource wait = _selectionWait;
+            _selectionWait = null;
+            wait.Cancel();
+        }
+        _rewardApplied = false;
+        _selectionCandidates.Clear();
         _inventory = null;
         _waveController = null;
         _candidateSelector = null;

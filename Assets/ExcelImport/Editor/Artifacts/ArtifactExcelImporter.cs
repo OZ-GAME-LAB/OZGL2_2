@@ -82,6 +82,14 @@ public static class ArtifactExcelImporter
                 new[] { "_targetTeam", "_applyType", "_allyClass", "_allyType", "_enemyClass", "_enemyType", "_statType", "_modifierType" });
             WriteEffects(serialized.FindProperty("_currencyEffects"), item.CurrencyEffects,
                 new[] { "_currencyType", "_rewardType", "_modifierType" });
+            SerializedProperty slotEffects = serialized.FindProperty("_consumableSlotEffects");
+            slotEffects.ClearArray();
+            slotEffects.arraySize = item.ConsumableSlotEffects.Count;
+            for (int i = 0; i < item.ConsumableSlotEffects.Count; i++)
+            {
+                slotEffects.GetArrayElementAtIndex(i).FindPropertyRelative("_additionalSlots").intValue =
+                    item.ConsumableSlotEffects[i];
+            }
             serialized.ApplyModifiedProperties();
             if (isNew)
             {

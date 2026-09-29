@@ -15,9 +15,9 @@ public class PersistentSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
 
     private SaveManager _saveManager;
     private OutGameTraitController _traits;
-    private OutGameTestWallet _wallet;
+    private PersistentCurrencyManager _wallet;
 
-    public void Initialize(SaveManager saveManager, OutGameTraitController traits, OutGameTestWallet wallet)
+    public void Initialize(SaveManager saveManager, OutGameTraitController traits, PersistentCurrencyManager wallet)
     {
         _saveManager = saveManager;
         _traits = traits;

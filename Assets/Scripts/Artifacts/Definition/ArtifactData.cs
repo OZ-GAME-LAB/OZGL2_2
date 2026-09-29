@@ -12,6 +12,7 @@ public class ArtifactData : ScriptableObject
     public int MaxStacks => _maxStacks;
     public IReadOnlyList<UnitStatEffectData> UnitStatEffects => _unitStatEffects;
     public IReadOnlyList<CurrencyEffectData> CurrencyEffects => _currencyEffects;
+    public IReadOnlyList<ConsumableSlotEffectData> ConsumableSlotEffects => _consumableSlotEffects;
 
     [SerializeField] private string _id;
     [SerializeField] private string _displayName;
@@ -25,4 +26,6 @@ public class ArtifactData : ScriptableObject
         new List<UnitStatEffectData>();
     [SerializeField] private List<CurrencyEffectData> _currencyEffects =
         new List<CurrencyEffectData>();
+    [SerializeField] private List<ConsumableSlotEffectData> _consumableSlotEffects =
+        new List<ConsumableSlotEffectData>();
 }

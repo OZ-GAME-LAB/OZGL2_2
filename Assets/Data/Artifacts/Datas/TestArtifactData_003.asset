@@ -13,14 +13,20 @@ MonoBehaviour:
   m_Name: TestArtifactData_003
   m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
   _id: artifact_003
-  _displayName: "\uC6E8\uC774\uBE0C \uD074\uB9AC\uC5B4 \uACE8\uB4DC + 20"
-  _description: "\uC6E8\uC774\uBE0C \uD074\uB9AC\uC5B4 \uACE8\uB4DC +20 \uCD94\uAC00"
+  _displayName: "\uBC15\uB3D9\uC758 \uBD81"
+  _description: "\uC544\uAD70 \uC804\uCCB4 \uACF5\uACA9\uC18D\uB3C4 3% \uC99D\uAC00"
   _icon: {fileID: 0}
   _rarity: 0
-  _maxStacks: 99
-  _unitStatEffects: []
-  _currencyEffects:
-  - _currencyType: 1
-    _rewardType: 1
-    _modifierType: 0
-    _value: 20
+  _maxStacks: 5
+  _unitStatEffects:
+  - _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _statType: 170
+    _modifierType: 1
+    _value: 0.03
+  _currencyEffects: []
+  _consumableSlotEffects: []
