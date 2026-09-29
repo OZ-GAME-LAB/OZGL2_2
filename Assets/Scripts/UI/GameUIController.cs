@@ -112,16 +112,21 @@ namespace Game.UI
         public void ShowWaveReward(int goldReward, bool hasNextWave)
         {
             if (goldReward < 0) throw new ArgumentOutOfRangeException(nameof(goldReward));
+            ShowProgressPrompt(string.Format(_waveRewardFormat, goldReward), hasNextWave);
+        }
+
+        public void ShowProgressPrompt(string message, bool canContinue)
+        {
             SetWaveStartInteractable(false);
             HideRunResult();
             _isContinueRequestPending = false;
-            SetTextIfAssigned(_waveRewardText, string.Format(_waveRewardFormat, goldReward));
+            SetTextIfAssigned(_waveRewardText, message ?? string.Empty);
             SetActiveIfAssigned(_waveRewardPanel, true);
 
             if (_continueButton != null)
             {
-                _continueButton.gameObject.SetActive(hasNextWave);
-                _continueButton.interactable = hasNextWave && ContinueRequested != null;
+                _continueButton.gameObject.SetActive(canContinue);
+                _continueButton.interactable = canContinue && ContinueRequested != null;
                 if (_continueButton.interactable) SelectButton(_continueButton);
             }
         }
