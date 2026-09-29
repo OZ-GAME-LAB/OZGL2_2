@@ -19,6 +19,9 @@ namespace Game.UI
         [SerializeField] private BuildingCoreProgress _coreProgress;
         [SerializeField] private RunGoldHudBinding _gold;
         [SerializeField] private CoreHudBinding _core;
+        [SerializeField] private CoreGameLoopUiBinding _gameLoop;
+        [SerializeField] private CoreRunDecisionBinding _runDecision;
+        [SerializeField] private TestWaitingScript _contentGate;
         [SerializeField] private TMP_Text _gemText;
         [SerializeField] private TMP_Text _hint;
 
@@ -31,7 +34,8 @@ namespace Game.UI
 
         private void Start()
         {
-            if (_ui == null || _wallet == null || _waves == null || _flow == null || _gold == null || _core == null)
+            if (_ui == null || _wallet == null || _waves == null || _flow == null || _gold == null ||
+                _core == null || _gameLoop == null || _runDecision == null || _contentGate == null)
             {
                 Debug.LogError("[UI/TeamBuildingUiStartup] 필수 UI/팀 시스템 참조가 없습니다.", this);
                 return;
@@ -51,6 +55,8 @@ namespace Game.UI
                 _wallet.Initialize(_waves, _flow, _effects, _coreProgress);
             }
             IsReady = _wallet.IsInitialized;
+            _gameLoop.Initialize(_ui, _flow, _waves, _wallet, _contentGate);
+            _runDecision.Initialize(_flow, _waves);
             Refresh();
             if (!IsReady) _ui.ShowMessage("재화 연결을 확인해 주세요.");
         }

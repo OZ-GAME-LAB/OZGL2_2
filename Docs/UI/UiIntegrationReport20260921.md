@@ -1,5 +1,20 @@
 # UI 연동 점검 보고 — 2026-09-21
 
+## 2026-09-29 게임 루프 통합
+
+- 작업 브랜치는 `feature/ui-game-loop-integration`이며 PR 대상은 `dev`다. 직접 머지하지 않는다.
+- UI 소유 씬 `Assets/Scenes/UI/PlayerTeamBuildingIntegration.unity`에 `건설/준비 → 웨이브 시작 → 전투 → 승리/패배 → 자동 재화 보상 → 계속 → 다음 웨이브 → 최종 종료 선택 → 결과` 흐름을 연결했다.
+- `CoreGameLoopUiBinding`은 `GameFlowController`, `WaveController`, `RunCurrencyManager`의 상태를 읽어 보상·이벤트·상점·결과 UI만 표시한다. 전투 판정, 보상 계산·지급, 노드 진행은 팀 Core 권한을 그대로 사용한다.
+- 웨이브 보상 팝업의 두 줄 문구가 잘리지 않도록 높이와 줄바꿈을 수정했고, 패배·승리 결과에서 재시작 버튼이 활성화되는 것을 확인했다.
+- 최신 팀 테스트 씬에 현재 `SpawnManager` 필수 참조와 `DamageResolver`가 없어서, UI 통합 씬 생성 시 팀 소유 `Assets/Prefabs/Units/Entire Unit System For Merge/SpawnManager.prefab`을 사용하고 팀 `DamageResolver` 컴포넌트 한 개를 보장한다. 팀 원본 `Test_Building.unity`와 팀 스크립트는 수정하지 않았다.
+- Unity 6000.3.23f1 격리 Play Mode에서 실제 팀 건설·재화·Core·스폰 API를 사용한 268개 검사를 통과했다. UI 런타임 오류는 0건이며 1280×720 보상·패배·승리 화면의 텍스트 잘림도 검사했다.
+- 전투 결과 검증은 팀 Core의 `ResolveBattleAsync()` 경로로 수행했다. 실제 스폰과 Battle 진입은 확인했지만 모든 유닛이 사망할 때까지의 장시간 AI 전투 완주는 별도 팀 전투 테스트가 필요하다.
+- 최신 `origin/dev` 팀 유닛의 랠리 이동 중 `[Unit_Gateway] A_WA_T1_전사(Clone) Rally movement failed.`가 5회 발생했다. 준비 완료 처리는 계속되어 루프는 진행되지만, 유닛 이동 담당자가 스폰·랠리 위치와 장애물 충돌을 확인해야 한다.
+- 별도 소크 검사에서는 실제 아군 생산 건물과 적 웨이브가 교전하고 `DamageResolver`를 통한 피해·사망·그룹 전멸까지 발생했다. 그러나 테스트 전용 5배속 45초 안에도 `Reward` 또는 `Finished`로 전환되지 않아 자동 승패 완료는 현재 팀 전투 블로커다.
+- `IRuntimeUnitManager.TeamWiped` 이벤트는 공개되어 있지만 `WaveController`는 현재 `UnitDied`만 구독한다. 남은 그룹의 전진·재교전과 마지막 전멸 시점의 승패 재평가를 유닛/Core 담당자가 함께 확인해야 한다. UI에서 임의로 승패를 결정하는 우회는 추가하지 않았다.
+- 팀 `ArtifactManager.SelectAndApplyAsync()`의 실제 선택 UI 호출은 여전히 TODO다. 현재 Core의 임시 `TestWaitingScript` 완료 게이트를 플레이어용 `계속` 버튼이 해제하므로 MVP 진행은 가능하지만 정식 아티팩트 획득 완료로 보지 않는다.
+- 검증은 원본 프로젝트를 열어 둔 채 `C:\Users\User\Documents\ChatGPT\DND Project\_unity_validation_20260929_ui` 복제본에서 수행했다. 원본 Unity 창을 조작하거나 팀 씬을 저장하지 않았다.
+
 ## 2026-09-29 최신 dev 재검증
 
 - 작업 브랜치는 `feature/ui-artifact-runtime-integration`, 기준은 최신 `origin/dev` 커밋 `2ba46a1` (`[Feat] 아웃게임 MVP 구현`)이다. PR 대상은 `dev`이며 직접 머지는 진행하지 않는다.
@@ -80,7 +95,7 @@
 | `Assets/Scenes/UI/PlayerUI.unity` | 사용 가능 — UI 독립 검증 | 공통 HUD, 팝업, 결과 UI를 빠르게 확인하는 UI 테스트 씬이다. 실제 전투 완성 씬은 아니다. |
 | `Assets/Scenes/UI/PlayerBuildingIntegration.unity` | 사용 가능 — 건설 UI 검증 | 실제 건설·재화 공개 API와 fixture 데이터를 사용해 건설/업그레이드/해체를 검사한다. |
 | `Assets/Scenes/UI/PlayerBuildingWorldInput.unity` | 사용 가능 — 입력 검증 | 월드 슬롯 클릭과 팝업 입력 차단을 검사한다. |
-| `Assets/Scenes/UI/PlayerTeamBuildingIntegration.unity` | 갱신 필요 | 최신 팀 `BootStrap`의 `_spawnManager`, `_runCurrencyManager`, `_buildController`, `_buildingCoreProgress` 연결이 현재 저장본에 없다. 최신 `Test_Building` 기준으로 재생성 또는 참조 마이그레이션 후 사용한다. |
+| `Assets/Scenes/UI/PlayerTeamBuildingIntegration.unity` | 사용 가능 — 팀 통합 데모 | 실제 팀 건설·재화·Core·스폰 API와 플레이어 HUD를 연결했다. 보상·패배·최종 승리·재시작 UI 검증을 통과했으며, 팀 유닛 랠리 이동 오류는 별도 확인이 필요하다. |
 | `Assets/Scenes/Test/Test_Building.unity` | 팀 원본 — 수정 금지 | 최신 팀 연결이 존재하는 기준 씬이다. UI 작업에서는 읽기와 비교만 한다. |
 
 ## 연동 및 검증 결과

@@ -135,6 +135,27 @@ public class AltarManager : MonoBehaviour
         return true;
     }
 
+    // Current date KDH 2026-09-29
+    // 아웃게임 시작 정보(OutGameStartContext)는 SO 참조 대신 ID만 담으므로, 카탈로그에서 찾아 선택합니다.
+    public bool TrySelectById(AltarId id)
+    {
+        if (!IsInitialized)
+        {
+            Debug.LogWarning("[OutGame/AltarManager] 초기화 후 제단을 선택할 수 있습니다.", this);
+            return false;
+        }
+        if (id == AltarId.None)
+        {
+            return false;
+        }
+        if (!_catalog.TryGetById(id, out AltarData altar))
+        {
+            Debug.LogWarning($"[OutGame/AltarManager] Catalog에 없는 제단 ID입니다. ID: {id}", this);
+            return false;
+        }
+        return TrySelect(altar);
+    }
+
     public bool TryClearSelection()
     {
         if (!IsInitialized)
@@ -260,6 +281,18 @@ public class AltarManager : MonoBehaviour
 
     private void HandlePhaseChanged(GamePhase phase)
     {
+        // Current date KDH 2026-09-29
+        // 첫 Preparation(스폰 전)에 1회 적용합니다. ResetRun으로 None에서 해제된 뒤에도 여기서 다시 적용됩니다.
+        // 웨이브마다 Preparation이 다시 오지만, IsApplied 확인으로 중복 적용을 막습니다.
+        if (phase == GamePhase.Preparation)
+        {
+            if (_selected != null && !IsApplied)
+            {
+                TryApplySelected();
+            }
+            return;
+        }
+
         // Reward = 웨이브 승리 후입니다. 패배 경로에는 Reward가 없습니다.
         if (phase == GamePhase.Reward)
         {

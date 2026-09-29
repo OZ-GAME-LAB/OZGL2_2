@@ -32,8 +32,8 @@ namespace Game.UI.Editor
             counts = owner.AddComponent<RuntimeUnitCountHud>(); Assign(counts, "_allyText", ally, "_enemyText", enemy);
             var waveCard = Overlay(owner, "WaveReward", 480, 240, out var waveRoot);
             Text(waveCard, "Title", "방어 성공", 32, 24, 416, 48, 30);
-            var waveReward = Text(waveCard, "Reward", "", 32, 80, 416, 42, 24, Gold);
-            var proceed = Btn(waveCard, "Continue", "계속", 32, 152, 416, 56, true);
+            var waveReward = Text(waveCard, "Reward", "", 32, 76, 416, 82, 24, Gold, true);
+            var proceed = Btn(waveCard, "Continue", "계속", 32, 168, 416, 56, true);
             var result = Overlay(owner, "RunResult", 560, 340, out resultRoot);
             Icon(result, "VictoryCrest", PlayerUiIcon.Symbol.Shield, 40, 38, 58, Gold);
             var resultTitle = Text(result, "Title", "방어 성공", 118, 42, 390, 56, 36);

@@ -13,10 +13,10 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
 
     private readonly List<TraitData> _data = new List<TraitData>();
     private readonly List<TraitLevelEntry> _levels = new List<TraitLevelEntry>();
-    private IPersistentWallet _wallet;
+    private OutGameTestWallet _wallet;
     private IPersistentSaveWriter _saveWriter;
 
-    public void Initialize(IPersistentWallet wallet, IPersistentSaveWriter saveWriter)
+    public void Initialize(OutGameTestWallet wallet, IPersistentSaveWriter saveWriter)
     {
         IsInitialized = false;
         _wallet = wallet;
@@ -89,14 +89,15 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
             return false;
         }
 
+        // Current date KDH 2026-09-29: 선행 요구 레벨과 레벨별 비용을 SO에서 읽습니다.
         TraitData prerequisite = data.Prerequisite;
-        if (prerequisite != null && GetLevel(prerequisite.Id) < 1)
+        if (prerequisite != null && GetLevel(prerequisite.Id) < data.PrerequisiteLevel)
         {
-            reason = prerequisite.DisplayName + " 1레벨이 필요합니다.";
+            reason = prerequisite.DisplayName + " " + data.PrerequisiteLevel + "레벨이 필요합니다.";
             return false;
         }
 
-        if (!_wallet.CanSpend(CurrencyType.Bloodstone, data.UpgradeCost))
+        if (!_wallet.CanSpend(CurrencyType.Bloodstone, data.GetUpgradeCost(_levels[index].Level)))
         {
             reason = "혈석이 부족합니다.";
             return false;
@@ -142,7 +143,8 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
         int index = FindIndex(id);
         data = CaptureSaveData();
         data._levels[index].Level++;
-        cost = _data[index].UpgradeCost;
+        // Current date KDH 2026-09-29: 올리기 전 레벨 기준 비용입니다. 사본만 올렸으므로 _levels는 아직 이전 레벨입니다.
+        cost = _data[index].GetUpgradeCost(_levels[index].Level);
         return true;
     }
 
@@ -235,8 +237,10 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
             TraitLevelEntry entry = data._levels[i];
             if (entry.Level == 0) continue;
 
-            TraitData prerequisite = _data[FindIndex(entry.Id)].Prerequisite;
-            if (prerequisite != null && GetSavedLevel(data, prerequisite.Id) < 1)
+            // Current date KDH 2026-09-29: 저장 데이터도 선행 요구 레벨 기준으로 검사합니다.
+            TraitData traitData = _data[FindIndex(entry.Id)];
+            TraitData prerequisite = traitData.Prerequisite;
+            if (prerequisite != null && GetSavedLevel(data, prerequisite.Id) < traitData.PrerequisiteLevel)
             {
                 error = "선행 특성이 없는 저장 데이터입니다: " + entry.Id;
                 return false;
