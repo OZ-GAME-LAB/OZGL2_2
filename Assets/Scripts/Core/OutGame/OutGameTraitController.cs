@@ -13,10 +13,10 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
 
     private readonly List<TraitData> _data = new List<TraitData>();
     private readonly List<TraitLevelEntry> _levels = new List<TraitLevelEntry>();
-    private IPersistentWallet _wallet;
+    private OutGameTestWallet _wallet;
     private IPersistentSaveWriter _saveWriter;
 
-    public void Initialize(IPersistentWallet wallet, IPersistentSaveWriter saveWriter)
+    public void Initialize(OutGameTestWallet wallet, IPersistentSaveWriter saveWriter)
     {
         IsInitialized = false;
         _wallet = wallet;

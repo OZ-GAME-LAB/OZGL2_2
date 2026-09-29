@@ -10,7 +10,7 @@ public class PersistentSaveData
 }
 
 [Serializable]
-public class PersistentWalletSaveData
+public class PersistentWalletSaveData //영구재화 저장 데이터
 {
     public int Version;
     public int Bloodstone;
