@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Units;
 using UnityEngine;
 
-// 아티팩트·제단·토템의 공통 효과 데이터를 유닛·재화 보정치로 변환
+// 아티팩트·제단·토템의 공통 효과 데이터를 유닛·재화·슬롯 보정치로 변환
 public class EffectConverter
 {
     // source: 효과를 제공한 객체. 이후 같은 객체로 효과를 제거 가능
@@ -116,6 +116,35 @@ public class EffectConverter
         }
 
         return currencyModifiers;
+    }
+
+    // 슬롯 효과가 없으면 빈 목록 반환. 감소 효과도 중첩 수만큼 반영
+    public List<ConsumableSlotModifier> ConvertConsumableSlotEffects(
+        object source, IReadOnlyList<ConsumableSlotEffectData> effects, int stackCount = 1)
+    {
+        if (source == null || stackCount < 1)
+        {
+            Debug.LogError("[Effects/EffectConverter] Source와 중첩 수(1 이상)를 확인해주세요.");
+            return null;
+        }
+
+        List<ConsumableSlotModifier> modifiers = new List<ConsumableSlotModifier>();
+        if (effects == null)
+        {
+            return modifiers;
+        }
+
+        foreach (ConsumableSlotEffectData effect in effects)
+        {
+            long value = (long)effect.AdditionalSlots * stackCount;
+            if (value < int.MinValue || value > int.MaxValue)
+            {
+                Debug.LogError("[Effects/EffectConverter] 슬롯 보정값이 정수 범위를 벗어났습니다.");
+                return null;
+            }
+            modifiers.Add(new ConsumableSlotModifier(source, (int)value));
+        }
+        return modifiers;
     }
 
     private bool ValidateEffect(UnitStatEffectData effect, float value)

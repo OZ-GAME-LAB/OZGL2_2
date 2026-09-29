@@ -52,9 +52,9 @@ public class ConsumableItemCatalog : ScriptableObject
                 Debug.LogError($"[Consumables/ConsumableItemCatalog] 비어 있는 아이템이 있습니다. Index: {i}", this);
                 continue;
             }
-            if (string.IsNullOrWhiteSpace(item.Id) || item.MaxCount < 1)
+            if (string.IsNullOrWhiteSpace(item.Id))
             {
-                Debug.LogError($"[Consumables/ConsumableItemCatalog] ID와 최대 보유 수량(1 이상)을 확인하세요. Asset: {item.name}", item);
+                Debug.LogError($"[Consumables/ConsumableItemCatalog] 아이템 ID를 확인하세요. Asset: {item.name}", item);
                 continue;
             }
             if (_itemById.ContainsKey(item.Id))

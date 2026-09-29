@@ -15,6 +15,7 @@ public class CurrencyTestPanel : MonoBehaviour
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private ArtifactTestPanel _artifactTestPanel;
+    [SerializeField] private ConsumableItemTestPanel _consumableTestPanel;
     [SerializeField] private PersistentCurrencyManager _persistent;
     [SerializeField] private CurrencyData _gold;
     [SerializeField] private CurrencyData _gem;
@@ -124,6 +125,11 @@ public class CurrencyTestPanel : MonoBehaviour
                 Report("웨이브 시작 — 외부 초기화 또는 Wave Catalog 설정 확인", false);
                 return;
             }
+            if (_consumableTestPanel != null)
+            {
+                _consumableTestPanel.Initialize(_effectManager,
+                    _artifactTestPanel != null ? _artifactTestPanel.Artifacts : null, newRun);
+            }
             if (_artifactTestPanel != null)
             {
                 _artifactTestPanel.Initialize(_waveController, _effectManager);
@@ -144,6 +150,10 @@ public class CurrencyTestPanel : MonoBehaviour
             _artifactTestPanel.EndRun();
         }
         _waitingForContent = false;
+        if (_consumableTestPanel != null)
+        {
+            _consumableTestPanel.ResetPanel();
+        }
         if (_shopTestPanel != null) { _shopTestPanel.ResetPanel(); }
         Report("Run 종료", _run.TryEndRun());
     }
@@ -157,7 +167,7 @@ public class CurrencyTestPanel : MonoBehaviour
     // 세 패널을 한 화면에서 배치. 작은 화면은 전체 UI를 같은 비율로 축소
     private void OnGUI()
     {
-        float scale = Mathf.Min(1f, Screen.width / 1200f);
+        float scale = Mathf.Min(1f, Screen.width / (_consumableTestPanel != null ? 1600f : 1200f));
         Matrix4x4 previousMatrix = GUI.matrix;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
         float height = Mathf.Max(150, Screen.height / scale - 24);
@@ -176,6 +186,12 @@ public class CurrencyTestPanel : MonoBehaviour
             _shopTestPanel.DrawPanel();
         }
         GUILayout.EndArea();
+        if (_consumableTestPanel != null)
+        {
+            GUILayout.BeginArea(new Rect(1200, 12, 388, height), GUI.skin.box);
+            _consumableTestPanel.DrawPanel(_run != null && _run.IsInitialized);
+            GUILayout.EndArea();
+        }
         GUI.matrix = previousMatrix;
     }
 
