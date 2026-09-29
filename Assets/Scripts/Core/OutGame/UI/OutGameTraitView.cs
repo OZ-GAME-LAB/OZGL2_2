@@ -98,7 +98,8 @@ public class OutGameTraitView : MonoBehaviour
             return;
         }
 
-        string cost = "(혈석 " + inspected.UpgradeCost + ")";
+        // Current date KDH 2026-09-29: 현재 레벨에서 다음 레벨로 올리는 비용을 표시합니다.
+        string cost = "(혈석 " + inspected.GetUpgradeCost(currentLevel) + ")";
         if (!canUpgrade) cost = "<color=#D32F2F>" + cost + "</color>";
         _upgradeLabel.text = "레벨 상승\n" + cost;
         if (!canUpgrade) _description.text += "\n\n" + reason;
