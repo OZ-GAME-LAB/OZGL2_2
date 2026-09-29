@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -30,18 +30,241 @@ namespace Units
             Unit_Core core,
             ActiveSkillData data)
         {
-            _core =
-                core;
+            _core = core;
 
-            _data =
-                data;
-
+            _data = data;
         }
 
 
         // ============================================================
         // Select
         // ============================================================
+
+        // 신규 공통 요청 경로. 기존 단일 스킬의 SelectTarget 및 동률 의미는 그대로 둔다.
+        public static SkillTargetResult SelectTargets(
+            SkillTargetRequest request,
+            IReadOnlyList<ICombatTarget> candidates)
+        {
+            var settings = request.Settings;
+
+            if (settings == null || !request.CanSelect)
+                return new SkillTargetResult(
+                    null,
+                    request.Origin,
+                    request.Direction,
+                    false,
+                    "Invalid owner/settings"
+                );
+
+            if (settings.Source == SkillTargetSource.None)
+                return new SkillTargetResult(
+                    null,
+                    request.Origin,
+                    request.Direction,
+                    true
+                );
+
+            var accepted = new List<ICombatTarget>();
+
+            var lifetimes = new Dictionary<ICombatTarget, CombatTargetSnapshot>();
+
+            // 외부 필터가 중첩 조회해도 입력 목록이 바뀌지 않는다.
+            var input = candidates == null ? new List<ICombatTarget>() : new List<ICombatTarget>(candidates);
+
+            foreach (var target in input)
+            {
+                if (!CombatTargetUtility.IsValid(target) || accepted.Contains(target))
+                    continue;
+
+                var lifetime = new CombatTargetSnapshot(target);
+
+                bool self = ReferenceEquals(target, request.Owner.Target);
+
+                bool relation = settings.Relation == SkillTargetRelation.Self ? self : settings.Relation == SkillTargetRelation.Friendly ? target.Team == request.Owner.Team && (settings.IncludeSelf || !self) : target.Team != request.Owner.Team;
+
+                if (!relation)
+                    continue;
+
+                if (settings.Relation == SkillTargetRelation.Hostile && request.HostileFilter != null && !request.HostileFilter(target))
+                    continue;
+
+                if (!lifetime.IsTargetable)
+                    continue;
+
+                bool valid = true;
+
+                foreach (var filter in settings.Filters)
+                {
+                    if (filter == null)
+                        continue;
+
+                    float value = GetMetric(
+                        target,
+                        request.Origin,
+                        filter.Metric
+                    );
+
+                    float expected = filter.Value;
+
+                    valid &= filter.Comparison switch
+                    {
+                        SkillTargetComparison.Less => value < expected,
+                        SkillTargetComparison.LessOrEqual => value <= expected,
+                        SkillTargetComparison.Greater => value > expected,
+                        SkillTargetComparison.GreaterOrEqual => value >= expected,
+                        SkillTargetComparison.Equal => Mathf.Abs(value - expected) <= 0.0001f,
+                        _ => false
+                    };
+                }
+
+                if (!valid)
+                    continue;
+
+                if (request.Area != null && request.Area.Shape != SkillAreaShape.Single)
+                {
+                    Vector2 offset = (Vector2)target.Transform.position - request.Origin;
+
+                    if (offset.sqrMagnitude > request.Area.Radius * request.Area.Radius)
+                        continue;
+
+                    if (request.Area.Shape == SkillAreaShape.Cone && (request.Direction.sqrMagnitude <= 0f || (offset.sqrMagnitude > 0f && Vector2.Angle(request.Direction, offset) > request.Area.Angle * 0.5f)))
+                        continue;
+                }
+
+                accepted.Add(target);
+
+                lifetimes[target] = lifetime;
+            }
+
+            if (!request.CanSelect)
+                return new SkillTargetResult(
+                    null,
+                    request.Origin,
+                    request.Direction,
+                    false,
+                    "Owner lifetime changed"
+                );
+
+            accepted.RemoveAll(target => !lifetimes[target].IsTargetable);
+
+            // Cluster 점수는 정렬 도중 바뀌지 않는 필터 통과 후보 집합으로 계산한다.
+            var scores = new Dictionary<ICombatTarget, double[]>();
+
+            foreach (var target in accepted)
+            {
+                var values = new double[settings.Priorities.Count];
+
+                for (int i = 0; i < values.Length; i++)
+                {
+                    var priority = settings.Priorities[i];
+
+                    if (priority == null)
+                        continue;
+
+                    switch (priority.Policy)
+                    {
+                        case SkillTargetPolicy.Current:
+                            values[i] = request.CurrentTarget.IsTargetable && ReferenceEquals(target, request.CurrentTarget.Target) ? 0 : 1;
+
+                            break;
+
+                        case SkillTargetPolicy.Nearest:
+                            values[i] = GetMetric(
+                                target,
+                                request.Origin,
+                                SkillTargetMetric.Distance
+                            );
+
+                            break;
+
+                        case SkillTargetPolicy.Farthest:
+                            values[i] = -GetMetric(
+                                target,
+                                request.Origin,
+                                SkillTargetMetric.Distance
+                            );
+
+                            break;
+
+                        case SkillTargetPolicy.LowestHP:
+                            values[i] = GetMetric(
+                                target,
+                                request.Origin,
+                                SkillTargetMetric.HpRatio
+                            );
+
+                            break;
+
+                        case SkillTargetPolicy.HighestHP:
+                            values[i] = -GetMetric(
+                                target,
+                                request.Origin,
+                                SkillTargetMetric.HpRatio
+                            );
+
+                            break;
+
+                        case SkillTargetPolicy.Cluster:
+                            foreach (var candidate in accepted)
+                                if (((Vector2)candidate.Transform.position - (Vector2)target.Transform.position).sqrMagnitude <= settings.ClusterRadius * settings.ClusterRadius)
+                                    values[i]--;
+
+                            break;
+                    }
+
+                    // 일정 폭 양자화로 동률을 정의하여 근사 비교의 비추이성을 피한다.
+                    values[i] = System.Math.Round(values[i] / 0.0001d);
+                }
+
+                scores[target] = values;
+            }
+
+            accepted.Sort((
+                a,
+                b) =>
+            {
+                for (int i = 0; i < settings.Priorities.Count; i++)
+                {
+                    int comparison = scores[a][i].CompareTo(scores[b][i]);
+
+                    if (comparison != 0)
+                        return comparison;
+                }
+
+                return a.Transform.GetInstanceID().CompareTo(b.Transform.GetInstanceID());
+            });
+
+            if (accepted.Count > settings.MaxTargetCount)
+                accepted.RemoveRange(settings.MaxTargetCount, accepted.Count - settings.MaxTargetCount);
+
+            return new SkillTargetResult(
+                accepted,
+                request.Origin,
+                request.Direction,
+                settings.Source == SkillTargetSource.None
+            );
+        }
+
+        private static float GetMetric(
+            ICombatTarget target,
+            Vector2 origin,
+            SkillTargetMetric metric)
+        {
+            float maxHp = target.RuntimeStatus != null ? target.RuntimeStatus.MaxHp : 0f;
+
+            float ratio = maxHp > 0f ? Mathf.Clamp01(target.CurrentHp / maxHp) : 0f;
+
+            return metric switch
+            {
+                SkillTargetMetric.Distance => Vector2.Distance(origin, target.Transform.position),
+                SkillTargetMetric.CurrentHp => target.CurrentHp,
+                SkillTargetMetric.HpRatio => ratio,
+                SkillTargetMetric.MissingHpRatio => 1f - ratio,
+                SkillTargetMetric.Shield => target.CurrentShield,
+                SkillTargetMetric.Defense => target.RuntimeStatus != null ? target.RuntimeStatus.Defense : 0f,
+                _ => 0f
+            };
+        }
 
         public ICombatTarget SelectTarget(
             ICombatTarget currentTarget,
@@ -50,62 +273,34 @@ namespace Units
             if (_core == null || _data == null)
                 return null;
 
-
             if (_data.TargetSide == SkillTargetRelation.Self)
                 return GetSelfTarget();
 
-
             if (_data.TargetPolicy == SkillTargetPolicy.Current)
             {
-                return Contains(candidates, currentTarget) && IsValidCandidate(
-                    currentTarget
-                )
-                    ? currentTarget
-                    : null;
+                return Contains(candidates, currentTarget) && IsValidCandidate(currentTarget) ? currentTarget : null;
             }
-
 
             if (candidates == null || candidates.Count <= 0)
                 return null;
 
-
             switch (_data.TargetPolicy)
             {
                 case SkillTargetPolicy.Nearest:
-
-                    return SelectNearest(
-                        candidates
-                    );
-
+                    return SelectNearest(candidates);
 
                 case SkillTargetPolicy.Farthest:
-
-                    return SelectFarthest(
-                        candidates
-                    );
-
+                    return SelectFarthest(candidates);
 
                 case SkillTargetPolicy.LowestHP:
-
-                    return SelectLowestHP(
-                        candidates
-                    );
-
+                    return SelectLowestHP(candidates);
 
                 case SkillTargetPolicy.HighestHP:
-
-                    return SelectHighestHP(
-                        candidates
-                    );
-
+                    return SelectHighestHP(candidates);
 
                 case SkillTargetPolicy.Cluster:
-
-                    return SelectCluster(
-                        candidates
-                    );
+                    return SelectCluster(candidates);
             }
-
 
             return null;
         }
@@ -115,19 +310,21 @@ namespace Units
         // Candidate
         // ============================================================
 
-        private static bool Contains(IReadOnlyList<ICombatTarget> candidates, ICombatTarget target)
+        private static bool Contains(
+            IReadOnlyList<ICombatTarget> candidates,
+            ICombatTarget target)
         {
             if (candidates == null)
                 return false;
+
             for (int i = 0; i < candidates.Count; i++)
                 if (ReferenceEquals(candidates[i], target))
                     return true;
+
             return false;
         }
 
-
-        private bool IsValidCandidate(
-            ICombatTarget target)
+        private bool IsValidCandidate(ICombatTarget target)
         {
             if (!CombatTargetUtility.IsValid(target))
                 return false;
@@ -138,27 +335,17 @@ namespace Units
             if (target.Transform == null)
                 return false;
 
-
             switch (_data.TargetSide)
             {
                 case SkillTargetRelation.Hostile:
-
-                    return target.Team
-                        != _core.Team;
-
+                    return target.Team != _core.Team;
 
                 case SkillTargetRelation.Friendly:
-
-                    return target.Team
-                        == _core.Team;
-
+                    return target.Team == _core.Team;
 
                 case SkillTargetRelation.Self:
-
-                    return target.Transform
-                        == _core.transform;
+                    return target.Transform == _core.transform;
             }
-
 
             return false;
         }
@@ -170,17 +357,12 @@ namespace Units
 
         private ICombatTarget GetSelfTarget()
         {
-            ICombatTarget selfTarget =
-                _core.GetComponent<Unit_Gateway>();
+            ICombatTarget selfTarget = _core.GetComponent<Unit_Gateway>();
 
-
-            if (!IsValidCandidate(
-                selfTarget
-            ))
+            if (!IsValidCandidate(selfTarget))
             {
                 return null;
             }
-
 
             return selfTarget;
         }
@@ -190,103 +372,62 @@ namespace Units
         // Distance
         // ============================================================
 
-        private ICombatTarget SelectNearest(
-            IReadOnlyList<ICombatTarget> candidates)
+        private ICombatTarget SelectNearest(IReadOnlyList<ICombatTarget> candidates)
         {
-            ICombatTarget selectedTarget =
-                null;
+            ICombatTarget selectedTarget = null;
 
-            float selectedDistanceSqr =
-                float.MaxValue;
+            float selectedDistanceSqr = float.MaxValue;
 
-
-            Vector2 origin =
-                _core.transform.position;
-
+            Vector2 origin = _core.transform.position;
 
             for (int i = 0; i < candidates.Count; i++)
             {
-                ICombatTarget candidate =
-                    candidates[i];
+                ICombatTarget candidate = candidates[i];
 
-
-                if (!IsValidCandidate(
-                    candidate
-                ))
+                if (!IsValidCandidate(candidate))
                 {
                     continue;
                 }
 
-
-                float distanceSqr =
-                    (
-                        (Vector2)candidate.Transform.position
-                        - origin
-                    ).sqrMagnitude;
-
+                float distanceSqr = ((Vector2)candidate.Transform.position - origin).sqrMagnitude;
 
                 if (distanceSqr >= selectedDistanceSqr)
                     continue;
 
+                selectedDistanceSqr = distanceSqr;
 
-                selectedDistanceSqr =
-                    distanceSqr;
-
-                selectedTarget =
-                    candidate;
+                selectedTarget = candidate;
             }
-
 
             return selectedTarget;
         }
 
-
-        private ICombatTarget SelectFarthest(
-            IReadOnlyList<ICombatTarget> candidates)
+        private ICombatTarget SelectFarthest(IReadOnlyList<ICombatTarget> candidates)
         {
-            ICombatTarget selectedTarget =
-                null;
+            ICombatTarget selectedTarget = null;
 
-            float selectedDistanceSqr =
-                -1f;
+            float selectedDistanceSqr = -1f;
 
-
-            Vector2 origin =
-                _core.transform.position;
-
+            Vector2 origin = _core.transform.position;
 
             for (int i = 0; i < candidates.Count; i++)
             {
-                ICombatTarget candidate =
-                    candidates[i];
+                ICombatTarget candidate = candidates[i];
 
-
-                if (!IsValidCandidate(
-                    candidate
-                ))
+                if (!IsValidCandidate(candidate))
                 {
                     continue;
                 }
 
-
-                float distanceSqr =
-                    (
-                        (Vector2)candidate.Transform.position
-                        - origin
-                    ).sqrMagnitude;
-
+                float distanceSqr = ((Vector2)candidate.Transform.position - origin).sqrMagnitude;
 
                 if (distanceSqr <= selectedDistanceSqr)
                     continue;
 
+                selectedDistanceSqr = distanceSqr;
 
-                selectedDistanceSqr =
-                    distanceSqr;
-
-                selectedTarget =
-                    candidate;
+                selectedTarget = candidate;
             }
-
 
             return selectedTarget;
         }
@@ -296,129 +437,80 @@ namespace Units
         // HP
         // ============================================================
 
-        private ICombatTarget SelectLowestHP(
-            IReadOnlyList<ICombatTarget> candidates)
+        private ICombatTarget SelectLowestHP(IReadOnlyList<ICombatTarget> candidates)
         {
-            ICombatTarget selectedTarget =
-                null;
+            ICombatTarget selectedTarget = null;
 
-            float selectedHpRatio =
-                float.MaxValue;
-
+            float selectedHpRatio = float.MaxValue;
 
             for (int i = 0; i < candidates.Count; i++)
             {
-                ICombatTarget candidate =
-                    candidates[i];
+                ICombatTarget candidate = candidates[i];
 
-
-                if (!IsValidCandidate(
-                    candidate
-                ))
+                if (!IsValidCandidate(candidate))
                 {
                     continue;
                 }
 
-
-                float hpRatio =
-                    GetHpRatio(
-                        candidate
-                    );
-
+                float hpRatio = GetHpRatio(candidate);
 
                 if (hpRatio >= selectedHpRatio)
                     continue;
 
+                selectedHpRatio = hpRatio;
 
-                selectedHpRatio =
-                    hpRatio;
-
-                selectedTarget =
-                    candidate;
+                selectedTarget = candidate;
             }
-
 
             return selectedTarget;
         }
 
-
-        private ICombatTarget SelectHighestHP(
-            IReadOnlyList<ICombatTarget> candidates)
+        private ICombatTarget SelectHighestHP(IReadOnlyList<ICombatTarget> candidates)
         {
-            ICombatTarget selectedTarget =
-                null;
+            ICombatTarget selectedTarget = null;
 
-            float selectedHpRatio =
-                -1f;
-
+            float selectedHpRatio = -1f;
 
             for (int i = 0; i < candidates.Count; i++)
             {
-                ICombatTarget candidate =
-                    candidates[i];
+                ICombatTarget candidate = candidates[i];
 
-
-                if (!IsValidCandidate(
-                    candidate
-                ))
+                if (!IsValidCandidate(candidate))
                 {
                     continue;
                 }
 
-
-                float hpRatio =
-                    GetHpRatio(
-                        candidate
-                    );
-
+                float hpRatio = GetHpRatio(candidate);
 
                 if (hpRatio <= selectedHpRatio)
                     continue;
 
+                selectedHpRatio = hpRatio;
 
-                selectedHpRatio =
-                    hpRatio;
-
-                selectedTarget =
-                    candidate;
+                selectedTarget = candidate;
             }
-
 
             return selectedTarget;
         }
 
-
-        private float GetHpRatio(
-            ICombatTarget target)
+        private float GetHpRatio(ICombatTarget target)
         {
-            Unit_Gateway gateway =
-                target as Unit_Gateway;
-
+            Unit_Gateway gateway = target as Unit_Gateway;
 
             if (gateway == null)
                 return 1f;
 
-
-            Unit_RuntimeStatus runtimeStatus =
-                gateway.RuntimeStatus;
-
+            Unit_RuntimeStatus runtimeStatus = gateway.RuntimeStatus;
 
             if (runtimeStatus == null)
                 return 1f;
 
-
-            float maxHp =
-                runtimeStatus.MaxHp;
-
+            float maxHp = runtimeStatus.MaxHp;
 
             if (maxHp <= 0f)
                 return 0f;
 
-
-            return Mathf.Clamp01(
-                gateway.CurrentHp
-                / maxHp
-            );
+            return Mathf.Clamp01(gateway.CurrentHp / maxHp);
         }
 
 
@@ -426,78 +518,49 @@ namespace Units
         // Cluster
         // ============================================================
 
-        private ICombatTarget SelectCluster(
-            IReadOnlyList<ICombatTarget> candidates)
+        private ICombatTarget SelectCluster(IReadOnlyList<ICombatTarget> candidates)
         {
-            ICombatTarget selectedTarget =
-                null;
+            ICombatTarget selectedTarget = null;
 
-            int selectedCount =
-                -1;
+            int selectedCount = -1;
 
-            float radiusSqr =
-                _data.AreaRadius
-                * _data.AreaRadius;
-
+            float radiusSqr = _data.AreaRadius * _data.AreaRadius;
 
             for (int i = 0; i < candidates.Count; i++)
             {
-                ICombatTarget centerTarget =
-                    candidates[i];
+                ICombatTarget centerTarget = candidates[i];
 
-
-                if (!IsValidCandidate(
-                    centerTarget
-                ))
+                if (!IsValidCandidate(centerTarget))
                 {
                     continue;
                 }
 
+                Vector2 center = centerTarget.Transform.position;
 
-                Vector2 center =
-                    centerTarget.Transform.position;
-
-                int count =
-                    0;
-
+                int count = 0;
 
                 for (int j = 0; j < candidates.Count; j++)
                 {
-                    ICombatTarget candidate =
-                        candidates[j];
+                    ICombatTarget candidate = candidates[j];
 
-
-                    if (!IsValidCandidate(
-                        candidate
-                    ))
+                    if (!IsValidCandidate(candidate))
                     {
                         continue;
                     }
 
-
-                    float distanceSqr =
-                        (
-                            (Vector2)candidate.Transform.position
-                            - center
-                        ).sqrMagnitude;
-
+                    float distanceSqr = ((Vector2)candidate.Transform.position - center).sqrMagnitude;
 
                     if (distanceSqr <= radiusSqr)
                         count++;
                 }
 
-
                 if (count <= selectedCount)
                     continue;
 
+                selectedCount = count;
 
-                selectedCount =
-                    count;
-
-                selectedTarget =
-                    centerTarget;
+                selectedTarget = centerTarget;
             }
-
 
             return selectedTarget;
         }

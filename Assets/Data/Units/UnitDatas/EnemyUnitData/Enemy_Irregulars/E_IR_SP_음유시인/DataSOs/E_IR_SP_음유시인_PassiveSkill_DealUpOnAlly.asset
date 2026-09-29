@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "E_IR_SP_음유시인_PassiveSkill_DealUpOnAlly"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 5
+  _tickInterval: 0.5
+  _conditions: []
+  _effectMode: 0
+  _actions:
+  - rid: 4844432381217865747
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432381217865747
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 2
+        _targetRelation: 1
+        _maxEffectTargetCount: 10
+        _areaType: 1
+        _areaRadius: 5
+        _areaAngle: 360
+        _effects:
+        - rid: 4844432381217865748
+    - rid: 4844432381217865748
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: be8522486ad949d793a0679af80412a1, type: 2}

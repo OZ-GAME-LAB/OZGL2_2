@@ -1,14 +1,19 @@
-﻿using Units.Skills;
+using Units.Skills;
 
 namespace Units
 {
     public readonly struct HealRequest
     {
+
+        public CombatEventMetadata Metadata { get; }
+
+        public CombatSourceSnapshot SourceSnapshot { get; }
+
         // ============================================================
         // Source
         // ============================================================
 
-        public Unit_Core Healer { get; }
+        public ICombatTarget Healer { get; }
 
 
         // ============================================================
@@ -16,6 +21,8 @@ namespace Units
         // ============================================================
 
         public ICombatTarget Target { get; }
+
+        public CombatTargetSnapshot TargetSnapshot { get; }
 
 
         // ============================================================
@@ -32,22 +39,26 @@ namespace Units
         // ============================================================
 
         public HealRequest(
-            Unit_Core healer,
+            ICombatTarget healer,
             ICombatTarget target,
             HealScalingStatType scalingStatType,
-            float healRatio)
+            float healRatio,
+            CombatEventMetadata metadata = default,
+            CombatSourceSnapshot sourceSnapshot = null)
         {
-            Healer =
-                healer;
+            SourceSnapshot = sourceSnapshot;
 
-            Target =
-                target;
+            TargetSnapshot = new CombatTargetSnapshot(target);
 
-            ScalingStatType =
-                scalingStatType;
+            Metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(healer);
 
-            HealRatio =
-                healRatio;
+            Healer = healer;
+
+            Target = target;
+
+            ScalingStatType = scalingStatType;
+
+            HealRatio = healRatio;
         }
     }
 }

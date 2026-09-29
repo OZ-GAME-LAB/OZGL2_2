@@ -8,8 +8,8 @@ namespace Units
 {
     public class Unit_Life : MonoBehaviour
     {
-        private const float ShieldLimitMultiplier =
-            2f;
+
+        private const float ShieldLimitMultiplier = 2f;
 
 
         // ============================================================
@@ -29,33 +29,30 @@ namespace Units
 
         private bool _isDead;
 
+        private int _damageDepth;
+
+        private int _lifeGeneration;
+
+        private DamageResult? _lethalCause;
+
+        private CombatApplicationResult _lethalApplication;
+
+        public CombatDeathResult LastDeath { get; private set; }
+
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public float CurrentHp
-            => _currentHp;
+        public float CurrentHp => _currentHp;
 
+        public float CurrentShield => _currentShield;
 
-        public float CurrentShield
-            => _currentShield;
+        public float MaxHp => _core != null && _core.RuntimeStatus != null ? _core.RuntimeStatus.MaxHp : 0f;
 
+        public float ShieldLimit => MaxHp * ShieldLimitMultiplier;
 
-        public float MaxHp
-            => _core != null
-                && _core.RuntimeStatus != null
-                    ? _core.RuntimeStatus.MaxHp
-                    : 0f;
-
-
-        public float ShieldLimit
-            => MaxHp
-            * ShieldLimitMultiplier;
-
-
-        public bool IsDead
-            => _isDead;
+        public bool IsDead => _isDead;
 
 
         // ============================================================
@@ -66,8 +63,10 @@ namespace Units
 
         public event Action<float, float> ShieldChanged;
 
-
         public event Action<DamageResult> Damaged;
+
+        // G4에서 처치 패시브에 연결할 확정 사망 결과. 기존 Damaged를 중복 발행하지 않는다.
+        public event Action<CombatDeathResult> DeathConfirmed;
 
         public event Action<float> Healed;
 
@@ -83,7 +82,6 @@ namespace Units
             SubscribeRuntimeStatusEvents();
         }
 
-
         private void OnDisable()
         {
             UnsubscribeRuntimeStatusEvents();
@@ -94,49 +92,42 @@ namespace Units
         // Initialize
         // ============================================================
 
-        public void Initialize(
-            Unit_Core core)
+        public void Initialize(Unit_Core core)
         {
             if (core == null)
             {
-                Debug.LogError(
-                    $"[Unit_Life] {name} : Unit_Core가 없습니다."
-                );
+                Debug.LogError($"[Unit_Life] {name} : Unit_Core가 없습니다.");
 
                 return;
             }
 
-
             UnsubscribeRuntimeStatusEvents();
 
+            _lifeGeneration++;
 
-            _core =
-                core;
+            _damageDepth = 0;
 
+            _lethalCause = null;
+
+            _lethalApplication = null;
+
+            LastDeath = null;
+
+            StopAllCoroutines();
+
+            _core = core;
 
             SubscribeRuntimeStatusEvents();
 
+            _currentHp = MaxHp;
 
-            _currentHp =
-                MaxHp;
+            _currentShield = 0f;
 
-            _currentShield =
-                0f;
+            _isDead = false;
 
-            _isDead =
-                false;
+            HpChanged?.Invoke(_currentHp, _currentHp);
 
-
-            HpChanged?.Invoke(
-                _currentHp,
-                _currentHp
-            );
-
-
-            ShieldChanged?.Invoke(
-                _currentShield,
-                _currentShield
-            );
+            ShieldChanged?.Invoke(_currentShield, _currentShield);
         }
 
 
@@ -144,104 +135,144 @@ namespace Units
         // Damage
         // ============================================================
 
-        public void TakeDamage(
-            DamageResult result)
+        public void TakeDamage(DamageResult result)
         {
-            if (_isDead)
-                return;
-
-
-            float damage =
-                result.Damage;
-
-
-            if (damage <= 0f)
-                return;
-
-
-            float remainingDamage =
-                damage;
-
-
-            ApplyShieldDamage(
-                ref remainingDamage
-            );
-
-
-            ApplyHpDamage(
-                remainingDamage
-            );
-
-
-            Damaged?.Invoke(
-                result
-            );
-
-
-            if (_currentHp <= 0f)
-            {
-                Die();
-            }
+            TakeDamageWithResult(result);
         }
 
+        public CombatApplicationResult TakeDamageWithResult(DamageResult result)
+        {
+            var target = _core != null ? _core.CombatTarget : null;
+
+            if (_isDead || !result.TargetSnapshot.MatchesLifetime || !ReferenceEquals(target, result.Target) || float.IsNaN(result.Damage) || float.IsInfinity(result.Damage))
+            {
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Damage,
+                    target,
+                    result.Metadata,
+                    "Invalid damage target or amount"
+                );
+            }
+
+            var applied = new CombatApplicationResult(
+                CombatApplicationKind.Damage,
+                target,
+                result.Damage,
+                result.Metadata
+            );
+
+            if (result.Damage <= 0f)
+                return applied;
+
+            int generation = _lifeGeneration;
+
+            _damageDepth++;
+
+            using (CombatEventContext.Enter(result.Metadata))
+            {
+                try
+                {
+                    float remainingDamage = result.Damage;
+
+                    ApplyShieldDamage(ref remainingDamage, applied);
+
+                    if (generation != _lifeGeneration)
+                        return applied;
+
+                    ApplyHpDamage(
+                        remainingDamage,
+                        result,
+                        applied
+                    );
+
+                    if (generation != _lifeGeneration)
+                        return applied;
+
+                    Damaged?.Invoke(result);
+                }
+                finally
+                {
+                    if (generation == _lifeGeneration)
+                    {
+                        _damageDepth--;
+
+                        if (_damageDepth == 0 && !_isDead && _currentHp <= 0f && _lethalCause.HasValue)
+                        {
+                            var death = new CombatDeathResult(new CombatTargetSnapshot(target), _lethalCause.Value);
+
+                            LastDeath = death;
+
+                            if (_lethalApplication != null)
+                                _lethalApplication.Death = death;
+
+                            using (CombatEventContext.Enter(death.Metadata))
+                            {
+                                Die();
+
+                                if (generation == _lifeGeneration)
+                                {
+                                    DeathConfirmed?.Invoke(death);
+
+                                    if (generation == _lifeGeneration)
+                                        _core?.NotifyDeathConfirmed(death);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return applied;
+        }
 
         private void ApplyShieldDamage(
-            ref float remainingDamage)
+            ref float remainingDamage,
+            CombatApplicationResult applied)
         {
-            if (_currentShield <= 0f)
+            if (_currentShield <= 0f || remainingDamage <= 0f)
                 return;
 
-            if (remainingDamage <= 0f)
-                return;
+            float previousShield = _currentShield;
 
+            float shieldDamage = Mathf.Min(_currentShield, remainingDamage);
 
-            float previousShield =
-                _currentShield;
+            _currentShield -= shieldDamage;
 
+            remainingDamage -= shieldDamage;
 
-            float shieldDamage =
-                Mathf.Min(
-                    _currentShield,
-                    remainingDamage
-                );
+            applied.ShieldAbsorbed = shieldDamage;
 
+            applied.Status = CombatApplicationStatus.Applied;
 
-            _currentShield -=
-                shieldDamage;
-
-            remainingDamage -=
-                shieldDamage;
-
-
-            ShieldChanged?.Invoke(
-                previousShield,
-                _currentShield
-            );
+            ShieldChanged?.Invoke(previousShield, _currentShield);
         }
 
-
         private void ApplyHpDamage(
-            float damage)
+            float damage,
+            DamageResult cause,
+            CombatApplicationResult applied)
         {
             if (damage <= 0f)
                 return;
 
+            float previousHp = _currentHp;
 
-            float previousHp =
-                _currentHp;
+            _currentHp = Mathf.Max(0f, _currentHp - damage);
 
+            applied.HpDamage = previousHp - _currentHp;
 
-            _currentHp =
-                Mathf.Max(
-                    0f,
-                    _currentHp - damage
-                );
+            if (applied.HpDamage > 0f)
+                applied.Status = CombatApplicationStatus.Applied;
 
+            // 실제로 양수 HP를 0으로 만든 사건을 보관한다. 이미 0인 대상의 후속 피해가 훔치지 않는다.
+            if (previousHp > 0f && _currentHp <= 0f)
+            {
+                _lethalCause = cause;
 
-            HpChanged?.Invoke(
-                previousHp,
-                _currentHp
-            );
+                _lethalApplication = applied;
+            }
+
+            HpChanged?.Invoke(previousHp, _currentHp);
         }
 
 
@@ -249,47 +280,64 @@ namespace Units
         // Heal
         // ============================================================
 
-        public void Heal(
-            float amount)
+        public void Heal(float amount)
         {
-            if (_isDead)
-                return;
+            HealWithResult(amount, CombatEventMetadata.Create(_core != null ? _core.CombatTarget : null));
+        }
 
-            if (amount <= 0f)
-                return;
+        public CombatApplicationResult HealWithResult(
+            float amount,
+            CombatEventMetadata metadata)
+        {
+            var target = _core != null ? _core.CombatTarget : null;
 
-            if (_currentHp >= MaxHp)
-                return;
-
-
-            float previousHp =
-                _currentHp;
-
-
-            _currentHp =
-                Mathf.Min(
-                    MaxHp,
-                    _currentHp + amount
+            if (_isDead || float.IsNaN(amount) || float.IsInfinity(amount))
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Heal,
+                    target,
+                    metadata,
+                    "Invalid life state or amount"
                 );
 
-
-            float healedAmount =
-                _currentHp - previousHp;
-
-
-            if (healedAmount <= 0f)
-                return;
-
-
-            HpChanged?.Invoke(
-                previousHp,
-                _currentHp
+            var applied = new CombatApplicationResult(
+                CombatApplicationKind.Heal,
+                target,
+                amount,
+                metadata
             );
 
+            if (amount <= 0f || _currentHp >= MaxHp)
+                return applied;
 
-            Healed?.Invoke(
-                healedAmount
-            );
+            int generation = _lifeGeneration;
+
+            using (CombatEventContext.Enter(metadata))
+            {
+                float previous = _currentHp;
+
+                _currentHp = Mathf.Min(MaxHp, _currentHp + amount);
+
+                applied.HealedAmount = _currentHp - previous;
+
+                if (applied.HealedAmount <= 0f)
+                    return applied;
+
+                applied.Status = CombatApplicationStatus.Applied;
+
+                if (_currentHp > 0f)
+                {
+                    _lethalCause = null;
+
+                    _lethalApplication = null;
+                }
+
+                HpChanged?.Invoke(previous, _currentHp);
+
+                if (generation == _lifeGeneration)
+                    Healed?.Invoke(applied.HealedAmount);
+            }
+
+            return applied;
         }
 
 
@@ -297,60 +345,57 @@ namespace Units
         // Shield
         // ============================================================
 
-        public void AddShield(
-            float amount)
+        public void AddShield(float amount)
         {
-            if (_isDead)
-                return;
-
-            if (amount <= 0f)
-                return;
-
-            if (_currentShield >= ShieldLimit)
-                return;
-
-
-            float previousShield =
-                _currentShield;
-
-
-            _currentShield =
-                Mathf.Min(
-                    ShieldLimit,
-                    _currentShield + amount
-                );
-
-
-            float addedAmount =
-                _currentShield - previousShield;
-
-
-            if (addedAmount <= 0f)
-                return;
-
-
-            ShieldChanged?.Invoke(
-                previousShield,
-                _currentShield
-            );
-
-
-            ShieldAdded?.Invoke(
-                addedAmount
-            );
+            AddShieldWithResult(amount, CombatEventMetadata.Create(_core != null ? _core.CombatTarget : null));
         }
 
-
-        public void AddShieldByMaxHp(
-            float ratio)
+        public CombatApplicationResult AddShieldWithResult(
+            float amount,
+            CombatEventMetadata metadata)
         {
-            if (ratio <= 0f)
-                return;
+            var target = _core != null ? _core.CombatTarget : null;
 
+            if (_isDead || float.IsNaN(amount) || float.IsInfinity(amount))
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Shield,
+                    target,
+                    metadata,
+                    "Invalid life state or amount"
+                );
 
-            AddShield(
-                MaxHp * ratio
+            var applied = new CombatApplicationResult(
+                CombatApplicationKind.Shield,
+                target,
+                amount,
+                metadata
             );
+
+            if (amount <= 0f || _currentShield >= ShieldLimit)
+                return applied;
+
+            int generation = _lifeGeneration;
+
+            using (CombatEventContext.Enter(metadata))
+            {
+                float previous = _currentShield;
+
+                _currentShield = Mathf.Min(ShieldLimit, _currentShield + amount);
+
+                applied.ShieldAdded = _currentShield - previous;
+
+                if (applied.ShieldAdded <= 0f)
+                    return applied;
+
+                applied.Status = CombatApplicationStatus.Applied;
+
+                ShieldChanged?.Invoke(previous, _currentShield);
+
+                if (generation == _lifeGeneration)
+                    ShieldAdded?.Invoke(applied.ShieldAdded);
+            }
+
+            return applied;
         }
 
 
@@ -363,36 +408,37 @@ namespace Units
             if (_isDead)
                 return;
 
+            _isDead = true;
 
-            _isDead =
-                true;
+            Debug.Log($"[Unit_Life] {name} 사망");
 
+            int generation = _lifeGeneration;
 
-            Debug.Log(
-                $"[Unit_Life] {name} 사망"
-            );
+            _core?.NotifyKillAttributed(LastDeath);
 
+            if (generation != _lifeGeneration)
+                return;
 
             _core?.NotifyDeath();
 
+            if (generation != _lifeGeneration)
+                return;
 
-            StartCoroutine(
-                DisableAfterDeath()
-            );
+            StartCoroutine(DisableAfterDeath());
         }
 
 
         // 임시적으로 사망 후 0.3초 후에 비활성화하도록 설정
         private IEnumerator DisableAfterDeath()
         {
-            yield return new WaitForSeconds(
-                0.3f
-            );
+            int generation = _lifeGeneration;
 
+            yield return new WaitForSeconds(0.3f);
 
-            gameObject.SetActive(
-                false
-            );
+            if (generation != _lifeGeneration)
+                yield break;
+
+            gameObject.SetActive(false);
         }
 
 
@@ -408,11 +454,8 @@ namespace Units
             if (_core.RuntimeStatus == null)
                 return;
 
-
-            _core.RuntimeStatus.MaxHpChanged +=
-                OnMaxHpChanged;
+            _core.RuntimeStatus.MaxHpChanged += OnMaxHpChanged;
         }
-
 
         private void UnsubscribeRuntimeStatusEvents()
         {
@@ -422,11 +465,8 @@ namespace Units
             if (_core.RuntimeStatus == null)
                 return;
 
-
-            _core.RuntimeStatus.MaxHpChanged -=
-                OnMaxHpChanged;
+            _core.RuntimeStatus.MaxHpChanged -= OnMaxHpChanged;
         }
-
 
         private void OnMaxHpChanged(
             float previousMaxHp,
@@ -434,35 +474,20 @@ namespace Units
         {
             if (_currentHp > currentMaxHp)
             {
-                float previousHp =
-                    _currentHp;
+                float previousHp = _currentHp;
 
+                _currentHp = currentMaxHp;
 
-                _currentHp =
-                    currentMaxHp;
-
-
-                HpChanged?.Invoke(
-                    previousHp,
-                    _currentHp
-                );
+                HpChanged?.Invoke(previousHp, _currentHp);
             }
-
 
             if (_currentShield > ShieldLimit)
             {
-                float previousShield =
-                    _currentShield;
+                float previousShield = _currentShield;
 
+                _currentShield = ShieldLimit;
 
-                _currentShield =
-                    ShieldLimit;
-
-
-                ShieldChanged?.Invoke(
-                    previousShield,
-                    _currentShield
-                );
+                ShieldChanged?.Invoke(previousShield, _currentShield);
             }
         }
     }

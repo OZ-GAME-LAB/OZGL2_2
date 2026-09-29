@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 
@@ -15,8 +15,7 @@ namespace Units.Skills
 
         [Header("Subject")]
         [SerializeField]
-        private PassiveConditionSubjectType _subjectType =
-            PassiveConditionSubjectType.Owner;
+        private PassiveConditionSubjectType _subjectType = PassiveConditionSubjectType.Owner;
 
 
         // ============================================================
@@ -25,61 +24,56 @@ namespace Units.Skills
 
         [Header("Condition")]
         [SerializeField]
-        private PassiveValueComparisonType _comparisonType =
-            PassiveValueComparisonType.LessOrEqual;
+        private PassiveValueComparisonType _comparisonType = PassiveValueComparisonType.LessOrEqual;
 
         [SerializeField]
         [Range(0f, 1f)]
-        private float _healthRatio =
-            0.5f;
+        private float _healthRatio = 0.5f;
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public PassiveConditionSubjectType SubjectType =>
-            _subjectType;
+        public PassiveConditionSubjectType SubjectType => _subjectType;
 
-        public PassiveValueComparisonType ComparisonType =>
-            _comparisonType;
+        public PassiveValueComparisonType ComparisonType => _comparisonType;
 
-        public float HealthRatio =>
-            _healthRatio;
+        public float HealthRatio => _healthRatio;
 
 
         // ============================================================
         // Evaluate
         // ============================================================
 
-        public override bool Evaluate(
-            PassiveContext context)
-        {
-            ICombatTarget subject =
-                GetSubject(
-                    context
-                );
+        public override CombatStateChange OwnerDependencies => SubjectType == PassiveConditionSubjectType.Owner ? CombatStateChange.Health | CombatStateChange.Stats : CombatStateChange.None;
 
-            if (subject == null ||
-                subject.RuntimeStatus == null)
+        public override CombatStateChange TargetDependencies => SubjectType == PassiveConditionSubjectType.Target ? CombatStateChange.Health | CombatStateChange.Stats : CombatStateChange.None;
+
+        public override bool Evaluate(PassiveContext context)
+        {
+            if (_subjectType == PassiveConditionSubjectType.Target && context.FrozenTarget != null)
+            {
+                var snapshot = context.FrozenTarget.Owner;
+
+                return snapshot.MaxHp > 0f && Compare(snapshot.Hp / snapshot.MaxHp, _healthRatio);
+            }
+
+            ICombatTarget subject = GetSubject(context);
+
+            if (subject == null || subject.RuntimeStatus == null)
             {
                 return false;
             }
 
-            float maxHp =
-                subject.RuntimeStatus.MaxHp;
+            float maxHp = subject.RuntimeStatus.MaxHp;
 
             if (maxHp <= 0f)
                 return false;
 
-            float currentRatio =
-                subject.CurrentHp /
-                maxHp;
+            float currentRatio = subject.CurrentHp / maxHp;
 
-            return Compare(
-                currentRatio,
-                _healthRatio
-            );
+            return Compare(currentRatio, _healthRatio);
         }
 
 
@@ -87,8 +81,7 @@ namespace Units.Skills
         // Subject
         // ============================================================
 
-        private ICombatTarget GetSubject(
-            PassiveContext context)
+        private ICombatTarget GetSubject(PassiveContext context)
         {
             switch (_subjectType)
             {
@@ -115,26 +108,19 @@ namespace Units.Skills
             switch (_comparisonType)
             {
                 case PassiveValueComparisonType.Less:
-                    return currentValue <
-                           targetValue;
+                    return currentValue < targetValue;
 
                 case PassiveValueComparisonType.LessOrEqual:
-                    return currentValue <=
-                           targetValue;
+                    return currentValue <= targetValue;
 
                 case PassiveValueComparisonType.Greater:
-                    return currentValue >
-                           targetValue;
+                    return currentValue > targetValue;
 
                 case PassiveValueComparisonType.GreaterOrEqual:
-                    return currentValue >=
-                           targetValue;
+                    return currentValue >= targetValue;
 
                 case PassiveValueComparisonType.Equal:
-                    return Mathf.Approximately(
-                        currentValue,
-                        targetValue
-                    );
+                    return Mathf.Approximately(currentValue, targetValue);
 
                 default:
                     return false;

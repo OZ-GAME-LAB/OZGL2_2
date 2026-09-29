@@ -192,6 +192,10 @@ namespace Units.Editor
         // Identity
         // ============================================================
 
+        // ============================================================
+        // Identity
+        // ============================================================
+
         private void DrawIdentitySection()
         {
             EditorGUILayout.BeginVertical(
@@ -221,20 +225,14 @@ namespace Units.Editor
                 {
                     case UnitTeam.Ally:
 
-                        EditorGUILayout.PropertyField(
-                            _allyIdentity,
-                            true
-                        );
+                        DrawAllyIdentity();
 
                         break;
 
 
                     case UnitTeam.Enemy:
 
-                        EditorGUILayout.PropertyField(
-                            _enemyIdentity,
-                            true
-                        );
+                        DrawEnemyIdentity();
 
                         break;
                 }
@@ -245,6 +243,535 @@ namespace Units.Editor
 
 
             EditorGUILayout.EndVertical();
+        }
+
+
+        // ============================================================
+        // Ally Identity
+        // ============================================================
+
+        private void DrawAllyIdentity()
+        {
+            SerializedProperty unitClass =
+                _allyIdentity.FindPropertyRelative(
+                    "_unitClass"
+                );
+
+            SerializedProperty unitTier =
+                _allyIdentity.FindPropertyRelative(
+                    "_unitTier"
+                );
+
+            SerializedProperty unitType =
+                _allyIdentity.FindPropertyRelative(
+                    "_unitType"
+                );
+
+
+            EditorGUI.BeginChangeCheck();
+
+
+            EditorGUILayout.PropertyField(
+                unitClass
+            );
+
+
+            bool classChanged =
+                EditorGUI.EndChangeCheck();
+
+
+            EditorGUILayout.PropertyField(
+                unitTier
+            );
+
+
+            AllyUnitClass allyClass =
+                (AllyUnitClass)unitClass.intValue;
+
+
+            if (classChanged)
+            {
+                ValidateAllyUnitType(
+                    allyClass,
+                    unitType
+                );
+            }
+
+
+            DrawAllyUnitType(
+                allyClass,
+                unitType
+            );
+        }
+
+
+        private void DrawAllyUnitType(
+            AllyUnitClass allyClass,
+            SerializedProperty unitType)
+        {
+            List<AllyUnitType> availableTypes =
+                GetAvailableAllyUnitTypes(
+                    allyClass
+                );
+
+
+            if (availableTypes.Count == 0)
+            {
+                unitType.intValue =
+                    (int)AllyUnitType.Default;
+
+                EditorGUI.BeginDisabledGroup(
+                    true
+                );
+
+                EditorGUILayout.EnumPopup(
+                    "Unit Type",
+                    AllyUnitType.Default
+                );
+
+                EditorGUI.EndDisabledGroup();
+
+                return;
+            }
+
+
+            AllyUnitType currentType =
+                (AllyUnitType)unitType.intValue;
+
+
+            int selectedIndex =
+                availableTypes.IndexOf(
+                    currentType
+                );
+
+
+            if (selectedIndex < 0)
+            {
+                selectedIndex = 0;
+
+                unitType.intValue =
+                    (int)availableTypes[0];
+            }
+
+
+            string[] displayNames =
+                new string[availableTypes.Count];
+
+
+            for (int i = 0;
+                 i < availableTypes.Count;
+                 i++)
+            {
+                displayNames[i] =
+                    ObjectNames.NicifyVariableName(
+                        availableTypes[i].ToString()
+                    );
+            }
+
+
+            int nextIndex =
+                EditorGUILayout.Popup(
+                    "Unit Type",
+                    selectedIndex,
+                    displayNames
+                );
+
+
+            unitType.intValue =
+                (int)availableTypes[nextIndex];
+        }
+
+
+        private List<AllyUnitType> GetAvailableAllyUnitTypes(
+            AllyUnitClass allyClass)
+        {
+            List<AllyUnitType> result =
+                new();
+
+
+            GetAllyUnitTypeRange(
+                allyClass,
+                out int minValue,
+                out int maxValue
+            );
+
+
+            if (minValue < 0)
+            {
+                return result;
+            }
+
+
+            AllyUnitType[] unitTypes =
+                (AllyUnitType[])Enum.GetValues(
+                    typeof(AllyUnitType)
+                );
+
+
+            for (int i = 0;
+                 i < unitTypes.Length;
+                 i++)
+            {
+                AllyUnitType unitType =
+                    unitTypes[i];
+
+                int value =
+                    (int)unitType;
+
+
+                if (value < minValue ||
+                    value > maxValue)
+                {
+                    continue;
+                }
+
+
+                result.Add(
+                    unitType
+                );
+            }
+
+
+            return result;
+        }
+
+
+        private void ValidateAllyUnitType(
+            AllyUnitClass allyClass,
+            SerializedProperty unitType)
+        {
+            GetAllyUnitTypeRange(
+                allyClass,
+                out int minValue,
+                out int maxValue
+            );
+
+
+            int currentValue =
+                unitType.intValue;
+
+
+            if (minValue < 0 ||
+                currentValue < minValue ||
+                currentValue > maxValue)
+            {
+                unitType.intValue =
+                    (int)AllyUnitType.Default;
+            }
+        }
+
+
+        private void GetAllyUnitTypeRange(
+            AllyUnitClass allyClass,
+            out int minValue,
+            out int maxValue)
+        {
+            switch (allyClass)
+            {
+                case AllyUnitClass.Warrior:
+
+                    minValue = 1;
+                    maxValue = 10;
+
+                    break;
+
+
+                case AllyUnitClass.Swordsman:
+
+                    minValue = 11;
+                    maxValue = 20;
+
+                    break;
+
+
+                case AllyUnitClass.Archer:
+
+                    minValue = 21;
+                    maxValue = 30;
+
+                    break;
+
+
+                case AllyUnitClass.Mage:
+
+                    minValue = 31;
+                    maxValue = 40;
+
+                    break;
+
+
+                case AllyUnitClass.Cultist:
+
+                    minValue = 41;
+                    maxValue = 50;
+
+                    break;
+
+
+                default:
+
+                    minValue = -1;
+                    maxValue = -1;
+
+                    break;
+            }
+        }
+
+
+        // ============================================================
+        // Enemy Identity
+        // ============================================================
+
+        private void DrawEnemyIdentity()
+        {
+            SerializedProperty unitClass =
+                _enemyIdentity.FindPropertyRelative(
+                    "_unitClass"
+                );
+
+            SerializedProperty unitFaction =
+                _enemyIdentity.FindPropertyRelative(
+                    "_unitFaction"
+                );
+
+            SerializedProperty unitType =
+                _enemyIdentity.FindPropertyRelative(
+                    "_unitType"
+                );
+
+
+            EditorGUILayout.PropertyField(
+                unitClass
+            );
+
+
+            EditorGUI.BeginChangeCheck();
+
+
+            EditorGUILayout.PropertyField(
+                unitFaction
+            );
+
+
+            bool factionChanged =
+                EditorGUI.EndChangeCheck();
+
+
+            EnemyUnitFaction faction =
+                (EnemyUnitFaction)unitFaction.intValue;
+
+
+            if (factionChanged)
+            {
+                ValidateEnemyUnitType(
+                    faction,
+                    unitType
+                );
+            }
+
+
+            DrawEnemyUnitType(
+                faction,
+                unitType
+            );
+        }
+
+
+        private void DrawEnemyUnitType(
+            EnemyUnitFaction faction,
+            SerializedProperty unitType)
+        {
+            List<EnemyUnitType> availableTypes =
+                GetAvailableEnemyUnitTypes(
+                    faction
+                );
+
+
+            if (availableTypes.Count == 0)
+            {
+                unitType.intValue =
+                    (int)EnemyUnitType.Default;
+
+                EditorGUI.BeginDisabledGroup(
+                    true
+                );
+
+                EditorGUILayout.EnumPopup(
+                    "Unit Type",
+                    EnemyUnitType.Default
+                );
+
+                EditorGUI.EndDisabledGroup();
+
+                return;
+            }
+
+
+            EnemyUnitType currentType =
+                (EnemyUnitType)unitType.intValue;
+
+
+            int selectedIndex =
+                availableTypes.IndexOf(
+                    currentType
+                );
+
+
+            if (selectedIndex < 0)
+            {
+                selectedIndex = 0;
+
+                unitType.intValue =
+                    (int)availableTypes[0];
+            }
+
+
+            string[] displayNames =
+                new string[availableTypes.Count];
+
+
+            for (int i = 0;
+                 i < availableTypes.Count;
+                 i++)
+            {
+                displayNames[i] =
+                    ObjectNames.NicifyVariableName(
+                        availableTypes[i].ToString()
+                    );
+            }
+
+
+            int nextIndex =
+                EditorGUILayout.Popup(
+                    "Unit Type",
+                    selectedIndex,
+                    displayNames
+                );
+
+
+            unitType.intValue =
+                (int)availableTypes[nextIndex];
+        }
+
+
+        private List<EnemyUnitType> GetAvailableEnemyUnitTypes(
+            EnemyUnitFaction faction)
+        {
+            List<EnemyUnitType> result =
+                new();
+
+
+            GetEnemyUnitTypeRange(
+                faction,
+                out int minValue,
+                out int maxValue
+            );
+
+
+            EnemyUnitType[] unitTypes =
+                (EnemyUnitType[])Enum.GetValues(
+                    typeof(EnemyUnitType)
+                );
+
+
+            for (int i = 0;
+                 i < unitTypes.Length;
+                 i++)
+            {
+                EnemyUnitType unitType =
+                    unitTypes[i];
+
+                int value =
+                    (int)unitType;
+
+
+                if (value < minValue ||
+                    value > maxValue)
+                {
+                    continue;
+                }
+
+
+                result.Add(
+                    unitType
+                );
+            }
+
+
+            return result;
+        }
+
+
+        private void ValidateEnemyUnitType(
+            EnemyUnitFaction faction,
+            SerializedProperty unitType)
+        {
+            GetEnemyUnitTypeRange(
+                faction,
+                out int minValue,
+                out int maxValue
+            );
+
+
+            int currentValue =
+                unitType.intValue;
+
+
+            if (currentValue < minValue ||
+                currentValue > maxValue)
+            {
+                unitType.intValue =
+                    (int)EnemyUnitType.Default;
+            }
+        }
+
+
+        private void GetEnemyUnitTypeRange(
+            EnemyUnitFaction faction,
+            out int minValue,
+            out int maxValue)
+        {
+            switch (faction)
+            {
+                case EnemyUnitFaction.Irregulars:
+
+                    minValue = 1;
+                    maxValue = 20;
+
+                    break;
+
+
+                case EnemyUnitFaction.RegularArmy:
+
+                    minValue = 21;
+                    maxValue = 40;
+
+                    break;
+
+
+                case EnemyUnitFaction.EliteArmy:
+
+                    minValue = 41;
+                    maxValue = 60;
+
+                    break;
+
+
+                case EnemyUnitFaction.Crusaders:
+
+                    minValue = 61;
+                    maxValue = 80;
+
+                    break;
+
+
+                default:
+
+                    minValue = 1;
+                    maxValue = 20;
+
+                    break;
+            }
         }
 
 

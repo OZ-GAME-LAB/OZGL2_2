@@ -12,21 +12,27 @@ namespace Units.Editor
         // ============================================================
 
         private SerializedProperty _skillRange;
+
         private SerializedProperty _skillCooldown;
 
         private SerializedProperty _targetSide;
+
         private SerializedProperty _targetPolicy;
 
         private SerializedProperty _actionType;
+
         private SerializedProperty _castTime;
 
         private SerializedProperty _deliveryType;
 
         private SerializedProperty _maxTargetCount;
+
         private SerializedProperty _maxEffectTargetCount;
 
         private SerializedProperty _areaType;
+
         private SerializedProperty _areaRadius;
+
         private SerializedProperty _areaAngle;
 
         private SerializedProperty _effects;
@@ -34,9 +40,11 @@ namespace Units.Editor
         private SerializedProperty _projectileSpeed;
 
         private SerializedProperty _dashDistance;
+
         private SerializedProperty _dashSpeed;
 
         private SerializedProperty _skillFXType;
+
         private SerializedProperty _hitFXType;
 
 
@@ -45,14 +53,22 @@ namespace Units.Editor
         // ============================================================
 
         private bool _basicFoldout = true;
+
         private bool _targetFoldout = true;
+
         private bool _actionFoldout = true;
+
         private bool _deliveryFoldout = true;
+
         private bool _areaFoldout = true;
+
         private bool _effectsFoldout = true;
+
         private bool _projectileFoldout = true;
+
         private bool _dashFoldout = true;
-        private bool _fxFoldout = true;
+
+        private bool _fxFoldout = false;
 
 
         // ============================================================
@@ -61,104 +77,41 @@ namespace Units.Editor
 
         private void OnEnable()
         {
-            _skillRange =
-                serializedObject.FindProperty(
-                    "_skillRange"
-                );
+            _skillRange = serializedObject.FindProperty("_skillRange");
 
-            _skillCooldown =
-                serializedObject.FindProperty(
-                    "_skillCooldown"
-                );
+            _skillCooldown = serializedObject.FindProperty("_skillCooldown");
 
+            _targetSide = serializedObject.FindProperty("_targetSide");
 
-            _targetSide =
-                serializedObject.FindProperty(
-                    "_targetSide"
-                );
+            _targetPolicy = serializedObject.FindProperty("_targetPolicy");
 
-            _targetPolicy =
-                serializedObject.FindProperty(
-                    "_targetPolicy"
-                );
+            _actionType = serializedObject.FindProperty("_actionType");
 
+            _castTime = serializedObject.FindProperty("_castTime");
 
-            _actionType =
-                serializedObject.FindProperty(
-                    "_actionType"
-                );
+            _deliveryType = serializedObject.FindProperty("_deliveryType");
 
-            _castTime =
-                serializedObject.FindProperty(
-                    "_castTime"
-                );
+            _maxTargetCount = serializedObject.FindProperty("_maxTargetCount");
 
+            _maxEffectTargetCount = serializedObject.FindProperty("_maxEffectTargetCount");
 
-            _deliveryType =
-                serializedObject.FindProperty(
-                    "_deliveryType"
-                );
+            _areaType = serializedObject.FindProperty("_areaType");
 
+            _areaRadius = serializedObject.FindProperty("_areaRadius");
 
-            _maxTargetCount =
-                serializedObject.FindProperty(
-                    "_maxTargetCount"
-                );
+            _areaAngle = serializedObject.FindProperty("_areaAngle");
 
-            _maxEffectTargetCount =
-                serializedObject.FindProperty(
-                    "_maxEffectTargetCount"
-                );
+            _effects = serializedObject.FindProperty("_effects");
 
+            _projectileSpeed = serializedObject.FindProperty("_projectileSpeed");
 
-            _areaType =
-                serializedObject.FindProperty(
-                    "_areaType"
-                );
+            _dashDistance = serializedObject.FindProperty("_dashDistance");
 
-            _areaRadius =
-                serializedObject.FindProperty(
-                    "_areaRadius"
-                );
+            _dashSpeed = serializedObject.FindProperty("_dashSpeed");
 
-            _areaAngle =
-                serializedObject.FindProperty(
-                    "_areaAngle"
-                );
+            _skillFXType = serializedObject.FindProperty("_skillFXType");
 
-
-            _effects =
-                serializedObject.FindProperty(
-                    "_effects"
-                );
-
-
-            _projectileSpeed =
-                serializedObject.FindProperty(
-                    "_projectileSpeed"
-                );
-
-
-            _dashDistance =
-                serializedObject.FindProperty(
-                    "_dashDistance"
-                );
-
-            _dashSpeed =
-                serializedObject.FindProperty(
-                    "_dashSpeed"
-                );
-
-
-            _skillFXType =
-                serializedObject.FindProperty(
-                    "_skillFXType"
-                );
-
-            _hitFXType =
-                serializedObject.FindProperty(
-                    "_hitFXType"
-                );
+            _hitFXType = serializedObject.FindProperty("_hitFXType");
         }
 
 
@@ -170,57 +123,58 @@ namespace Units.Editor
         {
             serializedObject.Update();
 
+            var actions = serializedObject.FindProperty("_actions");
 
-            DrawBasicSection();
+            SkillInspectorUI.Header("액티브 스킬", actions.arraySize > 0
+                ? actions.arraySize + "개 동작을 순서대로 실행" : "레거시 단일 스킬 설정");
 
-            EditorGUILayout.Space();
-
-            DrawTargetSection();
-
-            EditorGUILayout.Space();
-
-            DrawActionSection();
-
-            EditorGUILayout.Space();
-
-            DrawDeliverySection();
-
-
-            if (ShouldDrawAreaSection())
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.Space();
+                EditorGUILayout.PropertyField(_skillRange, new GUIContent("사용 사거리"));
 
-                DrawAreaSection();
+                EditorGUILayout.PropertyField(_skillCooldown, new GUIContent("재사용 대기시간"));
+
+                if (SkillInspectorUI.Foldout(serializedObject, "initialTarget", "최초 대상 선택"))
+                {
+                    EditorGUILayout.PropertyField(_targetSide, new GUIContent("대상 관계"));
+
+                    if (GetTargetSide() != SkillTargetRelation.Self)
+                        EditorGUILayout.PropertyField(_targetPolicy, new GUIContent("선택 우선순위"));
+
+                    if (GetTargetSide() != SkillTargetRelation.Self &&
+                        (SkillTargetPolicy)_targetPolicy.intValue == SkillTargetPolicy.Cluster)
+                        EditorGUILayout.PropertyField(_areaRadius, new GUIContent("최초 대상 밀집 반경"));
+                }
             }
 
+            EditorGUILayout.Space(6);
 
-            EditorGUILayout.Space();
+            SkillAuthoringGUI.Draw(actions);
 
-            DrawEffectsSection();
-
-
-            if (ShouldDrawProjectileSection())
+            if (actions.arraySize == 0 &&
+                SkillInspectorUI.Foldout(serializedObject, "legacy", "기존 단일 스킬 설정", true))
             {
-                EditorGUILayout.Space();
+                DrawActionSection();
 
-                DrawProjectileSection();
+                DrawDeliverySection();
+
+                if (ShouldDrawAreaSection())
+                    DrawAreaSection();
+
+                DrawEffectsSection();
+
+                if (ShouldDrawProjectileSection())
+                    DrawProjectileSection();
+
+                if (ShouldDrawDashSection())
+                    DrawDashSection();
+
+                DrawFXSection();
             }
 
+            SkillInspectorUI.Commit(serializedObject);
 
-            if (ShouldDrawDashSection())
-            {
-                EditorGUILayout.Space();
-
-                DrawDashSection();
-            }
-
-
-            EditorGUILayout.Space();
-
-            DrawFXSection();
-
-
-            serializedObject.ApplyModifiedProperties();
+            SkillInspectorUI.Diagnostics(serializedObject);
         }
 
 
@@ -230,37 +184,25 @@ namespace Units.Editor
 
         private void DrawBasicSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _basicFoldout = EditorGUILayout.Foldout(
+                _basicFoldout,
+                "Basic",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _basicFoldout =
-                EditorGUILayout.Foldout(
-                    _basicFoldout,
-                    "Basic",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_basicFoldout)
             {
                 EditorGUI.indentLevel++;
 
+                EditorGUILayout.PropertyField(_skillRange);
 
-                EditorGUILayout.PropertyField(
-                    _skillRange
-                );
-
-                EditorGUILayout.PropertyField(
-                    _skillCooldown
-                );
-
+                EditorGUILayout.PropertyField(_skillCooldown);
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -272,42 +214,28 @@ namespace Units.Editor
 
         private void DrawTargetSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _targetFoldout = EditorGUILayout.Foldout(
+                _targetFoldout,
+                "Target",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _targetFoldout =
-                EditorGUILayout.Foldout(
-                    _targetFoldout,
-                    "Target",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_targetFoldout)
             {
                 EditorGUI.indentLevel++;
 
+                EditorGUILayout.PropertyField(_targetSide);
 
-                EditorGUILayout.PropertyField(
-                    _targetSide
-                );
-
-
-                if (GetTargetSide()
-                    != SkillTargetRelation.Self)
+                if (GetTargetSide() != SkillTargetRelation.Self)
                 {
-                    EditorGUILayout.PropertyField(
-                        _targetPolicy
-                    );
+                    EditorGUILayout.PropertyField(_targetPolicy);
                 }
-
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -319,42 +247,28 @@ namespace Units.Editor
 
         private void DrawActionSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _actionFoldout = EditorGUILayout.Foldout(
+                _actionFoldout,
+                "Action",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _actionFoldout =
-                EditorGUILayout.Foldout(
-                    _actionFoldout,
-                    "Action",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_actionFoldout)
             {
                 EditorGUI.indentLevel++;
 
+                EditorGUILayout.PropertyField(_actionType);
 
-                EditorGUILayout.PropertyField(
-                    _actionType
-                );
-
-
-                if (GetActionType()
-                    == ActiveSkillActionType.Cast)
+                if (GetActionType() == ActiveSkillActionType.Cast)
                 {
-                    EditorGUILayout.PropertyField(
-                        _castTime
-                    );
+                    EditorGUILayout.PropertyField(_castTime);
                 }
-
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -366,55 +280,35 @@ namespace Units.Editor
 
         private void DrawDeliverySection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _deliveryFoldout = EditorGUILayout.Foldout(
+                _deliveryFoldout,
+                "Delivery",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _deliveryFoldout =
-                EditorGUILayout.Foldout(
-                    _deliveryFoldout,
-                    "Delivery",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_deliveryFoldout)
             {
                 EditorGUI.indentLevel++;
 
+                EditorGUILayout.PropertyField(_deliveryType);
 
-                EditorGUILayout.PropertyField(
-                    _deliveryType
-                );
+                EditorGUILayout.PropertyField(_areaType);
 
-                EditorGUILayout.PropertyField(
-                    _areaType
-                );
-
-
-                if (GetDeliveryType()
-                    == ActiveSkillDeliveryType.Projectile)
+                if (GetDeliveryType() == ActiveSkillDeliveryType.Projectile)
                 {
-                    EditorGUILayout.PropertyField(
-                        _maxTargetCount
-                    );
+                    EditorGUILayout.PropertyField(_maxTargetCount);
                 }
 
-
-                if (GetAreaType()
-                    != ActiveSkillAreaType.Single)
+                if (GetAreaType() != ActiveSkillAreaType.Single)
                 {
-                    EditorGUILayout.PropertyField(
-                        _maxEffectTargetCount
-                    );
+                    EditorGUILayout.PropertyField(_maxEffectTargetCount);
                 }
-
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -426,55 +320,37 @@ namespace Units.Editor
 
         private void DrawAreaSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _areaFoldout = EditorGUILayout.Foldout(
+                _areaFoldout,
+                "Area",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _areaFoldout =
-                EditorGUILayout.Foldout(
-                    _areaFoldout,
-                    "Area",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_areaFoldout)
             {
                 EditorGUI.indentLevel++;
 
-
                 switch (GetAreaType())
                 {
                     case ActiveSkillAreaType.TargetCircle:
-
                     case ActiveSkillAreaType.SelfCircle:
-
-                        EditorGUILayout.PropertyField(
-                            _areaRadius
-                        );
+                        EditorGUILayout.PropertyField(_areaRadius);
 
                         break;
 
-
                     case ActiveSkillAreaType.SelfCone:
+                        EditorGUILayout.PropertyField(_areaRadius);
 
-                        EditorGUILayout.PropertyField(
-                            _areaRadius
-                        );
-
-                        EditorGUILayout.PropertyField(
-                            _areaAngle
-                        );
+                        EditorGUILayout.PropertyField(_areaAngle);
 
                         break;
                 }
 
-
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -486,112 +362,78 @@ namespace Units.Editor
 
         private void DrawEffectsSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
-            );
+            SkillInspectorUI.Cards(_effects, DrawEffect,
+                () => SkillInspectorUI.TypeMenu(_effects, true), "적용 효과");
+        }
 
+        private void DrawEffect(
+            SerializedProperty effectProperty,
+            int index)
+        {
+            object effect = effectProperty.managedReferenceValue;
 
-            _effectsFoldout =
-                EditorGUILayout.Foldout(
-                    _effectsFoldout,
-                    "Effects",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
+            EditorGUILayout.LabelField(GetEffectLabel(effectProperty, index), EditorStyles.boldLabel);
 
-
-            if (_effectsFoldout)
+            if (effect == null)
             {
-                EditorGUI.indentLevel++;
+                EditorGUILayout.HelpBox("Effect 데이터가 비어 있습니다.", MessageType.Warning);
 
+                return;
+            }
 
-                for (int i = 0;
-                     i < _effects.arraySize;
-                     i++)
-                {
-                    SerializedProperty effectProperty =
-                        _effects.GetArrayElementAtIndex(
-                            i
-                        );
+            switch (effect)
+            {
+                case SkillHealEffectData:
+                    DrawHealEffect(effectProperty);
 
+                    break;
 
-                    EditorGUILayout.BeginVertical(
-                        EditorStyles.helpBox
-                    );
+                case SkillShieldEffectData:
+                    DrawShieldEffect(effectProperty);
 
+                    break;
 
+                default:
                     EditorGUILayout.PropertyField(
                         effectProperty,
-                        new GUIContent(
-                            GetEffectLabel(
-                                effectProperty,
-                                i
-                            )
-                        ),
+                        GUIContent.none,
                         true
                     );
 
-
-                    if (GUILayout.Button(
-                        "Remove Effect"
-                    ))
-                    {
-                        _effects.DeleteArrayElementAtIndex(
-                            i
-                        );
-
-                        EditorGUILayout.EndVertical();
-
-                        break;
-                    }
-
-
-                    EditorGUILayout.EndVertical();
-                }
-
-
-                EditorGUILayout.Space();
-
-
-                EditorGUILayout.BeginHorizontal();
-
-
-                if (GUILayout.Button(
-                    "Add Damage"
-                ))
-                {
-                    AddEffect(
-                        new SkillDamageEffectData()
-                    );
-                }
-
-                if (GUILayout.Button(
-                    "Add Heal"
-                ))
-                {
-                    AddEffect(
-                        new SkillHealEffectData()
-                    );
-                }
-
-                if (GUILayout.Button(
-                    "Add Runtime Effect"
-                ))
-                {
-                    AddEffect(
-                        new SkillRuntimeEffectData()
-                    );
-                }
-
-
-                EditorGUILayout.EndHorizontal();
-
-
-                EditorGUI.indentLevel--;
+                    break;
             }
+        }
 
+        private void DrawHealEffect(SerializedProperty effectProperty)
+        {
+            SerializedProperty scalingStatType = effectProperty.FindPropertyRelative("_scalingStatType");
 
-            EditorGUILayout.EndVertical();
+            SerializedProperty healRatio = effectProperty.FindPropertyRelative("_healRatio");
+
+            EditorGUILayout.PropertyField(scalingStatType);
+
+            DrawPercentageValueField(
+                healRatio,
+                "Heal Ratio",
+                0f,
+                10f
+            );
+        }
+
+        private void DrawShieldEffect(SerializedProperty effectProperty)
+        {
+            SerializedProperty scalingStatType = effectProperty.FindPropertyRelative("_scalingStatType");
+
+            SerializedProperty shieldRatio = effectProperty.FindPropertyRelative("_shieldRatio");
+
+            EditorGUILayout.PropertyField(scalingStatType);
+
+            DrawPercentageValueField(
+                shieldRatio,
+                "Shield Ratio",
+                0f,
+                10f
+            );
         }
 
 
@@ -601,33 +443,23 @@ namespace Units.Editor
 
         private void DrawProjectileSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _projectileFoldout = EditorGUILayout.Foldout(
+                _projectileFoldout,
+                "Projectile",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _projectileFoldout =
-                EditorGUILayout.Foldout(
-                    _projectileFoldout,
-                    "Projectile",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_projectileFoldout)
             {
                 EditorGUI.indentLevel++;
 
-
-                EditorGUILayout.PropertyField(
-                    _projectileSpeed
-                );
-
+                EditorGUILayout.PropertyField(_projectileSpeed);
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -639,37 +471,25 @@ namespace Units.Editor
 
         private void DrawDashSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _dashFoldout = EditorGUILayout.Foldout(
+                _dashFoldout,
+                "Dash",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _dashFoldout =
-                EditorGUILayout.Foldout(
-                    _dashFoldout,
-                    "Dash",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_dashFoldout)
             {
                 EditorGUI.indentLevel++;
 
+                EditorGUILayout.PropertyField(_dashDistance);
 
-                EditorGUILayout.PropertyField(
-                    _dashDistance
-                );
-
-                EditorGUILayout.PropertyField(
-                    _dashSpeed
-                );
-
+                EditorGUILayout.PropertyField(_dashSpeed);
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -681,37 +501,25 @@ namespace Units.Editor
 
         private void DrawFXSection()
         {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            _fxFoldout = EditorGUILayout.Foldout(
+                _fxFoldout,
+                "FX",
+                true,
+                EditorStyles.foldoutHeader
             );
-
-
-            _fxFoldout =
-                EditorGUILayout.Foldout(
-                    _fxFoldout,
-                    "FX",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
 
             if (_fxFoldout)
             {
                 EditorGUI.indentLevel++;
 
+                EditorGUILayout.PropertyField(_skillFXType);
 
-                EditorGUILayout.PropertyField(
-                    _skillFXType
-                );
-
-                EditorGUILayout.PropertyField(
-                    _hitFXType
-                );
-
+                EditorGUILayout.PropertyField(_hitFXType);
 
                 EditorGUI.indentLevel--;
             }
-
 
             EditorGUILayout.EndVertical();
         }
@@ -721,54 +529,74 @@ namespace Units.Editor
         // Effects
         // ============================================================
 
-        private void AddEffect(
-            SkillEffectData effect)
+        private void AddEffect(SkillEffectData effect)
         {
-            int index =
-                _effects.arraySize;
+            int index = _effects.arraySize;
 
-            _effects.InsertArrayElementAtIndex(
-                index
-            );
+            _effects.InsertArrayElementAtIndex(index);
 
-            SerializedProperty effectProperty =
-                _effects.GetArrayElementAtIndex(
-                    index
-                );
+            SerializedProperty effectProperty = _effects.GetArrayElementAtIndex(index);
 
-            effectProperty.managedReferenceValue =
-                effect;
+            effectProperty.managedReferenceValue = effect;
         }
-
 
         private string GetEffectLabel(
             SerializedProperty effectProperty,
             int index)
         {
-            object effect =
-                effectProperty.managedReferenceValue;
-
+            object effect = effectProperty.managedReferenceValue;
 
             if (effect == null)
             {
                 return $"Effect {index}";
             }
 
-
             return effect switch
             {
-                SkillDamageEffectData =>
-                    $"Effect {index} - Damage",
+                SkillDamageEffectData => $"Effect {index} - Damage",
+                SkillHealEffectData => $"Effect {index} - Heal",
+                SkillShieldEffectData => $"Effect {index} - Shield",
+                SkillRuntimeEffectData => $"Effect {index} - Runtime Effect",
+                _ => $"Effect {index}"};
+        }
 
-                SkillHealEffectData =>
-                    $"Effect {index} - Heal",
 
-                SkillRuntimeEffectData =>
-                    $"Effect {index} - Runtime Effect",
+        // ============================================================
+        // Value Fields
+        // ============================================================
 
-                _ =>
-                    $"Effect {index}"
-            };
+        private void DrawPercentageValueField(
+            SerializedProperty property,
+            string label,
+            float minValue,
+            float maxValue)
+        {
+            float displayValue = property.floatValue * 100f;
+
+            EditorGUI.BeginChangeCheck();
+
+            EditorGUILayout.BeginHorizontal();
+
+            EditorGUILayout.PrefixLabel(label);
+
+            float nextDisplayValue = EditorGUILayout.FloatField(displayValue);
+
+            GUILayout.Label("%", GUILayout.Width(15f));
+
+            EditorGUILayout.EndHorizontal();
+
+            if (!EditorGUI.EndChangeCheck())
+            {
+                return;
+            }
+
+            float nextValue = nextDisplayValue / 100f;
+
+            property.floatValue = Mathf.Clamp(
+                nextValue,
+                minValue,
+                maxValue
+            );
         }
 
 
@@ -778,22 +606,17 @@ namespace Units.Editor
 
         private bool ShouldDrawAreaSection()
         {
-            return GetAreaType()
-                != ActiveSkillAreaType.Single;
+            return GetAreaType() != ActiveSkillAreaType.Single;
         }
-
 
         private bool ShouldDrawProjectileSection()
         {
-            return GetDeliveryType()
-                == ActiveSkillDeliveryType.Projectile;
+            return GetDeliveryType() == ActiveSkillDeliveryType.Projectile;
         }
-
 
         private bool ShouldDrawDashSection()
         {
-            return GetActionType()
-                == ActiveSkillActionType.Dash;
+            return GetActionType() == ActiveSkillActionType.Dash;
         }
 
 
@@ -803,29 +626,22 @@ namespace Units.Editor
 
         private SkillTargetRelation GetTargetSide()
         {
-            return (SkillTargetRelation)
-                _targetSide.enumValueIndex;
+            return (SkillTargetRelation)_targetSide.enumValueIndex;
         }
-
 
         private ActiveSkillActionType GetActionType()
         {
-            return (ActiveSkillActionType)
-                _actionType.enumValueIndex;
+            return (ActiveSkillActionType)_actionType.enumValueIndex;
         }
-
 
         private ActiveSkillDeliveryType GetDeliveryType()
         {
-            return (ActiveSkillDeliveryType)
-                _deliveryType.enumValueIndex;
+            return (ActiveSkillDeliveryType)_deliveryType.enumValueIndex;
         }
-
 
         private ActiveSkillAreaType GetAreaType()
         {
-            return (ActiveSkillAreaType)
-                _areaType.enumValueIndex;
+            return (ActiveSkillAreaType)_areaType.enumValueIndex;
         }
     }
 }
