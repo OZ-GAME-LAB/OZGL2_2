@@ -22,6 +22,8 @@ namespace Game.UI.Editor
         public const string ScenePath = "Assets/Scenes/UI/PlayerTeamBuildingIntegration.unity";
         private const string SpawnManagerPrefabPath =
             "Assets/Prefabs/Units/Entire Unit System For Merge/SpawnManager.prefab";
+        private const string PlayerVictoryRewardPrefabPath =
+            "Assets/Prefabs/UI/Player/PlayerVictoryReward.prefab";
 
         [MenuItem("Game/UI/Create Team Building Integration Scene")]
         public static void CreateScene()
@@ -148,6 +150,7 @@ namespace Game.UI.Editor
                 var effects = teamRoots.SelectMany(r => r.GetComponentsInChildren<EffectManager>(true)).SingleOrDefault();
                 if (effects != null) Assign(startup, "_effects", effects);
                 EnsureArtifactBackend(scene, owner);
+                EnsureArtifactSelectionUi(scene, owner);
                 owner.SetActive(true);
                 UiCoreCameraRigSetup.Ensure(scene, flow, camera);
                 var cameraController = scene.GetRootGameObjects()
@@ -176,7 +179,9 @@ namespace Game.UI.Editor
 
             var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             var owner = scene.GetRootGameObjects().Single(root => root.name == "Team Building Player UI");
-            if (!EnsureArtifactBackend(scene, owner)) return;
+            bool backendChanged = EnsureArtifactBackend(scene, owner);
+            bool selectionUiChanged = EnsureArtifactSelectionUi(scene, owner);
+            if (!backendChanged && !selectionUiChanged) return;
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new IOException("Failed to save UI artifact backend: " + ScenePath);
             Debug.Log("[UI/TeamBuilding] Connected artifact backend in UI-owned scene.");
@@ -279,6 +284,8 @@ namespace Game.UI.Editor
             var gate = roots.SelectMany(root => root.GetComponentsInChildren<TestWaitingScript>(true)).Single();
             EnsureDamageResolver(scene);
             EnsureGameLoopLayout(hud);
+            EnsureArtifactBackend(scene, owner);
+            EnsureArtifactSelectionUi(scene, owner);
 
             var decisionRoot = hud.transform.Find("QuarterDecision");
             if (decisionRoot == null) throw new InvalidOperationException("Missing QuarterDecision view.");
@@ -301,9 +308,10 @@ namespace Game.UI.Editor
             var waveStart = hud.transform.Find("BottomBar/WaveStart");
             if (waveStart == null) throw new InvalidOperationException("Missing WaveStart button.");
             waveStart.gameObject.SetActive(true);
+            var artifactPanel = owner.GetComponentInChildren<ArtifactRewardPanel>(true);
             SetArray(nav, "_blockingPanels", new[] { Ref<GameObject>(hud, "_waveRewardPanel"),
                 Ref<GameObject>(hud, "_runResultPanel"), Ref<GameObject>(hud, "_messagePanel"),
-                decisionRoot.gameObject });
+                decisionRoot.gameObject, Ref<GameObject>(artifactPanel, "_panelRoot") });
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
                 throw new IOException("Failed to save UI-owned game loop integration scene.");
@@ -356,6 +364,67 @@ namespace Game.UI.Editor
             changed |= SetReferenceIfEmpty(bootstrap, "_artifactManager", manager);
             changed |= SetReferenceIfEmpty(bootstrap, "_effectManager", effects);
             changed |= SetReferenceIfEmpty(startup, "_effects", effects);
+            return changed;
+        }
+
+        private static bool EnsureArtifactSelectionUi(Scene scene, GameObject owner)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerVictoryRewardPrefabPath);
+            if (prefab == null || prefab.GetComponent<ArtifactRewardPanel>() == null)
+                throw new InvalidOperationException("Player victory reward UI prefab is unavailable.");
+
+            bool changed = false;
+            var panels = owner.GetComponentsInChildren<ArtifactRewardPanel>(true);
+            if (panels.Length > 1)
+                throw new InvalidOperationException("Team UI contains multiple artifact reward panels.");
+
+            ArtifactRewardPanel panel;
+            if (panels.Length == 0)
+            {
+                var instance = PrefabUtility.InstantiatePrefab(prefab, scene) as GameObject;
+                if (instance == null)
+                    throw new InvalidOperationException("Failed to instantiate the player victory reward UI.");
+                instance.name = "Player Victory Reward";
+                instance.transform.SetParent(owner.transform, false);
+                panel = instance.GetComponent<ArtifactRewardPanel>();
+                changed = true;
+            }
+            else
+            {
+                panel = panels[0];
+            }
+
+            var bindings = owner.GetComponents<ArtifactRewardBinding>();
+            if (bindings.Length > 1)
+                throw new InvalidOperationException("Team UI contains multiple artifact reward bindings.");
+            var binding = bindings.Length == 1 ? bindings[0] : owner.AddComponent<ArtifactRewardBinding>();
+            changed |= bindings.Length == 0;
+            changed |= SetReferenceIfEmpty(binding, "_panel", panel);
+
+            var navigation = owner.GetComponentInChildren<PlayerUiNavigation>(true);
+            changed |= AddArrayReferenceIfMissing(navigation, "_blockingPanels", Ref<GameObject>(panel, "_panelRoot"));
+
+            // 팀 ArtifactManager가 UI 직렬화 필드를 제공한 뒤에는 같은 마이그레이션으로 자동 연결한다.
+            var manager = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<ArtifactManager>(true)).Single();
+            var managerFields = new SerializedObject(manager);
+            var selectionUi = managerFields.FindProperty("_selectionUI");
+            if (selectionUi != null)
+            {
+                if (selectionUi.propertyType != SerializedPropertyType.ObjectReference)
+                    throw new InvalidOperationException("ArtifactManager._selectionUI must be an object reference.");
+                if (selectionUi.objectReferenceValue == null)
+                {
+                    selectionUi.objectReferenceValue = binding;
+                    managerFields.ApplyModifiedPropertiesWithoutUndo();
+                    changed = true;
+                }
+                else if (selectionUi.objectReferenceValue != binding)
+                {
+                    throw new InvalidOperationException("Custom artifact selection UI will not be overwritten.");
+                }
+            }
+
             return changed;
         }
 
@@ -441,6 +510,24 @@ namespace Game.UI.Editor
             var so = new SerializedObject(obj); var array = so.FindProperty(field); array.arraySize = values.Length;
             for (int i = 0; i < values.Length; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
             so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static bool AddArrayReferenceIfMissing(
+            UnityEngine.Object obj,
+            string field,
+            UnityEngine.Object value)
+        {
+            if (obj == null || value == null) throw new ArgumentNullException();
+            var so = new SerializedObject(obj);
+            var array = so.FindProperty(field);
+            if (array == null || !array.isArray)
+                throw new InvalidOperationException("Missing serialized array: " + field);
+            for (int i = 0; i < array.arraySize; i++)
+                if (array.GetArrayElementAtIndex(i).objectReferenceValue == value) return false;
+            array.InsertArrayElementAtIndex(array.arraySize);
+            array.GetArrayElementAtIndex(array.arraySize - 1).objectReferenceValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            return true;
         }
     }
 }
