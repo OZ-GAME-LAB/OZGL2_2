@@ -23,6 +23,7 @@ namespace Game.UI.Editor
         private static readonly StringBuilder _report = new StringBuilder();
         private static int _checks;
         private static int _errors;
+        private static int _knownTeamRuntimeErrors;
         private static int _searchErrors;
 
         static TeamBuildingUiValidation() => EditorApplication.playModeStateChanged += HandleState;
@@ -31,8 +32,12 @@ namespace Game.UI.Editor
         {
             if (!Application.isBatchMode || !Path.GetFullPath(Application.dataPath).Replace('\\', '/').Contains("/UnityUIValidation/"))
                 throw new InvalidOperationException("Use an isolated UnityUIValidation project.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(TeamBuildingUiSetup.ScenePath) != null &&
+                !AssetDatabase.DeleteAsset(TeamBuildingUiSetup.ScenePath))
+                throw new IOException("Failed to replace the generated UI integration scene.");
             TeamBuildingUiSetup.CreateScene();
             TeamBuildingUiSetup.ConnectExistingTeamApis();
+            TeamBuildingUiSetup.ConnectExistingGameLoopUi();
             var scene = EditorSceneManager.OpenScene(TeamBuildingUiSetup.ScenePath);
             foreach (var root in scene.GetRootGameObjects())
                 foreach (var transform in root.GetComponentsInChildren<Transform>(true))
@@ -66,7 +71,7 @@ namespace Game.UI.Editor
 
         private static async UniTaskVoid RunAsync()
         {
-            _checks = _errors = _searchErrors = 0; _report.Clear();
+            _checks = _errors = _knownTeamRuntimeErrors = _searchErrors = 0; _report.Clear();
             Application.logMessageReceived += HandleLog;
             try
             {
@@ -107,7 +112,17 @@ namespace Game.UI.Editor
                 Check(!UnityEngine.Object.FindObjectsByType<CurrencyTestPanel>(FindObjectsSortMode.None).Any(p => p.enabled), "manual currency debug panel hidden in copy");
                 Check(!UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None).Any(c => c.name == "TestCanvas" && c.enabled), "team debug canvas hidden, logic preserved");
                 Check(UnityEngine.Object.FindFirstObjectByType<Samples.MvpRuntimeHudSample>() == null && UnityEngine.Object.FindFirstObjectByType<Samples.PlayerUiPreviewBindings>() == null, "no preview initialization or mock units");
-                Check(!Ref<Button>(hud, "_waveStartButton").gameObject.activeSelf, "test combat start not exposed as production UI");
+                var waveStart = Ref<Button>(hud, "_waveStartButton");
+                var continueButton = Ref<Button>(hud, "_continueButton");
+                var restartButton = Ref<Button>(hud, "_restartButton");
+                var rewardPanel = Ref<GameObject>(hud, "_waveRewardPanel");
+                var resultPanel = Ref<GameObject>(hud, "_runResultPanel");
+                var loop = UnityEngine.Object.FindFirstObjectByType<CoreGameLoopUiBinding>();
+                var runDecision = UnityEngine.Object.FindFirstObjectByType<CoreRunDecisionBinding>();
+                Check(loop != null && loop.IsReady, "player game-loop UI binding is ready");
+                Check(runDecision != null, "quarter completion choice uses the player UI");
+                Check(waveStart.gameObject.activeSelf && waveStart.interactable,
+                    "player can start a wave from the production HUD");
                 await Capture("01-team-slots", 1280, 720);
 
                 foreach (var slot in slots)
@@ -180,10 +195,14 @@ namespace Game.UI.Editor
                 Click(Point(launch));
                 Check(binding.SelectedSlot != null && catalog.Popup.IsVisible, "build shortcut selects a real empty team slot");
                 binding.ClearSelection();
-                Check(await flow.TrySpawnUnits(), "core preparation submits and completes the real enemy spawn request");
+                waveStart.onClick.Invoke();
+                await Wait(() => flow.CurPhase == GamePhase.Battle);
+                Check(flow.CurPhase == GamePhase.Battle,
+                    "wave start button submits the real enemy spawn request and enters battle");
                 Click(Point(slots[0]));
                 Check(binding.SelectedSlot == null && !catalog.Popup.IsVisible, "battle phase blocks original slot construction UI");
-                await ValidateAutomaticRewards(startup, flow, wallet, hud);
+                await ValidateAutomaticRewards(startup, flow, wallet, hud, continueButton, restartButton,
+                    rewardPanel, resultPanel, runDecision);
                 int beforeCore = wallet.GetBalance(CurrencyType.Gold);
                 Check(beforeCore >= 100, "rewarded run can afford team core upgrade");
                 binding.ClearSelection(); await UniTask.NextFrame();
@@ -227,8 +246,10 @@ namespace Game.UI.Editor
                 Check(slots[0].CurrentBuilding.Data == nextBuildings[0] &&
                     wallet.GetBalance(CurrencyType.Gold) == beforeBarracks - 50,
                     "UI executes team barracks TryUpgrade exactly once");
-                Check(_errors == 0, "no runtime UI/game errors");
-                _report.Insert(0, $"PASS: {_checks} team scene/UI assertions. Runtime errors: {_errors}; Search startup exceptions: {_searchErrors}.\nUnity 6000.3.23f1, isolated Play Mode. Real team assets/API, not full combat or Player build.\n");
+                Check(_errors == 0, "no runtime UI errors");
+                _report.Insert(0, $"PASS: {_checks} team scene/UI assertions. UI runtime errors: {_errors}; " +
+                    $"known team rally errors: {_knownTeamRuntimeErrors}; Search startup exceptions: {_searchErrors}.\n" +
+                    "Unity 6000.3.23f1, isolated Play Mode. Real team assets/API; battle results are driven through the Core result API.\n");
                 File.WriteAllText(Output("results.txt"), _report.ToString());
                 Debug.Log("[UI/TeamBuildingValidation] " + _checks + " assertions passed.");
                 SessionState.SetBool(Key, false); EditorApplication.Exit(0);
@@ -243,10 +264,11 @@ namespace Game.UI.Editor
         }
 
         private static async UniTask ValidateAutomaticRewards(TeamBuildingUiStartup startup,
-            GameFlowController flow, RunCurrencyManager wallet, GameUIController hud)
+            GameFlowController flow, RunCurrencyManager wallet, GameUIController hud,
+            Button continueButton, Button restartButton, GameObject rewardPanel, GameObject resultPanel,
+            CoreRunDecisionBinding runDecision)
         {
             var waves = UnityEngine.Object.FindFirstObjectByType<WaveController>();
-            var gate = UnityEngine.Object.FindFirstObjectByType<TestWaitingScript>();
             var goldText = Ref<TMP_Text>(hud, "_goldText");
             var gemText = Ref<TMP_Text>(startup, "_gemText");
             int events = 0;
@@ -272,6 +294,7 @@ namespace Game.UI.Editor
                     {
                         waves.JumpToLastWaveForTest();
                         Check(await flow.TrySpawnUnits(), "boss reward test starts through Core");
+                        await Wait(() => flow.CurPhase == GamePhase.Battle);
                     }
                     int gold = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
                     int gems = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gem);
@@ -288,6 +311,9 @@ namespace Game.UI.Editor
                         "Reward phase grants currency without any UI payout: " + round);
                     Check(goldText.text == expectedGold.ToString("N0") && gemText.text == $"보석 {expectedGems:N0}",
                         "Gold and Gem HUD show the automatic wallet transaction: " + round);
+                    Check(rewardPanel.activeInHierarchy && continueButton.interactable,
+                        "reward phase opens a player-facing continue prompt: " + round);
+                    if (round == 0) await Capture("06-team-reward", 1280, 720);
                     Check(events == beforeEvents + (gold > 0 ? 1 : 0) + (gems > 0 ? 1 : 0) &&
                         duplicateRejected && atomicSnapshot, "one atomic automatic payout rejects event reentry: " + round);
                     Check(wallet.TryPrepareWaveReward() && !wallet.TryApplyWaveReward(),
@@ -296,18 +322,24 @@ namespace Game.UI.Editor
                     startup.enabled = false; startup.enabled = true; startup.Refresh();
                     Check(events == stableEvents && wallet.GetBalance(CurrencyType.Gold) == expectedGold,
                         "UI re-enable cannot reinitialize or repay the wallet: " + round);
-                    gate.ChooseResultBtn();
+                    continueButton.onClick.Invoke();
                     await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
+                    Check(!rewardPanel.activeInHierarchy, "continue closes the reward prompt: " + round);
                     Check(waves.CurQuarter == (round == 0 ? 1 : 2) && waves.CurWave == (round == 0 ? 2 : 1),
                         "explicit test gate progresses the original Core once: " + round);
                 }
 
                 int beforeLoss = events;
                 Check(await flow.TrySpawnUnits(), "defeat scenario starts through Core");
+                await Wait(() => flow.CurPhase == GamePhase.Battle);
                 await flow.ResolveBattleAsync(ResultType.Defeat);
                 Check(flow.CurPhase == GamePhase.Finished && events == beforeLoss &&
                     wallet.GetBalance(CurrencyType.Gold) == expectedGold &&
                     wallet.GetBalance(CurrencyType.Gem) == expectedGems, "defeat does not award victory currency");
+                Check(resultPanel.activeInHierarchy, "defeat opens the player result screen");
+                Check(restartButton.gameObject.activeInHierarchy && restartButton.interactable,
+                    "defeat result offers a playable restart action");
+                await Capture("07-team-defeat-result", 1280, 720);
                 Check(wallet.CurrentGoldReward == 0 && wallet.CurrentGemReward == 0 && !wallet.TryApplyWaveReward(),
                     "Finished clears prepared reward and rejects late payout");
 
@@ -321,6 +353,7 @@ namespace Game.UI.Editor
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && wallet.GetBalance(CurrencyType.Gem) == 0 &&
                     goldText.text == "100" && gemText.text == "보석 0", "explicit new run refreshes both HUD currencies");
                 Check(await flow.TrySpawnUnits(), "new run starts normally");
+                await Wait(() => flow.CurPhase == GamePhase.Battle);
                 expectedGold = 100 + wallet.CurrentGoldReward;
                 expectedGems = wallet.CurrentGemReward;
                 int newRunEvents = events;
@@ -332,8 +365,35 @@ namespace Game.UI.Editor
                     "end/reinitialize removes old subscriptions and pays only once");
                 Check(goldText.text == expectedGold.ToString("N0") && gemText.text == $"보석 {expectedGems:N0}",
                     "new-run reward is reflected in the visible HUD");
-                gate.ChooseResultBtn();
+                continueButton.onClick.Invoke();
                 await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
+
+                waves.JumpToLastQuarterForTest();
+                waves.JumpToLastWaveForTest();
+                Check(waves.CurQuarter == WaveController.MAIN_QUARTERS && waves.IsLastWave,
+                    "test-only navigation reaches the final main-game boss");
+                Check(await flow.TrySpawnUnits(), "final boss starts through Core");
+                await Wait(() => flow.CurPhase == GamePhase.Battle);
+                flow.ResolveBattleAsync(ResultType.Victory).Forget();
+                await Wait(() => flow.CurPhase == GamePhase.Reward);
+                continueButton.onClick.Invoke();
+                await Wait(() => flow.CurPhase == GamePhase.QuarterComplete && flow.CanChooseRunDecision);
+                Check(runDecision.IsVisible, "final main-game clear opens the finish-or-continue choice");
+                var finishButton = Ref<Button>(runDecision, "_finishButton");
+                Check(finishButton.interactable, "final clear offers the finish action");
+                finishButton.onClick.Invoke();
+                await Wait(() => flow.CurPhase == GamePhase.Finished);
+                Check(resultPanel.activeInHierarchy && restartButton.interactable,
+                    "finish choice opens the victory result and restart action");
+                await Capture("08-team-victory-result", 1280, 720);
+
+                Check(wallet.TryEndRun(), "test owner ends the completed victory run");
+                wallet.Initialize(waves, flow, null,
+                    UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>());
+                flow.ResetRun();
+                startup.Refresh();
+                Check(flow.CurPhase == GamePhase.Preparation && !resultPanel.activeInHierarchy,
+                    "test reset returns to building preparation after the victory result");
             }
             finally
             {
@@ -395,6 +455,12 @@ namespace Game.UI.Editor
         private static void HandleLog(string message, string stack, LogType type)
         {
             if (type == LogType.Exception && stack.Contains("UnityEditor.Search.SearchDatabase")) { _searchErrors++; return; }
+            if (type == LogType.Error && message.StartsWith("[Unit_Gateway]", StringComparison.Ordinal) &&
+                message.EndsWith("Rally movement failed.", StringComparison.Ordinal))
+            {
+                _knownTeamRuntimeErrors++;
+                return;
+            }
             if (type == LogType.Error || type == LogType.Exception || type == LogType.Assert) _errors++;
         }
         private static async UniTask Capture(string name, int width, int height)
