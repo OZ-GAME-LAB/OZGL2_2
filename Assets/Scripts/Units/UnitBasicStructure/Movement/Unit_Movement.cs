@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 
 namespace Units
@@ -282,6 +282,7 @@ namespace Units
 
         public void Stop()
         {
+            _core?.PlayAnimation_Idle();
             _isMoving =
                 false;
 
@@ -428,6 +429,9 @@ namespace Units
 
         public void ReleasePosition()
         {
+            if (!_isMoving)
+                _core?.PlayAnimation_Idle();
+
             _isHoldingPosition =
                 false;
 
@@ -612,6 +616,11 @@ namespace Units
         private void ApplyHoldVelocity(
             Vector2 targetVelocity)
         {
+            if (targetVelocity.sqrMagnitude > 0.0001f)
+                _core?.PlayAnimation_Move();
+            else
+                _core?.PlayAnimation_Idle();
+
             Vector2 acceleration =
                 Vector2.ClampMagnitude(
                     (

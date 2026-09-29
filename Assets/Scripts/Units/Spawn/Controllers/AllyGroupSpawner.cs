@@ -516,7 +516,12 @@ namespace Units
             // ========================================================
 
             core.Initialize(
-                finalModifier
+                finalModifier,
+                _unitStatModifierManager.GetAllyPassiveSkills(
+                    unitData.GetAllyClass(),
+                    unitData.GetAllyType(),
+                    unitData.GetAllyTier()
+                )
             );
 
 

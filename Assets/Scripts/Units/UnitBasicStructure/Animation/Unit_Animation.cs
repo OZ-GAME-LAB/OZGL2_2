@@ -25,6 +25,10 @@ namespace Units
         private float _nextHitTime;
         private PlayerState _lastState;
         private int _lastIndex = -1;
+        private bool _moving;
+        private bool _victory;
+        private int _skillMotion; // 0: 없음, 1: 캐스팅, 2: 돌진
+        private float _oneShotUntil;
 
         // ============================================================
         // Initialize
@@ -55,6 +59,10 @@ namespace Units
             _stunned = false;
             _nextHitTime = float.NegativeInfinity;
             _lastIndex = -1;
+            _moving = false;
+            _victory = false;
+            _skillMotion = 0;
+            _oneShotUntil = 0f;
             _animator.Rebind();
             PlayAnimation_Idle();
         }
@@ -74,14 +82,76 @@ namespace Units
         // Animation
         // ============================================================
 
-        public void PlayAnimation_Idle() => Play(PlayerState.IDLE, 0, true);
-        public void PlayAnimation_Move() => Play(PlayerState.MOVE, 0, true);
-        public void PlayAnimation_Dash() => Play(PlayerState.MOVE, 1, true);
-        public void PlayAnimation_Attack() => Play(PlayerState.ATTACK, 0);
-        public void PlayAnimation_Skill() => Play(PlayerState.ATTACK, 1);
-        public void PlayAnimation_Cast() => Play(PlayerState.OTHER, 0, true);
-        public void PlayAnimation_Buff() => Play(PlayerState.OTHER, 1);
-        public void PlayAnimation_Victory() => Play(PlayerState.OTHER, 2, true);
+        // 논리적 공격 완료는 즉시 발생할 수 있다. 클립 재생 시간과 별도로 관리한다.
+        private void Update() => RefreshContinuousAnimation();
+
+        public void PlayAnimation_Idle()
+        {
+            _moving = false;
+            RefreshContinuousAnimation();
+        }
+
+        public void PlayAnimation_Move()
+        {
+            _moving = true;
+            RefreshContinuousAnimation();
+        }
+
+        public void PlayAnimation_Dash() => StartSkillMotion(2);
+        public void PlayAnimation_Cast() => StartSkillMotion(1);
+        public void PlayAnimation_Attack() => PlayOneShot(PlayerState.ATTACK, 0);
+        public void PlayAnimation_Skill() => PlayOneShot(PlayerState.ATTACK, 1);
+        public void PlayAnimation_Buff() => PlayOneShot(PlayerState.OTHER, 1);
+
+        public void PlayAnimation_Victory()
+        {
+            if (_dead || _stunned || _victory)
+                return;
+            _victory = true;
+            _skillMotion = 0;
+            _oneShotUntil = 0f;
+            RefreshContinuousAnimation();
+        }
+
+        private void StartSkillMotion(int motion)
+        {
+            if (_dead || _stunned || _victory)
+                return;
+            _skillMotion = motion;
+            _oneShotUntil = 0f;
+            RefreshContinuousAnimation();
+        }
+
+        public void StopAnimation_SkillMotion()
+        {
+            if (_skillMotion == 0)
+                return;
+            _skillMotion = 0;
+            RefreshContinuousAnimation();
+        }
+
+        private void RefreshContinuousAnimation()
+        {
+            if (_dead || _stunned || Time.time < _oneShotUntil)
+                return;
+            if (_victory)
+                Play(PlayerState.OTHER, 2, true);
+            else if (_skillMotion == 1)
+                Play(PlayerState.OTHER, 0, true);
+            else if (_skillMotion == 2)
+                Play(PlayerState.MOVE, 1, true);
+            else
+                Play(_moving ? PlayerState.MOVE : PlayerState.IDLE, 0, true);
+        }
+
+        private bool PlayOneShot(PlayerState state, int index)
+        {
+            if (_victory || !Play(state, index))
+                return false;
+            var clip = _spum.StateAnimationPairs[state.ToString()][index];
+            _oneShotUntil = Time.time + clip.length / Mathf.Max(0.01f, _animator.speed);
+            return true;
+        }
 
         public void PlayAnimation_Hit()
         {
@@ -94,7 +164,7 @@ namespace Units
             if (!_hitAnimationEnabled || Time.time < _nextHitTime)
                 return false;
 
-            if (!Play(PlayerState.DAMAGED, 0))
+            if (!PlayOneShot(PlayerState.DAMAGED, 0))
                 return false;
 
             _nextHitTime = Time.time + Mathf.Max(0f, _hitCooldown);
@@ -103,9 +173,11 @@ namespace Units
 
         public void PlayAnimation_Stun()
         {
-            if (_stunned || !Play(PlayerState.DEBUFF, 0, true))
+            if (_dead || _stunned || _victory)
                 return;
-
+            _oneShotUntil = 0f;
+            _skillMotion = 0;
+            Play(PlayerState.DEBUFF, 0, true);
             _stunned = true;
         }
 
@@ -116,7 +188,7 @@ namespace Units
                 return;
 
             _stunned = false;
-            PlayAnimation_Idle();
+            RefreshContinuousAnimation();
         }
 
         public void PlayAnimation_Death()
@@ -140,7 +212,16 @@ namespace Units
                 return false;
 
             if (skipRepeated && _lastState == state && _lastIndex == index)
-                return false;
+            {
+                // 캐스팅 또는 승리 중 OTHER가 끝나면 다시 재생한다.
+                bool restartOther = (_skillMotion == 1 || _victory)
+                    && state == PlayerState.OTHER
+                    && !_animator.IsInTransition(0)
+                    && !_animator.GetCurrentAnimatorStateInfo(0).IsName("OTHER");
+
+                if (!restartOther)
+                    return false;
+            }
 
             if (!_spum.StateAnimationPairs.TryGetValue(state.ToString(), out var clips)
                 || clips == null || index < 0 || index >= clips.Count || clips[index] == null)

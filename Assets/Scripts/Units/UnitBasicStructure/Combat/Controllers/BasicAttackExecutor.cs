@@ -90,6 +90,8 @@ namespace Units
                     return;
                 }
 
+                _core.PlayAnimation_Attack();
+
                 switch (_data.ExecutionType)
                 {
                     case BasicAttackExecutionType.Direct:

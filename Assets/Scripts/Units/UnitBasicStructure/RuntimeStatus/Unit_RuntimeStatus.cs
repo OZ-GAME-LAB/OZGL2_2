@@ -17,6 +17,8 @@ namespace Units
         [SerializeField]
         private UnitData _unitData;
 
+        private IReadOnlyList<PassiveSkillData> _spawnPassiveSkills = Array.Empty<PassiveSkillData>();
+
         private AdjustedStatus _adjustedStatus;
 
         private FinalStatus _finalStatus;
@@ -109,7 +111,7 @@ namespace Units
 
         public ActiveSkillData ActiveSkillData => _unitData != null ? _unitData.ActiveSkillData : null;
 
-        public IReadOnlyList<PassiveSkillData> PassiveSkillDatas => _unitData != null ? _unitData.PassiveSkillDatas : Array.Empty<PassiveSkillData>();
+        public IReadOnlyList<PassiveSkillData> PassiveSkillDatas => _spawnPassiveSkills;
 
 
         // ============================================================
@@ -189,6 +191,17 @@ namespace Units
 
         public void Initialize(FinalStatModifier spawnModifier)
         {
+            Initialize(spawnModifier, null);
+        }
+
+
+        // 외부 패시브는 이 수명의 초기화 시점에만 받는다.
+        public void Initialize(
+            FinalStatModifier spawnModifier,
+            IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
+        {
+            _spawnPassiveSkills = Array.Empty<PassiveSkillData>();
+
             if (_unitData == null)
             {
                 Debug.LogError($"[Unit_RuntimeStatus] {name} : UnitData가 없습니다.");
@@ -204,6 +217,8 @@ namespace Units
 
             _beforeStatuses.Clear();
 
+            InitializePassiveSkills(spawnPassiveSkills);
+
             _adjustedStatus = new AdjustedStatus(_unitData, spawnModifier);
 
             _finalStatus = new FinalStatus(_adjustedStatus);
@@ -211,6 +226,41 @@ namespace Units
             _effectStatus = new EffectStatus(IsImmuneToStatus);
 
             _effectStatus.StatusChanged += OnStatusChanged;
+        }
+
+
+        private void InitializePassiveSkills(IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
+        {
+            List<PassiveSkillData> result = new();
+
+            HashSet<PassiveSkillData> included = new();
+
+            // 기본 목록의 기존 실행 순서와 중복 설정은 보존한다.
+            if (_unitData.PassiveSkillDatas != null)
+            {
+                foreach (PassiveSkillData passiveSkill in _unitData.PassiveSkillDatas)
+                {
+                    if (passiveSkill == null)
+                        continue;
+
+                    result.Add(passiveSkill);
+
+                    included.Add(passiveSkill);
+                }
+            }
+
+            if (spawnPassiveSkills != null)
+            {
+                foreach (PassiveSkillData passiveSkill in spawnPassiveSkills)
+                {
+                    if (passiveSkill != null && included.Add(passiveSkill))
+                    {
+                        result.Add(passiveSkill);
+                    }
+                }
+            }
+
+            _spawnPassiveSkills = result.AsReadOnly();
         }
 
 

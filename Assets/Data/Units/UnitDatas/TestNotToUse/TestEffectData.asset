@@ -12,18 +12,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
   m_Name: TestEffectData
   m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
-  _effectId: 
-  _alignment: 0
+  _skillSchemaVersion: 0
+  _effectId: TestDotDeal
+  _alignment: 1
   _durationType: 0
-  _duration: 0
-  _stackType: 0
-  _maxStack: 1
+  _duration: 10
+  _stackType: 3
+  _maxStack: 10
   _actions:
-  - rid: 4844432244939948127
+  - rid: 4844432405556887655
+  _categories: []
   references:
     version: 2
     RefIds:
-    - rid: 4844432244939948127
-      type: {class: StatusEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
+    - rid: 4844432405556887655
+      type: {class: PeriodicDamageEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
-        _statusType: 0
+        _interval: 1
+        _damage: 100
