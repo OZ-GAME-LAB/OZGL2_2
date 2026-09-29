@@ -19,10 +19,16 @@ namespace Game.UI.Editor
         public const string ScenePath = "Assets/Scenes/Test/MvpArtifactRewardTest.unity";
         public const string PrefabPath = "Assets/Prefabs/UI/MvpArtifactReward.prefab";
         public const string FontPath = "Assets/Data/UI/Tests/ArtifactRewardTestFont.asset";
+        public const string FallbackIconPath = "Assets/Art/Sprites/UI/ArtifactUnknownRelic.png";
 
-        private static readonly Color Paper = new Color32(233, 241, 244, 255);
-        private static readonly Color Muted = new Color32(145, 169, 182, 255);
-        private static readonly Color Mint = new Color32(121, 229, 195, 255);
+        private static readonly Color Paper = new Color32(244, 231, 211, 255);
+        private static readonly Color Muted = new Color32(184, 150, 142, 255);
+        private static readonly Color Mint = new Color32(219, 157, 70, 255);
+        private static readonly Color Frame = new Color32(139, 98, 58, 255);
+        private static readonly Color Board = new Color32(24, 15, 24, 255);
+        private static readonly Color Surface = new Color32(38, 24, 37, 255);
+        private static readonly Color Primary = new Color32(132, 31, 51, 255);
+        private static readonly Color Ember = new Color32(118, 18, 50, 68);
 
         [MenuItem("Game/UI/Create Missing Artifact Reward Assets")]
         public static void Build()
@@ -90,12 +96,12 @@ namespace Game.UI.Editor
             {
                 var panel = root.AddComponent<ArtifactRewardPanel>();
                 var overlay = Box(root.transform, "RewardOverlay", Vector2.zero, Vector2.one,
-                    Vector2.zero, Vector2.zero, new Color32(4, 10, 16, 242));
+                    Vector2.zero, Vector2.zero, new Color32(7, 5, 9, 244));
                 var card = Box(overlay, "RewardCard", new Vector2(.5f, .5f), new Vector2(.5f, .5f),
-                    new Vector2(-720, -430), new Vector2(720, 430), new Color32(25, 36, 48, 255));
-                Label(card, "Title", "전투 승리 · 아티팩트 선택", 42, Paper, 56, 764, 1328, 62);
-                Label(card, "Instruction", "3개 중 1개 선택 → 확정     /     미선택 시 모두 포기", 24, Muted, 56, 719, 1328, 40);
-                var reward = Label(card, "Reward", "획득 골드 --     ·     획득 보석 --", 28, Mint, 56, 665, 1328, 44);
+                    new Vector2(-640, -380), new Vector2(640, 380), Board);
+                Label(card, "Title", "승리 보상", 40, Paper, 430, 688, 420, 72);
+                Label(card, "Instruction", "3개의 유물 중 하나를 선택하세요", 20, Muted, 64, 596, 1152, 34);
+                var reward = Label(card, "Reward", "보상 집계 중", 28, Mint, 260, 635, 760, 40);
                 var fields = new SerializedObject(panel);
                 var cards = fields.FindProperty("_cards");
                 cards.arraySize = 3;
@@ -104,7 +110,7 @@ namespace Game.UI.Editor
                 {
                     float x = 56 + i * 452;
                     var item = Box(card, "Candidate" + i, Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero,
-                        new Color32(37, 52, 66, 255));
+                        Surface);
                     Place(item, x, 210, 424, 430);
                     var button = item.gameObject.AddComponent<Button>();
                     button.targetGraphic = item.GetComponent<Image>();
@@ -118,14 +124,14 @@ namespace Game.UI.Editor
                     name.fontSizeMin = 20;
                     var rarity = Label(item, "Rarity", "등급", 23, Mint, 24, 284, 376, 36);
                     var iconRoot = Box(item, "IconFrame", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero,
-                        new Color32(21, 32, 43, 255));
+                        new Color32(20, 14, 22, 255));
                     Place(iconRoot, 24, 166, 376, 98);
                     iconRoot.GetComponent<Image>().raycastTarget = false;
                     var icon = Box(iconRoot, "Icon", new Vector2(.5f, .5f), new Vector2(.5f, .5f),
                         new Vector2(-43, -43), new Vector2(43, 43), Color.white).GetComponent<Image>();
                     icon.preserveAspect = true;
                     icon.raycastTarget = false;
-                    var placeholder = Label(iconRoot, "MissingIcon", "이미지 준비 중", 22, Muted, 0, 0, 376, 98);
+                    var placeholder = Label(iconRoot, "MissingIcon", "유물", 30, Muted, 0, 0, 376, 98);
                     placeholder.alignment = TextAlignmentOptions.Center;
                     var effect = Label(item, "Effect", "효과 설명", 23, Paper, 24, 32, 376, 112);
                     effect.textWrappingMode = TextWrappingModes.Normal;
@@ -146,7 +152,7 @@ namespace Game.UI.Editor
                 var status = Label(card, "Status", "", 24, Muted, 56, 135, 1328, 46);
                 status.alignment = TextAlignmentOptions.Center;
                 var clear = Button(card, "Clear", "선택 해제", 270, 64);
-                var confirm = Button(card, "Confirm", "모두 포기하고 계속", 600, 64);
+                var confirm = Button(card, "Confirm", "건너뛰기", 600, 64);
                 Place((RectTransform)clear.transform, 269, 50, 270, 64);
                 Place((RectTransform)confirm.transform, 571, 50, 600, 64);
                 for (int i = 0; i < 3; i++) buttons[i].navigation = new Navigation
@@ -180,13 +186,37 @@ namespace Game.UI.Editor
             var panel = asset.GetComponent<ArtifactRewardPanel>();
             if (panel == null) throw new InvalidOperationException("Unexpected prefab at " + PrefabPath);
             var fields = new SerializedObject(panel);
-            var rarityRect = asset.transform.Find("RewardOverlay/RewardCard/Candidate0/Rarity") as RectTransform;
+            var rewardCard = asset.transform.Find("RewardOverlay/RewardCard") as RectTransform;
+            var title = asset.transform.Find("RewardOverlay/RewardCard/Title")?.GetComponent<TMP_Text>();
+            var rewardRect = asset.transform.Find("RewardOverlay/RewardCard/Reward") as RectTransform;
+            var instructionRect = asset.transform.Find("RewardOverlay/RewardCard/Instruction") as RectTransform;
+            var pageRect = asset.transform.Find("RewardOverlay/RewardCard/PageCounter") as RectTransform;
+            var firstCardRect = asset.transform.Find("RewardOverlay/RewardCard/Candidate0") as RectTransform;
+            var previousRect = asset.transform.Find("RewardOverlay/RewardCard/PreviousPage") as RectTransform;
+            var previousLabel = asset.transform.Find("RewardOverlay/RewardCard/PreviousPage/Label")?.GetComponent<TMP_Text>();
+            var confirmLabel = asset.transform.Find("RewardOverlay/RewardCard/Confirm/Label")?.GetComponent<TMP_Text>();
+            var effectRect = asset.transform.Find("RewardOverlay/RewardCard/Candidate0/Effect") as RectTransform;
+            var watermark = asset.transform.Find("RewardOverlay/RewardCard/RelicWatermark");
+            var runeGlow = asset.transform.Find("RewardOverlay/RewardCard/Candidate0/IconFrame/RuneGlow");
             if (fields.FindProperty("_previousPageButton").objectReferenceValue != null &&
                 fields.FindProperty("_nextPageButton").objectReferenceValue != null &&
                 fields.FindProperty("_pageText").objectReferenceValue != null &&
                 fields.FindProperty("_instructionText").objectReferenceValue != null &&
+                fields.FindProperty("_fallbackIcon").objectReferenceValue != null &&
                 asset.transform.Find("RewardOverlay/RewardCard/VictoryHeaderFrame") != null &&
-                rarityRect != null && rarityRect.sizeDelta.y >= 40) return;
+                rewardCard != null && Mathf.Approximately(rewardCard.sizeDelta.x, 1280) &&
+                Mathf.Approximately(rewardCard.sizeDelta.y, 760) && title != null && title.text == "승리 보상" &&
+                rewardRect != null && Mathf.Approximately(rewardRect.sizeDelta.y, 42) &&
+                instructionRect != null && Mathf.Approximately(instructionRect.sizeDelta.y, 34) &&
+                pageRect != null && Mathf.Approximately(pageRect.sizeDelta.y, 24) &&
+                firstCardRect != null && Mathf.Approximately(firstCardRect.anchoredPosition.y, 135) &&
+                previousRect != null && Mathf.Approximately(previousRect.anchoredPosition.x, 32) &&
+                previousLabel != null && previousLabel.text == "이전" && confirmLabel != null &&
+                Mathf.Approximately(confirmLabel.fontSize, 18) && watermark != null &&
+                runeGlow is RectTransform runeGlowRect &&
+                runeGlowRect.pivot == new Vector2(0.5f, 0.5f) &&
+                rewardCard.GetComponent<Image>().color == Board && effectRect != null &&
+                Mathf.Approximately(effectRect.sizeDelta.x, 306)) return;
             var root = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
@@ -222,53 +252,141 @@ namespace Game.UI.Editor
             page.gameObject.SetActive(false);
         }
 
-        // PDF는 배치용 와이어프레임이다. 색상/폰트는 기존 임시 스타일을 유지하고
-        // 기존 오브젝트와 직렬화 참조를 재사용해 공유 씬이나 게임 규칙을 변경하지 않는다.
+        // PDF는 배치용 와이어프레임이다. 기존 오브젝트와 직렬화 참조를 재사용하고
+        // 플레이어용 어두운 판타지 팔레트만 적용해 공유 씬이나 게임 규칙을 변경하지 않는다.
         private static void ConfigureReferenceLayout(GameObject root)
         {
+            var fallbackIcon = GetFallbackIcon();
+            Assign(root.GetComponent<ArtifactRewardPanel>(), "_fallbackIcon", fallbackIcon);
             var card = (RectTransform)root.transform.Find("RewardOverlay/RewardCard");
-            card.sizeDelta = new Vector2(1440, 900);
-            AddFrame(card, new Color32(75, 99, 113, 255));
+            card.sizeDelta = new Vector2(1280, 760);
+            card.GetComponent<Image>().color = Board;
+            card.parent.GetComponent<Image>().color = new Color32(5, 2, 7, 247);
+            AddFrame(card, Frame);
             var header = card.Find("VictoryHeaderFrame") as RectTransform;
             if (header == null)
                 header = Box(card, "VictoryHeaderFrame", Vector2.zero, Vector2.zero,
-                    Vector2.zero, Vector2.zero, new Color32(32, 47, 60, 255));
-            Place(header, 460, 824, 520, 92);
+                    Vector2.zero, Vector2.zero, new Color32(49, 31, 43, 255));
+            Place(header, 430, 688, 420, 72);
+            header.GetComponent<Image>().color = new Color32(54, 24, 39, 255);
             header.GetComponent<Image>().raycastTarget = false;
             header.SetAsFirstSibling();
-            AddFrame(header, new Color32(75, 99, 113, 255));
+            AddFrame(header, Frame);
 
-            var title = LayoutLabel(card, "Title", 460, 824, 520, 92, 40, TextAlignmentOptions.Center);
-            title.text = "전투 승리";
-            var reward = LayoutLabel(card, "Reward", 310, 714, 820, 88, 29, TextAlignmentOptions.Center);
-            reward.text = "획득 골드 --\n획득 보석 --";
-            LayoutLabel(card, "Instruction", 56, 666, 1328, 36, 23, TextAlignmentOptions.Center);
+            var title = LayoutLabel(card, "Title", 430, 688, 420, 72, 38, TextAlignmentOptions.Center);
+            title.text = "승리 보상";
+            title.color = Paper;
+            var reward = LayoutLabel(card, "Reward", 260, 638, 760, 42, 24, TextAlignmentOptions.Center);
+            reward.text = "보상 집계 중";
+            reward.color = Mint;
+            var instruction = LayoutLabel(card, "Instruction", 64, 596, 1152, 34, 20, TextAlignmentOptions.Center);
+            instruction.text = "3개의 유물 중 하나를 선택하세요";
+            instruction.color = Muted;
 
             for (int i = 0; i < 3; i++)
             {
                 var candidate = (RectTransform)card.Find("Candidate" + i);
-                Place(candidate, 164 + i * 380, 178, 352, 466);
-                AddFrame(candidate, new Color32(80, 102, 115, 255));
+                Place(candidate, 115 + i * 360, 135, 330, 420);
+                candidate.GetComponent<Image>().color = Surface;
+                AddFrame(candidate, Frame);
                 var iconFrame = (RectTransform)candidate.Find("IconFrame");
-                Place(iconFrame, 24, 248, 304, 182);
-                AddFrame(iconFrame, new Color32(75, 99, 113, 255));
-                // 실제 이미지가 제공될 때까지 기존 빈 이미지 안내를 유지한다.
+                Place(iconFrame, 22, 224, 286, 158);
+                iconFrame.GetComponent<Image>().color = new Color32(14, 8, 17, 255);
+                AddFrame(iconFrame, Frame);
+                var runeGlow = Decoration(iconFrame, "RuneGlow", Ember);
+                Place(runeGlow, 107, 43, 72, 72);
+                RotateAroundCenter(runeGlow, 45);
+                runeGlow.SetAsFirstSibling();
                 var icon = (RectTransform)iconFrame.Find("Icon");
-                icon.sizeDelta = new Vector2(158, 158);
-                LayoutLabel(iconFrame, "MissingIcon", 0, 0, 304, 182, 22, TextAlignmentOptions.Center);
-                LayoutLabel(candidate, "Name", 16, 194, 320, 42, 28, TextAlignmentOptions.Center);
-                LayoutLabel(candidate, "Rarity", 16, 148, 320, 40, 23, TextAlignmentOptions.Center);
-                LayoutLabel(candidate, "Effect", 24, 24, 304, 110, 23, TextAlignmentOptions.Top);
-                LayoutLabel(candidate, "Selection/Selected", 12, -30, 328, 28, 18, TextAlignmentOptions.Center);
+                icon.sizeDelta = new Vector2(136, 136);
+                var missing = LayoutLabel(iconFrame, "MissingIcon", 0, 0, 286, 158, 30, TextAlignmentOptions.Center);
+                missing.text = "유물";
+                missing.color = Muted;
+                LayoutLabel(candidate, "Name", 14, 174, 302, 42, 24, TextAlignmentOptions.Center).color = Paper;
+                LayoutLabel(candidate, "Rarity", 14, 132, 302, 34, 19, TextAlignmentOptions.Center);
+                LayoutLabel(candidate, "Effect", 12, 24, 306, 92, 18, TextAlignmentOptions.Top).color = Paper;
+                var selection = candidate.Find("Selection").GetComponent<Image>();
+                selection.color = Mint;
+                var selected = LayoutLabel(candidate, "Selection/Selected", 12, -28, 306, 26, 17, TextAlignmentOptions.Center);
+                selected.text = "선택";
+                selected.color = Mint;
             }
 
-            LayoutLabel(card, "Status", 56, 120, 1328, 40, 23, TextAlignmentOptions.Center);
-            LayoutButton(card, "Confirm", 480, 30, 480, 68, true);
-            LayoutButton(card, "Clear", 252, 38, 188, 52, false);
-            // 가변 후보용 추가 조작은 주 버튼과 분리해 카드 좌우에 배치한다.
-            LayoutButton(card, "PreviousPage", 52, 382, 88, 60, false);
-            LayoutButton(card, "NextPage", 1300, 382, 88, 60, false);
-            LayoutLabel(card, "PageCounter", 1210, 730, 174, 56, 23, TextAlignmentOptions.Center);
+            ConfigureThemeDecorations(card, fallbackIcon);
+
+            LayoutLabel(card, "Status", 64, 94, 1152, 30, 18, TextAlignmentOptions.Center).color = Muted;
+            LayoutButton(card, "Confirm", 440, 18, 400, 60, true);
+            LayoutButton(card, "Clear", 260, 22, 160, 52, false);
+            LayoutButton(card, "PreviousPage", 32, 317, 64, 56, false);
+            LayoutButton(card, "NextPage", 1184, 317, 64, 56, false);
+            LayoutLabel(card, "PageCounter", 550, 566, 180, 24, 15, TextAlignmentOptions.Center).color = Muted;
+        }
+
+        private static void ConfigureThemeDecorations(RectTransform card, Sprite fallbackIcon)
+        {
+            var watermark = Decoration(card, "RelicWatermark", Color.white);
+            Place(watermark, 1000, 48, 220, 220);
+            var watermarkImage = watermark.GetComponent<Image>();
+            watermarkImage.sprite = fallbackIcon;
+            watermarkImage.preserveAspect = true;
+            watermarkImage.color = new Color(0.48f, 0.08f, 0.18f, 0.035f);
+            watermark.SetAsFirstSibling();
+
+            var headerRelic = Decoration(card, "HeaderRelic", Color.white);
+            Place(headerRelic, 439, 694, 60, 60);
+            var headerImage = headerRelic.GetComponent<Image>();
+            headerImage.sprite = fallbackIcon;
+            headerImage.preserveAspect = true;
+            headerImage.color = new Color(1, 1, 1, .72f);
+
+            ConfigureAccent(card, "TopAccentLeft", 64, 724, 330, 2, new Color32(139, 98, 58, 190));
+            ConfigureAccent(card, "TopAccentRight", 886, 724, 330, 2, new Color32(139, 98, 58, 190));
+            var leftRune = ConfigureAccent(card, "TopRuneLeft", 405, 718, 12, 12, new Color32(199, 132, 62, 220));
+            RotateAroundCenter(leftRune, 45);
+            var rightRune = ConfigureAccent(card, "TopRuneRight", 863, 718, 12, 12, new Color32(199, 132, 62, 220));
+            RotateAroundCenter(rightRune, 45);
+
+            Color innerFrame = new Color32(139, 98, 58, 105);
+            ConfigureAccent(card, "InnerFrameTop", 14, 744, 1252, 2, innerFrame);
+            ConfigureAccent(card, "InnerFrameBottom", 14, 14, 1252, 2, innerFrame);
+            ConfigureAccent(card, "InnerFrameLeft", 14, 14, 2, 732, innerFrame);
+            ConfigureAccent(card, "InnerFrameRight", 1264, 14, 2, 732, innerFrame);
+        }
+
+        private static RectTransform ConfigureAccent(
+            Transform parent,
+            string name,
+            float x,
+            float y,
+            float width,
+            float height,
+            Color color)
+        {
+            var accent = Decoration(parent, name, color);
+            Place(accent, x, y, width, height);
+            accent.GetComponent<Image>().color = color;
+            return accent;
+        }
+
+        private static void RotateAroundCenter(RectTransform rect, float degrees)
+        {
+            var centerOffset = Vector2.Scale(rect.sizeDelta,
+                new Vector2(0.5f - rect.pivot.x, 0.5f - rect.pivot.y));
+            rect.anchoredPosition += centerOffset;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.localEulerAngles = new Vector3(0, 0, degrees);
+        }
+
+        private static RectTransform Decoration(Transform parent, string name, Color color)
+        {
+            var decoration = parent.Find(name) as RectTransform;
+            if (decoration == null)
+                decoration = Box(parent, name, Vector2.zero, Vector2.zero,
+                    Vector2.zero, Vector2.zero, color);
+            var image = decoration.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return decoration;
         }
 
         private static TMP_Text LayoutLabel(Transform parent, string path, float x, float y,
@@ -289,12 +407,46 @@ namespace Game.UI.Editor
             var button = parent.Find(name).GetComponent<Button>();
             Place((RectTransform)button.transform, x, y, width, height);
             var label = LayoutLabel(button.transform, "Label", 10, 0, width - 20, height, 24, TextAlignmentOptions.Center);
-            if (!primary)
+            if (name == "Confirm")
             {
-                button.GetComponent<Image>().color = new Color32(43, 61, 75, 255);
-                label.color = Paper;
-                AddFrame((RectTransform)button.transform, new Color32(75, 99, 113, 255));
+                label.text = "건너뛰기";
+                label.fontSize = label.fontSizeMax = 18;
             }
+            else if (name == "Clear") label.text = "선택 취소";
+            else if (name == "PreviousPage")
+            {
+                label.text = "이전";
+                label.fontSize = label.fontSizeMax = 18;
+            }
+            else if (name == "NextPage")
+            {
+                label.text = "다음";
+                label.fontSize = label.fontSizeMax = 18;
+            }
+            var image = button.GetComponent<Image>();
+            var colors = button.colors;
+            image.color = Color.white;
+            if (primary)
+            {
+                colors.normalColor = Primary;
+                colors.highlightedColor = new Color32(155, 61, 70, 255);
+                colors.selectedColor = colors.highlightedColor;
+                colors.pressedColor = new Color32(96, 35, 45, 255);
+                colors.disabledColor = new Color32(70, 53, 61, 190);
+                label.color = Paper;
+                AddFrame((RectTransform)button.transform, new Color32(170, 105, 79, 255));
+            }
+            else
+            {
+                colors.normalColor = new Color32(53, 40, 52, 255);
+                colors.highlightedColor = new Color32(76, 55, 69, 255);
+                colors.selectedColor = colors.highlightedColor;
+                colors.pressedColor = new Color32(39, 29, 39, 255);
+                colors.disabledColor = new Color32(45, 38, 45, 180);
+                label.color = Paper;
+                AddFrame((RectTransform)button.transform, Frame);
+            }
+            button.colors = colors;
         }
 
         private static void AddFrame(RectTransform rect, Color color)
@@ -318,6 +470,25 @@ namespace Game.UI.Editor
             AssetDatabase.AddObjectToAsset(font.material, font);
             AssetDatabase.SaveAssetIfDirty(font);
             return font;
+        }
+
+        private static Sprite GetFallbackIcon()
+        {
+            var importer = AssetImporter.GetAtPath(FallbackIconPath) as TextureImporter;
+            if (importer == null) throw new InvalidOperationException("Artifact fallback icon is required at " + FallbackIconPath);
+            bool needsImport = importer.textureType != TextureImporterType.Sprite ||
+                               importer.spriteImportMode != SpriteImportMode.Single ||
+                               importer.maxTextureSize != 512 || !importer.alphaIsTransparency;
+            if (needsImport)
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.maxTextureSize = 512;
+                importer.alphaIsTransparency = true;
+                importer.SaveAndReimport();
+            }
+            return AssetDatabase.LoadAssetAtPath<Sprite>(FallbackIconPath) ??
+                   throw new InvalidOperationException("Could not load artifact fallback icon as a Sprite.");
         }
     }
 }
