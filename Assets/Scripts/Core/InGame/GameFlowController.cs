@@ -421,7 +421,7 @@ namespace Game.Core
         /// <summary>임시 연출 대기. 실제 컷씬·통계창 완료를 기다리는 구현으로 교체한다.</summary>
         private UniTask PlayBattleResultAsync(ResultType result, CancellationToken token)
         {
-            return UniTask.Delay(TimeSpan.FromSeconds(Mathf.Max(StagingTime, Units.Unit_Life.DeathDisappearDelay)), cancellationToken: token);
+            return UniTask.Delay(TimeSpan.FromSeconds(StagingTime), cancellationToken: token);
         }
 
         /// <summary>현재 전투의 유닛·그룹과 준비 상태를 정리한다.</summary>

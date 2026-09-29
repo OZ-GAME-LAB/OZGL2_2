@@ -15,7 +15,7 @@ namespace Units
 
         [Header("피격 애니메이션")]
         [SerializeField] private bool _hitAnimationEnabled = true;
-        [SerializeField, Min(0f)] private float _hitCooldown = 0.3f;
+        [SerializeField, Min(0f)] private float _hitCooldown = 0.5f;
 
         private AnimatorOverrideController _ownedController;
         private RuntimeAnimatorController _originalController;
