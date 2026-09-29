@@ -4,14 +4,16 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-// 상점 품목을 보관하고 재화·아티팩트 매니저에 거래 요청
+// 상점 품목을 보관하고 재화·아티팩트·소모성 아이템 매니저에 거래 요청
 public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
 {
     public bool IsInitialized => _selector != null && _artifactManager != null &&
-        _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized;
+        _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized &&
+        (!HasConsumableSales || (_consumables != null && _consumables.IsInitialized));
     public bool HasStock { get; private set; }
     public IReadOnlyList<ShopArtifactSlot> PurchaseSlots => _purchaseSlots;
     public IReadOnlyList<ShopArtifactExchangeSlot> ExchangeSlots => _exchangeSlots;
+    public IReadOnlyList<ShopConsumableSlot> ConsumableSlots => _consumableSlots;
     public event Action ShopChanged;
 
     [SerializeField] private ShopTable _shopTable;
@@ -19,12 +21,18 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
     private ArtifactManager _artifactManager;
     private RunCurrencyManager _runCurrencyManager;
     private ShopArtifactSelector _selector;
+    private ConsumableItemManager _consumables;
+    private ShopConsumableSelector _consumableSelector;
+    private List<ShopConsumableSlot> _consumableSlots = new List<ShopConsumableSlot>();
+    private bool HasConsumableSales => _shopTable != null && _shopTable.ShopConsumableTable != null &&
+        _shopTable.ShopConsumableTable.SlotCount > 0;
     private List<ShopArtifactSlot> _purchaseSlots = new List<ShopArtifactSlot>();
     private List<ShopArtifactExchangeSlot> _exchangeSlots = new List<ShopArtifactExchangeSlot>();
     private bool _isTrading;
 
-    // 두 매니저 초기화 후 호출. 품목 생성은 TryGenerateStock에서 별도로 처리
-    public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager)
+    // 판매에 사용하는 매니저 초기화 후 호출. 소모성 판매 설정이 있으면 소모성 매니저도 필요
+    public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager,
+        ConsumableItemManager consumableItemManager = null)
     {
         if (_isTrading || IsInitialized)
         {
@@ -38,11 +46,22 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
             return;
         }
 
+        if (HasConsumableSales && (consumableItemManager == null || !consumableItemManager.IsInitialized ||
+            consumableItemManager.Catalog == null))
+        {
+            Debug.LogError("[Shop/ShopManager] 소모성 판매에 사용할 초기화된 ConsumableItemManager 연결 필요", this);
+            return;
+        }
+
         _artifactManager = artifactManager;
+        _consumables = consumableItemManager;
+        _consumableSelector = new ShopConsumableSelector(
+            _consumables != null ? _consumables.Catalog : null, _shopTable);
         _runCurrencyManager = runCurrencyManager;
         _selector = new ShopArtifactSelector(artifactManager.ArtifactCatalog, artifactManager, _shopTable);
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
+        _consumableSlots.Clear();
         HasStock = false;
     }
 
@@ -86,13 +105,16 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
 
         // 한쪽 추첨이 실패하면 기존 상점 목록 유지
         if (!_selector.TryCreatePurchaseSlots(out List<ShopArtifactSlot> purchases) ||
-            !_selector.TryCreateExchangeSlots(out List<ShopArtifactExchangeSlot> exchanges))
+            !_selector.TryCreateExchangeSlots(out List<ShopArtifactExchangeSlot> exchanges) ||
+            _consumableSelector == null ||
+            !_consumableSelector.TryCreatePurchaseSlots(out List<ShopConsumableSlot> consumables))
         {
             return false;
         }
 
         _purchaseSlots = purchases;
         _exchangeSlots = exchanges;
+        _consumableSlots = consumables;
         HasStock = true;
         _isTrading = true;
         ShopChanged?.Invoke();
@@ -122,6 +144,34 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
             return true;
         });
 
+        if (succeeded)
+        {
+            ShopChanged?.Invoke();
+        }
+        _isTrading = false;
+        return succeeded;
+    }
+
+    // 공간 부족은 구매 실패. 지급 실패 시 TryApplyTrade에서 잔액 복원
+    public bool TryPurchaseConsumable(ShopConsumableSlot slot)
+    {
+        if (!IsInitialized || _isTrading || _consumables == null || !_consumables.IsInitialized ||
+            !_consumables.HasEmptySlot || slot == null || !_consumableSlots.Contains(slot) ||
+            slot.IsPurchased || slot.Price < 0 || !_runCurrencyManager.CanSpend(slot.Currency, slot.Price))
+        {
+            return false;
+        }
+
+        _isTrading = true;
+        bool succeeded = _runCurrencyManager.TryApplyTrade(slot.Currency, -slot.Price, () =>
+        {
+            if (!_consumables.TryAdd(slot.Item))
+            {
+                return false;
+            }
+            slot.MarkPurchased();
+            return true;
+        });
         if (succeeded)
         {
             ShopChanged?.Invoke();
@@ -222,6 +272,9 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
         _selector = null;
+        _consumableSlots.Clear();
+        _consumableSelector = null;
+        _consumables = null;
         _artifactManager = null;
         _runCurrencyManager = null;
         HasStock = false;

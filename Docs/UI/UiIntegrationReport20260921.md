@@ -1,5 +1,14 @@
 # UI 연동 점검 보고 — 2026-09-21
 
+## 2026-09-29 아티팩트 선택 UI 통합 씬 준비
+
+- 작업 브랜치는 `feature/ui-final-game-loop-validation`이며 PR 대상은 `dev`다. 팀 코드와 팀 원본 씬은 수정하지 않았다.
+- UI 소유 씬 `Assets/Scenes/UI/PlayerTeamBuildingIntegration.unity`에 추적 중인 `PlayerVictoryReward` 프리팹과 `ArtifactRewardBinding`을 추가했다. 팝업은 시작 시 숨겨져 있으며 열리는 동안 건설 카탈로그 등 다른 플레이어 팝업 입력을 차단한다.
+- `TeamBuildingUiSetup`은 새 통합 씬을 만들거나 기존 UI 씬을 마이그레이션할 때 동일한 아티팩트 UI를 중복 없이 보장한다. 팀 `ArtifactManager`에 `_selectionUI` 직렬화 필드가 추가되면 기존 사용자 지정 참조를 덮어쓰지 않고 자동 연결한다.
+- 현재 팀 `ArtifactManager`에는 해당 필드가 없고 `SelectAndApplyAsync()`의 실제 UI 호출도 TODO 상태다. UI에서 후보를 다시 추첨하거나 임시 진행 토글을 직접 해제하는 우회는 추가하지 않았다.
+- Unity 6000.3.23f1 격리 복사본에서 C# 컴파일 오류 0건을 확인했다. 팀 건설·재화·Core·보상·패배·최종 승리와 새 아티팩트 UI 참조를 포함한 Play Mode 검사 272개 assertion이 통과했다.
+- 기존 팀 유닛 CustomEditor의 `CS0414` 경고 3종은 그대로이며 이번 UI 변경에서 수정하지 않았다. 첫 `-nographics` 검사는 URP 캡처용 RenderTexture를 만들 수 없어 중단됐고, 그래픽 모드 재실행에서 전체 검사가 통과했다.
+
 ## 2026-09-29 게임 루프 통합
 
 - 작업 브랜치는 `feature/ui-game-loop-integration`이며 PR 대상은 `dev`다. 직접 머지하지 않는다.

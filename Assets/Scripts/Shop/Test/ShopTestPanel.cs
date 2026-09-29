@@ -7,6 +7,7 @@ public class ShopTestPanel : MonoBehaviour
     [SerializeField] private ShopManager _shop;
     [SerializeField] private RunCurrencyManager _run;
     [SerializeField] private ArtifactManager _artifacts;
+    [SerializeField] private ConsumableItemManager _consumables;
 
     private Vector2 _scroll;
     private string _result = "기존 재화 패널에서 Run 시작 후 상점을 생성하세요.";
@@ -23,7 +24,7 @@ public class ShopTestPanel : MonoBehaviour
         {
             return false;
         }
-        _shop.Initialize(_artifacts, _run);
+        _shop.Initialize(_artifacts, _run, _consumables);
         if (!_shop.TryGenerateStock())
         {
             return false;
@@ -100,6 +101,29 @@ public class ShopTestPanel : MonoBehaviour
             else if (GUILayout.Button("구매"))
             {
                 Report("구매", _shop.TryPurchase(slot));
+            }
+        }
+
+        GUILayout.Space(8);
+        GUILayout.Label($"소모성 아이템 {_shop.ConsumableSlots.Count}종");
+        if (_consumables != null && _consumables.IsInitialized)
+        {
+            GUILayout.Label($"보유 {_consumables.ItemCount} / 허용 {_consumables.Capacity}");
+            if (!_consumables.HasEmptySlot)
+            {
+                GUILayout.Label("빈 슬롯이 없어 구매할 수 없습니다.");
+            }
+        }
+        foreach (ShopConsumableSlot slot in _shop.ConsumableSlots)
+        {
+            GUILayout.Label($"{slot.Item.DisplayName} / {slot.Currency} {slot.Price}");
+            if (slot.IsPurchased)
+            {
+                GUILayout.Label("구매 완료");
+            }
+            else if (GUILayout.Button("소모성 아이템 구매"))
+            {
+                Report("소모성 아이템 구매", _shop.TryPurchaseConsumable(slot));
             }
         }
 
@@ -182,7 +206,7 @@ public class ShopTestPanel : MonoBehaviour
 
     private void Report(string action, bool succeeded)
     {
-        _result = $"{action}: {(succeeded ? "성공" : "실패 — 잔액·중첩·설정 확인")}";
+        _result = $"{action}: {(succeeded ? "성공" : "실패 — 잔액·중첩·빈 슬롯·설정 확인")}";
         Debug.Log($"[Shop/Test] {_result}", this);
         // 버튼 처리로 목록 크기가 바뀌어도 현재 GUI 순회를 계속하지 않음
         GUIUtility.ExitGUI();
