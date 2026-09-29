@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.UI.Samples;
 using TMPro;
@@ -63,12 +64,15 @@ namespace Game.UI.Editor
             panel.ShowReward(data);
             Check(panel.IsVisible && panel.SelectedArtifactId == null, "opens with no automatic choice");
             Check(EventSystem.current.currentSelectedGameObject == buttons[0].gameObject, "focus is card, not forfeit");
-            Check(!confirm.interactable && status.text.Contains("연결 대기"), "missing receiver locks confirmation");
+            Check(Mathf.Approximately(confirmText.fontSize, 18), "skip action uses secondary text size");
+            Check(!confirm.interactable && status.text.Contains("기다려"), "missing receiver locks confirmation");
             Click(confirm);
             Check(!panel.IsRequestPending, "unbound confirm has no request");
-            Check(rewardText.text.Contains("+30") && rewardText.text.Contains("+0"), "zero gems displayed without invented reward");
-            Check(rewardText.text.Split('\n').Length == 2, "gold and gems on separate lines as in reference");
-            Check(confirmText.text == "모두 포기하고 계속" && !clear.interactable, "forfeit meaning visible");
+            Check(rewardText.text == "골드 +30", "zero-value currency is omitted from the reward summary");
+            Check(confirmText.text == "건너뛰기" && !clear.gameObject.activeSelf,
+                "unselected state exposes only the concise skip action");
+            float skipWidth = ((RectTransform)confirm.transform).rect.width;
+            Check(skipWidth <= 240.1f, "skip remains a compact secondary action");
             var requests = new List<ArtifactRewardRequest>();
             Action<ArtifactRewardRequest> receive = request =>
             {
@@ -81,16 +85,24 @@ namespace Game.UI.Editor
             Check(requests.Count == 0 && panel.SelectedArtifactId == data.Candidates[1].ArtifactId,
                 "card selection does not apply/submit");
             Click(buttons[2]);
+            var fallbackIcon = new SerializedObject(panel).FindProperty("_fallbackIcon").objectReferenceValue as Sprite;
+            Check(fallbackIcon != null, "shared fallback artwork assigned");
             for (int i = 0; i < 3; i++)
             {
                 Check(Row<GameObject>(cards, i, "Selection").activeSelf == (i == 2), "exclusive highlight " + i);
-                Check(Row<Image>(cards, i, "Icon").enabled == false && Row<GameObject>(cards, i, "MissingIcon").activeSelf,
+                Check(Row<Image>(cards, i, "Icon").enabled && Row<Image>(cards, i, "Icon").sprite == fallbackIcon &&
+                    !Row<GameObject>(cards, i, "MissingIcon").activeSelf,
                     "missing artwork fallback " + i);
                 Check(Row<TMP_Text>(cards, i, "Effect").text == data.Candidates[i].EffectDescription, "effect text " + i);
             }
-            Check(confirmText.text == "선택 확정", "explicit confirm caption");
+            Check(confirmText.text == "선택하기" && clear.gameObject.activeSelf &&
+                ((RectTransform)confirm.transform).rect.width > skipWidth, "selected state exposes stronger player actions");
+            Check(Mathf.Approximately(confirmText.fontSize, 24), "selected action uses primary text size");
             Click(clear);
-            Check(panel.SelectedArtifactId == null && confirmText.text.Contains("포기"), "can deselect before forfeit");
+            Check(panel.SelectedArtifactId == null && confirmText.text == "건너뛰기" && !clear.gameObject.activeSelf,
+                "can deselect before skipping");
+            Check(Mathf.Abs(((RectTransform)confirm.transform).rect.width - skipWidth) < .1f,
+                "deselect restores compact skip action");
             Click(buttons[0]);
             await UniTask.Delay(TimeSpan.FromSeconds(.2), ignoreTimeScale: true);
             await CaptureAsync(panel, 1280, 720, "selected");
@@ -148,10 +160,10 @@ namespace Game.UI.Editor
             panel.ResetReward();
             panel.ShowReward(snapshot);
             Check(!panel.TryResolveRequest(stale.RequestId, true) && panel.IsVisible, "reset invalidates old UI response");
-            Check(panel.SelectedArtifactId == null && rewardText.text.Contains("--"), "new session and unknown currency");
+            Check(panel.SelectedArtifactId == null && rewardText.text.Contains("집계 중"), "new session and unknown currency");
             var alternate = MvpArtifactRewardSample.CreateExample(snapshot.RewardId);
             panel.ShowReward(alternate);
-            Check(rewardText.text.Contains("--"), "same reward ID preserves original snapshot");
+            Check(rewardText.text.Contains("집계 중"), "same reward ID preserves original snapshot");
             for (int i = 0; i < 8; i++)
             {
                 panel.gameObject.SetActive(false);
@@ -226,6 +238,7 @@ namespace Game.UI.Editor
             panel.ResetReward();
             panel.ChoiceRequested -= receive;
             await RunPagingChecksAsync(panel);
+            await RunInterfaceContractChecksAsync(panel, buttons, confirm);
             sample.enabled = true;
             sample.ShowNextReward();
             Debug.Log("[UI/MvpArtifactRewardValidation] PASS " + _checks + " checks. No gameplay changes; synthetic UI input only.");
@@ -249,6 +262,8 @@ namespace Game.UI.Editor
             var instruction = Field<TMP_Text>(fields, "_instructionText");
             var status = Field<TMP_Text>(fields, "_statusText");
             var buttons = new[] { Row<Button>(cards, 0, "Button"), Row<Button>(cards, 1, "Button"), Row<Button>(cards, 2, "Button") };
+            Check(previous.GetComponentInChildren<TMP_Text>().text == "이전" &&
+                next.GetComponentInChildren<TMP_Text>().text == "다음", "paging actions use readable labels");
             var requests = new List<ArtifactRewardRequest>();
             Action<ArtifactRewardRequest> receive = requests.Add;
             panel.ChoiceRequested += receive;
@@ -263,12 +278,15 @@ namespace Game.UI.Editor
                     int pages = (count + 2) / 3;
                     Check(data.Candidates.Count == count && panel.PageCount == pages, count + " candidates retained, no truncation");
                     Check(panel.CurrentPageIndex == 0 && panel.SelectedArtifactId == null, "new reward resets page and selection");
-                    Check(instruction.text.Contains("총 " + count + "개"), "count-aware instruction");
+                    Check(count == 1 ? instruction.text == "유물을 확인하세요" : instruction.text.Contains(count + "개의 유물"),
+                        "concise count-aware instruction");
                     Check(pageText.gameObject.activeSelf == (pages > 1) && next.gameObject.activeSelf == (pages > 1), "paging only when needed");
                     previous.onClick.Invoke();
                     Check(panel.CurrentPageIndex == 0, "cannot move before first page");
                     for (int p = 0; p < pages; p++)
                     {
+                        int visibleCount = Math.Min(3, count - p * 3);
+                        CheckVisibleCardsCentered(panel, buttons, visibleCount);
                         Check(panel.CurrentPageIndex == p && pageText.text == (p + 1) + " / " + pages, "correct page indicator");
                         Check(previous.interactable == (p > 0) && next.interactable == (p < pages - 1), "paging bounds");
                         Check(previous.navigation.selectOnRight == buttons[0] &&
@@ -339,7 +357,7 @@ namespace Game.UI.Editor
                 Check(panel.CurrentPageIndex == 1 && panel.SelectedArtifactId == five.Candidates[4].ArtifactId,
                     "disable/enable retains global selection and page");
                 panel.ShowReward(MvpArtifactRewardSample.CreateExample(five.RewardId, 1));
-                Check(panel.PageCount == 2 && instruction.text.Contains("총 5개"), "same reward snapshot cannot silently shrink");
+                Check(panel.PageCount == 2 && instruction.text.Contains("5개의 유물"), "same reward snapshot cannot silently shrink");
                 await WaitForEnabledTint(confirm);
                 await CaptureAsync(panel, 1280, 720, "five-page2");
                 await CaptureAsync(panel, 1920, 1080, "five-page2");
@@ -370,6 +388,101 @@ namespace Game.UI.Editor
             }
         }
 
+        private static async UniTask RunInterfaceContractChecksAsync(
+            ArtifactRewardPanel panel,
+            IReadOnlyList<Button> buttons,
+            Button confirm)
+        {
+            var host = new GameObject("ArtifactSelectionInterfaceValidation");
+            var binding = host.AddComponent<ArtifactRewardBinding>();
+            var bindingFields = new SerializedObject(binding);
+            bindingFields.FindProperty("_panel").objectReferenceValue = panel;
+            bindingFields.ApplyModifiedPropertiesWithoutUndo();
+            var artifacts = new[]
+            {
+                CreateArtifact("interface_guard", "수호의 파편", "받는 피해 감소"),
+                CreateArtifact("interface_ember", "잔불의 인장", "공격력 증가"),
+                CreateArtifact("interface_vow", "관문의 맹세", "최대 체력 증가")
+            };
+
+            try
+            {
+                IArtifactSelectionUI selectionUI = binding;
+                selectionUI.Open();
+                UniTask<ArtifactData> selectedTask = selectionUI.SelectAsync(artifacts, CancellationToken.None);
+                await UniTask.NextFrame();
+                Check(panel.IsVisible && binding.IsChoosing && confirm.interactable,
+                    "interface opens the existing selection popup");
+                Click(buttons[1]);
+                Click(confirm);
+                ArtifactData selected = await selectedTask;
+                Check(selected == artifacts[1] && !panel.IsVisible,
+                    "interface returns the selected team ArtifactData");
+                selectionUI.Close();
+
+                selectionUI.Open();
+                UniTask<ArtifactData> forfeitTask = selectionUI.SelectAsync(artifacts, CancellationToken.None);
+                await UniTask.NextFrame();
+                Click(confirm);
+                Check(await forfeitTask == null, "interface returns null for explicit forfeit");
+                selectionUI.Close();
+
+                using (var cancellation = new CancellationTokenSource())
+                {
+                    selectionUI.Open();
+                    UniTask<ArtifactData> cancelledTask = selectionUI.SelectAsync(artifacts, cancellation.Token);
+                    await UniTask.NextFrame();
+                    bool duplicateRejected = false;
+                    try
+                    {
+                        await selectionUI.SelectAsync(artifacts, CancellationToken.None);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        duplicateRejected = true;
+                    }
+                    Check(duplicateRejected, "interface rejects overlapping selection requests");
+
+                    cancellation.Cancel();
+                    bool cancelled = false;
+                    try
+                    {
+                        await cancelledTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        cancelled = true;
+                    }
+                    Check(cancelled && !panel.IsVisible && !binding.IsChoosing,
+                        "interface cancellation clears and hides the popup");
+                    selectionUI.Close();
+                }
+
+                selectionUI.Open();
+                selectionUI.Open();
+                selectionUI.Close();
+                Check(!panel.IsVisible && !binding.IsChoosing, "interface open and close are repeat-safe");
+            }
+            finally
+            {
+                binding.Close();
+                UnityEngine.Object.Destroy(host);
+                foreach (ArtifactData artifact in artifacts) UnityEngine.Object.Destroy(artifact);
+                panel.ResetReward();
+            }
+        }
+
+        private static ArtifactData CreateArtifact(string id, string displayName, string description)
+        {
+            var artifact = ScriptableObject.CreateInstance<ArtifactData>();
+            var fields = new SerializedObject(artifact);
+            fields.FindProperty("_id").stringValue = id;
+            fields.FindProperty("_displayName").stringValue = displayName;
+            fields.FindProperty("_description").stringValue = description;
+            fields.ApplyModifiedPropertiesWithoutUndo();
+            return artifact;
+        }
+
         private static async UniTask WaitForEnabledTint(Button button)
         {
             float deadline = Time.realtimeSinceStartup + 5;
@@ -381,6 +494,19 @@ namespace Game.UI.Editor
                 await UniTask.NextFrame();
             }
             Check(true, "enabled action is visually enabled after transition");
+        }
+
+        private static void CheckVisibleCardsCentered(
+            ArtifactRewardPanel panel,
+            IReadOnlyList<Button> buttons,
+            int visibleCount)
+        {
+            var view = Field<GameObject>(new SerializedObject(panel), "_panelRoot");
+            Rect board = WorldRect(view.transform.Find("RewardCard"));
+            Rect first = WorldRect(buttons[0].transform);
+            Rect last = WorldRect(buttons[visibleCount - 1].transform);
+            Check(Mathf.Abs((first.xMin + last.xMax) * .5f - board.center.x) < .1f,
+                visibleCount + " visible candidate cards are centered as a group");
         }
 
         private static T Field<T>(SerializedObject fields, string name) where T : UnityEngine.Object =>
@@ -406,11 +532,9 @@ namespace Game.UI.Editor
         {
             Check(SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null, "graphics required for layout validation");
             await UniTask.NextFrame();
-            // Existing HUD validator also uses a fresh native Canvas per snapshot:
-            // same-frame hide/show can otherwise leave stale offscreen render batches.
-            // Clone the view subtree only, never its controller or gameplay components.
             var sourceCanvas = panel.GetComponent<Canvas>();
             bool sourceEnabled = sourceCanvas.enabled;
+            var sourceScaler = panel.GetComponent<CanvasScaler>();
             var cameraObject = new GameObject("Artifact Snapshot Camera", typeof(Camera));
             var camera = cameraObject.GetComponent<Camera>();
             camera.enabled = false;
@@ -418,34 +542,64 @@ namespace Game.UI.Editor
             camera.backgroundColor = new Color32(15, 22, 31, 255);
             camera.orthographic = true;
             camera.transform.position = new Vector3(0, 0, -10);
-            var root = new GameObject("Artifact Snapshot Canvas", typeof(RectTransform), typeof(Canvas));
-            root.SetActive(false);
+            var snapshotRoot = new GameObject("Artifact Snapshot Canvas",
+                typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+            snapshotRoot.SetActive(false);
             var sourceView = Field<GameObject>(new SerializedObject(panel), "_panelRoot");
-            var view = UnityEngine.Object.Instantiate(sourceView, root.transform, false);
-            var canvas = root.GetComponent<Canvas>();
+            var view = UnityEngine.Object.Instantiate(sourceView, snapshotRoot.transform, false);
+            view.name = sourceView.name;
+            var canvas = snapshotRoot.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = camera;
+            canvas.planeDistance = 1;
+            canvas.sortingOrder = sourceCanvas.sortingOrder;
+            canvas.additionalShaderChannels = sourceCanvas.additionalShaderChannels;
+            var boardCanvas = view.transform.Find("RewardCard").gameObject.AddComponent<Canvas>();
+            boardCanvas.overrideSorting = true;
+            boardCanvas.sortingOrder = sourceCanvas.sortingOrder + 1;
+            boardCanvas.additionalShaderChannels = sourceCanvas.additionalShaderChannels;
+            var scaler = snapshotRoot.GetComponent<CanvasScaler>();
+            CopyCanvasScaler(sourceScaler, scaler);
             var target = new RenderTexture(width, height, 24);
             var previousTarget = RenderTexture.active;
+            var captureOnlyHiddenCards = new HashSet<GameObject>();
             Texture2D pixels = null;
             try
             {
-                sourceCanvas.enabled = false;
                 camera.targetTexture = target;
-                canvas.renderMode = RenderMode.ScreenSpaceCamera;
-                canvas.worldCamera = camera;
-                canvas.planeDistance = 1;
-                canvas.scaleFactor = Mathf.Sqrt((width / 1920f) * (height / 1080f));
-                root.SetActive(true);
+                // Never retarget the live Canvas between resolutions. A fresh isolated
+                // Canvas avoids stale partial CanvasRenderer batches and cannot affect the
+                // player's visible UI or its input state.
+                sourceCanvas.enabled = false;
+                snapshotRoot.SetActive(true);
+                foreach (var graphic in view.GetComponentsInChildren<Graphic>(true))
+                {
+                    if (!graphic.gameObject.activeInHierarchy) continue;
+                    bool enabled = graphic.enabled;
+                    graphic.enabled = false;
+                    graphic.enabled = enabled;
+                    if (enabled) graphic.SetAllDirty();
+                }
+                for (int i = 0; i < 4; i++)
+                {
+                    Canvas.ForceUpdateCanvases();
+                    await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
+                    await UniTask.NextFrame();
+                }
                 Canvas.ForceUpdateCanvases();
-                foreach (var label in canvas.GetComponentsInChildren<TMP_Text>())
+                foreach (var label in view.GetComponentsInChildren<TMP_Text>())
                 {
                     label.ForceMeshUpdate();
-                    Check(label.font.HasCharacters(label.text, out uint[] missing, false, true), "glyphs " + label.name);
+                    // Rendering already populated a dynamic runtime lookup when needed.
+                    // Validation must query only; tryAddCharacter would dirty the source
+                    // TMP font asset by appending font-feature records in the Editor.
+                    Check(label.font.HasCharacters(label.text, out uint[] missing, false, false), "glyphs " + label.name);
                     Check(!label.isTextOverflowing, width + " text fits " + label.name);
                 }
                 Canvas.ForceUpdateCanvases();
                 CheckReferenceLayout(view.transform);
                 var corners = new Vector3[4];
-                foreach (var button in canvas.GetComponentsInChildren<Button>())
+                foreach (var button in view.GetComponentsInChildren<Button>())
                 {
                     ((RectTransform)button.transform).GetWorldCorners(corners);
                     foreach (var corner in corners)
@@ -455,18 +609,45 @@ namespace Game.UI.Editor
                             width + " button bounds " + button.name);
                     }
                 }
+                // Unity's manual camera rendering can drop an entire Canvas batch when
+                // sibling card roots are inactive. Keep clone-only hidden slots active
+                // offscreen so the capture uses a stable batch; runtime visibility and
+                // layout assertions above still exercise the real active state.
+                for (int i = 0; i < 3; i++)
+                {
+                    var candidate = view.transform.Find("RewardCard/Candidate" + i).gameObject;
+                    if (candidate.activeSelf) continue;
+                    captureOnlyHiddenCards.Add(candidate);
+                    candidate.SetActive(true);
+                    var rect = (RectTransform)candidate.transform;
+                    rect.anchoredPosition += Vector2.left * 10000;
+                }
+                foreach (var graphic in view.GetComponentsInChildren<Graphic>(true))
+                    if (graphic.gameObject.activeInHierarchy && graphic.enabled) graphic.SetAllDirty();
+                Canvas.ForceUpdateCanvases();
+                await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
+                Canvas.ForceUpdateCanvases();
                 camera.Render();
                 RenderTexture.active = target;
                 pixels = new Texture2D(width, height, TextureFormat.RGB24, false);
                 pixels.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 pixels.Apply();
+                CheckRenderedSurface(view.transform.Find("RewardCard"), camera, pixels,
+                    new Color(.07f, .045f, .07f), "reward board");
+                CheckRenderedSurface(view.transform.Find("RewardCard/VictoryHeaderFrame"), camera, pixels,
+                    new Color(.15f, .08f, .12f), "victory heading frame");
+                var confirmTransform = view.transform.Find("RewardCard/Confirm");
+                bool hasPrimaryAction = ((RectTransform)confirmTransform).rect.width > 240.1f;
+                CheckRenderedSurface(confirmTransform, camera, pixels,
+                    hasPrimaryAction ? new Color(.30f, .10f, .10f) : new Color(.12f, .08f, .12f),
+                    hasPrimaryAction ? "primary action" : "secondary skip action");
                 for (int i = 0; i < 3; i++)
                 {
                     var card = view.transform.Find("RewardCard/Candidate" + i);
-                    if (!card.gameObject.activeInHierarchy) continue;
+                    if (!card.gameObject.activeInHierarchy || captureOnlyHiddenCards.Contains(card.gameObject)) continue;
                     var point = camera.WorldToScreenPoint(card.TransformPoint(new Vector3(10, 10, 0)));
                     var pixel = pixels.GetPixel((int)point.x, (int)point.y);
-                    Check(pixel.g > .12f && pixel.b > .16f, "snapshot actually rendered candidate " + i);
+                    Check(pixel.r > .14f && pixel.b > .14f, "snapshot actually rendered candidate " + i);
                 }
                 Directory.CreateDirectory("Logs/ArtifactRewardValidation");
                 File.WriteAllBytes("Logs/ArtifactRewardValidation/reward-" + width + "x" + height + "-" + suffix + ".png", pixels.EncodeToPNG());
@@ -475,19 +656,66 @@ namespace Game.UI.Editor
             {
                 RenderTexture.active = previousTarget;
                 camera.targetTexture = null;
-                canvas.worldCamera = null;
-                UnityEngine.Object.DestroyImmediate(root);
+                sourceCanvas.enabled = sourceEnabled;
+                UnityEngine.Object.DestroyImmediate(snapshotRoot);
                 UnityEngine.Object.DestroyImmediate(cameraObject);
                 if (pixels != null) UnityEngine.Object.DestroyImmediate(pixels);
                 UnityEngine.Object.DestroyImmediate(target);
-                sourceCanvas.enabled = sourceEnabled;
+                Canvas.ForceUpdateCanvases();
             }
+        }
+
+        private static void CopyCanvasScaler(CanvasScaler source, CanvasScaler destination)
+        {
+            if (source == null)
+            {
+                destination.enabled = false;
+                return;
+            }
+            destination.uiScaleMode = source.uiScaleMode;
+            destination.referencePixelsPerUnit = source.referencePixelsPerUnit;
+            destination.scaleFactor = source.scaleFactor;
+            destination.referenceResolution = source.referenceResolution;
+            destination.screenMatchMode = source.screenMatchMode;
+            destination.matchWidthOrHeight = source.matchWidthOrHeight;
+            destination.physicalUnit = source.physicalUnit;
+            destination.fallbackScreenDPI = source.fallbackScreenDPI;
+            destination.defaultSpriteDPI = source.defaultSpriteDPI;
+            destination.dynamicPixelsPerUnit = source.dynamicPixelsPerUnit;
+            destination.enabled = source.enabled;
+        }
+
+        private static void CheckRenderedSurface(
+            Transform transform,
+            Camera camera,
+            Texture2D pixels,
+            Color minimum,
+            string description)
+        {
+            var rectTransform = (RectTransform)transform;
+            Rect rect = rectTransform.rect;
+            Vector3 world = rectTransform.TransformPoint(new Vector3(rect.xMin + 10, rect.yMin + 10));
+            Vector3 screen = camera.WorldToScreenPoint(world);
+            Color pixel = pixels.GetPixel(
+                Mathf.Clamp(Mathf.RoundToInt(screen.x), 0, pixels.width - 1),
+                Mathf.Clamp(Mathf.RoundToInt(screen.y), 0, pixels.height - 1));
+            Check(pixel.r >= minimum.r && pixel.g >= minimum.g && pixel.b >= minimum.b,
+                "snapshot actually rendered " + description);
         }
 
         private static void CheckReferenceLayout(Transform view)
         {
             var board = view.Find("RewardCard");
             var boardRect = WorldRect(board);
+            var watermark = board.Find("RelicWatermark")?.GetComponent<Image>();
+            var headerRelic = board.Find("HeaderRelic")?.GetComponent<Image>();
+            Check(watermark != null && watermark.sprite != null && watermark.color.a < .1f,
+                "dark fantasy watermark is decorative and unobtrusive");
+            Check(headerRelic != null && headerRelic.sprite != null && !headerRelic.raycastTarget,
+                "header relic decoration is visible and non-interactive");
+            Check(board.Find("TopAccentLeft") != null && board.Find("TopAccentRight") != null &&
+                board.Find("InnerFrameTop") != null && board.Find("InnerFrameBottom") != null,
+                "dark fantasy frame accents exist");
             var title = WorldRect(board.Find("Title"));
             var rewards = WorldRect(board.Find("Reward"));
             var confirm = WorldRect(board.Find("Confirm"));
@@ -507,6 +735,9 @@ namespace Game.UI.Editor
                 var name = WorldRect(candidate.Find("Name"));
                 var rarity = WorldRect(candidate.Find("Rarity"));
                 var effect = WorldRect(candidate.Find("Effect"));
+                var runeGlow = candidate.Find("IconFrame/RuneGlow")?.GetComponent<Image>();
+                Check(runeGlow != null && !runeGlow.raycastTarget && runeGlow.color.a < .5f,
+                    "artifact rune glow stays decorative " + i);
                 Check(rect.height > rect.width, "reference portrait card " + i);
                 Check(rewards.yMin > rect.yMax && confirm.yMax < rect.yMin, "reference reward/card/action vertical order " + i);
                 Check(icon.yMin > name.yMax && name.yMin > rarity.yMax && rarity.yMin > effect.yMax,
