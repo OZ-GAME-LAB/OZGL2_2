@@ -13,10 +13,10 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
 
     private readonly List<TraitData> _data = new List<TraitData>();
     private readonly List<TraitLevelEntry> _levels = new List<TraitLevelEntry>();
-    private OutGameTestWallet _wallet;
+    private PersistentCurrencyManager _wallet;
     private IPersistentSaveWriter _saveWriter;
 
-    public void Initialize(OutGameTestWallet wallet, IPersistentSaveWriter saveWriter)
+    public void Initialize(PersistentCurrencyManager wallet, IPersistentSaveWriter saveWriter)
     {
         IsInitialized = false;
         _wallet = wallet;
@@ -122,7 +122,7 @@ public class OutGameTraitController : MonoBehaviour, ITraitProgression, ISaveDat
         PersistentSaveData next = _saveWriter.CaptureSaveData();
         next.Traits = data;
         next.Wallet = _wallet.CaptureSaveData();
-        next.Wallet.Bloodstone -= cost;
+        next.Wallet.Amount -= cost;
         if (!_saveWriter.TrySave(next, out error)) return false;
 
         // 파일 저장 실패 시에는 어느 쪽도 바뀌지 않습니다. 성공 후 한 번만 적용합니다.

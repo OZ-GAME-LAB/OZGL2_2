@@ -24,7 +24,7 @@ public class OutGameTraitView : MonoBehaviour
     [SerializeField] private Button _backButton;
 
     private ITraitProgression _progression;
-    private OutGameTestWallet _wallet;
+    private PersistentCurrencyManager _wallet;
     private TraitId _inspectedTrait;
 
     public event Action<TraitId> UpgradeRequested;
@@ -47,7 +47,7 @@ public class OutGameTraitView : MonoBehaviour
         return valid;
     }
 
-    public void Initialize(ITraitProgression progression, OutGameTestWallet wallet)
+    public void Initialize(ITraitProgression progression, PersistentCurrencyManager wallet)
     {
         Shutdown();
         if (!ValidateReferences() || progression == null || wallet == null) return;

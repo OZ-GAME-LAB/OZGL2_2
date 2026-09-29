@@ -12,16 +12,12 @@ public class PersistentSaveData
 [Serializable]
 public class PersistentWalletSaveData //영구재화 저장 데이터
 {
-    public int Version;
-    public int Bloodstone;
+    public CurrencyType Type;
+    public int Amount;
 
-    public PersistentWalletSaveData()
+    public PersistentWalletSaveData(int amount)
     {
-    }
-
-    public PersistentWalletSaveData(int bloodstone)
-    {
-        Version = 1;
-        Bloodstone = bloodstone;
+        Type = CurrencyType.Bloodstone;
+        Amount = amount;
     }
 }

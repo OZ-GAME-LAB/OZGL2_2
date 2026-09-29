@@ -16,7 +16,7 @@ public static class OutGameSetupTestValidation
     private static OutGameBootstrap _bootstrap;
     private static OutGameStartController _startController;
     private static OutGameUIController _uiController;
-    private static OutGameTestWallet _wallet;
+    private static PersistentCurrencyManager _wallet;
     private static SaveManager _saveManager;
     private static OutGameTraitController _traits;
     private static OutGameTotemController _totems;
@@ -44,7 +44,7 @@ public static class OutGameSetupTestValidation
             _root = _bootstrap.GetComponentInParent<Canvas>().gameObject;
             _startController = _root.GetComponentInChildren<OutGameStartController>(true);
             _uiController = _root.GetComponentInChildren<OutGameUIController>(true);
-            _wallet = _root.GetComponentInChildren<OutGameTestWallet>(true);
+            _wallet = _root.GetComponentInChildren<PersistentCurrencyManager>(true);
             _saveManager = _root.GetComponentInChildren<SaveManager>(true);
             Require(_saveManager != null, "Persistent SaveManager connected");
             // 실제 플레이어의 영구 저장 파일을 읽거나 덮어쓰지 않습니다.
