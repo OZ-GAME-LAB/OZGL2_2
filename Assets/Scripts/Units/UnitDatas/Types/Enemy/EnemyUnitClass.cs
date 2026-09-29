@@ -7,7 +7,7 @@ namespace Units
     {
         Default = 0,
 
-        // Classes
+
         Tanker,
         Bruiser,
         Assassin,

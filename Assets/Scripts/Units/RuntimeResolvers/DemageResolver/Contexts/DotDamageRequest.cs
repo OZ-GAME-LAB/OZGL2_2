@@ -1,12 +1,15 @@
-﻿namespace Units
+namespace Units
 {
     public readonly struct DotDamageRequest
     {
+
+        public CombatEventMetadata Metadata { get; }
+
         // ============================================================
         // Source
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
 
         public DamageSourceType SourceType { get; }
 
@@ -16,6 +19,8 @@
         // ============================================================
 
         public ICombatTarget Target { get; }
+
+        public CombatTargetSnapshot TargetSnapshot { get; }
 
 
         // ============================================================
@@ -30,22 +35,23 @@
         // ============================================================
 
         public DotDamageRequest(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             ICombatTarget target,
             float damage,
-            DamageSourceType sourceType)
+            DamageSourceType sourceType,
+            CombatEventMetadata metadata = default)
         {
-            Attacker =
-                attacker;
+            TargetSnapshot = new CombatTargetSnapshot(target);
 
-            Target =
-                target;
+            Metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(attacker);
 
-            Damage =
-                damage;
+            Attacker = attacker;
 
-            SourceType =
-                sourceType;
+            Target = target;
+
+            Damage = damage;
+
+            SourceType = sourceType;
         }
     }
 }

@@ -12,7 +12,6 @@ namespace Units
 
         private readonly TargetResolver _targetResolver;
 
-
         private readonly List<ICombatTarget> _singleTarget = new List<ICombatTarget>(1);
 
 
@@ -20,13 +19,9 @@ namespace Units
         // Constructor
         // ============================================================
 
-        public ProjectileImpactResolver(
-            Unit_Core attacker)
+        public ProjectileImpactResolver()
         {
-            _targetResolver =
-                new TargetResolver(
-                    attacker
-                );
+            _targetResolver = new TargetResolver();
         }
 
 
@@ -43,69 +38,42 @@ namespace Units
             if (request.Attacker == null)
                 return;
 
-
-            // 사망한 시전자의 투사체는 유지하되, 풀에서 재사용된 다른 생애의 공격으로 처리하지 않는다.
-            Unit_Gateway attackerGateway = request.Attacker.GetComponent<Unit_Gateway>();
-            if (attackerGateway != null && attackerGateway.LifetimeVersion != request.AttackerLifetimeVersion)
-                return;
-
-
+            // 공격자 수명이 끝나도 발사 시 스냅샷으로 적용한다. 이벤트 전달은 원래 수명에서만 허용한다.
             IReadOnlyList<ICombatTarget> targets;
-
 
             if (request.ImpactType == ProjectileImpactType.Single)
             {
-                if (!CombatTargetUtility.IsValid(collisionTarget)
-                    || (request.TargetFilter != null && !request.TargetFilter(collisionTarget)))
+                if (!CombatTargetUtility.IsValid(collisionTarget) || (request.TargetFilter != null && !request.TargetFilter(collisionTarget)))
                     return;
-
 
                 _singleTarget.Clear();
 
-                _singleTarget.Add(
-                    collisionTarget
-                );
+                _singleTarget.Add(collisionTarget);
 
-
-                targets =
-                    _singleTarget;
+                targets = _singleTarget.ToArray();
             }
             else
             {
-                targets =
-                    _targetResolver.ResolveHitTargets(
-                        new TargetHitRequest(
-                            position,
-                            direction,
-                            request.AreaRadius,
-                            request.AreaAngle,
-                            request.MaxImpactTargetCount,
-                            request.ImpactType == ProjectileImpactType.Cone
-                                ? HitAreaType.Cone
-                                : HitAreaType.Circle,
-                            request.TargetTeam,
-                            request.TargetFilter
-                        )
-                    );
+                targets = _targetResolver.ResolveHitTargets(new TargetHitRequest(position, direction, request.AreaRadius, request.AreaAngle, request.MaxImpactTargetCount, request.ImpactType == ProjectileImpactType.Cone ? HitAreaType.Cone : HitAreaType.Circle, request.TargetTeam, request.TargetFilter));
             }
-
 
             if (request.DamageRequest.HasValue)
             {
                 ResolveDamage(
                     request.DamageRequest.Value,
-                    targets
+                    targets,
+                    request.Flight
                 );
 
                 return;
             }
 
-
             if (request.SkillEffectRequest.HasValue)
             {
                 ResolveSkillEffects(
                     request.SkillEffectRequest.Value,
-                    targets
+                    targets,
+                    request.Flight
                 );
             }
         }
@@ -117,27 +85,31 @@ namespace Units
 
         private void ResolveDamage(
             DamageRequest pendingRequest,
-            IReadOnlyList<ICombatTarget> targets)
+            IReadOnlyList<ICombatTarget> targets,
+            ProjectileFlightState flight)
         {
             if (DamageResolver.Instance == null)
             {
-                Debug.LogError(
-                    "[ProjectileImpactResolver] DamageResolver가 존재하지 않습니다."
-                );
+                Debug.LogError("[ProjectileImpactResolver] DamageResolver가 존재하지 않습니다.");
 
                 return;
             }
 
+            var unique = new List<ICombatTarget>();
 
-            DamageResolver.Instance.Resolve(
-                new DamageRequest(
-                    pendingRequest.Attacker,
-                    targets,
-                    pendingRequest.SourceType,
-                    pendingRequest.DamageType,
-                    pendingRequest.DamageMultiplier
-                )
-            );
+            foreach (var target in targets)
+            {
+                var snapshot = new CombatTargetSnapshot(target);
+
+                if (snapshot.IsTargetable && flight.Enter(snapshot))
+                    unique.Add(target);
+            }
+
+            if (unique.Count == 0)
+                return;
+
+            foreach (var result in DamageResolver.Instance.ResolveWithResults(new DamageRequest(pendingRequest.Attacker, unique, pendingRequest.SourceType, pendingRequest.DamageType, pendingRequest.DamageMultiplier, pendingRequest.Metadata, pendingRequest.SourceSnapshot)))
+                flight.Record(result);
         }
 
 
@@ -147,38 +119,61 @@ namespace Units
 
         private void ResolveSkillEffects(
             SkillEffectRequest pendingRequest,
-            IReadOnlyList<ICombatTarget> targets)
+            IReadOnlyList<ICombatTarget> targets,
+            ProjectileFlightState flight)
         {
             if (SkillEffectResolver.Instance == null)
             {
-                Debug.LogError(
-                    "[ProjectileImpactResolver] SkillEffectResolver가 존재하지 않습니다."
-                );
+                Debug.LogError("[ProjectileImpactResolver] SkillEffectResolver가 존재하지 않습니다.");
 
                 return;
             }
 
-
             if (targets == null)
                 return;
 
+            var snapshots = new List<CombatTargetSnapshot>();
 
-            for (int i = 0; i < targets.Count; i++)
+            foreach (var candidate in targets)
+                snapshots.Add(new CombatTargetSnapshot(candidate));
+
+            for (int i = 0; i < snapshots.Count; i++)
             {
-                ICombatTarget target =
-                    targets[i];
+                ICombatTarget target = snapshots[i].Target;
 
-                if (!CombatTargetUtility.IsValid(target))
+                if (!snapshots[i].IsTargetable || !flight.Enter(snapshots[i]))
                     continue;
 
-
-                SkillEffectResolver.Instance.Resolve(
-                    new SkillEffectRequest(
+                if (pendingRequest.Batch != null)
+                {
+                    var context = new SkillConditionContext(
                         pendingRequest.Caster,
-                        target,
-                        pendingRequest.Effects
-                    )
-                );
+                        snapshots[i],
+                        _targetResolver,
+                        pendingRequest.Metadata,
+                        pendingRequest.Batch.IsActiveSkill,
+                        pendingRequest.Metadata.ActionIndex,
+                        pendingRequest.Batch.PreviousResult,
+                        target.Transform.position,
+                        pendingRequest.SourceSnapshot
+                    );
+
+                    foreach (var result in SkillAttackDelivery.Hit(pendingRequest.Batch, context))
+                        flight.Record(result);
+
+                    pendingRequest.Batch.EventTemplate?.NotifyHit(
+                        snapshots[i],
+                        pendingRequest.Metadata,
+                        context.Position
+                    );
+
+                    flight.NotifyFX(SkillFXHook.OnHit, context.Position);
+
+                    continue;
+                }
+
+                foreach (var result in SkillEffectResolver.Instance.ResolveWithResults(new SkillEffectRequest(pendingRequest.Caster, target, pendingRequest.Effects, pendingRequest.Metadata, sourceSnapshot: pendingRequest.SourceSnapshot)))
+                    flight.Record(result);
             }
         }
     }

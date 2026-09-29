@@ -1,30 +1,52 @@
-﻿
-
-
 namespace Units
 {
     public readonly struct DotHealRequest
     {
-        public Unit_Core Healer { get; }
+
+        public CombatEventMetadata Metadata { get; }
+
+        // ============================================================
+        // Source
+        // ============================================================
+
+        public ICombatTarget Healer { get; }
+
+
+        // ============================================================
+        // Target
+        // ============================================================
 
         public ICombatTarget Target { get; }
+
+        public CombatTargetSnapshot TargetSnapshot { get; }
+
+
+        // ============================================================
+        // Heal
+        // ============================================================
 
         public float HealAmount { get; }
 
 
+        // ============================================================
+        // Constructor
+        // ============================================================
+
         public DotHealRequest(
-            Unit_Core healer,
+            ICombatTarget healer,
             ICombatTarget target,
-            float healAmount)
+            float healAmount,
+            CombatEventMetadata metadata = default)
         {
-            Healer =
-                healer;
+            TargetSnapshot = new CombatTargetSnapshot(target);
 
-            Target =
-                target;
+            Metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(healer);
 
-            HealAmount =
-                healAmount;
+            Healer = healer;
+
+            Target = target;
+
+            HealAmount = healAmount;
         }
     }
 }

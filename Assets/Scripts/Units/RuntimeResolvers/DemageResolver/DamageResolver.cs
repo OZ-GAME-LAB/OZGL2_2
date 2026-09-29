@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -19,8 +19,7 @@ namespace Units
         // References
         // ============================================================
 
-        private readonly DamageContextBuilder _contextBuilder =
-            new();
+        private readonly DamageContextBuilder _contextBuilder = new();
 
 
         // ============================================================
@@ -29,31 +28,23 @@ namespace Units
 
         private void Awake()
         {
-            if (Instance != null
-                && Instance != this)
+            if (Instance != null && Instance != this)
             {
-                Debug.LogError(
-                    "[DamageResolver] DamageResolver가 중복 생성되어 자동 삭제됩니다."
-                );
+                Debug.LogError("[DamageResolver] DamageResolver가 중복 생성되어 자동 삭제됩니다.");
 
-                Destroy(
-                    gameObject
-                );
+                Destroy(gameObject);
 
                 return;
             }
 
-            Instance =
-                this;
+            Instance = this;
         }
-
 
         private void OnDestroy()
         {
             if (Instance == this)
             {
-                Instance =
-                    null;
+                Instance = null;
             }
         }
 
@@ -62,74 +53,68 @@ namespace Units
         // Resolve
         // ============================================================
 
-        public void Resolve(
-            DamageRequest request)
+        public void Resolve(DamageRequest request)
         {
-            if (!IsValidRequest(
-                    request))
+            ResolveWithResults(request);
+        }
+
+        public IReadOnlyList<CombatApplicationResult> ResolveWithResults(DamageRequest request)
+        {
+            var results = new List<CombatApplicationResult>();
+
+            if (!IsValidRequest(request) || (request.SourceSnapshot == null && !request.Metadata.Owner.MatchesLifetime))
             {
-                return;
+                results.Add(CombatApplicationResult.Invalid(CombatApplicationKind.Damage, null, request.Metadata, "Invalid damage request"));
+
+                return results.AsReadOnly();
             }
 
-            for (int i = 0;
-                 i < request.Targets.Count;
-                 i++)
-            {
-                ICombatTarget target =
-                    request.Targets[i];
+            var targets = request.TargetSnapshots;
 
-                if (!IsValidTarget(
-                        request,
-                        target))
+            for (int i = 0; i < targets.Count; i++)
+            {
+                var snapshot = targets[i];
+
+                var target = snapshot.Target;
+
+                if ((request.SourceSnapshot == null && !request.Metadata.Owner.MatchesLifetime) || !snapshot.IsTargetable || !IsValidTarget(request, target))
                 {
+                    results.Add(CombatApplicationResult.Invalid(CombatApplicationKind.Damage, target, request.Metadata, "Invalid target lifetime or relation"));
+
                     continue;
                 }
 
-                DamageContext damageContext =
-                    _contextBuilder.Build(
-                        request,
-                        target
-                    );
+                var metadata = CombatEventMetadata.Create(request.Attacker, request.Metadata);
 
-                float damage =
-                    CalculateDamage(
-                        damageContext,
-                        out bool isCritical
-                    );
+                using (CombatEventContext.Enter(metadata))
+                {
+                    DamageContext context = _contextBuilder.Build(request, target);
 
-                if (damage <= 0f)
-                    continue;
+                    float damage = CalculateDamage(context, out bool isCritical);
 
-                ApplyDamage(
-                    damageContext,
-                    damage,
-                    isCritical
-                );
+                    results.Add(ApplyDamage(context, damage, isCritical, metadata));
+                }
             }
+
+            return results.AsReadOnly();
         }
 
-
-        public void ResolveDotDamage(
-            DotDamageRequest request)
+        public void ResolveDotDamage(DotDamageRequest request)
         {
-            if (!IsValidDotDamageRequest(
-                    request))
-            {
-                return;
-            }
+            ResolveDotDamageWithResult(request);
+        }
 
-            DamageResult result =
-                new DamageResult(
-                    request.Attacker,
+        public CombatApplicationResult ResolveDotDamageWithResult(DotDamageRequest request)
+        {
+            if (!IsValidDotDamageRequest(request) || !request.TargetSnapshot.IsTargetable)
+                return CombatApplicationResult.Invalid(
+                    CombatApplicationKind.Damage,
                     request.Target,
-                    request.Damage,
-                    request.SourceType,
-                    false
+                    request.Metadata,
+                    "Invalid DoT request"
                 );
 
-            request.Target.TakeDamage(
-                result
-            );
+            return request.Target.TakeDamageWithResult(new DamageResult(request.Attacker, request.Target, request.Damage, request.SourceType, false, request.Metadata));
         }
 
 
@@ -137,13 +122,12 @@ namespace Units
         // Validation
         // ============================================================
 
-        private bool IsValidRequest(
-            DamageRequest request)
+        private bool IsValidRequest(DamageRequest request)
         {
             if (request.Attacker == null)
                 return false;
 
-            if (request.Attacker.RuntimeStatus == null)
+            if (request.SourceSnapshot == null && request.Attacker.RuntimeStatus == null)
                 return false;
 
             if (request.Targets == null)
@@ -158,7 +142,6 @@ namespace Units
             return true;
         }
 
-
         private bool IsValidTarget(
             DamageRequest request,
             ICombatTarget target)
@@ -169,8 +152,7 @@ namespace Units
             if (!target.IsTargetable)
                 return false;
 
-            if (target.Team ==
-                request.Attacker.Team)
+            if (target.Team == (request.SourceSnapshot?.Owner.Team ?? request.Metadata.Owner.Team))
             {
                 return false;
             }
@@ -181,9 +163,7 @@ namespace Units
             return true;
         }
 
-
-        private bool IsValidDotDamageRequest(
-            DotDamageRequest request)
+        private bool IsValidDotDamageRequest(DotDamageRequest request)
         {
             if (request.Attacker == null)
                 return false;
@@ -194,8 +174,7 @@ namespace Units
             if (!request.Target.IsTargetable)
                 return false;
 
-            if (request.Target.Team ==
-                request.Attacker.Team)
+            if (request.Target.Team == request.Metadata.Owner.Team)
             {
                 return false;
             }
@@ -215,29 +194,17 @@ namespace Units
             DamageContext context,
             out bool isCritical)
         {
-            float damage =
-                CalculateBaseDamage(
-                    context
-                );
+            float damage = CalculateBaseDamage(context);
 
-            damage =
-                CalculateCriticalDamage(
-                    context,
-                    damage,
-                    out isCritical
-                );
-
-            damage =
-                CalculateDefenseDamage(
-                    context,
-                    damage
-                );
-
-
-            return Mathf.Max(
-                0f,
-                damage
+            damage = CalculateCriticalDamage(
+                context,
+                damage,
+                out isCritical
             );
+
+            damage = CalculateDefenseDamage(context, damage);
+
+            return Mathf.Max(0f, damage);
         }
 
 
@@ -245,28 +212,15 @@ namespace Units
         // Base Damage
         // ============================================================
 
-        private float CalculateBaseDamage(
-            DamageContext context)
+        private float CalculateBaseDamage(DamageContext context)
         {
-            AttackerContext attacker =
-                context.Attacker;
+            AttackerContext attacker = context.Attacker;
 
-            float damage =
-                attacker.AttackPower
-                * attacker.DamageMultiplier
-                * attacker.SourceDamageMultiplier
-                * attacker.GeneralDamageMultiplier;
+            float damage = attacker.AttackPower * attacker.DamageMultiplier * attacker.SourceDamageMultiplier * attacker.GeneralDamageMultiplier;
 
-            damage =
-                ApplyDamageValueModifiers(
-                    context,
-                    damage
-                );
+            damage = ApplyDamageValueModifiers(context, damage);
 
-            return Mathf.Max(
-                0f,
-                damage
-            );
+            return Mathf.Max(0f, damage);
         }
 
 
@@ -279,17 +233,13 @@ namespace Units
             float damage,
             out bool isCritical)
         {
-            float criticalChance =
-                context.Attacker.CriticalChance;
+            float criticalChance = context.Attacker.CriticalChance;
 
-            float criticalDamage =
-                context.Attacker.CriticalDamage;
+            float criticalDamage = context.Attacker.CriticalDamage;
 
-            bool forceCritical =
-                false;
+            bool forceCritical = false;
 
-            bool preventCritical =
-                false;
+            bool preventCritical = false;
 
             ApplyCriticalModifiers(
                 context,
@@ -299,36 +249,28 @@ namespace Units
                 ref preventCritical
             );
 
-            criticalChance =
-                Mathf.Clamp01(
-                    criticalChance
-                );
+            criticalChance = Mathf.Clamp01(criticalChance);
 
             if (preventCritical)
             {
-                isCritical =
-                    false;
+                isCritical = false;
 
                 return damage;
             }
 
             if (forceCritical)
             {
-                isCritical =
-                    true;
+                isCritical = true;
             }
             else
             {
-                isCritical =
-                    Random.value <=
-                    criticalChance;
+                isCritical = Random.value <= criticalChance;
             }
 
             if (!isCritical)
                 return damage;
 
-            return damage
-                * criticalDamage;
+            return damage * criticalDamage;
         }
 
 
@@ -340,18 +282,11 @@ namespace Units
             DamageContext context,
             float damage)
         {
-            float defense =
-                Mathf.Max(
-                    0f,
-                    context.Target.Defense
-                );
+            float defense = Mathf.Max(0f, context.Target.Defense);
 
-            float defenseIgnore =
-                context.Attacker.DefenseIgnore;
+            float defenseIgnore = context.Attacker.DefenseIgnore;
 
-            float damageTakenMultiplier =
-                context.Target
-                    .DamageTakenMultiplier;
+            float damageTakenMultiplier = context.Target.DamageTakenMultiplier;
 
             ApplyDefenseModifiers(
                 context,
@@ -359,10 +294,7 @@ namespace Units
                 ref damageTakenMultiplier
             );
 
-            defenseIgnore =
-                Mathf.Clamp01(
-                    defenseIgnore
-                );
+            defenseIgnore = Mathf.Clamp01(defenseIgnore);
 
             switch (context.Attacker.DamageType)
             {
@@ -370,24 +302,16 @@ namespace Units
                     break;
 
                 case DamageType.Magic:
-
-                    defense *=
-                        0.5f;
+                    defense *= 0.5f;
 
                     break;
             }
 
-            defense *=
-                1f - defenseIgnore;
+            defense *= 1f - defenseIgnore;
 
-            damage =
-                Mathf.Max(
-                    0f,
-                    damage - defense
-                );
+            damage = Mathf.Max(0f, damage - defense);
 
-            return damage
-                * damageTakenMultiplier;
+            return damage * damageTakenMultiplier;
         }
 
 
@@ -399,112 +323,84 @@ namespace Units
             DamageContext context,
             float damage)
         {
-            damage =
-                ApplyAttackerDamageValueModifiers(
-                    context,
-                    damage
-                );
+            damage = ApplyAttackerDamageValueModifiers(context, damage);
 
-            damage =
-                ApplyTargetDamageValueModifiers(
-                    context,
-                    damage
-                );
+            damage = ApplyTargetDamageValueModifiers(context, damage);
 
             return damage;
         }
-
 
         private float ApplyAttackerDamageValueModifiers(
             DamageContext context,
             float damage)
         {
-            IReadOnlyList<PassiveDamageModifier> modifiers =
-                context.Attacker.DamageModifiers;
+            IReadOnlyList<PassiveDamageModifier> modifiers = context.Attacker.DamageModifiers;
 
             if (modifiers == null)
                 return damage;
 
-            for (int i = 0;
-                 i < modifiers.Count;
-                 i++)
+            for (int i = 0; i < modifiers.Count; i++)
             {
-                PassiveDamageModifier modifier =
-                    modifiers[i];
+                PassiveDamageModifier modifier = modifiers[i];
 
-                if (modifier.Action.CalculationType !=
-                    PassiveDamageCalculationType.Damage)
+                if (modifier.Action.CalculationType != PassiveDamageCalculationType.Damage)
                 {
                     continue;
                 }
 
-                if (modifier.Action
-                    is not PassiveDamageValueModifierActionData action)
+                if (modifier.Action is not PassiveDamageValueModifierActionData action)
                 {
                     continue;
                 }
 
-                if (!EvaluateAttackerModifier(
-                        context,
-                        modifier))
+                if (!EvaluateAttackerModifier(context, modifier))
                 {
                     continue;
                 }
 
-                damage =
-                    ApplyValueModifier(
-                        damage,
-                        action.ModifierType,
-                        action.Value
-                    );
+                damage = ApplyValueModifier(
+                    damage,
+                    action.ModifierType,
+                    action.Value
+                );
             }
 
             return damage;
         }
 
-
         private float ApplyTargetDamageValueModifiers(
             DamageContext context,
             float damage)
         {
-            IReadOnlyList<PassiveDamageModifier> modifiers =
-                context.Target.DamageModifiers;
+            IReadOnlyList<PassiveDamageModifier> modifiers = context.Target.DamageModifiers;
 
             if (modifiers == null)
                 return damage;
 
-            for (int i = 0;
-                 i < modifiers.Count;
-                 i++)
+            for (int i = 0; i < modifiers.Count; i++)
             {
-                PassiveDamageModifier modifier =
-                    modifiers[i];
+                PassiveDamageModifier modifier = modifiers[i];
 
-                if (modifier.Action.CalculationType !=
-                    PassiveDamageCalculationType.Damage)
+                if (modifier.Action.CalculationType != PassiveDamageCalculationType.Damage)
                 {
                     continue;
                 }
 
-                if (modifier.Action
-                    is not PassiveDamageValueModifierActionData action)
+                if (modifier.Action is not PassiveDamageValueModifierActionData action)
                 {
                     continue;
                 }
 
-                if (!EvaluateTargetModifier(
-                        context,
-                        modifier))
+                if (!EvaluateTargetModifier(context, modifier))
                 {
                     continue;
                 }
 
-                damage =
-                    ApplyValueModifier(
-                        damage,
-                        action.ModifierType,
-                        action.Value
-                    );
+                damage = ApplyValueModifier(
+                    damage,
+                    action.ModifierType,
+                    action.Value
+                );
             }
 
             return damage;
@@ -543,7 +439,6 @@ namespace Units
             );
         }
 
-
         private void ApplyCriticalModifiers(
             DamageContext context,
             IReadOnlyList<PassiveDamageModifier> modifiers,
@@ -556,35 +451,21 @@ namespace Units
             if (modifiers == null)
                 return;
 
-            for (int i = 0;
-                 i < modifiers.Count;
-                 i++)
+            for (int i = 0; i < modifiers.Count; i++)
             {
-                PassiveDamageModifier modifier =
-                    modifiers[i];
+                PassiveDamageModifier modifier = modifiers[i];
 
-                if (modifier.Action.CalculationType !=
-                    PassiveDamageCalculationType.Critical)
+                if (modifier.Action.CalculationType != PassiveDamageCalculationType.Critical)
                 {
                     continue;
                 }
 
-                if (modifier.Action
-                    is not PassiveCriticalModifierActionData action)
+                if (modifier.Action is not PassiveCriticalModifierActionData action)
                 {
                     continue;
                 }
 
-                bool conditionPassed =
-                    isAttacker
-                        ? EvaluateAttackerModifier(
-                            context,
-                            modifier
-                        )
-                        : EvaluateTargetModifier(
-                            context,
-                            modifier
-                        );
+                bool conditionPassed = isAttacker ? EvaluateAttackerModifier(context, modifier) : EvaluateTargetModifier(context, modifier);
 
                 if (!conditionPassed)
                     continue;
@@ -592,33 +473,22 @@ namespace Units
                 switch (action.ModifierType)
                 {
                     case PassiveCriticalModifierType.Chance:
-
-                        criticalChance +=
-                            action.Value;
+                        criticalChance += action.Value;
 
                         break;
-
 
                     case PassiveCriticalModifierType.Damage:
-
-                        criticalDamage +=
-                            action.Value;
+                        criticalDamage += action.Value;
 
                         break;
-
 
                     case PassiveCriticalModifierType.ForceCritical:
-
-                        forceCritical =
-                            true;
+                        forceCritical = true;
 
                         break;
 
-
                     case PassiveCriticalModifierType.PreventCritical:
-
-                        preventCritical =
-                            true;
+                        preventCritical = true;
 
                         break;
                 }
@@ -635,80 +505,62 @@ namespace Units
             ref float defenseIgnore,
             ref float damageTakenMultiplier)
         {
-            IReadOnlyList<PassiveDamageModifier> attackerModifiers =
-                context.Attacker.DamageModifiers;
+            IReadOnlyList<PassiveDamageModifier> attackerModifiers = context.Attacker.DamageModifiers;
 
             if (attackerModifiers != null)
             {
-                for (int i = 0;
-                     i < attackerModifiers.Count;
-                     i++)
+                for (int i = 0; i < attackerModifiers.Count; i++)
                 {
-                    PassiveDamageModifier modifier =
-                        attackerModifiers[i];
+                    PassiveDamageModifier modifier = attackerModifiers[i];
 
-                    if (modifier.Action.CalculationType !=
-                        PassiveDamageCalculationType.Defense)
+                    if (modifier.Action.CalculationType != PassiveDamageCalculationType.Defense)
                     {
                         continue;
                     }
 
-                    if (modifier.Action
-                        is not PassiveDefenseModifierActionData action)
+                    if (modifier.Action is not PassiveDefenseModifierActionData action)
                     {
                         continue;
                     }
 
-                    if (!EvaluateAttackerModifier(
-                            context,
-                            modifier))
+                    if (!EvaluateAttackerModifier(context, modifier))
                     {
                         continue;
                     }
 
                     // 공격자 측 Defense Modifier는
                     // 방어력 관통에 적용한다.
-                    defenseIgnore +=
-                        action.Value;
+                    defenseIgnore += action.Value;
                 }
             }
 
-            IReadOnlyList<PassiveDamageModifier> targetModifiers =
-                context.Target.DamageModifiers;
+            IReadOnlyList<PassiveDamageModifier> targetModifiers = context.Target.DamageModifiers;
 
             if (targetModifiers == null)
                 return;
 
-            for (int i = 0;
-                 i < targetModifiers.Count;
-                 i++)
+            for (int i = 0; i < targetModifiers.Count; i++)
             {
-                PassiveDamageModifier modifier =
-                    targetModifiers[i];
+                PassiveDamageModifier modifier = targetModifiers[i];
 
-                if (modifier.Action.CalculationType !=
-                    PassiveDamageCalculationType.Defense)
+                if (modifier.Action.CalculationType != PassiveDamageCalculationType.Defense)
                 {
                     continue;
                 }
 
-                if (modifier.Action
-                    is not PassiveDefenseModifierActionData action)
+                if (modifier.Action is not PassiveDefenseModifierActionData action)
                 {
                     continue;
                 }
 
-                if (!EvaluateTargetModifier(
-                        context,
-                        modifier))
+                if (!EvaluateTargetModifier(context, modifier))
                 {
                     continue;
                 }
 
                 // 피격자 측 Defense Modifier는
                 // 받는 피해 배율에 적용한다.
-                damageTakenMultiplier +=
-                    action.Value;
+                damageTakenMultiplier += action.Value;
             }
         }
 
@@ -721,23 +573,21 @@ namespace Units
             DamageContext context,
             PassiveDamageModifier modifier)
         {
-            return context.Attacker.Attacker
-                .EvaluateDamageModifierConditions(
-                    modifier.RuntimePassive,
-                    context.Target.Target
-                );
-        }
+            if (context.Attacker.SourceSnapshot != null)
+                return context.Attacker.SourceSnapshot.Evaluate(modifier, context.Target.Target);
 
+            return context.Attacker.Attacker.EvaluateDamageModifierConditions(modifier.RuntimePassive, context.Target.Target);
+        }
 
         private bool EvaluateTargetModifier(
             DamageContext context,
             PassiveDamageModifier modifier)
         {
-            return context.Attacker.Attacker
-                .EvaluateTargetDamageModifierConditions(
-                    context.Target.Target,
-                    modifier.RuntimePassive
-                );
+            return context.Target.Target.EvaluateDamageModifierConditions(
+                modifier.RuntimePassive,
+                context.Attacker.Attacker,
+                context.Attacker.SourceSnapshot
+            );
         }
 
 
@@ -753,19 +603,12 @@ namespace Units
             switch (modifierType)
             {
                 case UnitStatModifierType.Flat:
-
-                    return value
-                        + modifierValue;
-
+                    return value + modifierValue;
 
                 case UnitStatModifierType.Percent:
-
-                    return value
-                        * (1f + modifierValue);
-
+                    return value * (1f + modifierValue);
 
                 default:
-
                     return value;
             }
         }
@@ -775,23 +618,22 @@ namespace Units
         // Damage Apply
         // ============================================================
 
-        private void ApplyDamage(
+        private CombatApplicationResult ApplyDamage(
             DamageContext context,
             float damage,
-            bool isCritical)
+            bool isCritical,
+            CombatEventMetadata metadata)
         {
-            DamageResult result =
-                new DamageResult(
-                    context.Attacker.Attacker,
-                    context.Target.Target,
-                    damage,
-                    context.Attacker.SourceType,
-                    isCritical
-                );
-
-            context.Target.Target.TakeDamage(
-                result
+            DamageResult result = new DamageResult(
+                context.Attacker.Attacker,
+                context.Target.Target,
+                damage,
+                context.Attacker.SourceType,
+                isCritical,
+                metadata
             );
+
+            return context.Target.Target.TakeDamageWithResult(result);
         }
     }
 }
