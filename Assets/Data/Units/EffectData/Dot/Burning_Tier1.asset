@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
   m_Name: Burning_Tier1
   m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
+  _skillSchemaVersion: 1
   _effectId: Burning_T1
   _alignment: 1
   _durationType: 0
@@ -20,6 +21,9 @@ MonoBehaviour:
   _maxStack: 3
   _actions:
   - rid: 4844432152660541513
+  _categories:
+  - Alignment.Harmful
+  - PeriodicDamage
   references:
     version: 2
     RefIds:

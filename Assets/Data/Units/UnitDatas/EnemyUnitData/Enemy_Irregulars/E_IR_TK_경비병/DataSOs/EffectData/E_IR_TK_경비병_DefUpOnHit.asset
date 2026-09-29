@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
+  m_Name: "E_IR_TK_\uACBD\uBE44\uBCD1_DefUpOnHit"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
+  _skillSchemaVersion: 1
+  _effectId: "E_IR_TK_\uACBD\uBE44\uBCD1_DefUpOnHit"
+  _alignment: 0
+  _durationType: 0
+  _duration: 3
+  _stackType: 3
+  _maxStack: 10
+  _actions:
+  - rid: 4844432381217865728
+  _categories:
+  - Alignment.Beneficial
+  - StatModifier
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432381217865728
+      type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
+      data:
+        _statType: 10
+        _modifierType: 0
+        _value: 0.5

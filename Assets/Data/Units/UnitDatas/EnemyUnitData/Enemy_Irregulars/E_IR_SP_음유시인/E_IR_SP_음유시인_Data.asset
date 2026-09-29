@@ -1,0 +1,65 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "E_IR_SP_음유시인_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "E_IR_SP_음유시인"
+  _unitName: "음유시인"
+  _team: 1
+  _allyIdentity:
+    _unitClass: 0
+    _unitTier: 0
+    _unitType: 0
+  _enemyIdentity:
+    _unitClass: 6
+    _unitFaction: 0
+    _unitType: 7
+  _stats:
+  - _statType: 0
+    _value: 400
+  - _statType: 10
+    _value: 0
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 15
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.1
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 5
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 
+  _basicAttackData: {fileID: 11400000, guid: b6ef20f87d524ebd832d2acbc0c58482, type: 2}
+  _activeSkillData: {fileID: 11400000, guid: ec8fab05edaa4da4b875b5ea65790747, type: 2}
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: 2fe4ec230f9746c39b29f91b8ea3c243, type: 2}

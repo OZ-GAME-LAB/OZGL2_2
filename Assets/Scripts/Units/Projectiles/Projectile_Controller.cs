@@ -11,24 +11,17 @@ namespace Units
 
         private ProjectileManager _manager;
 
-
         private ProjectileRequest _request;
-
 
         private ProjectileImpactResolver _impactResolver;
 
-
         private RaycastHit2D[] _hits = new RaycastHit2D[16];
-
 
         private Vector2 _direction;
 
-
         private float _radius;
 
-
         private float _remainingLifetime;
-
 
         private bool _isFlying;
 
@@ -54,35 +47,21 @@ namespace Units
 
             _request = request;
 
-            _radius = Mathf.Max(
-                0.01f,
-                collisionRadius
-            );
+            _radius = Mathf.Max(0.01f, collisionRadius);
 
-            _remainingLifetime = Mathf.Max(
-                0.1f,
-                maxLifetime
-            );
+            _remainingLifetime = Mathf.Max(0.1f, maxLifetime);
 
-            _impactResolver =
-                new ProjectileImpactResolver(
-                    request.Attacker
-                );
+            _impactResolver = new ProjectileImpactResolver();
 
-            transform.position =
-                request.Origin;
+            transform.position = request.Origin;
 
+            Vector2 offset = (Vector2)request.Target.Transform.position - request.Origin;
 
-            Vector2 offset =
-                (Vector2)request.Target.Transform.position - request.Origin;
-
-            _direction =
-                offset.sqrMagnitude > 0f
-                    ? offset.normalized
-                    : Vector2.right;
-
+            _direction = offset.sqrMagnitude > 0f ? offset.normalized : Vector2.right;
 
             _isFlying = true;
+
+            _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Flight, transform.position);
         }
 
 
@@ -95,36 +74,28 @@ namespace Units
             if (!_isFlying)
                 return;
 
-
-            _remainingLifetime -=
-                Time.fixedDeltaTime;
-
+            _remainingLifetime -= Time.fixedDeltaTime;
 
             // 이미 발사된 투사체는 Target과 공격자의 상태에 관계없이 유지되며,
             // 충돌하거나 수명이 종료될 때까지 발사 시점의 방향으로 이동한다.
             if (_remainingLifetime <= 0f)
             {
+                _isFlying = false;
+
+                _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Expire, transform.position);
+
                 Release();
 
                 return;
             }
 
+            Vector2 origin = transform.position;
 
-            Vector2 origin =
-                transform.position;
+            float distance = _request.ProjectileSpeed * Time.fixedDeltaTime;
 
-
-            float distance =
-                _request.ProjectileSpeed
-                * Time.fixedDeltaTime;
-
-
-            var filter =
-                ContactFilter2D.noFilter;
-
+            var filter = ContactFilter2D.noFilter;
 
             int count;
-
 
             // 고속 투사체가 Collider를 건너뛰지 않도록 이번 틱의 이동 구간 전체를 검사한다.
             do
@@ -138,82 +109,50 @@ namespace Units
                     distance
                 );
 
-
                 if (count < _hits.Length)
                     break;
 
-
-                Array.Resize(
-                    ref _hits,
-                    _hits.Length * 2
-                );
+                Array.Resize(ref _hits, _hits.Length * 2);
             }
             while (true);
 
+            ICombatTarget impactTarget = null;
 
-            ICombatTarget impactTarget =
-                null;
+            float nearestDistance = float.MaxValue;
 
-
-            float nearestDistance =
-                float.MaxValue;
-
-
-            for (int i = 0;
-                i < count;
-                i++)
+            for (int i = 0; i < count; i++)
             {
-                var collider =
-                    _hits[i].collider;
-
+                var collider = _hits[i].collider;
 
                 if (collider == null)
                     continue;
 
-
-                var candidate =
-                    collider.GetComponentInParent<ICombatTarget>();
-
+                var candidate = collider.GetComponentInParent<ICombatTarget>();
 
                 // 발사 시점에 저장한 Target Team의 유닛에만 충돌하며,
                 // 다른 팀과 환경 Collider는 통과한다.
-                if (!CombatTargetUtility.IsValid(candidate)
-                    || candidate.Team != _request.TargetTeam
-                    || (_request.TargetFilter != null && !_request.TargetFilter(candidate))
-                    || _hits[i].distance >= nearestDistance)
+                if (!CombatTargetUtility.IsValid(candidate) || candidate.Team != _request.TargetTeam || (_request.TargetFilter != null && !_request.TargetFilter(candidate)) || _hits[i].distance >= nearestDistance)
                 {
                     continue;
                 }
 
+                impactTarget = candidate;
 
-                impactTarget =
-                    candidate;
-
-
-                nearestDistance =
-                    _hits[i].distance;
+                nearestDistance = _hits[i].distance;
             }
-
 
             if (impactTarget != null)
             {
                 Impact(
                     impactTarget,
-                    origin
-                    + _direction
-                    * nearestDistance,
+                    origin + _direction * nearestDistance,
                     _direction
                 );
-
 
                 return;
             }
 
-
-            transform.position =
-                origin
-                + _direction
-                * distance;
+            transform.position = origin + _direction * distance;
         }
 
 
@@ -229,16 +168,17 @@ namespace Units
             if (!_isFlying)
                 return;
 
-
             _isFlying = false;
 
-
-            transform.position =
-                position;
-
+            transform.position = position;
 
             try
             {
+                _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Collision, position);
+
+                if (_request.Flight == null || _request.Flight.Ended)
+                    return;
+
                 _impactResolver.Resolve(
                     _request,
                     target,
@@ -261,9 +201,21 @@ namespace Units
         {
             _isFlying = false;
 
+            var flight = _request.Flight;
 
-            if (_manager != null)
-                _manager.Release(this);
+            _request = default;
+
+            _impactResolver = null;
+
+            try
+            {
+                flight?.Complete();
+            }
+            finally
+            {
+                if (_manager != null)
+                    _manager.Release(this);
+            }
         }
 
 
@@ -273,7 +225,25 @@ namespace Units
 
         private void OnDisable()
         {
+            bool wasFlying = _isFlying;
+
             _isFlying = false;
+
+            var flight = _request.Flight;
+
+            _request = default;
+
+            _impactResolver = null;
+
+            try
+            {
+                if (wasFlying)
+                    flight?.NotifyFX(Units.Skills.SkillFXHook.Expire, transform.position);
+            }
+            finally
+            {
+                flight?.Complete();
+            }
         }
     }
 }

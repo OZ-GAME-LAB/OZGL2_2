@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Units.Effects;
 
@@ -11,11 +11,9 @@ namespace Units
         // Data
         // ============================================================
 
-        private readonly List<RuntimeEffectInstance> _activeEffects =
-            new();
+        private readonly List<RuntimeEffectInstance> _activeEffects = new();
 
-        private readonly Dictionary<UnitStatusEffectType, int> _statusCounts =
-            new();
+        private readonly Dictionary<UnitStatusEffectType, int> _statusCounts = new();
 
         private readonly Func<UnitStatusEffectType, bool> _isImmuneToStatus;
 
@@ -24,8 +22,7 @@ namespace Units
         // Properties
         // ============================================================
 
-        public IReadOnlyList<RuntimeEffectInstance> ActiveEffects =>
-            _activeEffects;
+        public IReadOnlyList<RuntimeEffectInstance> ActiveEffects => _activeEffects;
 
 
         // ============================================================
@@ -39,11 +36,9 @@ namespace Units
         // Constructor
         // ============================================================
 
-        public EffectStatus(
-            Func<UnitStatusEffectType, bool> isImmuneToStatus)
+        public EffectStatus(Func<UnitStatusEffectType, bool> isImmuneToStatus)
         {
-            _isImmuneToStatus =
-                isImmuneToStatus;
+            _isImmuneToStatus = isImmuneToStatus;
         }
 
 
@@ -51,91 +46,58 @@ namespace Units
         // Effect Methods
         // ============================================================
 
-        public bool AddEffect(
-            RuntimeEffectInstance instance)
+        public bool AddEffect(RuntimeEffectInstance instance)
         {
-            if (instance == null ||
-                instance.Data == null ||
-                _activeEffects.Contains(instance))
+            if (instance == null || instance.Data == null || _activeEffects.Contains(instance))
             {
                 return false;
             }
 
+            _activeEffects.Add(instance);
 
-            _activeEffects.Add(
-                instance
-            );
-
-
-            AddStatuses(
-                instance
-            );
-
+            AddStatuses(instance);
 
             return true;
         }
 
-
-        public bool RemoveEffect(
-            RuntimeEffectInstance instance)
+        public bool RemoveEffect(RuntimeEffectInstance instance)
         {
-            if (instance == null ||
-                !_activeEffects.Remove(instance))
+            if (instance == null || !_activeEffects.Remove(instance))
             {
                 return false;
             }
 
-
-            RemoveStatuses(
-                instance
-            );
-
+            RemoveStatuses(instance);
 
             return true;
         }
 
-
-        public bool HasEffect(
-            string effectId)
+        public bool HasEffect(string effectId)
         {
-            return GetEffect(
-                effectId
-            ) != null;
+            return GetEffect(effectId) != null;
         }
 
-
-        public RuntimeEffectInstance GetEffect(
-            string effectId)
+        public RuntimeEffectInstance GetEffect(string effectId)
         {
-            if (string.IsNullOrEmpty(
-                    effectId))
+            if (string.IsNullOrEmpty(effectId))
             {
                 return null;
             }
 
-
-            for (int i = 0;
-                 i < _activeEffects.Count;
-                 i++)
+            for (int i = 0; i < _activeEffects.Count; i++)
             {
-                RuntimeEffectInstance instance =
-                    _activeEffects[i];
+                RuntimeEffectInstance instance = _activeEffects[i];
 
-
-                if (instance == null ||
-                    instance.Data == null)
+                if (instance == null || instance.Data == null)
                 {
                     continue;
                 }
 
-
-                if (instance.Data.EffectId ==
-                    effectId)
+                if (instance.Definition.EffectId == effectId)
                 {
                     return instance;
                 }
             }
-
 
             return null;
         }
@@ -145,13 +107,9 @@ namespace Units
         // Status Methods
         // ============================================================
 
-        public bool HasStatus(
-            UnitStatusEffectType statusType)
+        public bool HasStatus(UnitStatusEffectType statusType)
         {
-            return _statusCounts.TryGetValue(
-                       statusType,
-                       out int count)
-                   && count > 0;
+            return _statusCounts.TryGetValue(statusType, out int count) && count > 0;
         }
 
 
@@ -159,131 +117,81 @@ namespace Units
         // Status Control
         // ============================================================
 
-        private void AddStatuses(
-            RuntimeEffectInstance instance)
+        private void AddStatuses(RuntimeEffectInstance instance)
         {
-            IReadOnlyList<EffectActionData> actions =
-                instance.Data.Actions;
+            IReadOnlyList<EffectActionData> actions = instance.Definition.Actions;
 
-
-            for (int i = 0;
-                 i < actions.Count;
-                 i++)
+            for (int i = 0; i < actions.Count; i++)
             {
-                if (actions[i]
-                    is not StatusEffectActionData statusAction)
+                if (actions[i] is not StatusEffectActionData statusAction)
                 {
                     continue;
                 }
 
-
-                if (IsImmuneToStatus(
-                        statusAction.StatusType))
+                if (IsImmuneToStatus(statusAction.StatusType))
                 {
                     continue;
                 }
 
-
-                AddStatus(
-                    statusAction.StatusType
-                );
+                AddStatus(statusAction.StatusType);
             }
         }
 
-
-        private void RemoveStatuses(
-            RuntimeEffectInstance instance)
+        private void RemoveStatuses(RuntimeEffectInstance instance)
         {
-            IReadOnlyList<EffectActionData> actions =
-                instance.Data.Actions;
+            IReadOnlyList<EffectActionData> actions = instance.Definition.Actions;
 
-
-            for (int i = 0;
-                 i < actions.Count;
-                 i++)
+            for (int i = 0; i < actions.Count; i++)
             {
-                if (actions[i]
-                    is not StatusEffectActionData statusAction)
+                if (actions[i] is not StatusEffectActionData statusAction)
                 {
                     continue;
                 }
-
 
                 // 현재는 UnitData 기반의 기본 면역만 사용하므로
                 // Effect의 생존 중 면역 상태가 변하지 않는 것을 전제로 한다.
-                if (IsImmuneToStatus(
-                        statusAction.StatusType))
+                if (IsImmuneToStatus(statusAction.StatusType))
                 {
                     continue;
                 }
 
-
-                RemoveStatus(
-                    statusAction.StatusType
-                );
+                RemoveStatus(statusAction.StatusType);
             }
         }
 
-
-        private void AddStatus(
-            UnitStatusEffectType statusType)
+        private void AddStatus(UnitStatusEffectType statusType)
         {
-            if (_statusCounts.TryGetValue(
-                    statusType,
-                    out int count))
+            if (_statusCounts.TryGetValue(statusType, out int count))
             {
-                _statusCounts[statusType] =
-                    count + 1;
+                _statusCounts[statusType] = count + 1;
 
                 return;
             }
 
+            _statusCounts.Add(statusType, 1);
 
-            _statusCounts.Add(
-                statusType,
-                1
-            );
-
-
-            StatusChanged?.Invoke(
-                statusType,
-                true
-            );
+            StatusChanged?.Invoke(statusType, true);
         }
 
-
-        private void RemoveStatus(
-            UnitStatusEffectType statusType)
+        private void RemoveStatus(UnitStatusEffectType statusType)
         {
-            if (!_statusCounts.TryGetValue(
-                    statusType,
-                    out int count))
+            if (!_statusCounts.TryGetValue(statusType, out int count))
             {
                 return;
             }
-
 
             count--;
 
-
             if (count > 0)
             {
-                _statusCounts[statusType] =
-                    count;
+                _statusCounts[statusType] = count;
 
                 return;
             }
 
+            _statusCounts.Remove(statusType);
 
-            _statusCounts.Remove(
-                statusType
-            );
-
-
-            StatusChanged?.Invoke(
-                statusType,
-                false
-            );
+            StatusChanged?.Invoke(statusType, false);
         }
 
 
@@ -291,13 +199,9 @@ namespace Units
         // Immunity
         // ============================================================
 
-        private bool IsImmuneToStatus(
-            UnitStatusEffectType statusType)
+        private bool IsImmuneToStatus(UnitStatusEffectType statusType)
         {
-            return _isImmuneToStatus != null &&
-                _isImmuneToStatus(
-                    statusType
-                );
+            return _isImmuneToStatus != null && _isImmuneToStatus(statusType);
         }
     }
 }
