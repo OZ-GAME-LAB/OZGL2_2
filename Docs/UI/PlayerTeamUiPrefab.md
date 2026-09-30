@@ -1,5 +1,23 @@
 # 플레이어 통합 UI 프리팹
 
+## 연결 검사 메뉴
+
+씬을 연 뒤 **Game → UI → Check Team UI Connections**를 실행한다.
+필수 참조 누락, 서로 다른 매니저 연결, 중복 통합 UI/HUD, 비활성 UI,
+건설 슬롯 클릭 연결, 데이터베이스 불일치, EventSystem/ArtifactManager 구성을 확인한다.
+문제가 있으면 Console에 한국어 안내와 해당 오브젝트 참조를 출력한다.
+Console 메시지의 컨텍스트를 통해 오브젝트를 찾고 Inspector에서 연결을 확인한다.
+
+검사는 읽기 전용이며, 자동 연결·씬 저장·게임 상태 변경을 하지 않는다.
+현재 씬 기준의 연결 검사이므로 실제 AI 전투, 승패 판정, 성능 검증을 대신하지 않는다.
+의도적으로 여러 씬에 매니저를 나눈 프로젝트 구성은 현재 단일 씬 계약에 맞게 별도 검토해야 한다.
+
+검증: Unity 6000.3.23f1 격리 프로젝트에서 정상 연결, 미연결 재화 매니저,
+중복 UI, 매니저 불일치, 슬롯 입력 누락, EventSystem 비활성, UI 비활성,
+다른 씬 참조 및 검사 전후 데이터/dirty 상태 보존 등 11개 검사 통과.
+실행: `Game.UI.Editor.PlayerTeamUiConnectionCheck.RunBatchTests`.
+결과: `Logs/PlayerTeamUiPrefab/connections.txt`.
+
 ## 파일과 범위
 
 - 새 통합 프리팹: `Assets/Prefabs/UI/Player/PlayerTeamUI.prefab`
