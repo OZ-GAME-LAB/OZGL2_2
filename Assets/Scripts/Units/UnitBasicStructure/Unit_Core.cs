@@ -49,12 +49,16 @@ namespace Units
         [SerializeField]
         private UnitTeam _team;
 
+        private Vector2 _facingDirection = Vector2.left;
+
 
         // ============================================================
         // Properties
         // ============================================================
 
         public UnitTeam Team => _team;
+
+        public Vector2 FacingDirection => _facingDirection;
 
         public ICombatTarget CombatTarget => _gateway;
 
@@ -179,6 +183,8 @@ namespace Units
             FinalStatModifier spawnModifier,
             IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
         {
+            _facingDirection = Vector2.left;
+
             InitComponents();
 
             UnbindComponentEvents();
@@ -634,6 +640,29 @@ namespace Units
         // Animation
         // ============================================================
 
+        public void SetFacingDirection(Vector2 direction)
+        {
+            if (!IsAlive || float.IsNaN(direction.x) || float.IsInfinity(direction.x)
+                || float.IsNaN(direction.y) || float.IsInfinity(direction.y)
+                || Mathf.Abs(direction.x) <= 0.01f)
+                return;
+
+            _facingDirection = direction.x > 0f ? Vector2.right : Vector2.left;
+
+            _animation?.SetFacingDirection(_facingDirection);
+        }
+
+
+        public void SetMovementFacingDirection(Vector2 velocity)
+        {
+            if ((_combat != null && _combat.IsBusy)
+                || (_animation != null && _animation.IsFacingLocked))
+                return;
+
+            SetFacingDirection(velocity);
+        }
+
+
         public void PlayAnimation_Idle()
         {
             if (_animation == null)
@@ -863,5 +892,7 @@ namespace Units
 
             _ai?.StartAI();
         }
+
+
     }
 }

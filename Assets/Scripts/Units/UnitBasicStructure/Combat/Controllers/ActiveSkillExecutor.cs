@@ -305,6 +305,8 @@ namespace Units
 
                     run.Entered = true;
 
+                    FaceActionTarget(run);
+
                     run.Batch.EventTemplate = Event(run, PassiveSkillTriggerType.ActiveSkillActionHit);
 
                     Notify(run, PassiveSkillTriggerType.ActiveSkillActionStarted);
@@ -339,6 +341,9 @@ namespace Units
 
                     if (!EnsureTarget(run))
                         continue;
+
+                    // OnStart 이후 대상을 재선정했다면 실제 실행 대상 쪽으로 갱신한다.
+                    FaceActionTarget(run);
 
                     run.Waiting = true;
 
@@ -517,6 +522,20 @@ namespace Units
                 _dashController.Cancel();
             }
         }
+
+        private void FaceActionTarget(Execution run)
+        {
+            if (_execution != run || !OwnerValid(run))
+                return;
+
+            var target = run.Targets?.PrimaryTarget ?? default;
+
+            if (target.IsTargetable && !ReferenceEquals(target.Target, run.Owner.Target))
+            {
+                _core.SetFacingDirection((Vector2)target.Target.Transform.position - (Vector2)_core.transform.position);
+            }
+        }
+
 
         private bool EnsureTarget(Execution run)
         {
@@ -787,7 +806,7 @@ namespace Units
 
             Vector2 origin = Origin(run, action);
 
-            Vector2 direction = run.Initial.IsTargetable ? (Vector2)run.Initial.Target.Transform.position - origin : (Vector2)_core.transform.right;
+            Vector2 direction = run.Initial.IsTargetable ? (Vector2)run.Initial.Target.Transform.position - origin : _core.FacingDirection;
 
             SkillTargetRequest Request(Predicate<ICombatTarget> filter) => new(
                 run.Owner.Target,
@@ -1112,5 +1131,7 @@ namespace Units
                     DispatchFX(new SkillFXRequest(entry, run.Metadata, run.Position, true));
 
         }
+
+
     }
 }

@@ -15,7 +15,17 @@ namespace Units
 
         [Header("피격 애니메이션")]
         [SerializeField] private bool _hitAnimationEnabled = true;
-        [SerializeField, Min(0f)] private float _hitCooldown = 0.5f;
+        [SerializeField, Min(0f)] private float _hitCooldown = 1f;
+
+        [Header("바라보는 방향")]
+        [Tooltip("좌우 반전할 외형 자식. 비워두면 SPUM 루트를 사용합니다.")]
+        [SerializeField] private Transform _facingRoot;
+        [Tooltip("원본 외형이 양수 X 스케일에서 오른쪽을 보는 경우 켭니다.")]
+        [SerializeField] private bool _spriteFacesRight;
+        [SerializeField] private bool _initialFacingRight;
+
+        public bool IsFacingLocked => _dead || _stunned || _victory
+            || _skillMotion != 0 || Time.time < _oneShotUntil;
 
         private AnimatorOverrideController _ownedController;
         private RuntimeAnimatorController _originalController;
@@ -36,8 +46,30 @@ namespace Units
 
         public void Initialize(Unit_Core core)
         {
+            // 풀 재사용 시 이전 수명의 사망/기절/피격 제한을 해제한다.
+            _dead = false;
+            _stunned = false;
+            _nextHitTime = float.NegativeInfinity;
+            _lastIndex = -1;
+            _moving = false;
+            _victory = false;
+            _skillMotion = 0;
+            _oneShotUntil = 0f;
+
             if (_spum == null)
                 _spum = GetComponentInChildren<SPUM_Prefabs>(true);
+
+            if (_facingRoot == null && _spum != null)
+                _facingRoot = _spum.transform;
+
+            // 유닛 루트·외부 오브젝트의 물리와 UI는 반전하지 않는다.
+            if (_facingRoot != null && (_facingRoot == transform || !_facingRoot.IsChildOf(transform)))
+            {
+                Debug.LogWarning($"[Unit_Animation] {name} : Facing Root는 외형 자식이어야 합니다.");
+                _facingRoot = null;
+            }
+
+            core.SetFacingDirection(_initialFacingRight ? Vector2.right : Vector2.left);
 
             if (_spum == null || _spum._anim == null)
                 return;
@@ -54,18 +86,29 @@ namespace Units
                 _initialized = true;
             }
 
-            // 풀 재사용 시 이전 수명의 사망/기절/피격 제한을 해제한다.
-            _dead = false;
-            _stunned = false;
-            _nextHitTime = float.NegativeInfinity;
-            _lastIndex = -1;
-            _moving = false;
-            _victory = false;
-            _skillMotion = 0;
-            _oneShotUntil = 0f;
             _animator.Rebind();
+            SetFacingDirection(core.FacingDirection);
             PlayAnimation_Idle();
         }
+
+        public void SetFacingDirection(Vector2 direction)
+        {
+            if (_facingRoot == null || Mathf.Abs(direction.x) <= 0.01f)
+                return;
+
+            bool facingRight = direction.x > 0f;
+
+            // 부모가 이미 반전된 프리팹도 월드 방향에 맞춘다. 크기와 Y/Z는 유지한다.
+            float parentSign = _facingRoot.parent != null
+                && _facingRoot.parent.TransformVector(Vector3.right).x < 0f ? -1f : 1f;
+
+            Vector3 scale = _facingRoot.localScale;
+
+            scale.x = Mathf.Abs(scale.x) * (facingRight == _spriteFacesRight ? 1f : -1f) * parentSign;
+
+            _facingRoot.localScale = scale;
+        }
+
 
         private void OnDestroy()
         {

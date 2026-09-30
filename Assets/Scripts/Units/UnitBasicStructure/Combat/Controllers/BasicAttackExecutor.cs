@@ -90,6 +90,8 @@ namespace Units
                     return;
                 }
 
+                _core.SetFacingDirection((Vector2)target.Transform.position - (Vector2)_core.transform.position);
+
                 _core.PlayAnimation_Attack();
 
                 switch (_data.ExecutionType)

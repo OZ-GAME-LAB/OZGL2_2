@@ -2,7 +2,6 @@
 using UnityEngine;
 
 
-
 namespace Units
 {
     public class Unit_AI : MonoBehaviour
@@ -87,7 +86,8 @@ namespace Units
         public void Initialize(
             Unit_Core core)
         {
-            _core = core;
+            _core =
+                core;
 
 
             InitializeSelector();
@@ -109,7 +109,8 @@ namespace Units
             _movementCompleted =
                 false;
 
-            _pendingSkillTargetReevaluation = false;
+            _pendingSkillTargetReevaluation =
+                false;
 
             _isRunning =
                 false;
@@ -295,12 +296,17 @@ namespace Units
 
             if (_pendingSkillTargetReevaluation)
             {
-                _pendingSkillTargetReevaluation = false;
+                _pendingSkillTargetReevaluation =
+                    false;
+
                 if (!ValidateCurrentAssignment())
                     return;
+
                 RequestTargetReevaluation();
+
                 return;
             }
+
 
             if (!ValidateCurrentAssignment())
                 return;
@@ -446,6 +452,7 @@ namespace Units
                 true;
         }
 
+
         private void OnMovementFailed()
         {
             if (!_isRunning)
@@ -454,8 +461,44 @@ namespace Units
             if (!IsCurrentAction(UnitAIActionType.Move))
                 return;
 
-            Debug.LogWarning($"Unit {name} failed to reach its destination. Requesting a new assignment.");
+            if (!_currentAssignment.HasValue)
+            {
+                RequestFullAssignment();
 
+                return;
+            }
+
+            UnitAssignment assignment =
+                _currentAssignment.Value;
+
+            if (!IsTargetValid(assignment.Target))
+            {
+                RequestFullAssignment();
+
+                return;
+            }
+
+            UnitAIActionType nextAction =
+                _actionSelector.SelectAction(
+                    assignment
+                );
+
+            // 이동에 실패했더라도 현재 타겟에 대해
+            // 공격/스킬 사용 또는 대기가 가능하다면
+            // 기존 Assignment를 유지하고 행동을 다시 판단한다.
+            if (nextAction != UnitAIActionType.Move)
+            {
+                _currentActionEnded =
+                    true;
+
+                _movementCompleted =
+                    false;
+
+                return;
+            }
+
+            // 여전히 이동이 필요한 상태라면 현재 위치 배정으로는
+            // 전투를 진행할 수 없으므로 전체 Assignment를 다시 요청한다.
             RequestFullAssignment();
         }
 
@@ -563,7 +606,10 @@ namespace Units
         public void QueueTargetReevaluation()
         {
             if (_isRunning)
-                _pendingSkillTargetReevaluation = true;
+            {
+                _pendingSkillTargetReevaluation =
+                    true;
+            }
         }
 
 
@@ -598,9 +644,13 @@ namespace Units
             if (_isRunning)
                 return;
 
-            _isRunning = true;
 
-            _nextThinkTime = 0f;
+            _isRunning =
+                true;
+
+            _nextThinkTime =
+                0f;
+
 
             EvaluateAction();
         }
@@ -616,7 +666,8 @@ namespace Units
                 return;
 
 
-            _pendingSkillTargetReevaluation = false;
+            _pendingSkillTargetReevaluation =
+                false;
 
             _isRunning =
                 false;
@@ -641,7 +692,8 @@ namespace Units
 
         public void PauseAI()
         {
-            _pendingSkillTargetReevaluation = false;
+            _pendingSkillTargetReevaluation =
+                false;
 
             _isRunning =
                 false;

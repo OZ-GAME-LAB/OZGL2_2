@@ -19,6 +19,9 @@ namespace Units
 
         Transform Transform { get; }
 
+        // 외형 반전과 독립적으로 유지하는 월드 좌우 방향이다.
+        Vector2 FacingDirection { get; }
+
 
         // ============================================================
         // Component
