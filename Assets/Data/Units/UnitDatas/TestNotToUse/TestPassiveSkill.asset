@@ -13,28 +13,32 @@ MonoBehaviour:
   m_Name: TestPassiveSkill
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
   _skillSchemaVersion: 1
-  _triggerType: 4
+  _triggerType: 3
   _tickInterval: 1
   _conditions:
-  - rid: 4844432244939948134
-  _effectMode: 1
+  - rid: 4844432405556887651
+  _effectMode: 0
   _actions:
-  - rid: 4844432244939948132
+  - rid: 4844432405556887652
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4844432244939948132
-      type: {class: PassiveStatModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
+    - rid: 4844432405556887651
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4844432405556887652
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _statType: 100
-        _modifierType: 1
-        _value: 1
-    - rid: 4844432244939948134
-      type: {class: PassiveRuntimeEffectConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+        _targetType: 1
+        _targetRelation: 2
+        _maxEffectTargetCount: 1
+        _areaType: 0
+        _areaRadius: 1
+        _areaAngle: 90
+        _effects:
+        - rid: 4844432405556887653
+    - rid: 4844432405556887653
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _subjectType: 0
-        _conditionType: 0
-        _effectId: 
-        _statusType: 0
-        _shouldExist: 1
+        _effectData: {fileID: 11400000, guid: 2c47993dac3bd074c9e40fdbf8bc8f8d, type: 2}

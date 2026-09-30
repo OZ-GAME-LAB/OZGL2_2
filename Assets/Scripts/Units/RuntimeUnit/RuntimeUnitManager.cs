@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -497,6 +497,12 @@ namespace Units
 
             PauseAllGroups();
 
+            var winners = team == UnitTeam.Enemy ? _allyUnits : _enemyUnits;
+            foreach (var winner in winners)
+            {
+                if (winner != null && winner.IsAlive)
+                    winner.PlayAnimation_Victory();
+            }
 
             Debug.Log(
                 $"[RuntimeUnitManager] " +

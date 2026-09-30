@@ -11,6 +11,10 @@ namespace Units
 
         private const float TargetStopDistance = 1.15f;
 
+        // Rigidbody2D 위치와 TargetStopDistance의 부동소수점 경계에서
+        // Dash가 극소 이동을 반복하며 종료되지 않는 것을 방지한다.
+        private const float ArrivalTolerance = 0.01f;
+
         private const int UnitLayer = 13;
 
 
@@ -58,6 +62,8 @@ namespace Units
         public bool IsDashing { get; private set; }
 
         public bool HasMoved { get; private set; }
+
+
         // 재선택은 정지 대상만 바꾼다. 시작 시 고정한 진행 방향은 유지한다.
         public void Retarget(ICombatTarget target)
         {
@@ -113,6 +119,8 @@ namespace Units
             // Target이 이동하더라도 진행 방향 자체는 변경하지 않는다.
             _direction = (targetPosition - currentPosition).normalized;
 
+            _core.SetFacingDirection(_direction);
+
             // DashDistance는 반드시 이동할 거리가 아니라
             // 한 번의 Dash에서 이동할 수 있는 최대 거리이다.
             _remainingDistance = Mathf.Max(0f, distance);
@@ -132,7 +140,10 @@ namespace Units
 
             IsDashing = true;
 
-            if (_remainingDistance <= 0f || _speed <= 0f || _direction.sqrMagnitude <= 0f || HasReachedTarget())
+            if (_remainingDistance <= ArrivalTolerance
+                || _speed <= 0f
+                || _direction.sqrMagnitude <= 0f
+                || HasReachedTarget())
             {
                 Complete();
             }
@@ -162,7 +173,7 @@ namespace Units
                 return;
             }
 
-            if (_remainingDistance <= 0f || HasReachedTarget())
+            if (_remainingDistance <= ArrivalTolerance || HasReachedTarget())
             {
                 Complete();
 
@@ -173,17 +184,28 @@ namespace Units
 
             Vector2 targetPosition = _target.Transform.position;
 
-            float step = Mathf.Min(_remainingDistance, _speed * Mathf.Max(0f, deltaTime));
+            float step = Mathf.Min(
+                _remainingDistance,
+                _speed * Mathf.Max(0f, deltaTime)
+            );
 
             // 이번 FixedTick에서 Target 앞의 정지 지점을 넘어가지 않도록
             // 실제 이동량을 제한한다.
-            float distanceToTarget = Vector2.Distance(currentPosition, targetPosition);
+            float distanceToTarget = Vector2.Distance(
+                currentPosition,
+                targetPosition
+            );
 
-            float availableDistance = Mathf.Max(0f, distanceToTarget - TargetStopDistance);
+            float availableDistance = Mathf.Max(
+                0f,
+                distanceToTarget - TargetStopDistance
+            );
 
             step = Mathf.Min(step, availableDistance);
 
-            if (step <= 0f)
+            // TargetStopDistance 경계에서 부동소수점 오차로 극소 이동을
+            // 반복하지 않도록 충분히 작은 이동량은 도착으로 처리한다.
+            if (step <= ArrivalTolerance)
             {
                 Complete();
 
@@ -203,7 +225,10 @@ namespace Units
                 _core.transform.position = nextPosition;
             }
 
-            _remainingDistance -= step;
+            _remainingDistance = Mathf.Max(
+                0f,
+                _remainingDistance - step
+            );
         }
 
 
@@ -224,8 +249,13 @@ namespace Units
 
             Vector2 toTarget = targetPosition - currentPosition;
 
-            // Target과 충분히 가까워졌다면 Dash를 종료한다.
-            if (toTarget.sqrMagnitude <= TargetStopDistance * TargetStopDistance)
+            // TargetStopDistance의 정확한 경계값에 의존하지 않고
+            // 작은 허용 오차 안에 들어오면 Dash 도착으로 처리한다.
+            float arrivalDistance =
+                TargetStopDistance + ArrivalTolerance;
+
+            if (toTarget.sqrMagnitude
+                <= arrivalDistance * arrivalDistance)
             {
                 return true;
             }
@@ -340,5 +370,7 @@ namespace Units
 
             callback?.Invoke();
         }
+
+
     }
 }

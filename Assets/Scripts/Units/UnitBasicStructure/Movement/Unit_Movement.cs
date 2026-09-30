@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 
 namespace Units
@@ -27,7 +27,7 @@ namespace Units
         private float _arrivalDistance = 0.15f;
 
         [SerializeField]
-        private float _stuckDistanceThreshold = 1f;
+        private float _stuckDistanceThreshold = 0.3f;
 
         [SerializeField]
         private float _stuckTimeLimit = 1f;
@@ -243,6 +243,10 @@ namespace Units
             if (_isMoving)
             {
                 UpdateMovement();
+
+                // 목적지 이동의 실제 속도를 사용한다. 자리 유지 보정은 시선을 바꾸지 않는다.
+                if (_isMoving)
+                    _core?.SetMovementFacingDirection(_rigidbody.linearVelocity);
             }
             else if (_isHoldingPosition)
             {
@@ -282,6 +286,7 @@ namespace Units
 
         public void Stop()
         {
+            _core?.PlayAnimation_Idle();
             _isMoving =
                 false;
 
@@ -428,6 +433,9 @@ namespace Units
 
         public void ReleasePosition()
         {
+            if (!_isMoving)
+                _core?.PlayAnimation_Idle();
+
             _isHoldingPosition =
                 false;
 
@@ -612,6 +620,11 @@ namespace Units
         private void ApplyHoldVelocity(
             Vector2 targetVelocity)
         {
+            if (targetVelocity.sqrMagnitude > 0.0001f)
+                _core?.PlayAnimation_Move();
+            else
+                _core?.PlayAnimation_Idle();
+
             Vector2 acceleration =
                 Vector2.ClampMagnitude(
                     (

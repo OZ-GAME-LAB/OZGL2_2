@@ -215,7 +215,7 @@ namespace Units.Skills
 
             var origin = data.UseTriggerPosition && context.TargetSnapshot.ObjectId != 0 ? context.TargetSnapshot.Position : owner.Position;
 
-            var direction = context.TargetSnapshot.ObjectId != 0 ? (context.TargetSnapshot.Position - owner.Position).normalized : (UnityEngine.Vector2)context.Owner.Transform.right;
+            var direction = context.TargetSnapshot.ObjectId != 0 ? (context.TargetSnapshot.Position - owner.Position).normalized : context.Owner.FacingDirection;
 
             var settings = action.Target;
 
@@ -521,7 +521,7 @@ namespace Units.Skills
 
             UnityEngine.Vector2 origin = owner.Transform.position;
 
-            UnityEngine.Vector2 forward = owner.Transform.right;
+            UnityEngine.Vector2 forward = owner.FacingDirection;
 
             UnityEngine.Vector2 targetDirection = (UnityEngine.Vector2)target.Transform.position - origin;
 
