@@ -45,7 +45,8 @@ public class ExcelImportWindow : EditorWindow
                 Object excel = EditorGUILayout.ObjectField("엑셀 파일", entry.Excel, typeof(DefaultAsset), false);
                 if (entry.Type == ExcelImportType.Artifacts)
                 {
-                    EditorGUILayout.LabelField("시트", "Artifacts / UnitStatEffects / CurrencyEffects");
+                    EditorGUILayout.LabelField("시트", "Artifacts / UnitStatEffects / CurrencyEffects / ConsumableSlotEffects");
+                    EditorGUILayout.HelpBox("ConsumableSlotEffects: ArtifactId / AdditionalSlots. 양수는 증가, 음수는 감소. 해당 ID의 행이 없으면 슬롯 효과를 제거합니다.", MessageType.Info);
                     entry.OutputFolder = EditorGUILayout.TextField("신규 S.O 폴더", entry.OutputFolder);
                     EditorGUILayout.HelpBox("대상에는 ArtifactCatalog를 연결하세요. 동일 ID는 갱신하고 신규 ID는 생성 후 카탈로그에 등록합니다. 아이콘과 엑셀에 없는 아티팩트는 유지합니다.", MessageType.Info);
                 }

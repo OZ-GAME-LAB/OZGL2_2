@@ -9,6 +9,7 @@ public interface IShopReader
 
     IReadOnlyList<ShopArtifactSlot> PurchaseSlots { get; }
     IReadOnlyList<ShopArtifactExchangeSlot> ExchangeSlots { get; }
+    IReadOnlyList<ShopConsumableSlot> ConsumableSlots { get; }
 
     event Action ShopChanged;
 

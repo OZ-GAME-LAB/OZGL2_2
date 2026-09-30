@@ -8,10 +8,12 @@ public class ConvertedEffects
     public IReadOnlyList<AllyStatModifier> AllyModifiers { get; }
     public IReadOnlyList<EnemyStatModifier> EnemyModifiers { get; }
     public IReadOnlyList<CurrencyModifier> CurrencyModifiers { get; }
+    public IReadOnlyList<ConsumableSlotModifier> ConsumableSlotModifiers { get; }
 
     public ConvertedEffects(List<AllyStatModifier> allyModifiers,
         List<EnemyStatModifier> enemyModifiers,
-        List<CurrencyModifier> currencyModifiers)
+        List<CurrencyModifier> currencyModifiers,
+        List<ConsumableSlotModifier> consumableSlotModifiers = null)
     {
         if (allyModifiers != null)
         {
@@ -25,6 +27,10 @@ public class ConvertedEffects
         if (currencyModifiers != null)
         {
             CurrencyModifiers = new List<CurrencyModifier>(currencyModifiers);
+        }
+        if (consumableSlotModifiers != null)
+        {
+            ConsumableSlotModifiers = new List<ConsumableSlotModifier>(consumableSlotModifiers);
         }
     }
 

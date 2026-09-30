@@ -25,6 +25,13 @@ namespace Game.UI.Editor
         private static int _errors;
         private static int _knownTeamRuntimeErrors;
         private static int _searchErrors;
+        private static bool _useStoredScene;
+
+        public static void RunStoredBatch()
+        {
+            _useStoredScene = true;
+            RunBatch();
+        }
 
         static TeamBuildingUiValidation() => EditorApplication.playModeStateChanged += HandleState;
 
@@ -32,12 +39,15 @@ namespace Game.UI.Editor
         {
             if (!Application.isBatchMode || !Path.GetFullPath(Application.dataPath).Replace('\\', '/').Contains("/UnityUIValidation/"))
                 throw new InvalidOperationException("Use an isolated UnityUIValidation project.");
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(TeamBuildingUiSetup.ScenePath) != null &&
+            if (!_useStoredScene && AssetDatabase.LoadAssetAtPath<SceneAsset>(TeamBuildingUiSetup.ScenePath) != null &&
                 !AssetDatabase.DeleteAsset(TeamBuildingUiSetup.ScenePath))
                 throw new IOException("Failed to replace the generated UI integration scene.");
-            TeamBuildingUiSetup.CreateScene();
-            TeamBuildingUiSetup.ConnectExistingTeamApis();
-            TeamBuildingUiSetup.ConnectExistingGameLoopUi();
+            if (!_useStoredScene)
+            {
+                TeamBuildingUiSetup.CreateScene();
+                TeamBuildingUiSetup.ConnectExistingTeamApis();
+                TeamBuildingUiSetup.ConnectExistingGameLoopUi();
+            }
             var scene = EditorSceneManager.OpenScene(TeamBuildingUiSetup.ScenePath);
             foreach (var root in scene.GetRootGameObjects())
                 foreach (var transform in root.GetComponentsInChildren<Transform>(true))
@@ -86,6 +96,10 @@ namespace Game.UI.Editor
                 var info = UnityEngine.Object.FindFirstObjectByType<BuildingInfoPanel>();
                 var actions = UnityEngine.Object.FindFirstObjectByType<BuildingActionPanel>();
                 var hud = UnityEngine.Object.FindFirstObjectByType<GameUIController>();
+                var artifactManager = UnityEngine.Object.FindFirstObjectByType<ArtifactManager>();
+                var artifactBinding = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardBinding>();
+                var artifactPanel = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardPanel>();
+                var navigation = UnityEngine.Object.FindFirstObjectByType<PlayerUiNavigation>();
                 var allSlots = UnityEngine.Object.FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None);
                 var coreSlots = allSlots.Where(slot => slot.CurrentBuilding != null &&
                     slot.CurrentBuilding.Data != null && slot.CurrentBuilding.Data.IsCore).ToArray();
@@ -121,6 +135,16 @@ namespace Game.UI.Editor
                 var runDecision = UnityEngine.Object.FindFirstObjectByType<CoreRunDecisionBinding>();
                 Check(loop != null && loop.IsReady, "player game-loop UI binding is ready");
                 Check(runDecision != null, "quarter completion choice uses the player UI");
+                Check(artifactManager != null && artifactManager.IsInitialized,
+                    "team artifact manager is initialized by the original bootstrap");
+                Check(artifactBinding != null && artifactPanel != null &&
+                    Ref<ArtifactRewardPanel>(artifactBinding, "_panel") == artifactPanel,
+                    "player artifact selection binding uses the tracked reward panel");
+                Check(artifactBinding.TryInitialize(artifactManager),
+                    "player artifact selection UI accepts the team artifact authority");
+                Check(!artifactPanel.IsVisible && ArrayHasReference(navigation, "_blockingPanels",
+                        Ref<GameObject>(artifactPanel, "_panelRoot")),
+                    "artifact selection starts hidden and blocks other player popups when opened");
                 Check(waveStart.gameObject.activeSelf && waveStart.interactable,
                     "player can start a wave from the production HUD");
                 await Capture("01-team-slots", 1280, 720);
@@ -263,6 +287,45 @@ namespace Game.UI.Editor
             finally { Application.logMessageReceived -= HandleLog; }
         }
 
+        private static async UniTask SelectTeamReward(Button continueButton)
+        {
+            var manager = UnityEngine.Object.FindFirstObjectByType<ArtifactManager>();
+            var panel = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardPanel>();
+            var binding = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardBinding>();
+            await Wait(() => manager.IsSelectingReward);
+            var expected = manager.SelectionCandidates.ToArray();
+            Check(expected.Length > 0 && !panel.IsVisible, "gold prompt precedes artifact selection");
+            Check(ClickTarget(Point(continueButton)) == continueButton.gameObject, "gold continue button receives pointer input");
+            Click(Point(continueButton));
+            continueButton.onClick.Invoke();
+            await Wait(() => panel.IsVisible, "artifact popup after gold confirmation");
+            binding.enabled = false;
+            Check(!panel.IsVisible, "disabling reward binding hides its view");
+            binding.enabled = true;
+            Check(panel.IsVisible && manager.IsSelectingReward, "re-enable resumes the same pending selection");
+            Check(!manager.TrySelectReward(null), "invalid selection does not complete the team reward");
+            Check(binding.CurrentReward.Candidates.Select(x => x.ArtifactId).SequenceEqual(expected.Select(x => x.Id)),
+                "UI uses the manager's exact candidates without rerolling");
+            var confirm = Ref<Button>(panel, "_confirmButton");
+            Check(!confirm.interactable, "team API requires a selection; unsupported skip is disabled");
+            confirm.onClick.Invoke();
+            Check(manager.IsSelectingReward && !manager.IsRewardApplied, "empty selection cannot complete reward");
+            var selected = expected[0];
+            int before = manager.TryGetById(selected.Id, out var instance) ? instance.StackCount : 0;
+            var card = Ref<Button>(panel, "_cards.Array.data[0].Button");
+            Check(ClickTarget(Point(card)) == card.gameObject, "artifact card receives pointer input");
+            Click(Point(card));
+            Check(confirm.interactable, "selecting a real candidate enables confirm");
+            await Capture("09-team-artifact-selection", 1280, 720);
+            Check(ClickTarget(Point(confirm)) == confirm.gameObject, "artifact confirm receives pointer input");
+            Click(Point(confirm));
+            confirm.onClick.Invoke();
+            Check(manager.TryGetById(selected.Id, out var after) && after.StackCount == before + 1,
+                "team selection API awards exactly one stack despite repeated confirm");
+            Check(!panel.IsVisible, "successful award closes the selection UI");
+            await UniTask.NextFrame();
+        }
+
         private static async UniTask ValidateAutomaticRewards(TeamBuildingUiStartup startup,
             GameFlowController flow, RunCurrencyManager wallet, GameUIController hud,
             Button continueButton, Button restartButton, GameObject rewardPanel, GameObject resultPanel,
@@ -322,7 +385,7 @@ namespace Game.UI.Editor
                     startup.enabled = false; startup.enabled = true; startup.Refresh();
                     Check(events == stableEvents && wallet.GetBalance(CurrencyType.Gold) == expectedGold,
                         "UI re-enable cannot reinitialize or repay the wallet: " + round);
-                    continueButton.onClick.Invoke();
+                    await SelectTeamReward(continueButton);
                     await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
                     Check(!rewardPanel.activeInHierarchy, "continue closes the reward prompt: " + round);
                     Check(waves.CurQuarter == (round == 0 ? 1 : 2) && waves.CurWave == (round == 0 ? 2 : 1),
@@ -365,7 +428,7 @@ namespace Game.UI.Editor
                     "end/reinitialize removes old subscriptions and pays only once");
                 Check(goldText.text == expectedGold.ToString("N0") && gemText.text == $"보석 {expectedGems:N0}",
                     "new-run reward is reflected in the visible HUD");
-                continueButton.onClick.Invoke();
+                await SelectTeamReward(continueButton);
                 await MvpRuntimeHudValidation.WaitForPhaseAfterContentAsync(flow, GamePhase.Preparation);
 
                 waves.JumpToLastQuarterForTest();
@@ -376,7 +439,7 @@ namespace Game.UI.Editor
                 await Wait(() => flow.CurPhase == GamePhase.Battle);
                 flow.ResolveBattleAsync(ResultType.Victory).Forget();
                 await Wait(() => flow.CurPhase == GamePhase.Reward);
-                continueButton.onClick.Invoke();
+                await SelectTeamReward(continueButton);
                 await Wait(() => flow.CurPhase == GamePhase.QuarterComplete && flow.CanChooseRunDecision);
                 Check(runDecision.IsVisible, "final main-game clear opens the finish-or-continue choice");
                 var finishButton = Ref<Button>(runDecision, "_finishButton");
@@ -404,6 +467,18 @@ namespace Game.UI.Editor
 
         private static T Ref<T>(UnityEngine.Object obj, string field) where T : UnityEngine.Object =>
             new SerializedObject(obj).FindProperty(field).objectReferenceValue as T;
+        private static bool ArrayHasReference(
+            UnityEngine.Object obj,
+            string field,
+            UnityEngine.Object expected)
+        {
+            if (obj == null || expected == null) return false;
+            var array = new SerializedObject(obj).FindProperty(field);
+            if (array == null || !array.isArray) return false;
+            for (int i = 0; i < array.arraySize; i++)
+                if (array.GetArrayElementAtIndex(i).objectReferenceValue == expected) return true;
+            return false;
+        }
         private static Vector2 Point(Component component)
         {
             Canvas.ForceUpdateCanvases();
@@ -433,12 +508,12 @@ namespace Game.UI.Editor
                 ExecuteEvents.Execute(data.pointerPress, data, ExecuteEvents.pointerClickHandler);
             }
         }
-        private static async UniTask Wait(Func<bool> condition)
+        private static async UniTask Wait(Func<bool> condition, string context = "Team startup")
         {
             float start = Time.realtimeSinceStartup;
             while (!condition())
             {
-                if (Time.realtimeSinceStartup - start > 30) throw new TimeoutException("Team startup");
+                if (Time.realtimeSinceStartup - start > 30) throw new TimeoutException(context);
                 await UniTask.NextFrame();
             }
         }

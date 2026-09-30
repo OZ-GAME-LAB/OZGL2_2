@@ -62,7 +62,7 @@ public static class OutGameSetupTestBuilder
 
         GameObject systems = new GameObject("Systems");
         systems.transform.SetParent(root.transform, false);
-        OutGameTestWallet wallet = systems.AddComponent<OutGameTestWallet>();
+        PersistentCurrencyManager wallet = systems.AddComponent<PersistentCurrencyManager>();
         SaveManager saveManager = systems.AddComponent<SaveManager>();
         PersistentSaveCoordinator persistentSaveCoordinator = systems.AddComponent<PersistentSaveCoordinator>();
         OutGameAltarController altar = systems.AddComponent<OutGameAltarController>();

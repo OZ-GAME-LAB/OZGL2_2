@@ -10,7 +10,7 @@ public class OutGameUIController : MonoBehaviour
     private IAltarSelection _altars;
     private ITraitProgression _traits;
     private ITotemSelection _totems;
-    private OutGameTestWallet _wallet;
+    private PersistentCurrencyManager _wallet;
     private OutGameStartController _startController;
 
     public bool ValidateReferences()
@@ -24,7 +24,7 @@ public class OutGameUIController : MonoBehaviour
     }
 
     public void Initialize(IAltarSelection altars, ITraitProgression traits, ITotemSelection totems,
-        OutGameTestWallet wallet, OutGameStartController startController)
+        PersistentCurrencyManager wallet, OutGameStartController startController)
     {
         Shutdown();
         _altars = altars;

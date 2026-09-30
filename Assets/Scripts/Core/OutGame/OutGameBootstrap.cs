@@ -4,7 +4,7 @@ using UnityEngine.Serialization;
 // 테스트 시작에 필요한 참조와 초기화 순서만 담당합니다.
 public class OutGameBootstrap : MonoBehaviour
 {
-    [SerializeField] private OutGameTestWallet _wallet;
+    [SerializeField] private PersistentCurrencyManager _wallet;
     [SerializeField] private OutGameAltarController altarController;
     [SerializeField] private OutGameTraitController traitController;
     [SerializeField] private OutGameTotemController totemController;

@@ -11,7 +11,7 @@ public static class PersistentSaveValidation
 {
     private static GameObject _root;
     private static OutGameTraitController _traits;
-    private static OutGameTestWallet _wallet;
+    private static PersistentCurrencyManager _wallet;
     private static SaveManager _saveManager;
     private static PersistentSaveCoordinator _coordinator;
     private static string _directory;
@@ -54,7 +54,7 @@ public static class PersistentSaveValidation
     private static void CreateFixture()
     {
         _root = new GameObject("PersistentSaveValidation") { hideFlags = HideFlags.HideAndDontSave };
-        _wallet = _root.AddComponent<OutGameTestWallet>();
+        _wallet = _root.AddComponent<PersistentCurrencyManager>();
         _traits = _root.AddComponent<OutGameTraitController>();
         _saveManager = _root.AddComponent<SaveManager>();
         _coordinator = _root.AddComponent<PersistentSaveCoordinator>();
@@ -146,8 +146,11 @@ public static class PersistentSaveValidation
         {
             null,
             new PersistentWalletSaveData(-1),
-            new PersistentWalletSaveData { Version = 0, Bloodstone = 500 },
-            new PersistentWalletSaveData { Version = 99, Bloodstone = 500 }
+            // 손상된 저장 파일에서 다른 타입이 들어오는 경우를 검증합니다.
+            new PersistentWalletSaveData(500) { Type = CurrencyType.None },
+            new PersistentWalletSaveData(500) { Type = CurrencyType.Gold },
+            new PersistentWalletSaveData(500) { Type = CurrencyType.Gem },
+            new PersistentWalletSaveData(500) { Type = (CurrencyType)99 }
         };
         for (int i = 0; i < invalidWallets.Length; i++)
             Require(!_wallet.TryValidateSaveData(invalidWallets[i], out error) && !string.IsNullOrEmpty(error),
@@ -164,7 +167,8 @@ public static class PersistentSaveValidation
         Require(_coordinator.IsReady && File.Exists(_coordinator.SavePath), "Initial profile written and coordinator ready");
         Require(_wallet.Balance == 500 && _traits.GetLevel(TraitId.StartingGold) == 0, "Initial defaults retained");
         string original = File.ReadAllText(_coordinator.SavePath);
-        Require(original.Contains("\"Traits\"") && original.Contains("\"Wallet\"") && original.Contains("\"_levels\"") && original.Contains("\"Bloodstone\""),
+        Require(original.Contains("\"Traits\"") && original.Contains("\"Wallet\"") && original.Contains("\"_levels\"") &&
+            original.Contains("\"Type\"") && original.Contains("\"Amount\""),
             "JSON contains nested trait and wallet fields");
         ITraitProgression progression = _traits;
         Require(!progression.TryUpgrade(TraitId.Production, out error), "Missing prerequisite rejected through trait interface");
@@ -199,8 +203,8 @@ public static class PersistentSaveValidation
         }
         Require(_saveManager.TryLoad(PersistentSaveCoordinator.SaveKey, out PersistentSaveData saved, out error),
             "Saved profile deserializes: " + error);
-        Require(saved.Traits.Version == 1 && saved.Wallet.Version == 1 && saved.Traits._levels.Count == 9 &&
-            Level(saved.Traits, TraitId.StartingGold) == 1 && saved.Wallet.Bloodstone == 400,
+        Require(saved.Traits.Version == 1 && saved.Wallet.Type == CurrencyType.Bloodstone && saved.Traits._levels.Count == 9 &&
+            Level(saved.Traits, TraitId.StartingGold) == 1 && saved.Wallet.Amount == 400,
             "Purchase file contains one upgraded level and one currency deduction");
         Initialize();
         Require(_coordinator.TryLoadOrCreate(out error), "Load existing profile: " + error);
@@ -238,7 +242,7 @@ public static class PersistentSaveValidation
             if (next.Traits._levels[i].Id == TraitId.StartingGold)
                 next.Traits._levels[i].Level = 1;
         }
-        next.Wallet.Bloodstone = 400;
+        next.Wallet.Amount = 400;
         Require(_wallet.Balance == 500 && _traits.GetLevel(TraitId.StartingGold) == 0,
             "Coordinator capture provides detached data for content changes");
 
@@ -263,7 +267,7 @@ public static class PersistentSaveValidation
             Require(_wallet.Balance == 500 && _traits.GetLevel(TraitId.StartingGold) == 0 && traitEvents == 0 && walletEvents == 0,
                 "Coordinator snapshot save never applies gameplay changes or sends provider notifications");
             Require(_saveManager.TryLoad(PersistentSaveCoordinator.SaveKey, out PersistentSaveData saved, out error) &&
-                saved.Wallet.Bloodstone == 400 && Level(saved.Traits, TraitId.StartingGold) == 1,
+                saved.Wallet.Type == CurrencyType.Bloodstone && saved.Wallet.Amount == 400 && Level(saved.Traits, TraitId.StartingGold) == 1,
                 "Snapshot save persists supplied data instead of unchanged live state: " + error);
             Require(_coordinator.TryLoad(out error), "Explicit load applies saved snapshot: " + error);
             Require(_wallet.Balance == 400 && _traits.GetLevel(TraitId.StartingGold) == 1 &&
@@ -350,7 +354,7 @@ public static class PersistentSaveValidation
             Require(_wallet.Balance == 400 && _traits.GetLevel(TraitId.StartingGold) == 1 && traitEvents == 1 && walletEvents == 1,
                 "Transient lock success commits and notifies each provider once");
             Require(_saveManager.TryLoad(PersistentSaveCoordinator.SaveKey, out PersistentSaveData firstPurchase, out error) &&
-                firstPurchase.Wallet.Bloodstone == 400 && Level(firstPurchase.Traits, TraitId.StartingGold) == 1,
+                firstPurchase.Wallet.Type == CurrencyType.Bloodstone && firstPurchase.Wallet.Amount == 400 && Level(firstPurchase.Traits, TraitId.StartingGold) == 1,
                 "Transient lock success writes correct paired state: " + error);
 
             string original = File.ReadAllText(path);
@@ -367,7 +371,7 @@ public static class PersistentSaveValidation
             Require(_wallet.Balance == 300 && _traits.GetLevel(TraitId.StartingGold) == 2 && traitEvents == 2 && walletEvents == 2,
                 "Unlocked retry applies exactly one additional purchase");
             Require(_saveManager.TryLoad(PersistentSaveCoordinator.SaveKey, out PersistentSaveData secondPurchase, out error) &&
-                secondPurchase.Wallet.Bloodstone == 300 && Level(secondPurchase.Traits, TraitId.StartingGold) == 2,
+                secondPurchase.Wallet.Type == CurrencyType.Bloodstone && secondPurchase.Wallet.Amount == 300 && Level(secondPurchase.Traits, TraitId.StartingGold) == 2,
                 "Unlocked retry stores second paired purchase: " + error);
         }
         finally
@@ -395,7 +399,7 @@ public static class PersistentSaveValidation
         // JsonUtility.ToJson은 null 직렬화 클래스도 기본 필드가 있는 객체로 만들 수 있습니다.
         // 손상된 파일 입력은 저장 API를 거치지 않고 실제 null/누락 JSON으로 작성합니다.
         string validTraitSection = "\"Traits\":{\"Version\":1,\"_levels\":[{\"Id\":12000,\"Level\":0}]}";
-        string validWalletSection = "\"Wallet\":{\"Version\":1,\"Bloodstone\":150}";
+        string validWalletSection = "\"Wallet\":{\"Type\":" + (int)CurrencyType.Bloodstone + ",\"Amount\":150}";
         string[] missingSections =
         {
             "{\"Traits\":null," + validWalletSection + "}",

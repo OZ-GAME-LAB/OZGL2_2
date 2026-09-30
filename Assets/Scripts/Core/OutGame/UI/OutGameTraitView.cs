@@ -24,7 +24,7 @@ public class OutGameTraitView : MonoBehaviour
     [SerializeField] private Button _backButton;
 
     private ITraitProgression _progression;
-    private OutGameTestWallet _wallet;
+    private PersistentCurrencyManager _wallet;
     private TraitId _inspectedTrait;
 
     public event Action<TraitId> UpgradeRequested;
@@ -47,7 +47,7 @@ public class OutGameTraitView : MonoBehaviour
         return valid;
     }
 
-    public void Initialize(ITraitProgression progression, OutGameTestWallet wallet)
+    public void Initialize(ITraitProgression progression, PersistentCurrencyManager wallet)
     {
         Shutdown();
         if (!ValidateReferences() || progression == null || wallet == null) return;
@@ -98,7 +98,8 @@ public class OutGameTraitView : MonoBehaviour
             return;
         }
 
-        string cost = "(혈석 " + inspected.UpgradeCost + ")";
+        // Current date KDH 2026-09-29: 현재 레벨에서 다음 레벨로 올리는 비용을 표시합니다.
+        string cost = "(혈석 " + inspected.GetUpgradeCost(currentLevel) + ")";
         if (!canUpgrade) cost = "<color=#D32F2F>" + cost + "</color>";
         _upgradeLabel.text = "레벨 상승\n" + cost;
         if (!canUpgrade) _description.text += "\n\n" + reason;

@@ -65,6 +65,7 @@ namespace Game.UI
         private ArtifactRewardViewData _data;
         private ArtifactRewardRequest _pendingRequest;
         private GameObject _previousSelection;
+        private bool _allowForfeit = true;
         private int _selectedIndex = -1;
         private int _pageIndex;
         private bool _showRequested;
@@ -111,6 +112,12 @@ namespace Game.UI
             HideView();
         }
 
+        public void SetForfeitAllowed(bool allowed)
+        {
+            _allowForfeit = allowed;
+            Refresh();
+        }
+
         public void ShowReward(ArtifactRewardViewData data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
@@ -138,6 +145,7 @@ namespace Game.UI
         /// <summary>실제 소유자가 이전 플레이/보상 요청을 무효화한 후 호출한다. 게임 상태를 취소하지 않는다.</summary>
         public void ResetReward()
         {
+            _allowForfeit = true;
             _data = null;
             _pendingRequest = null;
             _selectedIndex = -1;
@@ -176,7 +184,7 @@ namespace Game.UI
 
         private void HandleConfirmClicked()
         {
-            if (!CanInteract() || _choiceRequested == null) return;
+            if (!CanInteract() || _choiceRequested == null || (!_allowForfeit && _selectedIndex < 0)) return;
             var request = new ArtifactRewardRequest(_data.RewardId, SelectedArtifactId);
             _pendingRequest = request;
             _message = null;
@@ -268,8 +276,8 @@ namespace Game.UI
             }
             _clearButton.gameObject.SetActive(_selectedIndex >= 0);
             _clearButton.interactable = unlocked && _selectedIndex >= 0;
-            _confirmButton.interactable = unlocked && _choiceRequested != null;
-            _confirmText.text = IsRequestPending ? "처리 중…" : _selectedIndex >= 0 ? "선택하기" : "건너뛰기";
+            _confirmButton.interactable = unlocked && _choiceRequested != null && (_allowForfeit || _selectedIndex >= 0);
+            _confirmText.text = IsRequestPending ? "처리 중…" : _selectedIndex >= 0 ? "선택하기" : _allowForfeit ? "건너뛰기" : "유물을 선택하세요";
             ConfigureActionPresentation(_selectedIndex >= 0);
             bool hasPages = PageCount > 1;
             _previousPageButton.gameObject.SetActive(hasPages);

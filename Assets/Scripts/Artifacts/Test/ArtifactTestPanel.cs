@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using Game.Core;
 using UnityEngine;
 
@@ -17,6 +19,7 @@ public class ArtifactTestPanel : MonoBehaviour
     private int _gem;
     private string _result = "재화 패널에서 웨이브 보상을 지급하세요.";
     private Vector2 _scroll;
+    private CancellationTokenSource _rewardWait;
 
     public void Initialize(WaveController waveController, EffectManager effectManager)
     {
@@ -50,10 +53,17 @@ public class ArtifactTestPanel : MonoBehaviour
         _completed = completed;
         _waiting = true;
         _result = $"{_wave.CurQuarter}분기 / {_wave.CurWave}웨이브 보상";
+        RunSelectionAsync().Forget();
     }
 
     public void CancelReward()
     {
+        if (_rewardWait != null)
+        {
+            CancellationTokenSource wait = _rewardWait;
+            _rewardWait = null;
+            wait.Cancel();
+        }
         _waiting = false;
         _completed = null;
         _candidates = new List<ArtifactData>();
@@ -70,28 +80,32 @@ public class ArtifactTestPanel : MonoBehaviour
         if (runActive && _waiting)
         {
             GUILayout.Label($"지급 완료: 골드 {_gold} / 보석 {_gem}");
-            foreach (ArtifactData artifact in _candidates)
+            if (_artifacts.IsRewardApplied)
             {
+                GUILayout.Label("아티팩트 지급 완료.");
+            }
+            if (_rewardWait == null && GUILayout.Button("선택 처리 재개"))
+            {
+                RunSelectionAsync().Forget();
+                GUIUtility.ExitGUI();
+            }
+            foreach (ArtifactData artifact in _artifacts.SelectionCandidates)
+            {
+                if (_artifacts.IsRewardApplied)
+                {
+                    break;
+                }
                 GUILayout.Label(artifact.Description);
                 if (GUILayout.Button($"{artifact.DisplayName} [{artifact.Rarity}] 선택"))
                 {
-                    if (_artifacts.TryAdd(artifact))
+                    if (_artifacts.TrySelectReward(artifact))
                     {
-                        CompleteReward();
+                        _result = "지급 완료. 다음 웨이브로 진행합니다.";
                     }
                     else
                     {
                         _result = "획득 실패: 중첩 및 효과 설정 확인";
                     }
-                    GUIUtility.ExitGUI();
-                }
-            }
-            if (_candidates.Count == 0)
-            {
-                GUILayout.Label("획득 가능한 후보가 없습니다.");
-                if (GUILayout.Button("보상 확인 / 다음 웨이브"))
-                {
-                    CompleteReward();
                     GUIUtility.ExitGUI();
                 }
             }
@@ -106,6 +120,35 @@ public class ArtifactTestPanel : MonoBehaviour
             }
         }
         GUILayout.EndScrollView();
+    }
+
+    private async UniTask RunSelectionAsync()
+    {
+        if (_rewardWait != null)
+        {
+            return;
+        }
+        CancellationTokenSource wait = new CancellationTokenSource();
+        _rewardWait = wait;
+        var outcome = await _artifacts.TestSelectAndApplyAsync(_candidates, wait.Token).SuppressCancellationThrow();
+        if (_rewardWait == wait)
+        {
+            _rewardWait = null;
+            if (!outcome.IsCanceled && outcome.Result)
+            {
+                CompleteReward();
+            }
+            else
+            {
+                _result = "선택 처리 중단. 초기화 및 다른 대기 상태를 확인한 뒤 재개하세요.";
+            }
+        }
+        wait.Dispose();
+    }
+
+    private void OnDisable()
+    {
+        CancelReward();
     }
 
     private void CompleteReward()

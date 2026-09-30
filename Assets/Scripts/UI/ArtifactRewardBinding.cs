@@ -32,6 +32,7 @@ namespace Game.UI
         private bool _faulted;
         private bool _interfaceListening;
         private bool _listening;
+        private bool _usesManagerSelection;
 
         private void OnEnable()
         {
@@ -147,7 +148,10 @@ namespace Game.UI
                 return true;
             }
             if (IsChoosing) return false;
-            if (!_manager.TryCreateCandidates(out var candidates)) return false;
+            _usesManagerSelection = _manager.IsSelectingReward;
+            IReadOnlyList<ArtifactData> candidates;
+            if (_usesManagerSelection) candidates = _manager.SelectionCandidates;
+            else if (!_manager.TryCreateCandidates(out candidates)) return false;
 
             // 추첨 성공 시 먼저 키/원본 후보를 보존한다. 표시 실패를 이유로 재추첨하지 않는다.
             _rewardId = rewardId;
@@ -171,6 +175,7 @@ namespace Game.UI
                     return true;
                 }
                 _viewData = new ArtifactRewardViewData(rewardId, awardedGold, awardedGems, offers);
+                _panel.SetForfeitAllowed(!_usesManagerSelection);
                 _panel.ShowReward(_viewData);
                 return true;
             }
@@ -195,6 +200,7 @@ namespace Game.UI
             _viewData = null;
             _completed = false;
             _faulted = false;
+            _usesManagerSelection = false;
             _candidates.Clear();
             _completedIds.Clear();
             if (_panel != null) _panel.ResetReward();
@@ -216,10 +222,18 @@ namespace Game.UI
             _isApplying = true;
             try
             {
-                if (!request.IsForfeit &&
-                    (!_candidates.TryGetValue(request.ArtifactId, out var data) || !_manager.TryAdd(data)))
+                if (_usesManagerSelection && request.IsForfeit)
                 {
-                    _panel.TryResolveRequest(request.RequestId, false, "획득 실패: 최대 중첩·효과 설정 확인 후 재시도하거나 포기해주세요.");
+                    _panel.TryResolveRequest(request.RequestId, false, "유물을 하나 선택해주세요.");
+                    return;
+                }
+                if (!request.IsForfeit &&
+                    (!_candidates.TryGetValue(request.ArtifactId, out var data) ||
+                     !(_usesManagerSelection ? _manager.TrySelectReward(data) : _manager.TryAdd(data))))
+                {
+                    _panel.TryResolveRequest(request.RequestId, false, _usesManagerSelection
+                        ? "획득 실패: 다른 유물을 선택하거나 효과 설정을 확인해주세요."
+                        : "획득 실패: 최대 중첩·효과 설정 확인 후 재시도하거나 포기해주세요.");
                     return;
                 }
                 // 실제 적용 성공/포기 확정 후에만 대기를 끝낸다. 완료를 먼저 기록해 재진입을 막는다.
