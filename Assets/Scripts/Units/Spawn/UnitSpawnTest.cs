@@ -1,9 +1,11 @@
-﻿using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks;
 using Game.Core;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
 using TMPro;
+using System;
+using Units.Skills;
 
 
 namespace Units
@@ -19,6 +21,32 @@ namespace Units
 
         [SerializeField]
         private RuntimeUnitManager _runtimeUnitManager;
+
+
+        // ============================================================
+        // Spawn Modifiers
+        // ============================================================
+
+        [Header("Spawn Stat Settings")]
+        [Tooltip("스폰 전에 적용할 아군 스탯. Percent 값 0.1은 +10%입니다.")]
+        [SerializeField]
+        private List<AllyStatSettings> _allyStatModifiers = new();
+
+        [Tooltip("스폰 전에 적용할 적 스탯. Percent 값 0.1은 +10%입니다.")]
+        [SerializeField]
+        private List<EnemyStatSettings> _enemyStatModifiers = new();
+
+
+        [Header("Spawn Passive Settings")]
+        [Tooltip("기본 패시브에 추가할 아군 패시브 SO. 이후 스폰에만 적용합니다.")]
+        [SerializeField]
+        private List<AllyPassiveSettings> _allyPassiveModifiers = new();
+
+        [Tooltip("기본 패시브에 추가할 적 패시브 SO. 이후 스폰에만 적용합니다.")]
+        [SerializeField]
+        private List<EnemyPassiveSettings> _enemyPassiveModifiers = new();
+
+        private UnitStatModifierManager _registeredModifierManager;
 
 
         // ============================================================
@@ -161,6 +189,12 @@ namespace Units
                 OnPreparationCompleted;
         }
 
+        private void OnDestroy()
+        {
+            ClearSpawnModifiers();
+        }
+
+
         private void Update()
         {
             UpdateEngagementDebugUI();
@@ -293,6 +327,108 @@ namespace Units
 
 
         // ============================================================
+        // Spawn Modifier Registration
+        // ============================================================
+
+        private bool ApplySpawnModifiers()
+        {
+            UnitStatModifierManager manager =
+                _spawnManager != null ? _spawnManager.StatModifierManager : null;
+
+            if (manager == null)
+            {
+                Debug.LogError("[UnitSpawnTest] SpawnManager의 UnitStatModifierManager가 없습니다.");
+
+                return false;
+            }
+
+            List<AllyStatModifier> allyStats = new();
+
+            List<EnemyStatModifier> enemyStats = new();
+
+            List<AllyPassiveSkillModifier> allyPassives = new();
+
+            List<EnemyPassiveSkillModifier> enemyPassives = new();
+
+            if (_allyStatModifiers != null)
+            {
+                foreach (AllyStatSettings setting in _allyStatModifiers)
+                {
+                    if (setting != null)
+                    {
+                        allyStats.Add(setting.ToModifier(this));
+                    }
+                }
+            }
+
+            if (_enemyStatModifiers != null)
+            {
+                foreach (EnemyStatSettings setting in _enemyStatModifiers)
+                {
+                    if (setting != null)
+                    {
+                        enemyStats.Add(setting.ToModifier(this));
+                    }
+                }
+            }
+
+            if (_allyPassiveModifiers != null)
+            {
+                foreach (AllyPassiveSettings setting in _allyPassiveModifiers)
+                {
+                    if (setting != null)
+                    {
+                        allyPassives.Add(setting.ToModifier(this));
+                    }
+                }
+            }
+
+            if (_enemyPassiveModifiers != null)
+            {
+                foreach (EnemyPassiveSettings setting in _enemyPassiveModifiers)
+                {
+                    if (setting != null)
+                    {
+                        enemyPassives.Add(setting.ToModifier(this));
+                    }
+                }
+            }
+
+            if (_registeredModifierManager != null && _registeredModifierManager != manager)
+            {
+                ClearSpawnModifiers();
+            }
+
+            IUnitStatModifierRegister register = manager;
+
+            // 이전 테스트 등록만 교체해서 반복 스폰의 스탯 누적을 막는다.
+            register.RemoveModifiersBySource(this);
+
+            register.AddBothModifiers(allyStats, enemyStats);
+
+            register.AddBothPassiveSkills(allyPassives, enemyPassives);
+
+            _registeredModifierManager = manager;
+
+            return true;
+        }
+
+
+        [ContextMenu("Clear Test Modifiers")]
+        private void ClearSpawnModifiers()
+        {
+            if (_registeredModifierManager == null)
+                return;
+
+            IUnitStatModifierRegister register = _registeredModifierManager;
+
+            register.RemoveModifiersBySource(this);
+
+            _registeredModifierManager = null;
+        }
+
+
+        // ============================================================
         // Test Spawn
         // ============================================================
 
@@ -303,8 +439,12 @@ namespace Units
                 return;
 
 
-            SpawnAllies();
-            SpawnEnemies();
+            if (!ApplySpawnModifiers())
+                return;
+
+
+            RequestAllySpawns();
+            RequestEnemySpawn();
 
 
             Debug.Log(
@@ -331,6 +471,16 @@ namespace Units
             }
 
 
+            if (!ApplySpawnModifiers())
+                return;
+
+
+            RequestAllySpawns();
+        }
+
+
+        private void RequestAllySpawns()
+        {
             _spawnManager.SpawnAllyGroup(
                 _allyUnitType1,
                 _allySpawnPosition1.position,
@@ -387,6 +537,16 @@ namespace Units
             }
 
 
+            if (!ApplySpawnModifiers())
+                return;
+
+
+            RequestEnemySpawn();
+        }
+
+
+        private void RequestEnemySpawn()
+        {
             SpawnContext context =
                 new SpawnContext(
                     _enemyClassWeights,
@@ -611,6 +771,165 @@ namespace Units
 
 
             return true;
+        }
+
+        // ============================================================
+        // Inspector Settings
+        // ============================================================
+
+        // 인스펙터 설정을 출처가 있는 런타임 Modifier로 변환한다.
+        [Serializable]
+        private sealed class AllyStatSettings
+        {
+            [Tooltip("Ally: All / Class / Type / Tier. 선택한 Apply Type의 대상 필드만 사용합니다.")]
+            [SerializeField]
+            private UnitModifierApplyType _applyType = UnitModifierApplyType.All;
+
+            [SerializeField]
+            private AllyUnitClass _targetClass;
+
+            [SerializeField]
+            private AllyUnitType _targetUnitType;
+
+            [SerializeField]
+            private AllyUnitTier _targetTier;
+
+            [SerializeField]
+            private UnitStatType _statType = UnitStatType.AttackPower;
+
+            [SerializeField]
+            private UnitStatModifierType _modifierType;
+
+            [SerializeField]
+            private float _value;
+
+
+            public AllyStatModifier ToModifier(object source)
+            {
+                return new AllyStatModifier(
+                    source,
+                    _applyType,
+                    _targetClass,
+                    _targetUnitType,
+                    _statType,
+                    _modifierType,
+                    _value,
+                    _targetTier
+                );
+            }
+        }
+
+
+        // 인스펙터 설정을 출처가 있는 런타임 Modifier로 변환한다.
+        [Serializable]
+        private sealed class AllyPassiveSettings
+        {
+            [Tooltip("Ally: All / Class / Type / Tier. 선택한 Apply Type의 대상 필드만 사용합니다.")]
+            [SerializeField]
+            private UnitModifierApplyType _applyType = UnitModifierApplyType.All;
+
+            [SerializeField]
+            private AllyUnitClass _targetClass;
+
+            [SerializeField]
+            private AllyUnitType _targetUnitType;
+
+            [SerializeField]
+            private AllyUnitTier _targetTier;
+
+            [SerializeField]
+            private PassiveSkillData _passiveSkill;
+
+
+            public AllyPassiveSkillModifier ToModifier(object source)
+            {
+                return new AllyPassiveSkillModifier(
+                    source,
+                    _passiveSkill,
+                    _applyType,
+                    _targetClass,
+                    _targetUnitType,
+                    _targetTier
+                );
+            }
+        }
+
+
+        // 인스펙터 설정을 출처가 있는 런타임 Modifier로 변환한다.
+        [Serializable]
+        private sealed class EnemyStatSettings
+        {
+            [Tooltip("Enemy: All / Class / Type / Faction. 선택한 Apply Type의 대상 필드만 사용합니다.")]
+            [SerializeField]
+            private UnitModifierApplyType _applyType = UnitModifierApplyType.All;
+
+            [SerializeField]
+            private EnemyUnitClass _targetClass;
+
+            [SerializeField]
+            private EnemyUnitType _targetUnitType;
+
+            [SerializeField]
+            private EnemyUnitFaction _targetFaction;
+
+            [SerializeField]
+            private UnitStatType _statType = UnitStatType.AttackPower;
+
+            [SerializeField]
+            private UnitStatModifierType _modifierType;
+
+            [SerializeField]
+            private float _value;
+
+
+            public EnemyStatModifier ToModifier(object source)
+            {
+                return new EnemyStatModifier(
+                    source,
+                    _applyType,
+                    _targetClass,
+                    _targetUnitType,
+                    _statType,
+                    _modifierType,
+                    _value,
+                    _targetFaction
+                );
+            }
+        }
+
+
+        // 인스펙터 설정을 출처가 있는 런타임 Modifier로 변환한다.
+        [Serializable]
+        private sealed class EnemyPassiveSettings
+        {
+            [Tooltip("Enemy: All / Class / Type / Faction. 선택한 Apply Type의 대상 필드만 사용합니다.")]
+            [SerializeField]
+            private UnitModifierApplyType _applyType = UnitModifierApplyType.All;
+
+            [SerializeField]
+            private EnemyUnitClass _targetClass;
+
+            [SerializeField]
+            private EnemyUnitType _targetUnitType;
+
+            [SerializeField]
+            private EnemyUnitFaction _targetFaction;
+
+            [SerializeField]
+            private PassiveSkillData _passiveSkill;
+
+
+            public EnemyPassiveSkillModifier ToModifier(object source)
+            {
+                return new EnemyPassiveSkillModifier(
+                    source,
+                    _passiveSkill,
+                    _applyType,
+                    _targetClass,
+                    _targetUnitType,
+                    _targetFaction
+                );
+            }
         }
     }
 }

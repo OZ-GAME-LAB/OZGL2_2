@@ -9,6 +9,8 @@ namespace Units
     public class Unit_Life : MonoBehaviour
     {
 
+        public const float DeathDisappearDelay = 2f;
+
         private const float ShieldLimitMultiplier = 2f;
 
 
@@ -428,12 +430,12 @@ namespace Units
         }
 
 
-        // 임시적으로 사망 후 0.3초 후에 비활성화하도록 설정
+        // 사망 애니메이션을 2초 동안 표시한 뒤 비활성화한다.
         private IEnumerator DisableAfterDeath()
         {
             int generation = _lifeGeneration;
 
-            yield return new WaitForSeconds(0.3f);
+            yield return new WaitForSeconds(DeathDisappearDelay);
 
             if (generation != _lifeGeneration)
                 yield break;

@@ -1119,7 +1119,12 @@ namespace Units
             // ========================================================
 
             core.Initialize(
-                finalModifier
+                finalModifier,
+                _unitStatModifierManager.GetEnemyPassiveSkills(
+                    unitData.GetEnemyClass(),
+                    unitData.GetEnemyType(),
+                    unitData.GetEnemyFaction()
+                )
             );
 
 

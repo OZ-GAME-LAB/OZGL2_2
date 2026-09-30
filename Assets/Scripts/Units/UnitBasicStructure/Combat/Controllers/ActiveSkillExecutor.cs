@@ -305,6 +305,8 @@ namespace Units
 
                     run.Entered = true;
 
+                    FaceActionTarget(run);
+
                     run.Batch.EventTemplate = Event(run, PassiveSkillTriggerType.ActiveSkillActionHit);
 
                     Notify(run, PassiveSkillTriggerType.ActiveSkillActionStarted);
@@ -340,6 +342,9 @@ namespace Units
                     if (!EnsureTarget(run))
                         continue;
 
+                    // OnStart 이후 대상을 재선정했다면 실제 실행 대상 쪽으로 갱신한다.
+                    FaceActionTarget(run);
+
                     run.Waiting = true;
 
                     int index = run.Index;
@@ -354,6 +359,7 @@ namespace Units
                             if (_execution != run)
                                 break;
 
+                            _core.PlayAnimation_Cast();
                             _castController.StartCast(cast.Duration / Mathf.Max(0.01f, _core.RuntimeStatus.AttackSpeed), () => CompleteDelayed(run, index));
 
                             break;
@@ -367,6 +373,7 @@ namespace Units
                             // Dash 이동은 별도 컨트롤러가 담당하며 일반 MovementCompleted를 발생시키지 않는다.
                             run.DashStarted = true;
 
+                            _core.PlayAnimation_Dash();
                             _dashController.StartDash(
                                 run.Targets.PrimaryTarget.Target,
                                 dash.Distance,
@@ -377,6 +384,12 @@ namespace Units
                             break;
 
                         case SkillAttackActionData attack:
+                            // Self 대상 지원 액션은 자가 버프, 나머지는 스킬 공격으로 표시한다.
+                            if (attack.Target.Source == SkillTargetSource.Self
+                                || attack.Target.Relation == SkillTargetRelation.Self)
+                                _core.PlayAnimation_Buff();
+                            else
+                                _core.PlayAnimation_Skill();
                             bool success = ExecuteAttack(run, attack);
 
                             if (_execution != run)
@@ -509,6 +522,20 @@ namespace Units
                 _dashController.Cancel();
             }
         }
+
+        private void FaceActionTarget(Execution run)
+        {
+            if (_execution != run || !OwnerValid(run))
+                return;
+
+            var target = run.Targets?.PrimaryTarget ?? default;
+
+            if (target.IsTargetable && !ReferenceEquals(target.Target, run.Owner.Target))
+            {
+                _core.SetFacingDirection((Vector2)target.Target.Transform.position - (Vector2)_core.transform.position);
+            }
+        }
+
 
         private bool EnsureTarget(Execution run)
         {
@@ -674,6 +701,10 @@ namespace Units
                     return;
             }
 
+            // Cast/Dash의 유지 연출만 종료한다. 즉시 완료된 공격 클립은 계속 재생한다.
+            if (run.Owner.MatchesLifetime)
+                _core.StopAnimation_SkillMotion();
+
             CleanupFX(run);
 
             run.Waiting = false;
@@ -694,6 +725,8 @@ namespace Units
                 return;
 
             _execution = null; // 정리/이벤트 재진입보다 먼저 이 실행의 진행 소유권을 해제한다.
+            if (run.Owner.MatchesLifetime)
+                _core.StopAnimation_SkillMotion();
             run.Moved |= run.DashStarted && _dashController.HasMoved;
 
             _castController.Cancel();
@@ -773,7 +806,7 @@ namespace Units
 
             Vector2 origin = Origin(run, action);
 
-            Vector2 direction = run.Initial.IsTargetable ? (Vector2)run.Initial.Target.Transform.position - origin : (Vector2)_core.transform.right;
+            Vector2 direction = run.Initial.IsTargetable ? (Vector2)run.Initial.Target.Transform.position - origin : _core.FacingDirection;
 
             SkillTargetRequest Request(Predicate<ICombatTarget> filter) => new(
                 run.Owner.Target,
@@ -1098,5 +1131,7 @@ namespace Units
                     DispatchFX(new SkillFXRequest(entry, run.Metadata, run.Position, true));
 
         }
+
+
     }
 }

@@ -49,12 +49,16 @@ namespace Units
         [SerializeField]
         private UnitTeam _team;
 
+        private Vector2 _facingDirection = Vector2.left;
+
 
         // ============================================================
         // Properties
         // ============================================================
 
         public UnitTeam Team => _team;
+
+        public Vector2 FacingDirection => _facingDirection;
 
         public ICombatTarget CombatTarget => _gateway;
 
@@ -170,6 +174,17 @@ namespace Units
 
         public void Initialize(FinalStatModifier spawnModifier)
         {
+            Initialize(spawnModifier, null);
+        }
+
+
+        // 외부 패시브는 이 수명의 초기화 시점에만 받는다.
+        public void Initialize(
+            FinalStatModifier spawnModifier,
+            IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
+        {
+            _facingDirection = Vector2.left;
+
             InitComponents();
 
             UnbindComponentEvents();
@@ -179,7 +194,7 @@ namespace Units
                 _gateway.Initialize(this);
             }
 
-            _runtimeStatus.Initialize(spawnModifier);
+            _runtimeStatus.Initialize(spawnModifier, spawnPassiveSkills);
 
             if (_runtimeStatus.UnitData != null)
             {
@@ -367,6 +382,11 @@ namespace Units
 
             // Stun과 Silence는 ActiveSkill을 차단한다.
             _combat?.SetActiveSkillBlocked(isStunned || isSilenced);
+
+            if (isStunned)
+                PlayAnimation_Stun();
+            else
+                StopAnimation_Stun();
         }
 
 
@@ -591,6 +611,9 @@ namespace Units
             if (!result.TargetSnapshot.MatchesLifetime)
                 return;
 
+            if (result.Damage > 0f)
+                PlayAnimation_Hit();
+
             NotifyTargetReevaluation();
 
             if (!result.TargetSnapshot.MatchesLifetime)
@@ -616,6 +639,93 @@ namespace Units
         // ============================================================
         // Animation
         // ============================================================
+
+        public void SetFacingDirection(Vector2 direction)
+        {
+            if (!IsAlive || float.IsNaN(direction.x) || float.IsInfinity(direction.x)
+                || float.IsNaN(direction.y) || float.IsInfinity(direction.y)
+                || Mathf.Abs(direction.x) <= 0.01f)
+                return;
+
+            _facingDirection = direction.x > 0f ? Vector2.right : Vector2.left;
+
+            _animation?.SetFacingDirection(_facingDirection);
+        }
+
+
+        public void SetMovementFacingDirection(Vector2 velocity)
+        {
+            if ((_combat != null && _combat.IsBusy)
+                || (_animation != null && _animation.IsFacingLocked))
+                return;
+
+            SetFacingDirection(velocity);
+        }
+
+
+        public void PlayAnimation_Idle()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Idle();
+        }
+
+        public void PlayAnimation_Dash()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Dash();
+        }
+
+        public void PlayAnimation_Cast()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Cast();
+        }
+
+        public void PlayAnimation_Buff()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Buff();
+        }
+
+        public void PlayAnimation_Victory()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Victory();
+        }
+
+        public void PlayAnimation_Stun()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.PlayAnimation_Stun();
+        }
+
+        public void StopAnimation_Stun()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.StopAnimation_Stun();
+        }
+
+        public void StopAnimation_SkillMotion()
+        {
+            if (_animation == null)
+                return;
+
+            _animation.StopAnimation_SkillMotion();
+        }
 
         public void PlayAnimation_Move()
         {
@@ -782,5 +892,7 @@ namespace Units
 
             _ai?.StartAI();
         }
+
+
     }
 }

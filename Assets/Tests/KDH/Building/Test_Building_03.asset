@@ -25,6 +25,7 @@ MonoBehaviour:
     amount: 99999
   buildFromEmptySlot: 0
   requiredCoreLevel: 2
+  requiredFamilyIds: []
   coreLevel: 0
   production:
     enabled: 0
@@ -33,7 +34,7 @@ MonoBehaviour:
     trigger: 0
   spawn:
     enabled: 1
-    unitType: 1
+    unitType: 11
     countPerWave: 5
     maxAlive: 5
   upgrades: []

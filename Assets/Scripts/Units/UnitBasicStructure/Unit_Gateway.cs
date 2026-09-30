@@ -68,6 +68,8 @@ namespace Units
 
         public Transform Transform => transform;
 
+        public Vector2 FacingDirection => _core != null ? _core.FacingDirection : Vector2.left;
+
         public bool IsAlive => _core != null && _core.IsAlive;
 
         public bool IsTargetable => isActiveAndEnabled && IsAlive;
@@ -385,6 +387,16 @@ namespace Units
             _isRallyMoving = true;
 
             _core.MoveTo(destination);
+        }
+
+
+        // ============================================================
+        // Animation
+        // ============================================================
+
+        public void PlayAnimation_Victory()
+        {
+            _core?.PlayAnimation_Victory();
         }
 
 
