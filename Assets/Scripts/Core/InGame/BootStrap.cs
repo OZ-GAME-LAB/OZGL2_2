@@ -30,6 +30,7 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
+    [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
     private IOutGameDataSetter _data;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
@@ -56,7 +57,24 @@ public class BootStrap : MonoBehaviour
         _cameraController.Initialize(_buildController);
         _data.SetOutGameData(context);
         OutGameStartContext.Pending = null;
-        _gameFlowController.BeginRun();
+        
+        switch (context.StartMode)
+        {
+            case StartMode.NewGame:
+                _data.SetOutGameData(context);
+                _gameFlowController.NewGame();
+                break;
+
+            case StartMode.Continue:
+                if (!_inGameSaveCoordinator.TryLoad(out string error))
+                {
+                    Debug.LogError(error);
+                    return;
+                }
+
+                _gameFlowController.Continue();
+                break;
+        }
     }
 
     private bool ValidateReferences()

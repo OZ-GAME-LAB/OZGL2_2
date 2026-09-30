@@ -47,12 +47,16 @@ public class TotemLevelEntry
     public int Level;
 }
 
+public enum StartMode
+{
+    NewGame, Continue
+}
 /// <summary>시작을 눌렀을 때 복사한 설정입니다. SO나 씬 오브젝트의 참조를 담지 않습니다.</summary>
 [Serializable]
 public class OutGameStartContext
 {
     public static OutGameStartContext Pending;
-    
+    public StartMode StartMode;
     public AltarId SelectedAltar; //선택된 제단
     public List<TraitLevelEntry> Traits = new List<TraitLevelEntry>(); //해금된 특성 리스트
     public List<TotemLevelEntry> Totems = new List<TotemLevelEntry>(); //선택된 토템 리스트
