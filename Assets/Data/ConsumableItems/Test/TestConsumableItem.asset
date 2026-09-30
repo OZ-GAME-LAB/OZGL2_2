@@ -16,3 +16,16 @@ MonoBehaviour:
   _displayName: Test Item
   _description: Inventory test only - no use effect
   _icon: {fileID: 0}
+  _targetTeam: 1
+  _targetMode: 2
+  _radius: 1
+  _effects:
+  - rid: 6652324207583035472
+  references:
+    version: 2
+    RefIds:
+    - rid: 6652324207583035472
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _damageType: 1
+        _damageMultiplier: 10
