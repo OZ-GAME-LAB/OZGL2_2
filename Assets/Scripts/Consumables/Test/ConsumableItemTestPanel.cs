@@ -1,3 +1,6 @@
+using Game.Core;
+using Units;
+using Units.Skills;
 using UnityEngine;
 
 // 재화 테스트 패널과 같은 Run 및 효과 매니저를 사용하는 소모성 아이템 테스트
@@ -5,6 +8,9 @@ public class ConsumableItemTestPanel : MonoBehaviour
 {
     public ConsumableItemManager Items => _items;
     [SerializeField] private ConsumableItemManager _items;
+    [SerializeField] private GameFlowController _gameFlow;
+    [SerializeField] private RuntimeUnitManager _unitManager;
+    [SerializeField] private SkillEffectResolver _resolver;
     private EffectManager _effects;
     private ArtifactManager _artifacts;
     private Vector2 _scroll;
@@ -22,13 +28,13 @@ public class ConsumableItemTestPanel : MonoBehaviour
         }
         if (!_items.IsInitialized)
         {
-            _items.Initialize(effects);
+            _items.Initialize(effects, _gameFlow, _unitManager, _resolver);
         }
         else if (newRun)
         {
             ResetPanel();
         }
-        _result = _items.IsInitialized ? "아이템 추가 후 슬롯 감소를 테스트하세요." : "Catalog 연결을 확인해주세요.";
+        _result = _items.IsInitialized ? "아이템 추가 후 슬롯 감소를 테스트하세요." : "Catalog 및 효과·전투 관련 매니저 연결을 확인해주세요.";
     }
 
     public void ResetPanel()

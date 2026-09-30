@@ -22,6 +22,7 @@ namespace Game.UI.Editor
         private const string Key = "Game.UI.TeamBuildingValidation";
         private static readonly StringBuilder _report = new StringBuilder();
         private static int _checks;
+        private static bool _legacyGateProbed;
         private static int _errors;
         private static int _knownTeamRuntimeErrors;
         private static int _searchErrors;
@@ -82,6 +83,7 @@ namespace Game.UI.Editor
         private static async UniTaskVoid RunAsync()
         {
             _checks = _errors = _knownTeamRuntimeErrors = _searchErrors = 0; _report.Clear();
+            _legacyGateProbed = false;
             Application.logMessageReceived += HandleLog;
             try
             {
@@ -293,9 +295,28 @@ namespace Game.UI.Editor
             var panel = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardPanel>();
             var binding = UnityEngine.Object.FindFirstObjectByType<ArtifactRewardBinding>();
             await Wait(() => manager.IsSelectingReward);
+            if (!_legacyGateProbed)
+            {
+                _legacyGateProbed = true;
+                UnityEngine.Object.FindFirstObjectByType<TestWaitingScript>().ChooseResultBtn();
+                await UniTask.NextFrame();
+                Check(manager.IsSelectingReward && !manager.IsRewardApplied &&
+                    UnityEngine.Object.FindFirstObjectByType<GameFlowController>().CurPhase == GamePhase.Reward,
+                    "legacy test completion cannot bypass pending artifact selection");
+            }
             var expected = manager.SelectionCandidates.ToArray();
+            // Core can enter Reward earlier in this frame than the Canvas render update.
+            // Send the simulated pointer only after the newly enabled UI has been processed.
+            await UniTask.Yield(PlayerLoopTiming.LastPostLateUpdate);
             Check(expected.Length > 0 && !panel.IsVisible, "gold prompt precedes artifact selection");
-            Check(ClickTarget(Point(continueButton)) == continueButton.gameObject, "gold continue button receives pointer input");
+            var goldPoint = Point(continueButton);
+            var goldHit = Hit(goldPoint);
+            var goldTarget = ClickTarget(goldPoint);
+            Check(goldTarget == continueButton.gameObject,
+                "gold continue button receives pointer input; hit=" + goldHit.gameObject.name +
+                "; handler=" + (goldTarget == null ? "none" : goldTarget.name) +
+                "; expected=" + continueButton.name + "; active=" + continueButton.gameObject.activeInHierarchy +
+                "; point=" + goldPoint);
             Click(Point(continueButton));
             continueButton.onClick.Invoke();
             await Wait(() => panel.IsVisible, "artifact popup after gold confirmation");
@@ -359,10 +380,12 @@ namespace Game.UI.Editor
                         Check(await flow.TrySpawnUnits(), "boss reward test starts through Core");
                         await Wait(() => flow.CurPhase == GamePhase.Battle);
                     }
-                    int gold = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gold);
-                    int gems = MvpEconomyUiValidation.GetExpectedReward(waves, CurrencyType.Gem);
+                    int gold = GetTeamReward(startup, waves, CurrencyType.Gold);
+                    int gems = GetTeamReward(startup, waves, CurrencyType.Gem);
                     Check(wallet.CurrentGoldReward == gold && wallet.CurrentGemReward == gems,
-                        "BattlePreparing freezes the team reward amounts: " + round);
+                        "BattlePreparing freezes the team reward amounts: " + round +
+                        "; actual=" + wallet.CurrentGoldReward + "/" + wallet.CurrentGemReward +
+                        "; expected=" + gold + "/" + gems);
                     expectedGold = wallet.GetBalance(CurrencyType.Gold) + gold;
                     expectedGems = wallet.GetBalance(CurrencyType.Gem) + gems;
                     int beforeEvents = events;
@@ -463,6 +486,22 @@ namespace Game.UI.Editor
                 wallet.BalanceChanged -= changed;
                 flow.StagingTime = staging;
             }
+        }
+
+        private static int GetTeamReward(TeamBuildingUiStartup startup, WaveController waves, CurrencyType type)
+        {
+            var table = MvpEconomyUiSetup.LoadRewardTable();
+            if (!table.TryGetRewards(Mathf.Min(waves.CurQuarter, WaveController.MAIN_QUARTERS),
+                waves.CurWave, out var rewards))
+                throw new InvalidOperationException("No team reward data for the current wave.");
+            var core = Ref<BuildingCoreProgress>(startup, "_coreProgress");
+            var effects = Ref<EffectManager>(startup, "_effects");
+            var calculator = new CurrencyRewardCalculator();
+            foreach (var reward in rewards)
+                if (reward.Currency.Type == type)
+                    return calculator.CalculateWaveReward(reward, core.CurrentLevel,
+                        effects != null ? effects.CurrencyModifiers : null).Amount;
+            return 0;
         }
 
         private static T Ref<T>(UnityEngine.Object obj, string field) where T : UnityEngine.Object =>
