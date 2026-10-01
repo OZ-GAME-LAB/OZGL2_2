@@ -176,6 +176,10 @@ namespace OZGL.KDH
 
             if (occupied)
                 _costBuilder.Append(canAfford ? "\n업그레이드" : "\n부족");
+            // Current date KDH 2026-10-01
+            // 건설 한도 때문에 막힌 경우를 재화 부족과 구분해서 보여 줍니다.
+            else if (!canAfford && _owner != null && !_owner.HasBuildCapacity)
+                _costBuilder.Append("\n한도 초과");
             else
                 _costBuilder.Append(canAfford ? "\n건설" : "\n부족");
 
