@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using Game.Cameras;
 using Game.Core;
+using Game.UI;
+using Game.UI.InGame;
 using OZGL.KDH;
 using Units;
 using UnityEngine;
@@ -31,7 +34,8 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
     [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
-
+    // [SerializeField] private TeamBuildingUiStartup _uiManager;
+    [SerializeField] private InGameUIManager _inGameUIManager;
     // Current date KDH 2026-09-29
     // 아웃게임 효과(특성·토템·제단)입니다. 연결하지 않아도 게임은 시작됩니다.
     [Header("OutGame Effects (KDH)")]
@@ -66,13 +70,24 @@ public class BootStrap : MonoBehaviour
         }
 
         _testScript.Initialize(_gameFlowController, _waveController);
-        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager);
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _cameraController);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _cameraController.Initialize(_buildController);
-
+        _cameraController.Initialize(_buildController,_gameFlowController);
+        var buildingSlots = new List<BuildingSlot>();
+        foreach (var root in gameObject.scene.GetRootGameObjects())
+            buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
+        // 기존 UI 연결 (전환 내역을 확인할 수 있도록 보존)
+        // _uiManager.Initialize(_runCurrencyManager, _waveController, _gameFlowController,
+        //     _effectManager, _buildingCoreProgress, _testScript, _buildController, buildingSlots.ToArray());
+        // if (!_uiManager.IsReady) return;
+        // _uiManager.gameObject.SetActive(true);
+        _inGameUIManager.Initialize(_runCurrencyManager, _waveController, _gameFlowController,
+            _artifactManager, _buildingCoreProgress, _testScript, _buildController, buildingSlots.ToArray());
+        if (!_inGameUIManager.IsReady) return;
+        _inGameUIManager.gameObject.SetActive(true);
         // Current date KDH 2026-09-29
         // GameFlow·RunCurrency 초기화 뒤, BeginRun 전에 연결해야 첫 Preparation 이벤트를 받습니다.
         InitializeOutGameEffects(context, fromOutGame);
@@ -102,6 +117,11 @@ public class BootStrap : MonoBehaviour
     private bool ValidateReferences()
     {
         bool valid = true;
+        if (_inGameUIManager == null)
+        {
+            Debug.LogError("[BootStrap] _inGameUIManager 참조가 없습니다. 새 UI 루트를 연결해주세요.", this);
+            valid = false;
+        }
         if (_testScript == null)
         {
             Debug.LogError("[BootStrap] _testScript 참조가 없습니다. Inspector에서 연결해주세요.", this);

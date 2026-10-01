@@ -82,8 +82,9 @@ namespace Game.Core
         public bool AutoContinue { get => _autoContinue; set => _autoContinue = value; }
 
         private TestWaitingScript _testScript;
-        private WaveController _waveController;
-        private ArtifactManager _artifactManager;
+        private WaveController _waveController; //인게임 전투 담당
+        private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
+        private RunSettlementManager _runSettlementManager; //게임 종료 후 정산 담당
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
         private bool _isTransitioning;
@@ -97,11 +98,16 @@ namespace Game.Core
 
         // 초기화 및 수명 관리
         /// <summary>참조를 연결하고 기존 실행을 취소한다.</summary>
-        public void Initialize(WaveController waveController, TestWaitingScript testScript, ArtifactManager artifactManager)
+        public void Initialize(
+            WaveController waveController, 
+            TestWaitingScript testScript, 
+            ArtifactManager artifactManager, 
+            InGameCameraController cameraController = null )
         {
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
+            _cameraController = cameraController;
             _nodeController = new NodeController(waveController.WaveCatalog);
             ClearToken();
             ResetDecisionState();
@@ -171,6 +177,7 @@ namespace Game.Core
             _isResetting = true;
             ResetRunAsync().Forget();
         }
+        //현재 진행중인 값 저장
         public GameFlowSaveData CaptureSaveData()
         {
             return new GameFlowSaveData(
@@ -178,7 +185,7 @@ namespace Game.Core
                 _resumeStep,
                 HasClearedMainGame);
         }
-
+        //저장된 값 불러와서 다시 쓸 수 있게 복원
         public void RestoreSaveData(GameFlowSaveData data)
         {
             _nodeController.RestoreSaveData(data.Node);

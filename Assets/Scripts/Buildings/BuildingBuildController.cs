@@ -45,10 +45,10 @@ namespace OZGL.KDH
             CacheRefs();
             SetupFilter();
 
-            if (_menu == null)
-                _menu = gameObject.AddComponent<BuildingBuildMenu>();
+            // if (_menu == null)
+            //     _menu = gameObject.AddComponent<BuildingBuildMenu>();
 
-            _menu.Bind(this);
+            //_menu.Bind(this);
         }
 
         private void OnDestroy()
@@ -508,7 +508,7 @@ namespace OZGL.KDH
             if (slot.IsOccupied)
             {
                 CollectOccupiedMenuRows(slot);
-                _menu.Show(slot, _candidates, wallet);
+                //_menu.Show(slot, _candidates, wallet);
                 NotifySlotSelected(slot);
                 return;
             }
@@ -526,7 +526,7 @@ namespace OZGL.KDH
                 return;
             }
 
-            _menu.Show(slot, _candidates, wallet);
+            //_menu.Show(slot, _candidates, wallet);
             NotifySlotSelected(slot);
         }
 
@@ -690,8 +690,8 @@ namespace OZGL.KDH
             else
                 _camera = Camera.main;
 
-            if (_menu == null)
-                _menu = GetComponent<BuildingBuildMenu>();
+            // if (_menu == null)
+            //     _menu = GetComponent<BuildingBuildMenu>();
 
             //if (_coreProgress == null)
             //    _coreProgress = GetComponent<BuildingCoreProgress>();

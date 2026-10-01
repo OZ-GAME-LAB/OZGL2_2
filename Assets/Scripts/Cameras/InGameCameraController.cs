@@ -63,7 +63,7 @@ namespace Game.Cameras
             _buildController.SlotDeselected -= FocusOut;
         }
 
-        public void Initialize(BuildingBuildController buildController)
+        public void Initialize(BuildingBuildController buildController, GameFlowController flowController)
         {
             if (_buildController != null)
             {
@@ -73,6 +73,8 @@ namespace Game.Cameras
             _buildController = buildController;
             _buildController.SlotSelected += FocusAt;
             _buildController.SlotDeselected += FocusOut;
+
+            _gameFlowController = flowController;
         }
         public void Toggle()
         {
