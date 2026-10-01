@@ -21,6 +21,7 @@ public class CurrencyTestPanel : MonoBehaviour
     [SerializeField] private CurrencyData _gold;
     [SerializeField] private CurrencyData _gem;
     [SerializeField] private CurrencyData _bloodstone;
+    [SerializeField] private TotemRunApplier _totemRunApplier;
 
     private bool _subscribed;
     [SerializeField] private ShopTestPanel _shopTestPanel;
@@ -496,7 +497,7 @@ public class CurrencyTestPanel : MonoBehaviour
         if (!_persistent.IsInitialized)
             _persistent.Initialize();
 
-        _settlement.Initialize(_waveController, _effectManager, _persistent);
+        _settlement.Initialize(_waveController, _effectManager, _persistent, _totemRunApplier);
     }
 
     private async UniTask ApplySettlementAsync()
