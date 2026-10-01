@@ -130,7 +130,7 @@ namespace Game.UI.Editor
                 Check(binding.SelectedSlot == null, "battle blocks opening construction");
                 await flow.ResolveBattleAsync(ResultType.Defeat);
                 Check(flow.CurPhase == GamePhase.Finished, "original defeat completes without invented final result");
-                flow.ResetRun(); await Wait(() => flow.CanEnterBuildMode(), "reset");
+                flow.QuitRun(); await Wait(() => flow.CanEnterBuildMode(), "reset");
                 binding.SelectSlot(slots[0]); Select(catalog, 0);
                 binding.enabled = false;
                 build.onClick.Invoke();

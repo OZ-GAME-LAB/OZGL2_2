@@ -114,7 +114,7 @@ public class CurrencyTestPanel : MonoBehaviour
             {
                 if (_testFlow != null)
                 {
-                    _testFlow.ResetRun();
+                    _testFlow.QuitRun();
                 }
                 else
                 {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Core;
+using Game.UI;
 using UnityEngine;
 
 // 아티팩트 후보 생성·보유 상태를 관리하고 공통 창구에 효과를 등록
@@ -38,6 +39,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     private WaveController _waveController;
     private ArtifactCandidateSelector _candidateSelector;
     private EffectManager _effectManager;
+    private IArtifactSelectionUI _selectionUI; // 10.2(문규성) : UI와 실제 연결시도용으로 추가했습니다. Initialize에도 인자를 추가해서 받을 수 있도록 수정했습니다. 
     private bool _isChanging;
     private List<ArtifactData> _testCandidates;
     private CancellationTokenSource _selectionWait;
@@ -51,9 +53,10 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     public IReadOnlyList<ArtifactData> SelectionCandidates => _selectionCandidates;
 
    
-
+    // 10.2(문규성) : 인자 추가중 오류가 많이 발생해서 일단 null 허용으로 만들어놓았습니다.
+    // 나중에 테스트시 문제가 생길 소지가 있어서 = null지우고 ArtifactRewardPresenter상속받거나 테스트용 인터페이스 구현체 만들어서 연결이 필요합니다. 
     // 웨이브와 공통 효과 매니저를 주입받아 새로운 Run의 보유 목록을 준비
-    public void Initialize(WaveController waveController, EffectManager effectManager)
+    public void Initialize(WaveController waveController, EffectManager effectManager, IArtifactSelectionUI artifactSelectionUI = null)
     {
         if (IsInitialized)
         {
@@ -84,9 +87,14 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             Debug.LogError("[Artifacts/ArtifactManager] EffectManager 참조가 없습니다.", this);
             return;
         }
-
+        
+        if (artifactSelectionUI == null)
+        {
+            Debug.LogError("[Artifacts/ArtifactManager] ArtifactSelectionUI 참조가 없습니다.", this);
+            return;
+        }
         _effectManager = effectManager;
-
+        _selectionUI = artifactSelectionUI;
         _waveController = waveController;
         _inventory = new ArtifactInventory(_artifactCatalog);
         _candidateSelector = new ArtifactCandidateSelector(_artifactCatalog, _inventory, _rewardTable);
@@ -151,7 +159,42 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         CancellationToken waitToken = wait.Token;
         _selectionWait = wait;
         // TODO: SelectionCandidates를 전달하여 아티팩트 선택 UI 열기
-        bool canceled = await UniTask.WaitUntil(() => _rewardApplied,
+        //10.02(문규성) : 실제 UI와 연결용으로 추가한 스크립트입니다. 
+        try
+        {
+            string message = null;
+
+            while (!_rewardApplied)
+            {
+                ArtifactData result = await _selectionUI.SelectAsync(
+                    _selectionCandidates, waitToken, false, message);
+
+                waitToken.ThrowIfCancellationRequested();
+
+                if (TrySelectReward(result))
+                    break;
+
+                message = "유물을 획득하지 못했습니다. 다시 선택해주세요.";
+            }
+
+            waitToken.ThrowIfCancellationRequested();
+            return true;
+        }
+        //SelectAsync에서 취소나 예외 발생시에 _selectionWait를 정리해 다음 요청을 막지 않도록 하기 위한 조치입니다. 
+        finally
+        {
+            if (_selectionWait == wait)
+            {
+                _selectionWait = null;
+
+                if (_rewardApplied)
+                    _selectionCandidates.Clear();
+            }
+            wait.Dispose();
+        }
+        
+        /*
+         bool canceled = await UniTask.WaitUntil(() => _rewardApplied,
             cancellationToken: waitToken).SuppressCancellationThrow();
 
         if (_selectionWait == wait)
@@ -163,6 +206,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         wait.Dispose();
         waitToken.ThrowIfCancellationRequested();
         return !canceled;
+        */
     }
 
     // 테스트 진입점만 별도 제공. 준비된 후보를 전달한 뒤 실제 게임과 같은 함수 실행

@@ -118,6 +118,12 @@ namespace Game.UI
             Refresh();
         }
 
+        public void SetMessage(string message)
+        {
+            _message = message;
+            Refresh();
+        }
+
         public void ShowReward(ArtifactRewardViewData data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Cameras;
+using Game.UI;
 using UnityEngine;
 
 namespace Game.Core
@@ -84,9 +85,10 @@ namespace Game.Core
         private TestWaitingScript _testScript;
         private WaveController _waveController; //인게임 전투 담당
         private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
-        private RunSettlementManager _runSettlementManager; //게임 종료 후 정산 담당
         private ArchiveManager _archiveManager;
         private IRunSettlementRewards _settlementRewards;
+        private IContinueUI _continueUI;
+        private IRunDecisionUI _decisionUI;
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
         private bool _isTransitioning;
@@ -119,6 +121,15 @@ namespace Game.Core
             ResetDecisionState();
             _isTransitioning = false;
             ChangePhase(GamePhase.None);
+        }
+
+        /// <summary>호출하고 결과를 기다리는 UI 계약을 연결한다. 게임 데이터는 Flow가 전달한다.</summary>
+        public void InitializeUI(IContinueUI continueUI, IRunDecisionUI decisionUI)
+        {
+            if (continueUI == null) throw new ArgumentNullException(nameof(continueUI));
+            if (decisionUI == null) throw new ArgumentNullException(nameof(decisionUI));
+            _continueUI = continueUI;
+            _decisionUI = decisionUI;
         }
 
         private void OnDestroy()
@@ -177,11 +188,12 @@ namespace Game.Core
             _isTransitioning = false;
 
         }
-        public void ResetRun()
+        //게임을 종료하고 메인으로 이동
+        public void QuitRun()
         {
             if (_isResetting) return;
             _isResetting = true;
-            ResetRunAsync().Forget();
+            ReturnToMainMenuAsync().Forget();
         }
         //현재 진행중인 값 저장
         public GameFlowSaveData CaptureSaveData()
@@ -199,7 +211,7 @@ namespace Game.Core
             HasClearedMainGame = data.HasClearedMainGame;
         }
 
-        private async UniTask ResetRunAsync()
+        private async UniTask ReturnToMainMenuAsync()
         {
             var pendingSpawn = _spawnCompletion?.Task ?? UniTask.CompletedTask;
             _isTransitioning = true;
@@ -213,7 +225,7 @@ namespace Game.Core
                 await pendingSpawn;
                 token.ThrowIfCancellationRequested();
                 _isTransitioning = false;
-                NewGame();
+                //TODO : 메인화면으로 씬 이동
             }
             finally
             {
@@ -284,12 +296,17 @@ namespace Game.Core
         {
             if (_isTransitioning || _curPhase != GamePhase.Battle) return;
             _isTransitioning = true;
-            var token = _cts.Token;
-            bool canceled = await ResolveBattleCoreAsync(result, token).SuppressCancellationThrow();
-            
-            // 이전 판의 취소된 작업은 새 판의 잠금이나 상태를 변경하지 않는다.
-            if (canceled || token.IsCancellationRequested) return;
-            _isTransitioning = false;
+            CancellationTokenSource lifetime = _cts;
+            var token = lifetime.Token;
+            try
+            {
+                await ResolveBattleCoreAsync(result, token).SuppressCancellationThrow();
+            }
+            finally
+            {
+                // 화면 취소/오류도 현재 작업의 잠금을 해제한다. 이전 판은 새 판을 변경하지 않는다.
+                if (ReferenceEquals(_cts, lifetime)) _isTransitioning = false;
+            }
         }
 
         /// <summary> 전투 종료 후 연출·보상·분기 진행 순서 처리 등 실제 기능 구현 </summary>
@@ -348,12 +365,28 @@ namespace Game.Core
                 {
                     _runDecision = null;
                     IsWaitingForRunDecision = true;
-                    // UI는 요청을 받아 창을 열고 ChooseFinishRun / ChooseContinueRun으로 응답한다.
-                    QuarterDecisionRequested?.Invoke();
-                    await UniTask.WaitUntil(() => _runDecision.HasValue, cancellationToken: token);
-                    token.ThrowIfCancellationRequested();
-                    
-                    IsWaitingForRunDecision = false;
+                    try
+                    {
+                        if (_decisionUI != null)
+                        {
+                            RunDecision decision = await _decisionUI.ChooseAsync(CurrentQuarter, token);
+                            token.ThrowIfCancellationRequested();
+                            if (decision != RunDecision.Finish && decision != RunDecision.Continue)
+                                throw new InvalidOperationException("The run decision UI returned an invalid choice.");
+                            _runDecision = decision;
+                        }
+                        else
+                        {
+                            // 기존 테스트/호환 경로. 새 UI 경로는 이벤트나 외부 버튼 입력을 기다리지 않는다.
+                            QuarterDecisionRequested?.Invoke();
+                            await UniTask.WaitUntil(() => _runDecision.HasValue, cancellationToken: token);
+                        }
+                        token.ThrowIfCancellationRequested();
+                    }
+                    finally
+                    {
+                        if (!token.IsCancellationRequested) IsWaitingForRunDecision = false;
+                    }
 
                     if (_runDecision.Value == RunDecision.Finish)
                     {
@@ -379,6 +412,16 @@ namespace Game.Core
 
             GamePhase phase = completedNode.PostBattleEvent == PostBattleEventType.Shop
                 ? GamePhase.Store : GamePhase.Event;
+            if (_continueUI != null)
+            {
+                ChangePhase(phase);
+                token.ThrowIfCancellationRequested();
+                await _continueUI.ShowAsync(phase == GamePhase.Store
+                    ? "상점 이용을 마쳤습니다.\n계속해서 다음 전투를 준비합니다."
+                    : "돌발 이벤트를 확인했습니다.\n계속해서 다음 전투를 준비합니다.", token);
+                token.ThrowIfCancellationRequested();
+                return;
+            }
             // 페이즈 구독자가 즉시 완료할 수 있도록 대기를 먼저 준비한다.
             var contentWait = _testScript.WaitPostBattleContentAsync(completedNode, token);
             ChangePhase(phase);
@@ -423,7 +466,9 @@ namespace Game.Core
                 return;
             }
 
-            //_runSettlementManager.TryApplyReward(summary);
+            _settlementRewards.TryApplyReward(summary);
+            
+            //메인화면 이동
         }
 
         private void ChangePhase(GamePhase phase)
@@ -483,10 +528,30 @@ namespace Game.Core
                 _runDecision = RunDecision.Continue;
         }
 
-        /// <summary>아티팩트 선택 UI 연동 전까지 기존 ChooseResult 버튼으로 보상 완료를 기다린다.</summary>
+        /// <summary>재화 확인창을 거치지 않고 유물 선택·적용 완료를 기다린다.</summary>
         private async UniTask WaitArtifactSelection(WaveBattleType battleType, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            if (_continueUI != null)
+            {
+                // 재화 지급 시점은 기존 Reward 구독에 유지한다. 지급 시점 통합은 저장/로드 작업에서 진행한다.
+                ChangePhase(GamePhase.Reward);
+                token.ThrowIfCancellationRequested();
+                IsWaitingForArtifactSelection = true;
+                try
+                {
+                    if (!await _artifactManager.SelectAndApplyAsync(battleType, token))
+                        throw new InvalidOperationException("Artifact selection and application did not complete.");
+                    token.ThrowIfCancellationRequested();
+                }
+                finally
+                {
+                    if (!token.IsCancellationRequested) IsWaitingForArtifactSelection = false;
+                }
+                return;
+            }
+
+            // 기존 테스트/임시 UI 호출자는 이전 대기 계약을 유지한다.
             IsWaitingForArtifactSelection = true;
             
             // 페이즈/선택 요청 구독자가 즉시 버튼 입력을 보내도 초기화로 덮어쓰지 않는다.

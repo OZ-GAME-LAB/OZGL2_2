@@ -47,7 +47,7 @@ namespace Game.UI.InGame
                 if (card != null && card.Slot != null) card.Slot.Unbind();
         }
 
-        public void SetItems(IReadOnlyList<BuildingCatalogItem> items)
+        public void SetItems(IReadOnlyList<BuildingCatalogItem> items, bool preservePage = false)
         {
             if (items == null) throw new ArgumentNullException(nameof(items));
             var ids = new HashSet<string>();
@@ -57,14 +57,8 @@ namespace Game.UI.InGame
 
             _items.Clear();
             for (int i = 0; i < items.Count; i++) _items.Add(items[i]);
-            _page = 0;
+            _page = preservePage ? Mathf.Clamp(_page, 0, Mathf.Max(0, (_items.Count - 1) / Mathf.Max(1, _cards.Length))) : 0;
             Refresh();
-        }
-
-        public void Show()
-        {
-            Refresh();
-            _popup.Show();
         }
 
         private void HandlePrevious()

@@ -27,6 +27,7 @@ namespace Game.UI
         private string _rewardId;
         private UniTaskCompletionSource<ArtifactData> _selectionCompletion;
         private bool _interfaceOpen;
+        private bool _interfaceAllowsForfeit;
         private bool _completed;
         private bool _isApplying;
         private bool _faulted;
@@ -64,11 +65,11 @@ namespace Game.UI
 
         public async UniTask<ArtifactData> SelectAsync(
             IReadOnlyList<ArtifactData> candidates,
-            CancellationToken token)
+            CancellationToken token,
+            bool allowForfeit = false,
+            string message = null)
         {
             token.ThrowIfCancellationRequested();
-            if (!_interfaceOpen)
-                throw new InvalidOperationException("Open the artifact selection UI before requesting a selection.");
             if (_selectionCompletion != null || IsChoosing)
                 throw new InvalidOperationException("An artifact selection is already in progress.");
             if (candidates == null || candidates.Count == 0)
@@ -84,6 +85,7 @@ namespace Game.UI
                 offers[i] = CreateOffer(data);
             }
 
+            if (!_interfaceOpen) Open();
             string rewardId = "artifact-selection-" + Guid.NewGuid().ToString("N");
             var completion = new UniTaskCompletionSource<ArtifactData>();
             _rewardId = rewardId;
@@ -93,17 +95,20 @@ namespace Game.UI
             foreach (var pair in candidateMap) _candidates.Add(pair.Key, pair.Value);
             _viewData = new ArtifactRewardViewData(rewardId, null, null, offers);
             _selectionCompletion = completion;
+            _interfaceAllowsForfeit = allowForfeit;
 
             try
             {
+                _panel.SetForfeitAllowed(allowForfeit);
                 _panel.ShowReward(_viewData);
+                _panel.SetMessage(message);
                 using (token.Register(() => completion.TrySetCanceled(token)))
                     return await completion.Task;
             }
             finally
             {
                 if (ReferenceEquals(_selectionCompletion, completion))
-                    ClearInterfaceRequest();
+                    Close();
             }
         }
 
@@ -255,6 +260,11 @@ namespace Game.UI
         private void HandleInterfaceChoiceRequested(ArtifactRewardRequest request)
         {
             if (!_interfaceOpen || !isActiveAndEnabled || !IsChoosing || request.RewardId != _rewardId) return;
+            if (request.IsForfeit && !_interfaceAllowsForfeit)
+            {
+                _panel.TryResolveRequest(request.RequestId, false, "유물을 하나 선택해주세요.");
+                return;
+            }
             ArtifactData selected = null;
             if (!request.IsForfeit && !_candidates.TryGetValue(request.ArtifactId, out selected))
             {

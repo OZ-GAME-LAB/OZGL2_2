@@ -7,7 +7,45 @@ using UnityEngine;
 
 namespace Game.Core
 {
-    public class ArchiveManager : MonoBehaviour, ISummary
+    [Serializable]
+    public class ArtifactCountData
+    {
+        public ArtifactRarity Rarity;
+        public int Count;
+
+        public ArtifactCountData(ArtifactRarity rarity, int count)
+        {
+            Rarity = rarity;
+            Count = count;
+        }
+    }
+    [Serializable]
+    public sealed class ArchiveSaveData
+    {
+        public long AllyDeathCount;
+        public long EnemyKillCount;
+        public List<ArtifactCountData> Artifacts = new List<ArtifactCountData>();
+        public int ClearWaveCount;
+        public int ClearBossCount;
+        public int MaxQuarter;
+        public int MaxWave;
+
+        public ArchiveSaveData(RunStats stat)
+        {
+            AllyDeathCount = stat.AllyDeathCount;
+            EnemyKillCount = stat.EnemyKillCount;
+            ClearWaveCount = stat.ClearWaveCount;
+            ClearBossCount = stat.ClearBossCount;
+            MaxQuarter = stat.MaxQuarter;
+            MaxWave = stat.MaxWave;
+            foreach (var artifact in stat.Artifacts)
+            {
+                Artifacts.Add(new ArtifactCountData(artifact.Key, artifact.Value));
+            }
+        }
+    }
+    
+    public class ArchiveManager : MonoBehaviour, ISummary, ISaveDataProvider<ArchiveSaveData>
     {
         private IArtifactReader _artifactReader;
         private RuntimeUnitManager _unitManager;
@@ -38,11 +76,16 @@ namespace Game.Core
             _unitManager.UnitDied += RefreshUnitDied;
         }
 
-        public void BeginRun()
+        public void NewGame()
         {
             _isRecording = true;
             _runStats = new RunStats();
             _runSummary = null;
+        }
+
+        public void Continue()
+        {
+            
         }
         public void CompleteRun()
         {
@@ -87,6 +130,36 @@ namespace Game.Core
             }
             _runStats.EnemyKillCount++;
         }
+
+        public ArchiveSaveData CaptureSaveData()
+        {
+            return new ArchiveSaveData(_runStats);
+        }
+
+        public void RestoreSaveData(ArchiveSaveData data)
+        {
+            RunStats stat = new RunStats();
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+
+            if (data.Artifacts == null)
+                throw new ArgumentException("유물 기록 목록이 없습니다.", nameof(data));
+
+            stat.AllyDeathCount = data.AllyDeathCount;
+            stat.EnemyKillCount = data.EnemyKillCount;
+            stat.ClearWaveCount = data.ClearWaveCount;
+            stat.ClearBossCount = data.ClearBossCount;
+            stat.MaxQuarter = data.MaxQuarter;
+            stat.MaxWave = data.MaxWave;
+            foreach (var artifact in data.Artifacts)
+            {
+                _runStats.Artifacts.Add(artifact.Rarity, artifact.Count);
+            }
+
+            _runStats = stat;
+            _isRecording = true;
+            _runSummary = null;
+        }
     }
 
     public class RunStats
@@ -98,6 +171,11 @@ namespace Game.Core
         public int ClearBossCount;
         public int MaxQuarter;
         public int MaxWave;
+        public RunStats(){ }
+        public RunStats(ArchiveSaveData saveData)
+        {
+            
+        }
     }
 
     public class RunSummary

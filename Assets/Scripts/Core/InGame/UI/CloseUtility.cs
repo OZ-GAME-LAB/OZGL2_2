@@ -14,7 +14,7 @@ namespace Game.UI.InGame
         public void Close()
         {
             if (_screen != null && _screen.Manager != null)
-                _screen.Manager.Close(_screen.Handle, UICloseReason.UserCancel);
+                _screen.Manager.ClosePopup(_screen.Id, UICloseReason.UserCancel);
         }
     }
 }

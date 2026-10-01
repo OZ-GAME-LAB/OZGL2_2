@@ -408,7 +408,7 @@ namespace Game.UI.Editor
             try
             {
                 IArtifactSelectionUI selectionUI = binding;
-                selectionUI.Open();
+                binding.Open();
                 UniTask<ArtifactData> selectedTask = selectionUI.SelectAsync(artifacts, CancellationToken.None);
                 await UniTask.NextFrame();
                 Check(panel.IsVisible && binding.IsChoosing && confirm.interactable,
@@ -418,18 +418,18 @@ namespace Game.UI.Editor
                 ArtifactData selected = await selectedTask;
                 Check(selected == artifacts[1] && !panel.IsVisible,
                     "interface returns the selected team ArtifactData");
-                selectionUI.Close();
+                binding.Close();
 
-                selectionUI.Open();
+                binding.Open();
                 UniTask<ArtifactData> forfeitTask = selectionUI.SelectAsync(artifacts, CancellationToken.None);
                 await UniTask.NextFrame();
                 Click(confirm);
                 Check(await forfeitTask == null, "interface returns null for explicit forfeit");
-                selectionUI.Close();
+                binding.Close();
 
                 using (var cancellation = new CancellationTokenSource())
                 {
-                    selectionUI.Open();
+                    binding.Open();
                     UniTask<ArtifactData> cancelledTask = selectionUI.SelectAsync(artifacts, cancellation.Token);
                     await UniTask.NextFrame();
                     bool duplicateRejected = false;
@@ -455,12 +455,12 @@ namespace Game.UI.Editor
                     }
                     Check(cancelled && !panel.IsVisible && !binding.IsChoosing,
                         "interface cancellation clears and hides the popup");
-                    selectionUI.Close();
+                    binding.Close();
                 }
 
-                selectionUI.Open();
-                selectionUI.Open();
-                selectionUI.Close();
+                binding.Open();
+                binding.Open();
+                binding.Close();
                 Check(!panel.IsVisible && !binding.IsChoosing, "interface open and close are repeat-safe");
             }
             finally

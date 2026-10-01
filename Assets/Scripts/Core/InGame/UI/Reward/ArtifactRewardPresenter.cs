@@ -6,329 +6,117 @@ using UnityEngine;
 
 namespace Game.UI.InGame
 {
-    /// <summary>후보/획득/효과는 팀원 매니저가 소유한다. UI는 한 보상의 선택 의도만 중계한다.</summary>
+    /// <summary>전달받은 후보를 표시하고 선택만 반환한다. 지급과 재시도는 요청한 시스템이 결정한다.</summary>
     [DisallowMultipleComponent]
     public sealed class ArtifactRewardPresenter : MonoBehaviour, IArtifactSelectionUI
     {
-        public event Action<string> Completed;
-
-        public bool IsChoosing => _rewardId != null && !_completed;
-        public bool IsApplying => _isApplying;
-        public bool IsFaulted => _faulted;
-        public ArtifactRewardViewData CurrentReward => _viewData;
+        public bool IsChoosing => _selectionCompletion != null;
+        public IReadOnlyList<ArtifactData> CurrentCandidates => _currentCandidates;
 
         [SerializeField] private ArtifactRewardView _panel;
 
-        private ArtifactManager _manager;
-        private IReadOnlyList<ArtifactInstance> _inventory;
-        private readonly Dictionary<string, ArtifactData> _candidates = new Dictionary<string, ArtifactData>();
-        private readonly HashSet<string> _completedIds = new HashSet<string>();
-        private ArtifactRewardViewData _viewData;
-        private string _rewardId;
         private UniTaskCompletionSource<ArtifactData> _selectionCompletion;
-        private bool _interfaceOpen;
-        private bool _completed;
-        private bool _isApplying;
-        private bool _faulted;
-        private bool _interfaceListening;
-        private bool _listening;
-        private bool _usesManagerSelection;
+        private IReadOnlyList<ArtifactData> _currentCandidates = Array.Empty<ArtifactData>();
 
-        private void OnEnable()
-        {
-            Subscribe();
-            if (_viewData != null && IsChoosing && HasCurrentInventory()) _panel.ShowReward(_viewData);
-        }
-
-        private void OnDisable()
-        {
-            Unsubscribe();
-            if (_interfaceOpen || _selectionCompletion != null) Close();
-            else if (_panel != null) _panel.HideReward();
-        }
-
-        public void Open()
-        {
-            if (_interfaceOpen) return;
-            if (!isActiveAndEnabled || _panel == null)
-                throw new InvalidOperationException("Artifact selection UI is not available.");
-            if (IsChoosing)
-                throw new InvalidOperationException("Another artifact reward is already in progress.");
-            if (!_listening)
-            {
-                _panel.ChoiceRequested += HandleChoiceRequested;
-                _interfaceListening = true;
-            }
-            _interfaceOpen = true;
-        }
+        private void OnDisable() => ResetReward();
 
         public async UniTask<ArtifactData> SelectAsync(
             IReadOnlyList<ArtifactData> candidates,
-            CancellationToken token)
+            CancellationToken token,
+            bool allowForfeit = false,
+            string message = null)
         {
             token.ThrowIfCancellationRequested();
-            if (!_interfaceOpen)
-                throw new InvalidOperationException("Open the artifact selection UI before requesting a selection.");
-            if (_selectionCompletion != null || IsChoosing)
-                throw new InvalidOperationException("An artifact selection is already in progress.");
+            if (!isActiveAndEnabled || _panel == null || _panel.Screen == null)
+                throw new InvalidOperationException("아티팩트 선택 UI 가 존재하지 않습니다.");
+            if (IsChoosing)
+                throw new InvalidOperationException("아티팩트 선택이 이미 진행중입니다.");
             if (candidates == null || candidates.Count == 0)
-                throw new ArgumentException("At least one artifact candidate is required.", nameof(candidates));
+                throw new ArgumentException("최소한 아티팩트 후보 1개는 제공되어야 합니다.", nameof(candidates));
 
-            var candidateMap = new Dictionary<string, ArtifactData>(candidates.Count, StringComparer.Ordinal);
-            var offers = new ArtifactRewardOffer[candidates.Count];
+            // 목록만 복사해 요청 중 후보 순서를 고정한다. 유물 데이터 자체는 원본을 사용한다.
+            var snapshot = new ArtifactData[candidates.Count];
+            var candidateIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < candidates.Count; i++)
             {
                 ArtifactData data = candidates[i];
-                if (data == null || string.IsNullOrWhiteSpace(data.Id) || !candidateMap.TryAdd(data.Id, data))
+                if (data == null || string.IsNullOrWhiteSpace(data.Id) || !candidateIds.Add(data.Id))
                     throw new ArgumentException("Candidates must be non-null with distinct IDs.", nameof(candidates));
-                offers[i] = CreateOffer(data);
+                snapshot[i] = data;
             }
 
-            string rewardId = "artifact-selection-" + Guid.NewGuid().ToString("N");
+            IReadOnlyList<ArtifactData> requestCandidates = Array.AsReadOnly(snapshot);
             var completion = new UniTaskCompletionSource<ArtifactData>();
-            _rewardId = rewardId;
-            _completed = false;
-            _faulted = false;
-            _candidates.Clear();
-            foreach (var pair in candidateMap) _candidates.Add(pair.Key, pair.Value);
-            _viewData = new ArtifactRewardViewData(rewardId, null, null, offers);
-            _selectionCompletion = completion;
+            bool submitting = false;
+            void OnChoice(ArtifactData selected)
+            {
+                if (!ReferenceEquals(_selectionCompletion, completion) || submitting ||
+                    completion.Task.Status != UniTaskStatus.Pending) return;
+                if (selected == null && !allowForfeit)
+                {
+                    _panel.TryResolveSelection(false, "유물을 하나 선택해주세요.");
+                    return;
+                }
+                if (selected != null && !ContainsCandidate(requestCandidates, selected))
+                {
+                    _panel.TryResolveSelection(false, "선택한 아티팩트가 현재 후보에 없습니다.");
+                    return;
+                }
 
+                // 선택에 따른 정상 닫힘이 취소 응답을 앞서 보내지 않게 한다.
+                submitting = true;
+                if (_panel.TryResolveSelection(true)) completion.TrySetResult(selected);
+                else submitting = false;
+            }
+            
+            void OnClosed(UIScreen screen, UICloseReason reason)
+            {
+                if (!submitting) completion.TrySetCanceled();
+            }
+
+            _selectionCompletion = completion;
+            _currentCandidates = requestCandidates;
+            UIScreen requestScreen = _panel.Screen;
+            _panel.ChoiceRequested += OnChoice;
+            requestScreen.Closed += OnClosed;
             try
             {
-                _panel.ShowReward(_viewData);
                 using (token.Register(() => completion.TrySetCanceled(token)))
+                {
+                    token.ThrowIfCancellationRequested();
+                    _panel.ShowSelection(requestCandidates, allowForfeit, message);
+                    if (!_panel.IsVisible)
+                        throw new InvalidOperationException("Artifact selection popup could not open.");
                     return await completion.Task;
+                }
             }
             finally
             {
+                // 취소 토큰은 작업 스레드에서도 취소될 수 있으므로 화면 정리는 Unity 스레드에서 한다.
+                await UniTask.SwitchToMainThread();
+                requestScreen.Closed -= OnClosed;
+                _panel.ChoiceRequested -= OnChoice;
                 if (ReferenceEquals(_selectionCompletion, completion))
-                    ClearInterfaceRequest();
-            }
-        }
-
-        public void Close()
-        {
-            _interfaceOpen = false;
-            _selectionCompletion?.TrySetCanceled();
-            ClearInterfaceRequest();
-            if (_interfaceListening && _panel != null)
-            {
-                _panel.ChoiceRequested -= HandleChoiceRequested;
-                _interfaceListening = false;
-            }
-        }
-
-        public bool TryInitialize(ArtifactManager manager)
-        {
-            if (_panel == null || manager == null || !manager.IsInitialized || _isApplying ||
-                _interfaceOpen || _selectionCompletion != null || (IsChoosing && _manager != manager)) return false;
-            if (_manager == manager && ReferenceEquals(_inventory, manager.Instances))
-            {
-                Subscribe();
-                return true;
-            }
-            Unsubscribe();
-            ResetReward();
-            _manager = manager;
-            _inventory = manager.Instances;
-            Subscribe();
-            return true;
-        }
-
-        /// <summary>awarded 값은 이미 지급한 재화다. 반복 호출은 최초 후보를 그대로 표시한다.</summary>
-        public bool TryShowReward(string rewardId, int? awardedGold, int? awardedGems)
-        {
-            if (!isActiveAndEnabled || !HasCurrentInventory() || _isApplying || _faulted ||
-                string.IsNullOrWhiteSpace(rewardId) || awardedGold < 0 || awardedGems < 0) return false;
-            if (_completedIds.Contains(rewardId)) return true;
-            if (_rewardId == rewardId)
-            {
-                if (_viewData != null) _panel.ShowReward(_viewData);
-                return true;
-            }
-            if (IsChoosing) return false;
-            _usesManagerSelection = _manager.IsSelectingReward;
-            IReadOnlyList<ArtifactData> candidates;
-            if (_usesManagerSelection) candidates = _manager.SelectionCandidates;
-            else if (!_manager.TryCreateCandidates(out candidates)) return false;
-
-            // 추첨 성공 시 먼저 키/원본 후보를 보존한다. 표시 실패를 이유로 재추첨하지 않는다.
-            _rewardId = rewardId;
-            _completed = false;
-            _candidates.Clear();
-            _viewData = null;
-            try
-            {
-                var offers = new ArtifactRewardOffer[candidates.Count];
-                for (int i = 0; i < candidates.Count; i++)
                 {
-                    var data = candidates[i];
-                    if (data == null || string.IsNullOrWhiteSpace(data.Id) || _candidates.ContainsKey(data.Id))
-                        throw new InvalidOperationException("Invalid or duplicate artifact candidate.");
-                    _candidates.Add(data.Id, data);
-                    offers[i] = CreateOffer(data);
+                    _selectionCompletion = null;
+                    _currentCandidates = Array.Empty<ArtifactData>();
+                    _panel.EndSelection();
                 }
-                if (offers.Length == 0)
-                {
-                    CompleteReward();
-                    return true;
-                }
-                _viewData = new ArtifactRewardViewData(rewardId, awardedGold, awardedGems, offers);
-                _panel.SetForfeitAllowed(!_usesManagerSelection);
-                _panel.ShowReward(_viewData);
-                return true;
-            }
-            catch (Exception exception)
-            {
-                _faulted = true;
-                Debug.LogException(exception, this);
-                return false;
             }
         }
 
-        /// <summary>플레이 소유자가 종료/리셋할 때 호출한다. 인벤토리나 효과는 변경하지 않는다.</summary>
+        /// <summary>화면 수명이 끝날 때 진행 중인 선택을 취소하고 표시 상태를 비운다.</summary>
         public void ResetReward()
         {
-            if (_isApplying) return;
-            if (_interfaceOpen || _selectionCompletion != null)
-            {
-                Close();
-                return;
-            }
-            _rewardId = null;
-            _viewData = null;
-            _completed = false;
-            _faulted = false;
-            _usesManagerSelection = false;
-            _candidates.Clear();
-            _completedIds.Clear();
+            _selectionCompletion?.TrySetCanceled();
             if (_panel != null) _panel.ResetReward();
         }
 
-        private void HandleChoiceRequested(ArtifactRewardRequest request)
+        private static bool ContainsCandidate(IReadOnlyList<ArtifactData> candidates, ArtifactData selected)
         {
-            if (_selectionCompletion != null)
-            {
-                HandleInterfaceChoiceRequested(request);
-                return;
-            }
-            if (!isActiveAndEnabled || !IsChoosing || request.RewardId != _rewardId || _isApplying) return;
-            if (_faulted || !HasCurrentInventory())
-            {
-                _panel.TryResolveRequest(request.RequestId, false, "보상 상태가 변경되었습니다. 플레이를 다시 시작해주세요.");
-                return;
-            }
-            _isApplying = true;
-            try
-            {
-                if (_usesManagerSelection && request.IsForfeit)
-                {
-                    _panel.TryResolveRequest(request.RequestId, false, "유물을 하나 선택해주세요.");
-                    return;
-                }
-                if (!request.IsForfeit &&
-                    (!_candidates.TryGetValue(request.ArtifactId, out var data) ||
-                     !(_usesManagerSelection ? _manager.TrySelectReward(data) : _manager.TryAdd(data))))
-                {
-                    _panel.TryResolveRequest(request.RequestId, false, _usesManagerSelection
-                        ? "획득 실패: 다른 유물을 선택하거나 효과 설정을 확인해주세요."
-                        : "획득 실패: 최대 중첩·효과 설정 확인 후 재시도하거나 포기해주세요.");
-                    return;
-                }
-                // 실제 적용 성공/포기 확정 후에만 대기를 끝낸다. 완료를 먼저 기록해 재진입을 막는다.
-                _completed = true;
-                _completedIds.Add(_rewardId);
-                _panel.TryResolveRequest(request.RequestId, true);
-                Completed?.Invoke(_rewardId);
-            }
-            catch (Exception exception)
-            {
-                // 동기 이벤트가 예외를 던지면 팀원 API가 일부 적용되었을 수 있다. 자동 재지급하지 않는다.
-                _faulted = true;
-                _panel.TryResolveRequest(request.RequestId, false, "처리 중 오류: 중복 지급 방지를 위해 재시도를 중단했습니다. Console을 확인해주세요.");
-                Debug.LogException(exception, this);
-            }
-            finally { _isApplying = false; }
+            for (int i = 0; i < candidates.Count; i++)
+                if (ReferenceEquals(candidates[i], selected)) return true;
+            return false;
         }
-
-        private void HandleInterfaceChoiceRequested(ArtifactRewardRequest request)
-        {
-            if (!_interfaceOpen || !isActiveAndEnabled || !IsChoosing || request.RewardId != _rewardId) return;
-            ArtifactData selected = null;
-            if (!request.IsForfeit && !_candidates.TryGetValue(request.ArtifactId, out selected))
-            {
-                _panel.TryResolveRequest(request.RequestId, false, "선택한 아티팩트가 현재 후보에 없습니다.");
-                return;
-            }
-
-            if (!_panel.TryResolveRequest(request.RequestId, true)) return;
-            _completed = true;
-            _selectionCompletion.TrySetResult(selected);
-        }
-
-        private void HandleCleared(IReadOnlyList<ArtifactInstance> removed) => ResetReward();
-
-        private bool HasCurrentInventory() => _manager != null && _manager.IsInitialized &&
-            ReferenceEquals(_inventory, _manager.Instances);
-
-        private void CompleteReward()
-        {
-            _completed = true;
-            _completedIds.Add(_rewardId);
-            _panel.ResetReward();
-            Completed?.Invoke(_rewardId);
-        }
-
-        private void ClearInterfaceRequest()
-        {
-            _selectionCompletion = null;
-            _rewardId = null;
-            _viewData = null;
-            _completed = false;
-            _faulted = false;
-            _candidates.Clear();
-            if (_panel != null) _panel.ResetReward();
-        }
-
-        private void Subscribe()
-        {
-            if (_listening || !isActiveAndEnabled || _panel == null || _manager == null) return;
-            _panel.ChoiceRequested += HandleChoiceRequested;
-            _manager.Cleared += HandleCleared;
-            _listening = true;
-        }
-
-        private void Unsubscribe()
-        {
-            if (!_listening) return;
-            if (_panel != null) _panel.ChoiceRequested -= HandleChoiceRequested;
-            if (_manager != null) _manager.Cleared -= HandleCleared;
-            _listening = false;
-        }
-
-        private static ArtifactRewardOffer CreateOffer(ArtifactData data)
-        {
-            return new ArtifactRewardOffer(data.Id, data.DisplayName, RarityName(data.Rarity),
-                string.IsNullOrWhiteSpace(data.Description) ? "효과 설명 미등록" : data.Description.Replace("\\n", "\n"),
-                data.Icon, RarityColor(data.Rarity));
-        }
-
-        internal static string RarityName(ArtifactRarity rarity) => rarity switch
-        {
-            ArtifactRarity.Common => "일반",
-            ArtifactRarity.Rare => "희귀",
-            ArtifactRarity.Legendary => "전설",
-            ArtifactRarity.Mythic => "신화",
-            _ => rarity.ToString()
-        };
-
-        internal static Color RarityColor(ArtifactRarity rarity) => rarity switch
-        {
-            ArtifactRarity.Rare => new Color32(112, 186, 255, 255),
-            ArtifactRarity.Legendary => new Color32(255, 205, 99, 255),
-            ArtifactRarity.Mythic => new Color32(246, 136, 172, 255),
-            _ => new Color32(200, 214, 220, 255)
-        };
     }
 }

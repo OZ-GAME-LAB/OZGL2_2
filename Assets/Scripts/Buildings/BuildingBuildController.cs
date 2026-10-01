@@ -12,7 +12,7 @@ namespace OZGL.KDH
 {
     // Current date KDH 2026-10-01
     // 건설 상태 저장/복원을 위해 ISaveDataProvider를 구현합니다. 파일 입출력은 SaveManager 쪽이 합니다.
-    public class BuildingBuildController : MonoBehaviour, ISaveDataProvider<BuildingSaveData>
+    public partial class BuildingBuildController : MonoBehaviour, ISaveDataProvider<BuildingSaveData>
     {
         private const int HitBufferSize = 8;
 

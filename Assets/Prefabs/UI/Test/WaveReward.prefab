@@ -423,6 +423,7 @@ GameObject:
   - component: {fileID: 8560685961876373771}
   - component: {fileID: 7478018437492703945}
   - component: {fileID: 1554023378880467815}
+  - component: {fileID: 4312402447477145756}
   m_Layer: 0
   m_Name: WaveReward
   m_TagString: Untagged
@@ -488,6 +489,18 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!225 &4312402447477145756
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6599039511055188326}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &7361481490147039213
 GameObject:
   m_ObjectHideFlags: 0
@@ -772,6 +785,7 @@ GameObject:
   m_Component:
   - component: {fileID: 445573119920951163}
   - component: {fileID: 3810932181186406805}
+  - component: {fileID: 258057226097167356}
   m_Layer: 0
   m_Name: WaveReward
   m_TagString: Untagged
@@ -811,12 +825,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 85e412873191dfd4fbe977999a7f9e23, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.UIScreen
+  _id: 4
+  _isHud: 0
+  _canCloseByUser: 0
+  _blocksHudInput: 1
   _root: {fileID: 6599039511055188326}
-  _window: {fileID: 0}
-  _initialFocus: {fileID: 673820165974407156}
-  _inputRoots: []
-  _detailsButton: {fileID: 0}
-  _detailsLabel: {fileID: 0}
-  _detailsRoot: {fileID: 0}
-  _collapsedHeight: 300
-  _expandedHeight: 440
+  _inputGroup: {fileID: 4312402447477145756}
+--- !u!114 &258057226097167356
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8629354492189778981}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19d7cb0ddee3d4489209cbef4b2cdec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.ContinueView
+  _screen: {fileID: 3810932181186406805}
+  _messageText: {fileID: 5820879760117229582}
+  _continueButton: {fileID: 673820165974407156}

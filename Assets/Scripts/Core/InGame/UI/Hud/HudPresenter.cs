@@ -16,6 +16,7 @@ namespace Game.UI.InGame
         [SerializeField] private TMP_Text _quarterText;
         [SerializeField] private TMP_Text _gemText;
         [SerializeField] private TMP_Text _hint;
+        [SerializeField] private MessageView _messages;
 
         private RunCurrencyManager _wallet;
         private GameFlowController _flow;
@@ -100,9 +101,7 @@ namespace Game.UI.InGame
             {
                 _requestVersion++;
                 _isStartPending = false;
-                _ui.HideWaveReward();
-                _ui.HideRunResult();
-                _ui.HideMessage();
+                _messages?.Hide();
             }
             Refresh();
         }
@@ -115,7 +114,7 @@ namespace Game.UI.InGame
             if (_flow == null || _waves == null)
             {
                 Refresh();
-                _ui.ShowMessage("코어 연결을 확인해주세요.");
+                _messages?.Show("코어 연결을 확인해주세요.");
                 return;
             }
             StartWaveAsync().Forget();
@@ -126,24 +125,24 @@ namespace Game.UI.InGame
             int requestVersion = ++_requestVersion;
             CancellationToken token = _bindingLifetime.Token;
             _isStartPending = true;
-            _ui.HideMessage();
+            _messages?.Hide();
             _ui.SetWaveStartInteractable(false);
             try
             {
                 bool started = await _flow.TrySpawnUnits().AttachExternalCancellation(token);
                 if (IsCurrentRequest(requestVersion) && !started)
-                    _ui.ShowMessage("웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요.");
+                    _messages?.Show("웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요.");
             }
             catch (OperationCanceledException)
             {
                 if (IsCurrentRequest(requestVersion))
-                    _ui.ShowMessage("웨이브 시작 요청이 취소되었습니다.");
+                    _messages?.Show("웨이브 시작 요청이 취소되었습니다.");
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception, this);
                 if (IsCurrentRequest(requestVersion))
-                    _ui.ShowMessage("전투 준비 중 오류가 발생했습니다. 코어 상태를 확인해주세요.");
+                    _messages?.Show("전투 준비 중 오류가 발생했습니다. 코어 상태를 확인해주세요.");
             }
             finally
             {

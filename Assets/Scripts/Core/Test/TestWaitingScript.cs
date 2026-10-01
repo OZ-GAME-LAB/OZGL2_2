@@ -127,7 +127,7 @@ public class TestWaitingScript : MonoBehaviour
     public void ResetBtn()
     {
         Debug.Log($"[TestWaitingScript] 게임 리셋 테스트");
-        _gameFlowController.ResetRun();
+        _gameFlowController.QuitRun();
     }
 
     public void ChooseResultBtn()

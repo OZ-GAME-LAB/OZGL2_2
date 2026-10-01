@@ -1,5 +1,6 @@
 using System.IO;
 using Game.Core;
+using OZGL.KDH;
 using UnityEngine;
 
 
@@ -20,6 +21,13 @@ public class InGameSaveCoordinator : MonoBehaviour
 
     private SaveManager _saveManager;
     private ISaveDataProvider<GameFlowSaveData> _flowController;
+    private ISaveDataProvider<RunCurrencySaveData> _runCurrency;
+    private ISaveDataProvider<ArtifactSaveData> _artifact;
+    private ISaveDataProvider<ShopSaveData> _shop;
+    private ISaveDataProvider<BuildingSaveData> _building;
+    private ISaveDataProvider<ConsumableItemSaveData> _consumableItem;
+    private ISaveDataProvider<PersistentSaveData> _persistent;
+    private ISaveDataProvider<ArchiveSaveData> _archive;
     
     public void Initialize(SaveManager saveManager, ISaveDataProvider<GameFlowSaveData> gameFlowController)
     {
@@ -56,17 +64,26 @@ public class InGameSaveCoordinator : MonoBehaviour
 
     public bool TryLoad(out string error)
     {
-        IsReady = false;
-        if (!CheckReferences(out error)) return false;
-        if (!_saveManager.TryLoad(SaveKey, out InGameSaveData data, out error))
-            return Fail(error, out error);
-        if (!TryValidate(data, out error)) return false;
+        try
+        {
+            IsReady = false;
+            if (!CheckReferences(out error)) return false;
+            if (!_saveManager.TryLoad(SaveKey, out InGameSaveData data, out error))
+                return Fail(error, out error);
+            if (!TryValidate(data, out error)) return false;
 
-        // 모든 영역을 검증한 뒤 함께 복원합니다. 복원 중에는 구매나 저장을 호출하지 않습니다.
-        IsReady = true;
-        LastError = null;
-        Apply(data);
-        return true;
+            // 모든 영역을 검증한 뒤 함께 복원합니다. 복원 중에는 구매나 저장을 호출하지 않습니다.
+            Apply(data);
+            
+            IsReady = true;
+            LastError = null;
+            return true;
+        }
+        catch (System.ArgumentException exception)
+        {
+            IsReady = false;
+            return Fail($"저장 데이터 복원 실패: {exception.Message}", out error);
+        }
     }
 
     public InGameSaveData CaptureSaveData()

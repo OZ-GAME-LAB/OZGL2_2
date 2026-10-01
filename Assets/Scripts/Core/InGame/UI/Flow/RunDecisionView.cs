@@ -1,112 +1,97 @@
 using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using Game.Core;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace Game.UI.InGame
 {
-    /// <summary>Core의 분기 종료 요청을 표시하고 종료·계속 입력을 전달한다.</summary>
+    /// <summary>분기 안내를 표시하고 종료 또는 계속 도전 의도를 반환한다.</summary>
     [DisallowMultipleComponent]
-    public sealed class RunDecisionView : MonoBehaviour
+    public sealed class RunDecisionView : MonoBehaviour, IRunDecisionUI
     {
         public bool IsVisible => _screen != null && _screen.IsVisible;
+        public bool IsPending => _pending != null;
 
         [SerializeField] private UIScreen _screen;
         [SerializeField] private TMP_Text _descriptionText;
-        [SerializeField] private Button _finishButton;
-        [SerializeField] private Button _continueButton;
+        [SerializeField] private UnityEngine.UI.Button _finishButton;
+        [SerializeField] private UnityEngine.UI.Button _continueButton;
 
-        private GameFlowController _flow;
-        private WaveController _waves;
-        private bool _isSubscribed;
+        private UniTaskCompletionSource<RunDecision> _pending;
 
-        private void OnEnable() => Bind();
-        private void OnDisable() => Unbind();
-
-        public void Initialize(GameFlowController flow, WaveController waves)
+        public async UniTask<RunDecision> ChooseAsync(int quarter, CancellationToken token)
         {
-            if (flow == null) throw new ArgumentNullException(nameof(flow));
-            if (waves == null) throw new ArgumentNullException(nameof(waves));
-            if (!HasView()) throw new InvalidOperationException("Run decision view references are incomplete.");
-            Unbind();
-            _flow = flow;
-            _waves = waves;
-            if (isActiveAndEnabled) Bind();
-        }
+            token.ThrowIfCancellationRequested();
+            if (quarter < 1) throw new ArgumentOutOfRangeException(nameof(quarter));
+            if (_pending != null) throw new InvalidOperationException("A run decision is already in progress.");
+            if (!isActiveAndEnabled || _screen == null || _screen.Manager == null ||
+                _descriptionText == null || _finishButton == null || _continueButton == null ||
+                _finishButton == _continueButton)
+                throw new InvalidOperationException("Run decision UI is not available.");
 
-        public void Refresh()
-        {
-            bool canChoose = _isSubscribed && _flow != null && _waves != null &&
-                _flow.CurPhase == GamePhase.QuarterComplete && _flow.CanChooseRunDecision;
-            if (!canChoose)
+            var completion = new UniTaskCompletionSource<RunDecision>();
+            _pending = completion;
+            bool completed = false;
+            UnityEngine.Events.UnityAction finish = () => Complete(completion, RunDecision.Finish, _finishButton);
+            UnityEngine.Events.UnityAction proceed = () => Complete(completion, RunDecision.Continue, _continueButton);
+            Action<UIScreen, UICloseReason> closed = (_, __) =>
             {
-                Hide();
-                return;
+                if (ReferenceEquals(_pending, completion)) completion.TrySetCanceled();
+            };
+            try
+            {
+                _descriptionText.text = $"{quarter}분기 돌파!\n승리로 마무리하거나 다음 분기에 도전할 수 있습니다.";
+                SetButtons(true);
+                _finishButton.onClick.AddListener(finish);
+                _continueButton.onClick.AddListener(proceed);
+                _screen.Closed += closed;
+                if (!_screen.Manager.ReplacePopup(_screen.Id) || !_screen.IsVisible)
+                    throw new InvalidOperationException("Run decision UI could not be opened.");
+                if (EventSystem.current != null)
+                    EventSystem.current.SetSelectedGameObject(_continueButton.gameObject);
+                RunDecision result;
+                using (token.Register(() => completion.TrySetCanceled(token)))
+                    result = await completion.Task;
+                completed = true;
+                return result;
             }
-
-            string text = $"{_waves.CurQuarter}분기 돌파!\n승리로 마무리하거나 다음 분기에 도전할 수 있습니다.";
-            if (_descriptionText.text != text) _descriptionText.text = text;
-            _finishButton.interactable = true;
-            _continueButton.interactable = true;
-            _screen.Show();
-        }
-
-        private void HandlePhaseChanged(GamePhase phase) => Refresh();
-
-        private void HandleFinishClicked()
-        {
-            if (!CanSubmit(_finishButton)) return;
-            _flow.ChooseFinishRun();
-            Refresh();
-        }
-
-        private void HandleContinueClicked()
-        {
-            if (!CanSubmit(_continueButton)) return;
-            _flow.ChooseContinueRun();
-            Refresh();
-        }
-
-        private bool CanSubmit(Button button) =>
-            isActiveAndEnabled && _isSubscribed && IsVisible && button != null && button.IsInteractable() &&
-            _flow != null && _flow.CurPhase == GamePhase.QuarterComplete && _flow.CanChooseRunDecision;
-
-        private bool HasView() => _screen != null && _descriptionText != null &&
-            _finishButton != null && _continueButton != null && _finishButton != _continueButton;
-
-        private void Bind()
-        {
-            if (_isSubscribed || _flow == null || _waves == null || !HasView()) return;
-            _flow.PhaseChanged += HandlePhaseChanged;
-            _flow.QuarterDecisionRequested += Refresh;
-            _finishButton.onClick.AddListener(HandleFinishClicked);
-            _continueButton.onClick.AddListener(HandleContinueClicked);
-            _isSubscribed = true;
-            Refresh();
-        }
-
-        private void Unbind()
-        {
-            if (_isSubscribed)
+            finally
             {
-                if (_flow != null)
+                await UniTask.SwitchToMainThread();
+                if (ReferenceEquals(_pending, completion))
                 {
-                    _flow.PhaseChanged -= HandlePhaseChanged;
-                    _flow.QuarterDecisionRequested -= Refresh;
+                    if (_finishButton != null) _finishButton.onClick.RemoveListener(finish);
+                    if (_continueButton != null) _continueButton.onClick.RemoveListener(proceed);
+                    SetButtons(false);
+                    if (_screen != null)
+                    {
+                        _screen.Closed -= closed;
+                        _screen.Manager?.ClosePopup(_screen.Id,
+                            completed ? UICloseReason.Completed : UICloseReason.ContextLost);
+                    }
+                    _pending = null;
                 }
-                if (_finishButton != null) _finishButton.onClick.RemoveListener(HandleFinishClicked);
-                if (_continueButton != null) _continueButton.onClick.RemoveListener(HandleContinueClicked);
             }
-            _isSubscribed = false;
-            Hide();
         }
 
-        private void Hide()
+        private void Complete(UniTaskCompletionSource<RunDecision> completion, RunDecision choice,
+            UnityEngine.UI.Button button)
         {
-            if (_finishButton != null) _finishButton.interactable = false;
-            if (_continueButton != null) _continueButton.interactable = false;
-            if (_screen != null) _screen.Hide();
+            if (!ReferenceEquals(_pending, completion) || !isActiveAndEnabled || !IsVisible || !button.IsInteractable()) return;
+            SetButtons(false);
+            completion.TrySetResult(choice);
         }
+
+        private void SetButtons(bool interactable)
+        {
+            if (_finishButton != null) _finishButton.interactable = interactable;
+            if (_continueButton != null) _continueButton.interactable = interactable;
+        }
+
+        private void OnDisable() => _pending?.TrySetCanceled();
+        private void OnDestroy() => _pending?.TrySetCanceled();
     }
 }

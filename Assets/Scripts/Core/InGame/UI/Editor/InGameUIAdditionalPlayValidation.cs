@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -11,6 +12,8 @@ using OZGL.KDH;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Game.UI.InGame.Editor
 {
@@ -31,12 +34,14 @@ namespace Game.UI.InGame.Editor
         private sealed class Context
         {
             public InGameUIManager UI;
-            public BuildingUIPresenter Building;
+            public BuildingUIConnection Building;
+            public ContinueView Continue;
+            public BootStrap Bootstrap;
             public BuildingCatalogView Catalog;
             public BuildingActionView Actions;
             public GameHudView Hud;
             public HudPresenter HudPresenter;
-            public RunFlowPresenter RunFlow;
+
             public ArtifactRewardPresenter Reward;
             public ArtifactRewardView RewardView;
             public GameFlowController Flow;
@@ -51,22 +56,24 @@ namespace Game.UI.InGame.Editor
             public Context(InGameUIManager ui)
             {
                 UI = ui;
-                Building = Read<BuildingUIPresenter>(ui, "_building");
-                Catalog = Read<BuildingCatalogView>(Building, "_catalog");
-                Actions = Read<BuildingActionView>(Building, "_actions");
-                Hud = Read<GameHudView>(ui, "_hud");
-                HudPresenter = Read<HudPresenter>(ui, "_hudPresenter");
-                RunFlow = Read<RunFlowPresenter>(ui, "_flow");
-                Reward = Read<ArtifactRewardPresenter>(ui, "_artifact");
+                Bootstrap = ui.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
+                Building = Read<BuildingUIConnection>(Bootstrap, "_buildingUIConnection");
+                var buildingView = Read<BuildingUIPresenter>(Bootstrap, "_buildingUI");
+                Catalog = Read<BuildingCatalogView>(buildingView, "_catalog");
+                Actions = Read<BuildingActionView>(buildingView, "_actions");
+                Hud = Read<GameHudView>(Bootstrap, "_hudView");
+                Continue = Read<ContinueView>(Bootstrap, "_continueUI");
+                Reward = Read<ArtifactRewardPresenter>(Bootstrap, "_artifactSelectionUI");
                 RewardView = Read<ArtifactRewardView>(Reward, "_panel");
-                Flow = Read<GameFlowController>(RunFlow, "_flow");
-                Waves = Read<WaveController>(RunFlow, "_waves");
-                Wallet = Read<RunCurrencyManager>(RunFlow, "_wallet");
-                Artifacts = Read<ArtifactManager>(RunFlow, "_artifacts");
-                Gate = Read<TestWaitingScript>(RunFlow, "_contentGate");
-                Controller = Read<BuildingBuildController>(Building, "_controller");
-                Core = Read<BuildingCoreProgress>(Building, "_coreProgress");
-                Slots = Read<BuildingSlot[]>(Building, "_slots");
+                Flow = Read<GameFlowController>(Bootstrap, "_gameFlowController");
+                Waves = Read<WaveController>(Bootstrap, "_waveController");
+                Wallet = Read<RunCurrencyManager>(Bootstrap, "_runCurrencyManager");
+                Artifacts = Read<ArtifactManager>(Bootstrap, "_artifactManager");
+                Controller = Read<BuildingBuildController>(Bootstrap, "_buildController");
+                Slots = ui.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BuildingSlot>(true)).ToArray();
+                HudPresenter = Read<HudPresenter>(Bootstrap, "_hudPresenter");
+                Gate = Read<TestWaitingScript>(Bootstrap, "_testScript");
+                Core = Read<BuildingCoreProgress>(Bootstrap, "_buildingCoreProgress");
             }
 
             public BuildingActionViewData Quote => Read<BuildingActionViewData>(Actions, "_data");
@@ -75,7 +82,7 @@ namespace Game.UI.InGame.Editor
                 if (!UI.TryGetScreen(id, out UIScreen screen)) throw new InvalidOperationException("Missing screen " + id);
                 return screen;
             }
-            public void InitializeUI() => UI.Initialize(Wallet, Waves, Flow, Artifacts, Core, Gate, Controller, Slots);
+            public void InitializeUI() => Bootstrap.InitializeUI(Slots);
         }
 
         private static async UniTask RunAsync()
@@ -92,12 +99,14 @@ namespace Game.UI.InGame.Editor
                 await WaitFor(() => ui != null && ui.IsReady, "Bootstrap initialization");
                 var c = new Context(ui);
                 await WaitFor(c.Flow.CanEnterBuildMode, "Preparation");
+                await ValidatePointerAndEscape(c);
                 await ValidateReinitialization(c);
+                await ValidateBuildingCapacity(c);
                 await ValidateOriginalUpgrades(c);
                 await ValidateContentFixture(c, GamePhase.Event, PostBattleEventType.Event);
                 await ValidateContentFixture(c, GamePhase.Store, PostBattleEventType.Shop);
                 await ValidateEmptyRewardFixture(c);
-                Check(c.Flow.CanEnterBuildMode() && !c.UI.HasModalOpen &&
+                Check(c.Flow.CanEnterBuildMode() && !c.UI.HasBlockingPopup &&
                     Read<UnityEngine.UI.Button>(c.Hud, "_waveStartButton").IsInteractable(),
                     "all fixtures restore a usable Preparation HUD");
                 Note("LIMIT", "Event/Store and empty candidate tests verify UI forwarding with temporary runtime fixtures, not generated node probabilities or real loot exhaustion.");
@@ -124,6 +133,168 @@ namespace Game.UI.InGame.Editor
             }
         }
 
+        private static async UniTask ValidatePointerAndEscape(Context c)
+        {
+            EventSystem events = EventSystem.current;
+            Check(events != null, "playing Test has an active EventSystem");
+            BuildingSlot empty = Array.Find(c.Slots, IsEmpty);
+            Check(empty != null, "pointer validation has a real empty construction slot");
+            Select(c, empty);
+            UIScreen catalog = c.Screen(UIId.BuildingCatalog);
+            UIScreen detail = c.Screen(UIId.Detail);
+            Check(catalog.IsVisible && c.UI.OpenPopup(UIId.Detail), "detail stacks over the real building catalog");
+            detail.GetComponent<DetailPopupView>().SetContent("입력 검증", "공용 상세", "EventSystem 경로 검사");
+            await WaitForCanvasRender();
+            var close = detail.GetComponentInChildren<CloseUtility>(true);
+            Button closeButton = Read<Button>(close, "_button");
+            var pointer = PointerAt(events, closeButton);
+            var hits = new List<RaycastResult>();
+            events.RaycastAll(pointer, hits);
+            Note("RAYCAST", DescribeRaycast(pointer, hits));
+            Check(hits.Count > 0 && hits[0].gameObject.transform.IsChildOf(detail.Root.transform),
+                "EventSystem raycast at the actual detail close button hits the top popup first");
+            GameObject clicked = ExecuteEvents.ExecuteHierarchy(hits[0].gameObject, pointer, ExecuteEvents.pointerClickHandler);
+            Check(clicked == closeButton.gameObject && !detail.IsVisible && catalog.IsVisible && c.UI.TopPopup == catalog,
+                "ExecuteEvents pointerClick follows the saved CloseUtility and returns to the real parent");
+
+            c.UI.ReplacePopup(UIId.ArtifactReward);
+            UIScreen required = c.Screen(UIId.ArtifactReward);
+            await WaitForCanvasRender();
+            Button start = Read<Button>(c.Hud, "_waveStartButton");
+            hits.Clear();
+            pointer = PointerAt(events, start);
+            events.RaycastAll(pointer, hits);
+            Note("RAYCAST", DescribeRaycast(pointer, hits));
+            Check(!start.IsInteractable() && !hits.Exists(hit => hit.gameObject == start.gameObject ||
+                hit.gameObject.transform.IsChildOf(start.transform)),
+                "mandatory popup prevents HUD start from receiving UI raycasts");
+            Check(hits.Count > 0 && hits[0].gameObject.transform.IsChildOf(required.Root.transform),
+                "the existing mandatory background still receives pointer hits over the HUD area");
+            c.UI.OpenPopup(UIId.Detail);
+            Check(c.UI.HasBlockingPopup && !start.IsInteractable(),
+                "a normal detail above mandatory reward does not unlock the HUD");
+            InGameUIValidation.SimulateEscape(c.UI);
+            Check(!detail.IsVisible && required.IsVisible && c.UI.TopPopup == required,
+                "synthetic InputSystem Escape reaches the manager Update branch in Play Mode");
+            InGameUIValidation.SimulateEscape(c.UI);
+            Check(required.IsVisible, "a second Escape preserves the mandatory reward");
+            c.UI.ClosePopup(UIId.ArtifactReward, UICloseReason.Completed);
+            c.Building.ClearSelection();
+            Note("INPUT", "Pointer tests use EventSystem.RaycastAll plus ExecuteEvents.pointerClickHandler. Escape uses temporary Keyboard state plus manager Update, not physical hardware or natural pointer movement.");
+        }
+
+        private static async UniTask WaitForCanvasRender()
+        {
+            // Graphic.depth는 첫 Canvas 렌더 후 유효하다. Update 직후 한 프레임만 기다리면
+            // 갓 열린 팝업이 아직 Raycaster에 등록되지 않은 시점을 검사할 수 있다.
+            await UniTask.NextFrame(PlayerLoopTiming.LastPostLateUpdate);
+            await UniTask.NextFrame(PlayerLoopTiming.LastPostLateUpdate);
+            Canvas.ForceUpdateCanvases();
+        }
+
+        private static string DescribeRaycast(PointerEventData pointer, List<RaycastResult> hits)
+        {
+            var report = new StringBuilder();
+            report.Append("Screen ").Append(Screen.width).Append('x').Append(Screen.height)
+                .Append(", point ").Append(pointer.position).Append(", hits ").Append(hits.Count);
+            for (int i = 0; i < Math.Min(hits.Count, 5); i++)
+                report.Append(" | ").Append(i).Append(':').Append(hits[i].gameObject.name)
+                    .Append(" depth=").Append(hits[i].depth).Append(" order=").Append(hits[i].sortingOrder);
+            return report.ToString();
+        }
+
+        private static PointerEventData PointerAt(EventSystem events, Button button)
+        {
+            RectTransform rect = (RectTransform)button.transform;
+            Canvas canvas = button.GetComponentInParent<Canvas>();
+            Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            return new PointerEventData(events)
+            {
+                button = PointerEventData.InputButton.Left,
+                position = RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(rect.rect.center))
+            };
+        }
+
+        private static async UniTask ValidateBuildingCapacity(Context c)
+        {
+            int limit = c.Controller.BuildLimit;
+            Check(limit > 0, "actual initial core has a configured positive construction limit: " + limit);
+            int originalCount = c.Controller.BuiltCount;
+            var built = new List<BuildingSlot>();
+            BuildingSlot reserved = c.Slots.LastOrDefault(IsEmpty);
+            Check(reserved != null, "an empty slot is reserved before filling construction capacity");
+            BuildingInteractionState heldState = c.Controller.QueryInteraction(reserved);
+            BuildingData heldCandidate = heldState.Candidates.First(candidate => candidate.HasValidCost).Data;
+            BuildingInteractionTarget heldTarget = heldState.Target;
+            try
+            {
+                while (c.Controller.HasBuildCapacity)
+                {
+                    BuildingSlot target = Array.Find(c.Slots, slot => slot != reserved && IsEmpty(slot));
+                    Check(target != null, "a real empty slot remains while filling the unchanged core limit");
+                    Select(c, target);
+                    string id = CapacityCandidate(c);
+                    CatalogClick(c, id);
+                    Fund(c, c.Quote.Build);
+                    int previousCount = c.Controller.BuiltCount;
+                    Click(ActionButton(c, "_build"), "build capacity fixture");
+                    Check(target.IsOccupied && c.Controller.BuiltCount == previousCount + 1,
+                        "one actual build increments the ordinary-building census once");
+                    built.Add(target);
+                    await UniTask.NextFrame();
+                }
+                Check(c.Controller.BuiltCount == limit && !c.Controller.HasBuildCapacity,
+                    "the configured core limit is reached without counting the core itself");
+                BuildingSlot extra = reserved;
+                Check(extra != null, "an empty slot exists for the over-limit rejection check");
+                Select(c, extra);
+                CatalogClick(c, heldCandidate.BuildingId);
+                Fund(c, c.Quote.Build);
+                var balance = Balance(c);
+                ActionButton(c, "_build").onClick.Invoke();
+                Check(!extra.IsOccupied && c.Controller.BuiltCount == limit && Balance(c) == balance && !c.Actions.IsRequestPending,
+                    "over-limit UI request cannot occupy a slot, charge currency, or leave its request pending");
+                BuildingInteractionResult capped = c.Controller.TryExecuteInteraction(heldTarget,
+                    BuildingInteractionAction.Build, heldCandidate);
+                Check(capped.Failure == BuildingInteractionFailure.BuildCapacity && !capped.MayHaveChangedState &&
+                    !extra.IsOccupied && Balance(c) == balance && c.Controller.BuiltCount == limit,
+                    "a target captured before capacity fills is rejected again by the execution API");
+                if (built.Count > 0)
+                {
+                    BuildingSlot released = built[built.Count - 1];
+                    SelectOccupied(c, released);
+                    Click(ActionButton(c, "_dismantle"), "release capacity fixture");
+                    await UniTask.NextFrame();
+                    Check(!released.IsOccupied && c.Controller.BuiltCount == limit - 1 && c.Controller.HasBuildCapacity,
+                        "demolition releases exactly one construction capacity");
+                    Select(c, extra);
+                    CatalogClick(c, CapacityCandidate(c));
+                    Fund(c, c.Quote.Build);
+                    Click(ActionButton(c, "_build"), "reuse released capacity");
+                    Check(extra.IsOccupied && c.Controller.BuiltCount == limit,
+                        "the freed capacity permits one new building through the UI");
+                    built.Add(extra);
+                }
+            }
+            finally
+            {
+                foreach (BuildingSlot slot in built)
+                    if (slot != null && slot.IsOccupied) c.Controller.TryDemolish(slot);
+                c.Building.ClearSelection();
+            }
+            await UniTask.NextFrame();
+            Check(c.Controller.BuiltCount == originalCount,
+                "capacity fixture restores the original occupied-slot census before upgrades");
+        }
+
+        private static string CapacityCandidate(Context c)
+        {
+            var data = Read<Dictionary<string, BuildingData>>(c.Building, "_byId");
+            foreach (BuildingCatalogItem item in Read<List<BuildingCatalogItem>>(c.Catalog, "_items"))
+                if (item.GoldCost.HasValue && data[item.Id].HasWorldVisual) return item.Id;
+            throw new InvalidOperationException("No unchanged valid building candidate for the capacity check.");
+        }
+
         private static async UniTask ValidateReinitialization(Context c)
         {
             object wallet = Read<object>(c.Wallet, "_wallet");
@@ -133,8 +304,11 @@ namespace Game.UI.InGame.Editor
             GamePhase phase = c.Flow.CurPhase;
             string subscribers = SubscriberSnapshot(c);
 
+            EventSystem.current.SetSelectedGameObject(Read<Button>(c.Hud, "_waveStartButton").gameObject);
             c.UI.gameObject.SetActive(false);
             await UniTask.NextFrame();
+            Check(EventSystem.current.currentSelectedGameObject == null,
+                "disabling the UI root clears the previous HUD keyboard selection");
             c.UI.gameObject.SetActive(true);
             await UniTask.NextFrame();
             AssertSameInitialization(c, wallet, inventory, balances, node, phase, subscribers, "root reactivation");
@@ -172,18 +346,15 @@ namespace Game.UI.InGame.Editor
 
             BuildingSlot empty = Array.Find(c.Slots, IsEmpty);
             Check(empty != null, "reactivation probe has an actual empty slot");
-            int shown = 0;
-            Action<UIScreen> onShown = screen => shown++;
-            c.Catalog.Popup.Shown += onShown;
             try
             {
                 Select(c, empty);
-                Check(shown == 1 && c.Building.SelectedSlot == empty && c.Catalog.Popup.IsVisible,
-                    "one world selection opens the catalog once after every reinitialization path");
+                Check(c.UI.OpenPopupCount == 1 && c.UI.TopPopup == c.Catalog.Popup &&
+                    c.Building.SelectedSlot == empty && c.Catalog.Popup.IsVisible,
+                    "one world selection leaves exactly one catalog entry after every reinitialization path");
             }
             finally
             {
-                c.Catalog.Popup.Shown -= onShown;
                 c.Building.ClearSelection();
             }
         }
@@ -211,9 +382,6 @@ namespace Game.UI.InGame.Editor
             AddSubscribers(lines, c.Controller, "SlotSelected");
             AddSubscribers(lines, c.Controller, "SlotDeselected");
             AddSubscribers(lines, c.Hud, "WaveStartRequested");
-            AddSubscribers(lines, c.Hud, "ContinueRequested");
-            AddSubscribers(lines, c.Hud, "RestartRequested");
-            AddSubscribers(lines, c.Reward, "Completed");
             AddSubscribers(lines, c.RewardView, "_choiceRequested");
             AddSubscribers(lines, c.Actions, "_actionRequested");
             lines.Sort(StringComparer.Ordinal);
@@ -309,6 +477,7 @@ namespace Game.UI.InGame.Editor
                 "upgrade UI quote matches the unchanged controller cost for " + previous.BuildingId + " -> " + next.BuildingId);
             var before = Balance(c);
             int requests = 0;
+            BuildingInteractionTarget previousTarget = c.Controller.QueryInteraction(slot, next).Target;
             Action<BuildingActionRequest> requested = request => requests++;
             c.Actions.ActionRequested += requested;
             try { Click(ActionButton(c, "_upgrade"), "Upgrade " + previous.BuildingId); }
@@ -319,6 +488,13 @@ namespace Game.UI.InGame.Editor
                 "upgrade deducts Gold " + gold + " and Gem " + gems + " exactly once");
             Check(c.Screen(UIId.BuildingInfo).IsVisible && c.Building.SelectedSlot == slot,
                 "upgrade retains the original selected-slot and open-details behavior");
+            Building replacement = slot.CurrentBuilding;
+            var afterUpgrade = Balance(c);
+            BuildingInteractionResult stale = c.Controller.TryExecuteInteraction(previousTarget,
+                BuildingInteractionAction.Demolish);
+            Check(stale.Failure == BuildingInteractionFailure.TargetChanged && !stale.MayHaveChangedState &&
+                ReferenceEquals(slot.CurrentBuilding, replacement) && Balance(c) == afterUpgrade,
+                "the old occupied target cannot demolish or refund the replacement building");
             if (core) Check(next.CoreLevel > previous.CoreLevel && c.Core.CurrentLevel == next.CoreLevel,
                 "core progress observes the higher original tier");
             await UniTask.NextFrame();
@@ -328,106 +504,27 @@ namespace Game.UI.InGame.Editor
 
         private static async UniTask ValidateContentFixture(Context c, GamePhase phase, PostBattleEventType content)
         {
-            Check(c.Flow.CanEnterBuildMode() && !c.Gate.IsWaitingForPostBattleContent && !c.Artifacts.IsSelectingReward,
-                phase + " UI fixture starts without a pending game operation");
-            GamePhase previous = c.Flow.CurPhase;
-            Node node = c.Flow.CurrentNode;
             var balance = Balance(c);
+            Node node = c.Flow.CurrentNode;
+            Note("UI FIXTURE", phase + " uses the explicit continue request; game phase/node are unchanged.");
             using (var cancellation = new CancellationTokenSource())
             {
-                UniTask pending = c.Gate.WaitPostBattleContentAsync(new Node(node.WaveNumber, node.Preset, content), cancellation.Token);
-                bool observed = false;
-                try
-                {
-                    Note("UI FIXTURE", phase + " uses a temporary CurPhase and RunFlowPresenter notification only; the real node and global PhaseChanged event are not modified/published.");
-                    Set(c.Flow, "_curPhase", phase);
-                    Invoke(c.RunFlow, "HandlePhaseChanged", phase);
-                    Check(c.Gate.IsWaitingForPostBattleContent && c.Screen(UIId.WaveReward).IsVisible,
-                        phase + " displays a continuation prompt for the real content gate");
-                    Check(!c.UI.CloseTop() && c.Screen(UIId.WaveReward).IsVisible,
-                        phase + " mandatory prompt rejects ESC CloseTop");
-                    Click(Read<UnityEngine.UI.Button>(c.Hud, "_continueButton"), phase + " Continue");
-                    await WaitFor(() => pending.Status != UniTaskStatus.Pending, phase + " content completion");
-                    observed = true;
-                    await pending;
-                    Check(!c.Gate.IsWaitingForPostBattleContent && !c.Screen(UIId.WaveReward).IsVisible,
-                        phase + " button completes the current gate and closes its prompt");
-                }
-                finally
-                {
-                    cancellation.Cancel();
-                    if (!observed) await pending.SuppressCancellationThrow();
-                    RestoreFixturePhase(c, previous);
-                }
+                UniTask pending = c.Continue.ShowAsync(phase == GamePhase.Event ? "이벤트 진행 대기" : "상점 진행 대기", cancellation.Token);
+                Check(c.Screen(UIId.WaveReward).IsVisible && !c.UI.CloseTopPopup(), phase + " request opens a required prompt");
+                Click(Read<UnityEngine.UI.Button>(c.Continue, "_continueButton"), phase + " Continue");
+                await pending;
+                Check(!c.Screen(UIId.WaveReward).IsVisible, phase + " confirmation closes before returning");
             }
-            Check(ReferenceEquals(c.Flow.CurrentNode, node) && Balance(c) == balance,
-                phase + " fixture preserves actual node progression and currency");
+            Check(ReferenceEquals(c.Flow.CurrentNode, node) && Balance(c) == balance, phase + " fixture changes neither node nor currency");
         }
 
         private static async UniTask ValidateEmptyRewardFixture(Context c)
         {
-            Check(c.Flow.CanEnterBuildMode() && !c.Artifacts.IsSelectingReward,
-                "empty reward fixture starts outside an actual selection");
             var balance = Balance(c);
-            object inventory = c.Artifacts.Instances;
-            int inventoryCount = c.Artifacts.Instances.Count;
-            GamePhase phase = c.Flow.CurPhase;
-            bool toggle = Read<bool>(c.Gate, "_toggle");
-            UniTask<bool> selection = c.Artifacts.TestSelectAndApplyAsync(Array.Empty<ArtifactData>(), CancellationToken.None);
-            Check(selection.Status != UniTaskStatus.Pending && await selection && !c.Artifacts.IsSelectingReward,
-                "existing ArtifactManager empty-candidate API completes immediately without opening selection");
-
-            using (var cancellation = new CancellationTokenSource())
-            {
-                UniTask gate = c.Gate.WaitToggle(cancellation.Token);
-                bool observed = false;
-                try
-                {
-                    Note("UI FIXTURE", "Reward uses the existing empty-candidate API and a temporary presenter-only phase; global Reward is not published, so no fake wave currency is granted.");
-                    Set(c.Flow, "_curPhase", GamePhase.Reward);
-                    Invoke(c.RunFlow, "HandlePhaseChanged", GamePhase.Reward);
-                    Check(c.Screen(UIId.WaveReward).IsVisible && !c.RewardView.IsVisible,
-                        "empty candidate reward still shows its initial continuation prompt");
-                    int frame = Time.frameCount;
-                    Click(Read<UnityEngine.UI.Button>(c.Hud, "_continueButton"), "empty reward Continue");
-                    Check(gate.Status == UniTaskStatus.Pending && !c.RewardView.IsVisible,
-                        "empty reward Continue preserves the required next-frame handoff");
-                    Check(Read<bool>(c.RunFlow, "_rewardAcknowledged"),
-                        "Continue marks the reward prompt acknowledged before reinitialization");
-                    c.InitializeUI();
-                    Check(c.UI.IsReady && c.Screen(UIId.WaveReward).IsVisible &&
-                        !c.RewardView.IsVisible && gate.Status == UniTaskStatus.Pending,
-                        "Initialize during an acknowledged reward restores its prompt without completing the gate");
-                    Check(!Read<bool>(c.RunFlow, "_rewardAcknowledged") &&
-                        !Read<bool>(c.RunFlow, "_pendingArtifactOpen"),
-                        "reward reinitialization resets both presenter handoff flags");
-                    frame = Time.frameCount;
-                    Click(Read<UnityEngine.UI.Button>(c.Hud, "_continueButton"), "restored empty reward Continue");
-                    await WaitFor(() => gate.Status != UniTaskStatus.Pending, "empty reward gate completion");
-                    observed = true;
-                    await gate;
-                    Check(Time.frameCount > frame && !c.RewardView.IsVisible && !c.Screen(UIId.WaveReward).IsVisible,
-                        "next-frame empty candidate handling completes the real gate without an artifact popup");
-                }
-                finally
-                {
-                    cancellation.Cancel();
-                    if (!observed) await gate.SuppressCancellationThrow();
-                    Set(c.Gate, "_toggle", toggle);
-                    RestoreFixturePhase(c, phase);
-                }
-            }
-            Check(Balance(c) == balance && ReferenceEquals(c.Artifacts.Instances, inventory) &&
-                c.Artifacts.Instances.Count == inventoryCount,
-                "empty reward fixture grants neither extra currency nor an artifact");
-        }
-
-        private static void RestoreFixturePhase(Context c, GamePhase phase)
-        {
-            if (c.Flow == null) return;
-            Set(c.Flow, "_curPhase", phase);
-            Invoke(c.RunFlow, "HandlePhaseChanged", phase);
-            c.HudPresenter.Refresh();
+            int count = c.Artifacts.Instances.Count;
+            Check(await c.Artifacts.TestSelectAndApplyAsync(Array.Empty<ArtifactData>(), CancellationToken.None), "empty candidates complete without UI selection");
+            Check(!c.RewardView.IsVisible && !c.Artifacts.IsSelectingReward && Balance(c) == balance && c.Artifacts.Instances.Count == count,
+                "empty candidate contract grants no additional currency or artifact");
         }
 
         private static void Select(Context c, BuildingSlot slot) => Invoke(c.Controller, "NotifySlotSelected", slot);
