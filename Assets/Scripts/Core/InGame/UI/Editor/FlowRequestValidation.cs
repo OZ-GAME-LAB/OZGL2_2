@@ -25,9 +25,11 @@ namespace Game.UI.InGame.EditorTools
         public static async UniTask ValidateAsync()
         {
             var checks = new List<string>();
+            var fontCopies = new List<UnityEngine.Object>();
             Scene activeScene = SceneManager.GetActiveScene();
             Scene preview = EditorSceneManager.NewPreviewScene();
             GameObject host = new GameObject("Flow request contract validation");
+            host.SetActive(false);
             SceneManager.MoveGameObjectToScene(host, preview);
             try
             {
@@ -55,15 +57,13 @@ namespace Game.UI.InGame.EditorTools
 
                 var settlement = settlementScreen.gameObject.AddComponent<SettlementView>();
                 Set(settlement, "_screen", settlementScreen);
-                Set(settlement, "_root", settlementScreen.Root);
-                foreach (string field in new[] { "_title", "_totems", "_progress", "_artifacts", "_score", "_bloodstone", "_gaugeText", "_notice" })
+                foreach (string field in new[] { "_progress", "_artifacts", "_bloodstone" })
                     Set(settlement, field, Label(settlementScreen.Root.transform, field));
-                var fill = new GameObject("Gauge", typeof(RectTransform));
-                fill.transform.SetParent(settlementScreen.Root.transform, false);
-                Set(settlement, "_gaugeFill", fill.GetComponent<RectTransform>());
                 var mainButton = Button(settlementScreen.Root.transform, "Main");
                 Set(settlement, "_mainButton", mainButton);
 
+                Game.UI.InGame.Editor.InGameUIValidation.PrepareFontsForRoots(new[] { host }, fontCopies);
+                host.SetActive(true);
                 Check(manager.InitializeScreens(), "UI requests initialize without game managers", checks);
                 await ValidateContinue(manager, continueView, continueScreen, continueText, continueButton, checks);
                 await ValidateDecision(manager, decision, decisionScreen, decisionText, finishButton, nextButton, checks);
@@ -82,6 +82,8 @@ namespace Game.UI.InGame.EditorTools
             finally
             {
                 EditorSceneManager.ClosePreviewScene(preview);
+                for (int i = fontCopies.Count - 1; i >= 0; i--)
+                    if (fontCopies[i] != null) UnityEngine.Object.DestroyImmediate(fontCopies[i]);
             }
         }
 
@@ -171,20 +173,36 @@ namespace Game.UI.InGame.EditorTools
             UIScreen screen, UnityEngine.UI.Button button, List<string> checks)
         {
             IRunSettlementUI contract = view;
-            var data = new RunSettlementViewData(true, "토템 ×1.2", "3분기", "희귀 2개", 1234, 120, 4, 10);
-            UniTask pending = contract.ShowAndWaitAsync(data, CancellationToken.None);
+            var stats = new RunStats { MaxQuarter = 3, MaxWave = 5, ClearWaveCount = 15, ClearBossCount = 3 };
+            stats.Artifacts.Add(ArtifactRarity.Common, 7);
+            stats.Artifacts.Add(ArtifactRarity.Rare, 2);
+            stats.Artifacts.Add(ArtifactRarity.Legendary, 1);
+            var summary = new RunSummary(stats);
+            UniTask pending = contract.ShowAndWaitAsync(summary, 1234, CancellationToken.None);
             var oldClosed = Read<Action<UIScreen, UICloseReason>>(screen, "Closed");
-            Check(Read<TMP_Text>(view, "_score").text == 1234.ToString("N0") &&
-                Read<TMP_Text>(view, "_bloodstone").text == $"획득 혈석  {120:N0}" &&
-                Mathf.Approximately(Read<RectTransform>(view, "_gaugeFill").anchorMax.x, .4f),
-                "settlement displays prepared score, bloodstones and gauge without calculating rewards", checks);
-            await RejectDuplicate(contract.ShowAndWaitAsync(data, CancellationToken.None), checks);
+            Check(Read<TMP_Text>(view, "_progress").text == "3분기 · 5웨이브" &&
+                Read<TMP_Text>(view, "_artifacts").text == "일반 7개\n희귀 2개\n전설 1개\n신화 0개" &&
+                Read<TMP_Text>(view, "_bloodstone").text == 1234.ToString("N0"),
+                "settlement displays RunSummary progress, four rarity counts and the supplied bloodstone amount", checks);
+            Check(view.IsPending && screen.IsVisible && pending.Status == UniTaskStatus.Pending &&
+                !manager.CloseTopPopup(), "settlement waits for confirmation and cannot close through ESC", checks);
+            await RejectDuplicate(contract.ShowAndWaitAsync(summary, 9999, CancellationToken.None), checks);
+            Check(Read<TMP_Text>(view, "_bloodstone").text == 1234.ToString("N0"),
+                "duplicate settlement does not replace the amount being confirmed", checks);
             button.onClick.Invoke();
             button.onClick.Invoke();
             await pending;
             Check(!view.IsPending && !screen.IsVisible, "settlement confirmation finishes after cleanup", checks);
 
-            pending = contract.ShowAndWaitAsync(data, CancellationToken.None);
+            pending = contract.ShowAndWaitAsync(new RunSummary(new RunStats()), 0, CancellationToken.None);
+            Check(Read<TMP_Text>(view, "_progress").text == "클리어 기록 없음" &&
+                Read<TMP_Text>(view, "_artifacts").text == "일반 0개\n희귀 0개\n전설 0개\n신화 0개" &&
+                Read<TMP_Text>(view, "_bloodstone").text == "0",
+                "an empty run displays no clear record and explicit zero counts", checks);
+            button.onClick.Invoke();
+            await pending;
+
+            pending = contract.ShowAndWaitAsync(summary, 1234, CancellationToken.None);
             oldClosed?.Invoke(screen, UICloseReason.ContextLost);
             Check(pending.Status == UniTaskStatus.Pending,
                 "an old screen callback cannot cancel a new settlement", checks);
@@ -192,14 +210,26 @@ namespace Game.UI.InGame.EditorTools
             await ExpectCanceled(pending, checks);
             using (var cancellation = new CancellationTokenSource())
             {
-                pending = contract.ShowAndWaitAsync(data, cancellation.Token);
+                pending = contract.ShowAndWaitAsync(summary, 1234, cancellation.Token);
                 cancellation.Cancel();
                 await ExpectCanceled(pending, checks);
+                await ExpectCanceled(contract.ShowAndWaitAsync(summary, 1234, cancellation.Token), checks);
+                Check(!screen.IsVisible, "an already canceled settlement does not reopen", checks);
             }
-            pending = contract.ShowAndWaitAsync(data, CancellationToken.None);
+            await RejectArgument(contract.ShowAndWaitAsync(null, 1234, CancellationToken.None), checks);
+            await RejectArgument(contract.ShowAndWaitAsync(summary, -1, CancellationToken.None), checks);
+            Check(!screen.IsVisible && !view.IsPending, "invalid settlement data does not start a request", checks);
+            pending = contract.ShowAndWaitAsync(summary, 1234, CancellationToken.None);
             Disable(view);
             await ExpectCanceled(pending, checks);
             Check(!view.IsPending && !screen.IsVisible, "settlement cancels cleanly on closure, token and disable", checks);
+        }
+
+        private static async UniTask RejectArgument(UniTask task, List<string> checks)
+        {
+            try { await task; }
+            catch (ArgumentException) { Check(true, "invalid settlement argument is rejected", checks); return; }
+            throw new InvalidOperationException("Invalid settlement argument was accepted.");
         }
 
         private static async UniTask RejectDuplicate(UniTask task, List<string> checks)
@@ -247,9 +277,9 @@ namespace Game.UI.InGame.EditorTools
 
         private static TMP_Text Label(Transform parent, string name)
         {
-            var label = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            var label = new GameObject(name, typeof(RectTransform));
             label.transform.SetParent(parent, false);
-            return label.GetComponent<TMP_Text>();
+            return label.AddComponent<TextMeshProUGUI>();
         }
 
         private static UnityEngine.UI.Button Button(Transform parent, string name)

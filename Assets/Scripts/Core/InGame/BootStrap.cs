@@ -36,7 +36,12 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
+    [Header("Save")]
     [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
+    [SerializeField] private PersistentSaveCoordinator _persistentSaveCoordinator;
+    [SerializeField] private SaveManager _saveManager;
+    
+    [SerializeField] private OutGameTraitController _persistentTraits;
     // [SerializeField] private TeamBuildingUiStartup _uiManager;
     [SerializeField] private InGameUIManager _inGameUIManager;
     [Header("UI Connections")]
@@ -83,13 +88,16 @@ public class BootStrap : MonoBehaviour
             context.SelectedAltar = AltarId.Abundance;
         }
 
+        if (!InitializePersistentData()) return;
+
         _testScript.Initialize(_gameFlowController, _waveController);
         _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager, _artifactSelectionUI);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier);
+        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier,
+            _settlementUI, _persistentSaveCoordinator);
         _archiveManager.Initialize(_artifactManager,_runtimeUnitManager,_waveController);
         _cameraController.Initialize(_buildController,_gameFlowController);
         var buildingSlots = new List<BuildingSlot>();
@@ -127,6 +135,18 @@ public class BootStrap : MonoBehaviour
         }
     }
 
+    // 저장용 특성은 런 효과용 선택 목록과 별개다. 파일에서 복원한 특성을 그대로 보존한다.
+    private bool InitializePersistentData()
+    {
+        _persistentCurrencyManager.Initialize();
+        _persistentTraits.Initialize(_persistentCurrencyManager, _persistentSaveCoordinator);
+        _persistentSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager);
+        if (_persistentSaveCoordinator.TryLoadOrCreate(out string error)) 
+            return true;
+        Debug.LogError("[BootStrap] 영구 데이터 초기화 실패: " + error, this);
+        return false;
+    }
+
     // 화면 등록과 게임 연결은 별도로 확인합니다. 이 단계에서는 게임을 시작하거나 재화를 지급하지 않습니다.
     public bool InitializeUI(BuildingSlot[] slots)
     {
@@ -153,6 +173,12 @@ public class BootStrap : MonoBehaviour
     private bool ValidateReferences()
     {
         bool valid = true;
+        if (_persistentCurrencyManager == null || _runSettlementManager == null || _saveManager == null ||
+            _persistentSaveCoordinator == null || _persistentTraits == null)
+        {
+            Debug.LogError("[BootStrap] 정산 매니저·혈석 지갑·SaveManager·영구 저장·특성 데이터 참조를 연결해주세요.", this);
+            valid = false;
+        }
         if (_inGameUIManager == null)
         {
             Debug.LogError("[BootStrap] _inGameUIManager 참조가 없습니다. 새 UI 루트를 연결해주세요.", this);

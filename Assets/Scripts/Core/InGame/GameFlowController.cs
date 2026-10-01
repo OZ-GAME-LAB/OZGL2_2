@@ -6,6 +6,7 @@ using Cysharp.Threading.Tasks;
 using Game.Cameras;
 using Game.UI;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Game.Core
 {
@@ -56,6 +57,8 @@ namespace Game.Core
     /// </summary>
     public class GameFlowController : MonoBehaviour, ISaveDataProvider<GameFlowSaveData>
     {
+        private const string MainMenuScene = "OutGameSetupTest";
+
         [Header("테스트용 종료 연출 시간입니다. Play 모드에서 조절하세요.")]
         [Min(0)]
         public float StagingTime = 0.5f;
@@ -214,6 +217,7 @@ namespace Game.Core
         private async UniTask ReturnToMainMenuAsync()
         {
             var pendingSpawn = _spawnCompletion?.Task ?? UniTask.CompletedTask;
+            _isResetting = true;
             _isTransitioning = true;
             ClearToken();
             var token = _cts.Token;
@@ -224,8 +228,7 @@ namespace Game.Core
                 // 스포너의 배치 공간 정리까지 끝난 후 런타임을 비운다.
                 await pendingSpawn;
                 token.ThrowIfCancellationRequested();
-                _isTransitioning = false;
-                //TODO : 메인화면으로 씬 이동
+                await SceneManager.LoadSceneAsync(MainMenuScene);
             }
             finally
             {
@@ -325,9 +328,12 @@ namespace Game.Core
                 await CleanupBattleAsync(token);
                 token.ThrowIfCancellationRequested(); 
                 //게임 종료
-                FinishRun(result);
+                await FinishRun(result, token);
                 return;
             }
+            // 승리를 확정한 현재 노드의 기록을 다음 노드로 이동하기 전에 한 번 알린다.
+            _waveController.NotifyWaveCleared(new WaveInfo(CurrentQuarter, completedNode.WaveNumber,
+                completedNode.BattleType, completedNode.PostBattleEvent));
             //분기 마지막 웨이브가 아닐경우 그대로 보상처리 후 진행
             if (!IsLastNode)
             {
@@ -390,7 +396,7 @@ namespace Game.Core
 
                     if (_runDecision.Value == RunDecision.Finish)
                     {
-                        FinishRun(ResultType.Victory);
+                        await FinishRun(ResultType.Victory, token);
                         return;
                     }
                 }
@@ -453,22 +459,36 @@ namespace Game.Core
         }
 
         // 게임 종료 및 내부 상태 관리
-        private void FinishRun(ResultType type)
+        private async UniTask FinishRun(ResultType type, CancellationToken token)
         {
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
-            ChangePhase(GamePhase.Finished);
-            _archiveManager.CompleteRun();
+            token.ThrowIfCancellationRequested();
+            if (_archiveManager == null || _settlementRewards == null)
+                throw new InvalidOperationException("게임 종료 기록과 정산 매니저를 먼저 연결해주세요.");
+
+            // 재시도에도 같은 확정 기록을 사용해야 이미 저장한 보상을 다시 지급하지 않는다.
             if (!_archiveManager.TryGetRunSummary(out RunSummary summary))
             {
-                Debug.LogError("[GameFlowController : FinishRun] 게임 결산을 불러올 수 없습니다!");
-                //바로 메인화면 보내기
-                return;
+                _archiveManager.CompleteRun();
+                if (!_archiveManager.TryGetRunSummary(out summary))
+                    throw new InvalidOperationException("게임 결산 기록을 불러올 수 없습니다.");
             }
 
-            _settlementRewards.TryApplyReward(summary);
-            
-            //메인화면 이동
+            while (!await _settlementRewards.TryApplyReward(summary, token))
+            {
+                token.ThrowIfCancellationRequested();
+                if (_continueUI == null)
+                    throw new InvalidOperationException("정산 실패 안내 UI를 먼저 연결해주세요.");
+                await _continueUI.ShowAsync("정산을 완료하지 못했습니다.\n계속 버튼을 누르면 다시 시도합니다.", token);
+            }
+            token.ThrowIfCancellationRequested();
+
+            // Finished를 먼저 보내면 제단·특성 효과가 해제되어 정산 배율이 사라진다.
+            ChangePhase(GamePhase.Finished);
+            if (_artifactManager != null && _artifactManager.IsInitialized && !_artifactManager.TryEndRun())
+                throw new InvalidOperationException("정산 후 유물 상태를 정리하지 못했습니다.");
+            await ReturnToMainMenuAsync();
         }
 
         private void ChangePhase(GamePhase phase)

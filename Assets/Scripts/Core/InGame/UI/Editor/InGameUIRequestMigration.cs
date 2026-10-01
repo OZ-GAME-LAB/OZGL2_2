@@ -17,6 +17,8 @@ namespace Game.UI.InGame.Editor
     public static class InGameUIRequestMigration
     {
         private const string Folder = "Assets/Prefabs/UI/Test/";
+        private const string SettlementFrameName = "RunSettlementFrame";
+        private const string SettlementContent = "Window/SummaryBox/ProgressColumn/ArtifactScrollView/Viewport/Content";
 
         [MenuItem("Game/UI/InGame/Connect Request UI")]
         public static void Apply()
@@ -91,20 +93,93 @@ namespace Game.UI.InGame.Editor
 
         private static SettlementView ConfigureSettlement(UIScreen screen)
         {
+            if (screen == null) throw new InvalidOperationException("RunResult 화면이 없습니다.");
+            GameObject frame = screen.transform.Find(SettlementFrameName)?.gameObject;
+            bool hostWasActive = screen.gameObject.activeSelf;
+            screen.gameObject.SetActive(false);
+            try
+            {
+                // 활성 프리팹의 TMP가 원본 폰트에 글리프를 추가하기 전에 Host부터 비활성화한다.
+                if (frame == null)
+                {
+                    var asset = AssetDatabase.LoadAssetAtPath<GameObject>(Folder + SettlementFrameName + ".prefab");
+                    if (asset == null) throw new InvalidOperationException("저장된 결산 프레임 프리팹이 없습니다.");
+                    frame = (GameObject)PrefabUtility.InstantiatePrefab(asset, screen.transform);
+                    frame.name = SettlementFrameName;
+                }
+                frame.SetActive(false);
+
+                // 기존 표시 자식과 원본 에셋을 보존하며, 활성 Host 아래 표시 루트만 교체한다.
+                if (screen.Root != null && screen.Root != screen.gameObject && screen.Root != frame)
+                {
+                    screen.Root.SetActive(false);
+                    RecordOverride(screen.Root);
+                }
+            }
+            finally
+            {
+                if (frame != null) frame.SetActive(false);
+                screen.gameObject.SetActive(hostWasActive);
+            }
+            screen.gameObject.SetActive(true);
+            CanvasGroup input = GetOrAdd<CanvasGroup>(frame);
+            input.alpha = 1;
+            input.interactable = false;
+            input.blocksRaycasts = false;
+            Set(screen, "_root", frame);
+            Set(screen, "_inputGroup", input);
+            SetBool(screen, "_canCloseByUser", false);
+            SetBool(screen, "_blocksHudInput", true);
+
             SettlementView view = GetOrAdd<SettlementView>(screen.gameObject);
+            view.enabled = true;
             Set(view, "_screen", screen);
-            Set(view, "_root", screen.Root);
-            Set(view, "_title", At<TMP_Text>(screen, "RunResult/Window/Title"));
-            Set(view, "_totems", At<TMP_Text>(screen, "RunResult/Window/TotemColumn/ScrollableContent/Totems"));
-            Set(view, "_progress", At<TMP_Text>(screen, "RunResult/Window/ProgressColumn/ScrollableContent/Progress"));
-            Set(view, "_artifacts", At<TMP_Text>(screen, "RunResult/Window/ProgressColumn/ScrollableContent/Artifacts"));
-            Set(view, "_score", At<TMP_Text>(screen, "RunResult/Window/ScoreColumn/Score"));
-            Set(view, "_bloodstone", At<TMP_Text>(screen, "RunResult/Window/Bloodstones"));
-            Set(view, "_gaugeText", At<TMP_Text>(screen, "RunResult/Window/BloodstoneGauge"));
-            Set(view, "_gaugeFill", At<RectTransform>(screen, "RunResult/Window/BloodstoneTrack/Fill"));
-            Set(view, "_notice", At<TMP_Text>(screen, "RunResult/Window/SettlementNotice"));
-            Set(view, "_mainButton", At<Button>(screen, "RunResult/Window/MainMenu"));
+            Set(view, "_progress", At<TMP_Text>(screen, SettlementFrameName + "/Window/SummaryBox/ProgressColumn/ProgressValue"));
+            Set(view, "_artifacts", ConfigureArtifactCounts(frame));
+            Set(view, "_bloodstone", At<TMP_Text>(screen, SettlementFrameName + "/Window/SummaryBox/BloodstoneReward/Value"));
+            Set(view, "_mainButton", At<UnityEngine.UI.Button>(screen, SettlementFrameName + "/Window/SummaryBox/Footer/MainMenuButton"));
+            RecordOverride(screen.gameObject);
+            RecordOverride(frame);
+            RecordOverride(input);
+            RecordOverride(view);
             return view;
+        }
+
+        private static TMP_Text ConfigureArtifactCounts(GameObject frame)
+        {
+            Transform content = frame.transform.Find(SettlementContent) ??
+                throw new InvalidOperationException("결산 유물 스크롤 Content가 없습니다.");
+            Transform existing = content.Find("ArtifactCounts");
+            if (existing != null)
+                return existing.GetComponent<TMP_Text>() ??
+                    throw new InvalidOperationException("ArtifactCounts에 TMP 텍스트가 없습니다.");
+
+            TMP_FontAsset font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Data/UI/Player/PlayerUIFont.asset");
+            if (font == null) throw new InvalidOperationException("기존 PlayerUIFont를 찾을 수 없습니다.");
+            var label = new GameObject("ArtifactCounts", typeof(RectTransform));
+            label.SetActive(false);
+            label.transform.SetParent(content, false);
+            TMP_Text text = label.AddComponent<TextMeshProUGUI>();
+            var layout = label.AddComponent<UnityEngine.UI.LayoutElement>();
+            var rect = label.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(0, 120);
+            text.font = font;
+            text.fontSize = 18;
+            text.enableAutoSizing = false;
+            text.alignment = TextAlignmentOptions.TopLeft;
+            text.color = new Color32(48, 48, 48, 255);
+            text.raycastTarget = false;
+            text.lineSpacing = 8;
+            text.text = "일반 0개\n희귀 0개\n전설 0개\n신화 0개";
+            layout.preferredHeight = 120;
+            layout.minHeight = 120;
+            layout.flexibleWidth = 1;
+            label.SetActive(true); // 표시 프레임은 계속 비활성이므로 원본 폰트의 글리프를 생성하지 않는다.
+            return text;
         }
 
         private static void ConnectBootstrap(BootStrap bootstrap, InGameUIManager manager)
@@ -146,9 +221,21 @@ namespace Game.UI.InGame.Editor
                     throw new InvalidOperationException("화면 표시 루트 또는 Canvas 구조가 올바르지 않습니다.");
             foreach (MonoBehaviour component in root.GetComponentsInChildren<MonoBehaviour>(true))
                 if (component == null) throw new InvalidOperationException("Missing Script가 있습니다.");
+            UIScreen settlement = screens.Single(screen => screen.Id == UIId.RunResult);
+            if (settlement.Root.name != SettlementFrameName || !settlement.gameObject.activeSelf ||
+                settlement.CanCloseByUser || !settlement.BlocksHudInput)
+                throw new InvalidOperationException("결산 프레임 또는 필수 확인 화면 설정이 올바르지 않습니다.");
+            var settlementData = new SerializedObject(settlement.GetComponent<SettlementView>());
+            foreach (string field in new[] { "_screen", "_progress", "_artifacts", "_bloodstone", "_mainButton" })
+                if (settlementData.FindProperty(field)?.objectReferenceValue == null)
+                    throw new InvalidOperationException("결산 표시 참조가 없습니다: " + field);
         }
 
-        private static T GetOrAdd<T>(GameObject host) where T : Component => host.GetComponent<T>() ?? host.AddComponent<T>();
+        private static T GetOrAdd<T>(GameObject host) where T : Component
+        {
+            T component = host.GetComponent<T>();
+            return component != null ? component : host.AddComponent<T>();
+        }
         private static T At<T>(UIScreen screen, string path) where T : Component =>
             screen.transform.Find(path)?.GetComponent<T>() ?? throw new InvalidOperationException("표시 참조가 없습니다: " + path);
         private static void Set(Object target, string field, Object value)
@@ -158,6 +245,20 @@ namespace Game.UI.InGame.Editor
             var property = data.FindProperty(field) ?? throw new InvalidOperationException("필드가 없습니다: " + field);
             property.objectReferenceValue = value;
             data.ApplyModifiedPropertiesWithoutUndo();
+            if (PrefabUtility.IsPartOfPrefabInstance(target)) PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+        }
+
+        private static void SetBool(Object target, string field, bool value)
+        {
+            var data = new SerializedObject(target);
+            var property = data.FindProperty(field) ?? throw new InvalidOperationException("필드가 없습니다: " + field);
+            property.boolValue = value;
+            data.ApplyModifiedPropertiesWithoutUndo();
+            if (PrefabUtility.IsPartOfPrefabInstance(target)) PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+        }
+
+        private static void RecordOverride(Object target)
+        {
             if (PrefabUtility.IsPartOfPrefabInstance(target)) PrefabUtility.RecordPrefabInstancePropertyModifications(target);
         }
     }

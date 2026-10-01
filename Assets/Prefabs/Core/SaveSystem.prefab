@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4359941706485508363}
   - component: {fileID: 2005282474242791097}
   - component: {fileID: 4556701183062533751}
+  - component: {fileID: 7047633373175326615}
   m_Layer: 0
   m_Name: SaveSystem
   m_TagString: Untagged
@@ -70,3 +71,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db6b22c733fed8045bdf9410a736af85, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SaveManager
+--- !u!114 &7047633373175326615
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7018707865029088004}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fd857feee190b9448ec085d327a42b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OutGameTraitController
+  _traitDatas:
+  - {fileID: 11400000, guid: 3c32e6dd6e37c5f429847040b65ac7b5, type: 2}
+  - {fileID: 11400000, guid: 6d39963ff33cb2441a51c059044a9536, type: 2}
+  - {fileID: 11400000, guid: 01417711556d7664595be30fbdbded83, type: 2}
+  - {fileID: 11400000, guid: 72c819beac80f8f459057186327f6f8b, type: 2}
+  - {fileID: 11400000, guid: ce2ca845197b35042b38dd11042c07f7, type: 2}
+  - {fileID: 11400000, guid: 2dd6946522541414d8d58667af215eb6, type: 2}
+  - {fileID: 11400000, guid: 15d4d0cb503fffd4685dfd6e5e72f234, type: 2}
+  - {fileID: 11400000, guid: ad3d97b9d1519f24a9ba46eeb2ecf94b, type: 2}
+  - {fileID: 11400000, guid: 295f616c0c9858741964bdf328685ec3, type: 2}

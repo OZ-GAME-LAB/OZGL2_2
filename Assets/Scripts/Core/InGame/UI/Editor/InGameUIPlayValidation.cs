@@ -512,10 +512,15 @@ namespace Game.UI.InGame.Editor
             await StartBattle(c, "defeat branch");
             c.Waves.SetFail();
             Note("INPUT", "Existing WaveController.SetFail test input.");
-            await WaitFor(() => c.Flow.CurPhase == GamePhase.Finished, "defeat Finish phase");
+            SettlementView settlement = Read<SettlementView>(c.Bootstrap, "_settlementUI");
+            await WaitFor(() => settlement.IsVisible && settlement.IsPending,
+                "defeat settlement request");
+            Check(c.Flow.CurPhase != GamePhase.Finished, "settlement waits before Finished clears run effects");
             Check(!c.RewardView.IsVisible && !c.Screen(UIId.WaveReward).IsVisible && !c.Decision.IsVisible,
                 "defeat bypasses artifact and quarter selection");
-            Limit("Actual settlement request/payout/scene exit is not implemented in this scope.");
+            Check(c.Manager.TopPopup == c.Screen(UIId.RunResult) && c.Manager.HasBlockingPopup,
+                "defeat opens the registered mandatory settlement screen");
+            Note("SCOPE", "Scene return and isolated bloodstone persistence are checked by RunSettlementPlayValidation.");
         }
 
         private static UniTask RunRestart(Context c)
