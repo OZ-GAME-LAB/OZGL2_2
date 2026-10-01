@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
-  m_Name: "A_AR_T1_\uAD81\uC218_ActiveSkill"
+  m_Name: "A_AR_T2_1_\uC7A5\uAD81\uC218_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
-  _skillRange: 9
+  _skillRange: 12
   _skillCooldown: 5
   _targetSide: 0
   _targetPolicy: 2
@@ -44,8 +44,8 @@ MonoBehaviour:
           _source: 6
           _relation: 0
           _includeSelf: 0
-          _range: 10
-          _maxTargetCount: 1
+          _range: 12
+          _maxTargetCount: 2
           _clusterRadius: 2
           _filters: []
           _priorities:
@@ -77,7 +77,7 @@ MonoBehaviour:
         _radius: 2
         _angle: 360
         _maxEffectTargets: 1
-        _projectileSpeed: 10
+        _projectileSpeed: 12
         _isLegacy: 0
     - rid: 4844432381217865735
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}

@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
-  m_Name: "A_AR_T1_\uAD81\uC218_ActiveSkill"
+  m_Name: "A_AR_T3_12_\uC18D\uC0AC\uC218_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
-  _skillRange: 9
-  _skillCooldown: 5
+  _skillRange: 10
+  _skillCooldown: 10
   _targetSide: 0
   _targetPolicy: 2
   _actionType: 0
@@ -45,7 +45,7 @@ MonoBehaviour:
           _relation: 0
           _includeSelf: 0
           _range: 10
-          _maxTargetCount: 1
+          _maxTargetCount: 3
           _clusterRadius: 2
           _filters: []
           _priorities:

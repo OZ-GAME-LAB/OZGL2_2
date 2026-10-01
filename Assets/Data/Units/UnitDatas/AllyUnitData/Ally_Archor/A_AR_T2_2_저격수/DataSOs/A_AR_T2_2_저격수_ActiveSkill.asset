@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
-  m_Name: "A_AR_T1_\uAD81\uC218_ActiveSkill"
+  m_Name: "A_AR_T2_2_\uC800\uACA9\uC218_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
-  _skillRange: 9
-  _skillCooldown: 5
+  _skillRange: 15
+  _skillCooldown: 10
   _targetSide: 0
   _targetPolicy: 2
   _actionType: 0
@@ -31,6 +31,7 @@ MonoBehaviour:
   _skillFXType: 0
   _hitFXType: 0
   _actions:
+  - rid: 4844432426836164623
   - rid: 4844432381217865734
   _skillSchemaVersion: 1
   _usesLegacyTargetSelection: 0
@@ -44,7 +45,7 @@ MonoBehaviour:
           _source: 6
           _relation: 0
           _includeSelf: 0
-          _range: 10
+          _range: 15
           _maxTargetCount: 1
           _clusterRadius: 2
           _filters: []
@@ -77,10 +78,30 @@ MonoBehaviour:
         _radius: 2
         _angle: 360
         _maxEffectTargets: 1
-        _projectileSpeed: 10
+        _projectileSpeed: 20
         _isLegacy: 0
     - rid: 4844432381217865735
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _damageType: 0
-        _damageMultiplier: 2
+        _damageMultiplier: 5
+    - rid: 4844432426836164623
+      type: {class: SkillCastActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _target:
+          _source: 2
+          _relation: 0
+          _includeSelf: 0
+          _range: 3
+          _maxTargetCount: 1
+          _clusterRadius: 1
+          _filters: []
+          _priorities: []
+        _targetLostPolicy: 0
+        _failurePolicy: 0
+        _origin: 0
+        _conditions: []
+        _baseEffects: []
+        _conditionalEffects: []
+        _fxEntries: []
+        _duration: 2

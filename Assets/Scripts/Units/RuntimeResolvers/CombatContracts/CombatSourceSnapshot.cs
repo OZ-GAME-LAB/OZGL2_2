@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -215,7 +215,7 @@ namespace Units
                 if (condition.TargetDependencies == CombatStateChange.None)
                     condition = new FrozenCondition(condition.Evaluate(context));
 
-                else if (condition.OwnerDependencies != CombatStateChange.None)
+                else if (condition.OwnerDependencies != CombatStateChange.None && !condition.SupportsSourceSnapshot)
                 {
                     Debug.LogWarning("[SkillSnapshot] Mixed/unknown condition requires a snapshot adapter: " + condition.GetType().Name);
 

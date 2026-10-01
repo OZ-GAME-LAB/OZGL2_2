@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -85,6 +85,7 @@ namespace Units.Editor
                 "SkillShieldEffectData" => "보호막",
                 "SkillRuntimeEffectData" => "상태 효과 부여",
                 "PassiveAdditionalAttackActionData" => "추가 공격",
+                "PassiveDistanceConditionData" => "거리 이상",
                 "PassiveEffectActionData" => "효과 적용",
                 _ => ObjectNames.NicifyVariableName(type.Name
                     .Replace("ConditionData", " Condition").Replace("ActionData", "")

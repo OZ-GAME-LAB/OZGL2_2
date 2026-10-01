@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Units.Effects;
@@ -26,6 +26,9 @@ namespace Units.Skills
         public virtual CombatStateChange TargetDependencies => CombatStateChange.All;
 
         public virtual bool UsesSpatialQuery => false;
+
+        // 양쪽 주체를 읽는 조건이 저장된 공격자 정보로도 평가 가능한지 명시한다.
+        public virtual bool SupportsSourceSnapshot => false;
 
         // ============================================================
         // Execution
@@ -366,6 +369,8 @@ namespace Units.Skills
         public override CombatStateChange TargetDependencies => _condition?.TargetDependencies ?? CombatStateChange.None;
 
         public override bool UsesSpatialQuery => _condition?.UsesSpatialQuery ?? false;
+
+        public override bool SupportsSourceSnapshot => _condition?.SupportsSourceSnapshot ?? false;
 
         // ============================================================
         // Execution
