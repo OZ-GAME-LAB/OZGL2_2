@@ -20,8 +20,12 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
     public bool IsUsing { get; private set; }
 
     public event Action InventoryChanged;
+    public event Action<ConsumableItemData, ICombatTarget> TargetEffectApplying;
+    public event Action<ConsumableItemData, ICombatTarget, IReadOnlyList<CombatApplicationResult>> TargetEffectApplied;
 
     [SerializeField] private ConsumableItemCatalog _itemCatalog;
+    [SerializeField] private ConsumableItemCaster _itemCasterPrefab;
+    private ConsumableItemCaster _itemCaster;
 
     private ConsumableItemInventory _inventory;
     private EffectManager _effectManager;
@@ -98,9 +102,24 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
             return;
         }
 
+        if (_itemCasterPrefab == null)
+        {
+            Debug.LogError("[Consumables/ConsumableItemManager] 아이템 전용 Caster 프리팹을 연결해주세요.", this);
+            return;
+        }
+        _itemCaster = Instantiate(_itemCasterPrefab, transform);
+        if (!_itemCaster.IsAlive)
+        {
+            Debug.LogError("[Consumables/ConsumableItemManager] Caster 초기화에 실패했습니다.", this);
+            Destroy(_itemCaster.gameObject);
+            return;
+        }
+
         _gameFlow = gameFlow;
         _targetSelector = new ConsumableItemTargetSelector(unitManager);
-        _effectExecutor = new ConsumableItemEffectExecutor(resolver);
+        _effectExecutor = new ConsumableItemEffectExecutor(resolver, _itemCaster);
+        _effectExecutor.TargetEffectApplying += (item, target) => TargetEffectApplying?.Invoke(item, target);
+        _effectExecutor.TargetEffectApplied += (item, target, results) => TargetEffectApplied?.Invoke(item, target, results);
         _effectManager = effectManager;
         _effectManager.EffectsChanged += HandleEffectsChanged;
         CreateInventory();

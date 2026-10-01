@@ -10,22 +10,23 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c191f9509a824484ad0c8dd52897de14, type: 3}
-  m_Name: TestConsumableItem
+  m_Name: ExplosiveFlask
   m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemData
-  _id: test_consumable_001
-  _displayName: Test Item
-  _description: Inventory test only - no use effect
+  _id: consumable_ExplosiveFlask
+  _displayName: "\uD3ED\uBC1C \uD50C\uB77C\uC2A4\uD06C"
+  _description: "\uC9C0\uC815 \uC704\uCE58\uC758 \uBC18\uACBD \uC548\uC5D0 \uC788\uB294
+    \uC801\uC5D0\uAC8C \uAE30\uBCF8 \uBB3C\uB9AC \uD53C\uD574 120\uC744 \uC90D\uB2C8\uB2E4."
   _icon: {fileID: 0}
   _targetTeam: 1
-  _targetMode: 2
-  _radius: 1
+  _targetMode: 1
+  _radius: 3
   _effects:
-  - rid: 6652324207583035472
+  - rid: 1967714623333597267
   references:
     version: 2
     RefIds:
-    - rid: 6652324207583035472
+    - rid: 1967714623333597267
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _damageType: 1
-        _damageMultiplier: 10
+        _damageType: 0
+        _damageMultiplier: 120

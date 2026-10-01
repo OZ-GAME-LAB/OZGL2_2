@@ -9,7 +9,8 @@ public enum ExcelImportType
     ArtifactReward = 1,
     ShopArtifactPrices = 2,
     ShopArtifactExchanges = 3,
-    Artifacts = 4
+    Artifacts = 4,
+    Consumables = 5
 }
 
 [Serializable]
