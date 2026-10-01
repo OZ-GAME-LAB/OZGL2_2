@@ -35,6 +35,7 @@ public class WaveSO : ScriptableObject
 {
     public int WaveID; //웨이브 식별자
     public string WaveName;
+    public EnemyUnitFaction Faction;
     public WaveBattleType BattleType;
     public ClassWeights Weights;
     public List<EnemyUnitType> MonsterIDs = new(); //몬스터 id 리스트

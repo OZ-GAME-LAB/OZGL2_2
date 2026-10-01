@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Cameras;
@@ -7,6 +8,7 @@ using UnityEngine;
 
 namespace Game.Core
 {
+    //현재 진행중인 게임 페이즈 
     public enum GamePhase
     {
         // 선언은 진행 순서로 정렬한다.
@@ -21,15 +23,37 @@ namespace Game.Core
         Store, //상점 나가기 대기 (Event와 선택적 분기)
         Finished, //게임 종료 상태
     }
-
+    //이어하기시 재개 위치
+    public enum RunResumeStep
+    {
+        Preparation = 0, //전투 준비
+        RewardSelection = 1, //보상 선택중
+        Event = 2, //이벤트 진입
+        Store = 3, //상점 진입
+        QuarterDecision = 4, //분기 보상 마무리 후 다음분기 진행여부 결정상황
+        Finished = 5 //결산창
+    }
     public enum ResultType { Victory, Defeat }
     public enum RunDecision { Finish, Continue }
 
+    public class GameFlowSaveData
+    {
+        public NodeSaveData Node;
+        public RunResumeStep ResumeStep;
+        public bool HasClearedMainGame;
+
+        public GameFlowSaveData(NodeSaveData node, RunResumeStep resumeStep, bool hasCleared)
+        {
+            Node = node;
+            ResumeStep = resumeStep;
+            HasClearedMainGame = hasCleared;
+        }
+    }
     /// <summary>
     /// 게임 전체 페이즈, 전투·보상 처리 순서, 완료 대기, 종료·리셋을 관리한다.
     /// <br/>언제 다음 노드로 이동할지 결정
     /// </summary>
-    public class GameFlowController : MonoBehaviour
+    public class GameFlowController : MonoBehaviour, ISaveDataProvider<GameFlowSaveData>
     {
         [Header("테스트용 종료 연출 시간입니다. Play 모드에서 조절하세요.")]
         [Min(0)]
@@ -58,9 +82,11 @@ namespace Game.Core
         public bool AutoContinue { get => _autoContinue; set => _autoContinue = value; }
 
         private TestWaitingScript _testScript;
-        private WaveController _waveController;
-        private ArtifactManager _artifactManager;
+        private WaveController _waveController; //인게임 전투 담당
+        private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
+        private RunSettlementManager _runSettlementManager; //게임 종료 후 정산 담당
         private GamePhase _curPhase;
+        private RunResumeStep _resumeStep;
         private bool _isTransitioning;
         private bool _isResetting;
         private UniTaskCompletionSource _spawnCompletion;
@@ -72,11 +98,16 @@ namespace Game.Core
 
         // 초기화 및 수명 관리
         /// <summary>참조를 연결하고 기존 실행을 취소한다.</summary>
-        public void Initialize(WaveController waveController, TestWaitingScript testScript, ArtifactManager artifactManager)
+        public void Initialize(
+            WaveController waveController, 
+            TestWaitingScript testScript, 
+            ArtifactManager artifactManager, 
+            InGameCameraController cameraController = null )
         {
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
+            _cameraController = cameraController;
             _nodeController = new NodeController(waveController.WaveCatalog);
             ClearToken();
             ResetDecisionState();
@@ -89,10 +120,9 @@ namespace Game.Core
             _cts?.Cancel();
             _cts?.Dispose();
         }
-
-        // 게임 시작·리셋 및 행동 가능 여부
-        /// <summary>새 판은 1분기 1웨이브부터 시작한다.</summary>
-        public void BeginRun()
+        
+        /// <summary> 새로운 게임을 시작하는 메서드</summary>
+        public void NewGame()
         {
             if (_isTransitioning) return;
             if (_curPhase != GamePhase.None && _curPhase != GamePhase.Finished) return;
@@ -110,11 +140,57 @@ namespace Game.Core
             _isTransitioning = false;
         }
 
+        public void Continue()
+        {
+            if (_isTransitioning) return;
+            if (_curPhase != GamePhase.None && _curPhase != GamePhase.Finished) return;
+            _isTransitioning = true;
+            ResetDecisionState();
+            switch (_resumeStep)
+            {
+                case RunResumeStep.Preparation:
+
+                    break;
+                case RunResumeStep.RewardSelection:
+
+                    break;
+                case RunResumeStep.Event:
+
+                    break;
+                case RunResumeStep.Store:
+
+                    break;
+                case RunResumeStep.QuarterDecision:
+
+                    break;
+                case RunResumeStep.Finished:
+
+                    break;
+            }
+            ChangePhase(GamePhase.Preparation);
+            _isTransitioning = false;
+
+        }
         public void ResetRun()
         {
             if (_isResetting) return;
             _isResetting = true;
             ResetRunAsync().Forget();
+        }
+        //현재 진행중인 값 저장
+        public GameFlowSaveData CaptureSaveData()
+        {
+            return new GameFlowSaveData(
+                _nodeController.CaptureSaveData(),
+                _resumeStep,
+                HasClearedMainGame);
+        }
+        //저장된 값 불러와서 다시 쓸 수 있게 복원
+        public void RestoreSaveData(GameFlowSaveData data)
+        {
+            _nodeController.RestoreSaveData(data.Node);
+            _resumeStep = data.ResumeStep;
+            HasClearedMainGame = data.HasClearedMainGame;
         }
 
         private async UniTask ResetRunAsync()
@@ -131,7 +207,7 @@ namespace Game.Core
                 await pendingSpawn;
                 token.ThrowIfCancellationRequested();
                 _isTransitioning = false;
-                BeginRun();
+                NewGame();
             }
             finally
             {
@@ -197,9 +273,7 @@ namespace Game.Core
             _isTransitioning = false;
         }
 
-        /// <summary>
-        /// 전투 결과를 받는 외부노출 메서드
-        /// </summary>
+        /// <summary> 전투 결과를 받는 외부노출 메서드 </summary>
         public async UniTask ResolveBattleAsync(ResultType result)
         {
             if (_isTransitioning || _curPhase != GamePhase.Battle) return;
@@ -212,9 +286,7 @@ namespace Game.Core
             _isTransitioning = false;
         }
 
-        /// <summary>
-        /// 전투 종료 후 연출·보상·분기 진행 순서 처리 등 실제 기능 구현
-        /// </summary>
+        /// <summary> 전투 종료 후 연출·보상·분기 진행 순서 처리 등 실제 기능 구현 </summary>
         private async UniTask ResolveBattleCoreAsync(ResultType result, CancellationToken token)
         {
             Node completedNode = CurrentNode;
@@ -412,8 +484,7 @@ namespace Game.Core
             // 현재 미완성 선택 UI의 false 반환은 허용하고 테스트 버튼으로 완료한다.
             await _artifactManager.SelectAndApplyAsync(battleType, token);
             token.ThrowIfCancellationRequested();
-            // TODO: 실제 아티팩트 선택·적용 완료가 연결되면 이 토글 대기를 제거한다.
-            await rewardWait;
+            await rewardWait; // TODO: 실제 아티팩트 선택·적용 완료가 연결되면 이 토글 대기를 제거한다.
             token.ThrowIfCancellationRequested();
             IsWaitingForArtifactSelection = false;
         }

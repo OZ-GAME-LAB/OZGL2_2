@@ -18,6 +18,8 @@ namespace Game.Core
             MonsterIDs = monsterIDs;
         }
     }
+
+
     //cost = 분기 * 10 + 웨이브 * 2 / 몬스터는 소환코스트 1로고정 (MVP)
     /// <summary>
     /// 현재 전투의 스폰 준비 요청, 생존 수 조회를 통한 승패 판정, 전투 정리 요청
@@ -149,7 +151,7 @@ namespace Game.Core
         /// <summary>
         /// 게임 시작 시 실제 초기화 및 기초세팅 시작
         /// </summary>
-        public void BeginRun() => _controller?.BeginRun();
+        public void BeginRun() => _controller?.NewGame();
 
         public void ProgressStage() => _controller?.RequestProgressStage();
 
