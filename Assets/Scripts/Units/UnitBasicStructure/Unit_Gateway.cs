@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
@@ -37,6 +37,14 @@ namespace Units
 
         public event Action<Unit_Gateway> Died;
 
+        public event Action<CombatStateChange> CombatStateChanged;
+
+        public void NotifySkillEvent(CombatSkillEvent notification) => _core?.NotifySkillEvent(notification);
+
+        internal void NotifyCombatStateChanged(CombatStateChange change) => CombatStateChanged?.Invoke(change);
+
+        public event Action<CombatDeathResult> DeathConfirmed;
+
         public event Action<Unit_Gateway> RequestFullAssignmentEvent;
 
         public event Action<Unit_Gateway> RequestTargetReevaluationEvent;
@@ -50,80 +58,53 @@ namespace Units
         // Properties
         // ============================================================
 
-        public Unit_Core Core
-            => _core;
+        public Unit_Core Core => _core;
 
-        public UnitTeam Team
-            => _core != null
-                ? _core.Team
-                : default;
+        public UnitTeam Team => _core != null ? _core.Team : default;
 
-        public Unit_RuntimeStatus RuntimeStatus
-            => _core != null
-                ? _core.RuntimeStatus
-                : default;
+        public Unit_RuntimeStatus RuntimeStatus => _core != null ? _core.RuntimeStatus : default;
 
-        public Unit_GroupAI GroupAI
-            => _groupAI;
+        public Unit_GroupAI GroupAI => _groupAI;
 
+        public Transform Transform => transform;
 
-        public Transform Transform
-            => transform;
+        public Vector2 FacingDirection => _core != null ? _core.FacingDirection : Vector2.left;
 
+        public bool IsAlive => _core != null && _core.IsAlive;
 
-        public bool IsAlive
-            => _core != null
-            && _core.IsAlive;
+        public bool IsTargetable => isActiveAndEnabled && IsAlive;
 
+        public bool CanUseActiveSkill => _core != null && _core.CanUseActiveSkill;
 
-        public bool IsTargetable
-            => IsAlive;
+        public float PreferredCombatRange => _core != null ? _core.PreferredCombatRange : 0f;
 
+        public float CurrentHp => _core != null ? _core.CurrentHp : 0f;
 
-        public bool CanUseActiveSkill
-            => _core != null
-            && _core.CanUseActiveSkill;
-
-
-        public float PreferredCombatRange
-            => _core != null
-                ? _core.PreferredCombatRange
-                : 0f;
-
-        public float CurrentHp
-            => _core != null
-                ? _core.CurrentHp
-                : 0f;
+        public float CurrentShield => _core != null ? _core.CurrentShield : 0f;
 
 
         // ============================================================
         // Initialize
         // ============================================================
 
-        internal void Initialize(
-            Unit_Core core)
+        internal void Initialize(Unit_Core core)
         {
             if (core == null)
             {
-                Debug.LogError(
-                    $"[Unit_Gateway] {name} : Unit_Core가 없습니다."
-                );
+                Debug.LogError($"[Unit_Gateway] {name} : Unit_Core가 없습니다.");
 
                 return;
             }
-
 
             UnbindEvents();
 
             LifetimeVersion++;
 
-            _core =
-                core;
+            NotifyCombatStateChanged(CombatStateChange.Lifetime);
 
+            _core = core;
 
-            _isRallyMoving =
-                false;
-
+            _isRallyMoving = false;
 
             BindEvents();
         }
@@ -133,8 +114,15 @@ namespace Units
         // Unity Lifecycle
         // ============================================================
 
+        private void OnDisable()
+        {
+            NotifyCombatStateChanged(CombatStateChange.Lifetime);
+        }
+
         private void OnDestroy()
         {
+            NotifyCombatStateChanged(CombatStateChange.Lifetime);
+
             UnbindEvents();
         }
 
@@ -148,62 +136,41 @@ namespace Units
             if (_core == null)
                 return;
 
+            _core.MovementCompleted += OnMovementCompleted;
 
-            _core.MovementCompleted +=
-                OnMovementCompleted;
-
-            _core.MovementFailed +=
-                OnMovementFailed;
+            _core.MovementFailed += OnMovementFailed;
         }
-
 
         private void UnbindEvents()
         {
             if (_core == null)
                 return;
 
+            _core.MovementCompleted -= OnMovementCompleted;
 
-            _core.MovementCompleted -=
-                OnMovementCompleted;
-
-            _core.MovementFailed -=
-                OnMovementFailed;
+            _core.MovementFailed -= OnMovementFailed;
         }
-
 
         private void OnMovementCompleted()
         {
             if (!_isRallyMoving)
                 return;
 
+            _isRallyMoving = false;
 
-            _isRallyMoving =
-                false;
+            _core?.HoldMovementPosition(_rallyPosition);
 
-
-            _core?.HoldMovementPosition(
-                _rallyPosition
-            );
-
-
-            RallyCompleted?.Invoke(
-                this
-            );
+            RallyCompleted?.Invoke(this);
         }
-
 
         private void OnMovementFailed()
         {
             if (!_isRallyMoving)
                 return;
 
+            _isRallyMoving = false;
 
-            _isRallyMoving =
-                false;
-
-            RallyCompleted?.Invoke(
-                this
-            );
+            RallyCompleted?.Invoke(this);
 
             Debug.LogError($"[Unit_Gateway] {gameObject.name} Rally movement failed.");
         }
@@ -215,33 +182,24 @@ namespace Units
 
         internal SkillEngagementResult RequestSkillEngagement(ICombatTarget target)
         {
-            return _groupAI != null
-                ? _groupAI.RequestSkillEngagement(this, target)
-                : SkillEngagementResult.Invalid;
+            return _groupAI != null ? _groupAI.RequestSkillEngagement(this, target) : SkillEngagementResult.Invalid;
         }
 
         internal Predicate<ICombatTarget> CaptureSkillTargetFilter()
         {
-            return _groupAI != null
-                ? _groupAI.CaptureSkillTargetFilter(this)
-                : RejectSkillTarget;
+            return _groupAI != null ? _groupAI.CaptureSkillTargetFilter(this) : RejectSkillTarget;
         }
 
         private static bool RejectSkillTarget(ICombatTarget target) => false;
 
-
-        internal void SetGroupAI(
-            Unit_GroupAI groupAI)
+        internal void SetGroupAI(Unit_GroupAI groupAI)
         {
-            _groupAI =
-                groupAI;
+            _groupAI = groupAI;
         }
-
 
         internal void ClearGroupAI()
         {
-            _groupAI =
-                null;
+            _groupAI = null;
         }
 
 
@@ -249,42 +207,31 @@ namespace Units
         // Assignment
         // ============================================================
 
-        public void SetUnitAssignment(
-            UnitAssignment assignment)
+        public void SetUnitAssignment(UnitAssignment assignment)
         {
             if (_core == null)
                 return;
 
-
-            _core.SetUnitAssignment(
-                assignment
-            );
+            _core.SetUnitAssignment(assignment);
         }
-
 
         public void ClearUnitAssignment()
         {
             if (_core == null)
                 return;
 
-
             _core.ClearUnitAssignment();
         }
-
 
         public void RequestFullAssignment()
         {
             RequestFullAssignmentEvent?.Invoke(this);
         }
 
-
         public void RequestTargetReevaluation()
         {
-            RequestTargetReevaluationEvent?.Invoke(
-                this
-            );
+            RequestTargetReevaluationEvent?.Invoke(this);
         }
-
 
         public void RequestPositionAssignment()
         {
@@ -301,12 +248,10 @@ namespace Units
             if (_core == null)
                 return;
 
-
             _core.ReleaseMovementPosition();
 
             _core.StartAI();
         }
-
 
         public void PauseAI()
         {
@@ -318,29 +263,69 @@ namespace Units
         // Life
         // ============================================================
 
-        public void TakeDamage(
-            DamageResult result)
+        public CombatApplicationResult TakeDamageWithResult(DamageResult result)
         {
-            _core?.TakeDamage(
-                result
+            return _core != null ? _core.TakeDamageWithResult(result) : CombatApplicationResult.Invalid(
+                CombatApplicationKind.Damage,
+                this,
+                result.Metadata,
+                "Life module unavailable"
             );
         }
 
-
-        public void Heal(
-            float amount)
+        public CombatApplicationResult HealWithResult(
+            float amount,
+            CombatEventMetadata metadata)
         {
-            _core?.Heal(
-                amount
+            return _core != null ? _core.HealWithResult(amount, metadata) : CombatApplicationResult.Invalid(
+                CombatApplicationKind.Heal,
+                this,
+                metadata,
+                "Life module unavailable"
             );
         }
 
+        public CombatApplicationResult AddShieldWithResult(
+            float amount,
+            CombatEventMetadata metadata)
+        {
+            return _core != null ? _core.AddShieldWithResult(amount, metadata) : CombatApplicationResult.Invalid(
+                CombatApplicationKind.Shield,
+                this,
+                metadata,
+                "Life module unavailable"
+            );
+        }
+
+        public event Action<SkillExecutionResult> SkillExecutionEnded;
+
+        internal void NotifySkillExecutionEnded(SkillExecutionResult result) => SkillExecutionEnded?.Invoke(result);
+
+        public bool TryConsumeEffectStacks(Units.Effects.EffectStackConsumeRequest request) => _core != null && _core.TryConsumeEffectStacks(request);
+
+        public void TakeDamage(DamageResult result)
+        {
+            _core?.TakeDamage(result);
+        }
+
+        public void Heal(float amount)
+        {
+            _core?.Heal(amount);
+        }
+
+        public void AddShield(float amount)
+        {
+            _core?.AddShield(amount);
+        }
+
+        internal void NotifyDeathConfirmed(CombatDeathResult result)
+        {
+            DeathConfirmed?.Invoke(result);
+        }
 
         internal void NotifyDeath()
         {
-            Died?.Invoke(
-                this
-            );
+            Died?.Invoke(this);
         }
 
 
@@ -352,22 +337,24 @@ namespace Units
             PassiveDamageOwnerType ownerType,
             List<PassiveDamageModifier> results)
         {
-            _core?.CollectDamageModifiers(
-                ownerType,
-                results
-            );
+            _core?.CollectDamageModifiers(ownerType, results);
         }
-
 
         public bool EvaluateDamageModifierConditions(
             RuntimePassiveSkill runtimePassive,
-            ICombatTarget target)
+            ICombatTarget target,
+            CombatSourceSnapshot frozenTarget = null)
         {
-            return _core != null &&
-                   _core.EvaluateDamageModifierConditions(
-                       runtimePassive,
-                       target
-                   );
+            return _core != null && _core.EvaluateDamageModifierConditions(
+                runtimePassive,
+                target,
+                frozenTarget
+            );
+        }
+
+        public void NotifyDamageDealt(ICombatTarget target)
+        {
+            _core?.NotifyDamageDealt(target);
         }
 
 
@@ -375,14 +362,10 @@ namespace Units
         // Advance
         // ============================================================
 
-        public void MoveTo(
-            Vector2 destination)
+        public void MoveTo(Vector2 destination)
         {
-            _core?.MoveTo(
-                destination
-            );
+            _core?.MoveTo(destination);
         }
-
 
         public void StopMovement()
         {
@@ -394,23 +377,26 @@ namespace Units
         // Rally
         // ============================================================
 
-        public void MoveToRally(
-            Vector2 destination)
+        public void MoveToRally(Vector2 destination)
         {
             if (_core == null)
                 return;
 
+            _rallyPosition = destination;
 
-            _rallyPosition =
-                destination;
+            _isRallyMoving = true;
 
-            _isRallyMoving =
-                true;
+            _core.MoveTo(destination);
+        }
 
 
-            _core.MoveTo(
-                destination
-            );
+        // ============================================================
+        // Animation
+        // ============================================================
+
+        public void PlayAnimation_Victory()
+        {
+            _core?.PlayAnimation_Victory();
         }
 
 
@@ -422,7 +408,6 @@ namespace Units
         {
             _core?.Pause();
         }
-
 
         public void Resume()
         {

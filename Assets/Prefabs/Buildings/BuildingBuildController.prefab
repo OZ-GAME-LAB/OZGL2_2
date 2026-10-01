@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 8784177057578582013}
   - component: {fileID: 8945716348887747133}
   - component: {fileID: 2813086061672694063}
+  - component: {fileID: 4952323082959062240}
   m_Layer: 0
   m_Name: BuildingBuildController
   m_TagString: Untagged
@@ -63,3 +64,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 97bce2d299c460447b234d598034d897, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingCoreProgress
+--- !u!114 &4952323082959062240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4696837340442821252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df11d38eab8036b49b56dddab7dc1682, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingCensus

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -8,11 +8,19 @@ namespace Units
 {
     public interface ICombatTarget
     {
+
+        event System.Action<CombatStateChange> CombatStateChanged;
+
+        void NotifySkillEvent(CombatSkillEvent notification);
+
         // ============================================================
         // Transform
         // ============================================================
 
         Transform Transform { get; }
+
+        // 외형 반전과 독립적으로 유지하는 월드 좌우 방향이다.
+        Vector2 FacingDirection { get; }
 
 
         // ============================================================
@@ -33,7 +41,11 @@ namespace Units
         // State
         // ============================================================
 
+        bool IsAlive { get; }
+
         bool IsTargetable { get; }
+
+        int LifetimeVersion { get; }
 
 
         // ============================================================
@@ -42,13 +54,25 @@ namespace Units
 
         float CurrentHp { get; }
 
-        void TakeDamage(
-            DamageResult result
-        );
+        float CurrentShield { get; }
 
-        void Heal(
-            float amount
-        );
+        CombatApplicationResult TakeDamageWithResult(DamageResult result);
+
+        CombatApplicationResult HealWithResult(
+            float amount,
+            CombatEventMetadata metadata);
+
+        CombatApplicationResult AddShieldWithResult(
+            float amount,
+            CombatEventMetadata metadata);
+
+        bool TryConsumeEffectStacks(Units.Effects.EffectStackConsumeRequest request);
+
+        void TakeDamage(DamageResult result);
+
+        void Heal(float amount);
+
+        void AddShield(float amount);
 
 
         // ============================================================
@@ -57,12 +81,13 @@ namespace Units
 
         void CollectDamageModifiers(
             PassiveDamageOwnerType ownerType,
-            List<PassiveDamageModifier> results
-        );
+            List<PassiveDamageModifier> results);
 
         bool EvaluateDamageModifierConditions(
             RuntimePassiveSkill runtimePassive,
-            ICombatTarget target
-        );
+            ICombatTarget target,
+            CombatSourceSnapshot frozenTarget = null);
+
+        void NotifyDamageDealt(ICombatTarget target);
     }
 }

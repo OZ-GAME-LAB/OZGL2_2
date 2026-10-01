@@ -1,4 +1,4 @@
-﻿using Units.Skills;
+using Units.Skills;
 
 namespace Units
 {
@@ -19,6 +19,51 @@ namespace Units
 
         private bool _hasExecutedOnce;
 
+        private bool _isExecuting;
+
+        public bool IsExecuting => _isExecuting;
+
+        public int PendingApplications { get; private set; }
+
+        public bool IsStopped { get; private set; }
+
+        public CombatEventMetadata ActivationMetadata { get; set; }
+
+        public void BeginPending()
+        {
+            PendingApplications++;
+        }
+
+        public void EndPending()
+        {
+            if (PendingApplications > 0)
+                PendingApplications--;
+        }
+
+        public void StopExecution()
+        {
+            IsStopped = true;
+        }
+
+        public PassiveConditionWatch Watch { get; set; }
+
+        public bool MaintenancePending { get; set; }
+
+        public bool TryBeginExecution()
+        {
+            if (_isExecuting || IsStopped || (Data.EffectMode == PassiveSkillEffectMode.Once && PendingApplications > 0))
+                return false;
+
+            _isExecuting = true;
+
+            return true;
+        }
+
+        public void EndExecution()
+        {
+            _isExecuting = false;
+        }
+
         private float _tickElapsedTime;
 
 
@@ -26,27 +71,25 @@ namespace Units
         // Properties
         // ============================================================
 
-        public PassiveSkillData Data =>
-            _data;
+        public PassiveSkillData Data => _data;
 
-        public bool IsActive =>
-            _isActive;
+        public bool IsActive => _isActive;
 
-        public bool HasExecutedOnce =>
-            _hasExecutedOnce;
+        public bool HasExecutedOnce => _hasExecutedOnce;
 
 
         // ============================================================
         // Constructor
         // ============================================================
 
-        public RuntimePassiveSkill(
-            PassiveSkillData data)
+        public RuntimePassiveSkill(PassiveSkillData data)
         {
             _data = data;
 
             _isActive = false;
+
             _hasExecutedOnce = false;
+
             _tickElapsedTime = 0f;
         }
 
@@ -55,8 +98,7 @@ namespace Units
         // Active State
         // ============================================================
 
-        public void SetActive(
-            bool isActive)
+        public void SetActive(bool isActive)
         {
             _isActive = isActive;
         }
@@ -76,16 +118,14 @@ namespace Units
         // Tick
         // ============================================================
 
-        public void AddTickTime(
-            float deltaTime)
+        public void AddTickTime(float deltaTime)
         {
             _tickElapsedTime += deltaTime;
         }
 
         public bool IsTickReady()
         {
-            return _tickElapsedTime >=
-                   _data.TickInterval;
+            return _tickElapsedTime >= _data.TickInterval;
         }
 
         public void ResetTickTime()

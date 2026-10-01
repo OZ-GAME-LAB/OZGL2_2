@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
   m_Name: DotHeal_Tier1
   m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
+  _skillSchemaVersion: 1
   _effectId: DotHeal_T1
   _alignment: 0
   _durationType: 0
@@ -20,6 +21,9 @@ MonoBehaviour:
   _maxStack: 1
   _actions:
   - rid: 4844432152660541526
+  _categories:
+  - Alignment.Beneficial
+  - PeriodicHeal
   references:
     version: 2
     RefIds:
@@ -27,4 +31,4 @@ MonoBehaviour:
       type: {class: PeriodicHealEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
         _interval: 0.5
-        _healRatio: 200
+        _healRatio: 0.03

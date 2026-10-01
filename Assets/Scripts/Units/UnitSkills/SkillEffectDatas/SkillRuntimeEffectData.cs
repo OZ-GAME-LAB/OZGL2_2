@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 using Units.Effects;
 
@@ -10,10 +10,18 @@ namespace Units.Skills
     public class SkillRuntimeEffectData
         : SkillEffectData
     {
+
         [SerializeField]
         private EffectData _effectData;
 
-        public EffectData EffectData =>
-            _effectData;
+        public EffectDefinitionSnapshot FrozenDefinition { get; private set; }
+
+        internal void FreezeDefinition()
+        {
+            if (_effectData != null)
+                FrozenDefinition = new EffectDefinitionSnapshot(_effectData);
+        }
+
+        public EffectData EffectData => _effectData;
     }
 }

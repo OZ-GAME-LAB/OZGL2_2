@@ -9,6 +9,9 @@ public class EffectManager : MonoBehaviour
     public IReadOnlyList<AllyStatModifier> AllyModifiers => _allyModifiers;
     public IReadOnlyList<EnemyStatModifier> EnemyModifiers => _enemyModifiers;
     public IReadOnlyList<CurrencyModifier> CurrencyModifiers => _currencyModifiers;
+    public IReadOnlyList<ConsumableSlotModifier> ConsumableSlotModifiers => _consumableSlotModifiers;
+    // 기본 슬롯 수는 포함하지 않은 전체 출처의 보정 합계
+    public int ConsumableSlotAdjustment { get; private set; }
 
     // 목록 갱신 완료 후 이벤트 발생 (기존 공통 효과를 새 목록으로 교체할 때 사용)
     public event Action EffectsChanged;
@@ -19,12 +22,20 @@ public class EffectManager : MonoBehaviour
     private readonly List<AllyStatModifier> _allyModifiers = new List<AllyStatModifier>();
     private readonly List<EnemyStatModifier> _enemyModifiers = new List<EnemyStatModifier>();
     private readonly List<CurrencyModifier> _currencyModifiers = new List<CurrencyModifier>();
+    private readonly List<ConsumableSlotModifier> _consumableSlotModifiers = new List<ConsumableSlotModifier>();
 
     // 같은 Source의 효과를 교체. 변환 실패 시 기존 효과 유지
     public bool TrySetEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
         IReadOnlyList<CurrencyEffectData> currencyEffects, int stackCount = 1)
     {
-        if (!TryConvertEffects(source, effects, currencyEffects, stackCount, out ConvertedEffects converted))
+        return TrySetEffects(source, effects, currencyEffects, null, stackCount);
+    }
+
+    public bool TrySetEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
+        IReadOnlyList<CurrencyEffectData> currencyEffects,
+        IReadOnlyList<ConsumableSlotEffectData> slotEffects, int stackCount = 1)
+    {
+        if (!TryConvertEffects(source, effects, currencyEffects, slotEffects, stackCount, out ConvertedEffects converted))
         {
             return false;
         }
@@ -36,6 +47,13 @@ public class EffectManager : MonoBehaviour
     // 효과 데이터 변환만 처리 (기존 효과 변경 및 이벤트 발생 X)
     public bool TryConvertEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
         IReadOnlyList<CurrencyEffectData> currencyEffects, int stackCount, out ConvertedEffects converted)
+    {
+        return TryConvertEffects(source, effects, currencyEffects, null, stackCount, out converted);
+    }
+
+    public bool TryConvertEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
+        IReadOnlyList<CurrencyEffectData> currencyEffects,
+        IReadOnlyList<ConsumableSlotEffectData> slotEffects, int stackCount, out ConvertedEffects converted)
     {
         converted = null;
         ConvertedUnitStatEffects unitModifiers = _converter.ConvertUnitStatEffects(source, effects, stackCount);
@@ -50,9 +68,16 @@ public class EffectManager : MonoBehaviour
             return false;
         }
 
-        // 두 변환이 모두 성공한 경우에만 해당 Source의 결과 전체를 교체
+        List<ConsumableSlotModifier> slotModifiers =
+            _converter.ConvertConsumableSlotEffects(source, slotEffects, stackCount);
+        if (slotModifiers == null)
+        {
+            return false;
+        }
+
+        // 모든 변환이 성공한 경우에만 해당 Source의 결과 전체를 교체
         converted = new ConvertedEffects(
-            unitModifiers.AllyModifiers, unitModifiers.EnemyModifiers, currencyModifiers);
+            unitModifiers.AllyModifiers, unitModifiers.EnemyModifiers, currencyModifiers, slotModifiers);
         return true;
     }
 
@@ -97,6 +122,8 @@ public class EffectManager : MonoBehaviour
         _allyModifiers.Clear();
         _enemyModifiers.Clear();
         _currencyModifiers.Clear();
+        _consumableSlotModifiers.Clear();
+        long slotAdjustment = 0;
 
         foreach (ConvertedEffects effects in _effectsBySource.Values)
         {
@@ -113,8 +140,18 @@ public class EffectManager : MonoBehaviour
             {
                 _currencyModifiers.AddRange(effects.CurrencyModifiers);
             }
+            if (effects.ConsumableSlotModifiers != null)
+            {
+                _consumableSlotModifiers.AddRange(effects.ConsumableSlotModifiers);
+                foreach (ConsumableSlotModifier modifier in effects.ConsumableSlotModifiers)
+                {
+                    slotAdjustment += modifier.AdditionalSlots;
+                }
+            }
         }
 
+        // 음수 합계는 유지하고 정수 범위 초과만 제한
+        ConsumableSlotAdjustment = (int)Math.Max(int.MinValue, Math.Min(int.MaxValue, slotAdjustment));
         EffectsChanged?.Invoke();
     }
 

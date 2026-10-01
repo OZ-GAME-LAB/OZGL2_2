@@ -40,6 +40,23 @@ namespace Game.UI
         private void OnEnable() => Bind();
         private void OnDisable() => Unbind();
 
+        public void Initialize(BuildingBuildController controller, RunCurrencyManager wallet,
+            GameFlowController flow, BuildingCoreProgress coreProgress, BuildingSlot[] slots)
+        {
+            if (controller == null) throw new ArgumentNullException(nameof(controller));
+            if (wallet == null) throw new ArgumentNullException(nameof(wallet));
+            if (flow == null) throw new ArgumentNullException(nameof(flow));
+            if (coreProgress == null) throw new ArgumentNullException(nameof(coreProgress));
+            if (slots == null) throw new ArgumentNullException(nameof(slots));
+            Unbind();
+            _controller = controller;
+            _wallet = wallet;
+            _flow = flow;
+            _coreProgress = coreProgress;
+            _slots = slots;
+            if (isActiveAndEnabled) Bind();
+        }
+
         private void LateUpdate()
         {
             if (_selectionId == null || _executing) return;
@@ -229,7 +246,7 @@ namespace Game.UI
 
         private bool IsCurrentCandidate(BuildingData data)
         {
-            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel(), GetCensus());
             return _candidates.Contains(data);
         }
 
@@ -260,7 +277,7 @@ namespace Game.UI
 
         private void PopulateCatalog()
         {
-            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel(), GetCensus());
             _items.Clear(); _byId.Clear();
             var duplicates = new HashSet<string>();
             foreach (var data in _candidates)
@@ -290,6 +307,11 @@ namespace Game.UI
             return _coreProgress != null ? _coreProgress.CurrentLevel : 0;
         }
 
+        private BuildingCensus GetCensus()
+        {
+            return _controller != null ? _controller.Census : null;
+        }
+
         private void Bind()
         {
             if (_bound || _catalog == null || _info == null || _actions == null ||
@@ -299,6 +321,7 @@ namespace Game.UI
             _info.InfoPanelClosed += HandleInfoClosed;
             _wallet.BalanceChanged += HandleBalanceChanged;
             _flow.PhaseChanged += HandlePhaseChanged;
+            _controller.SlotSelected += SelectSlot;
             _bound = true;
         }
 

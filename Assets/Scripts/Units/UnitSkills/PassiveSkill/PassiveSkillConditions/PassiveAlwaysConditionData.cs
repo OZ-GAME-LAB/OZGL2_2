@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 
 
@@ -8,8 +8,14 @@ namespace Units.Skills
     public class PassiveAlwaysConditionData
         : PassiveSkillConditionData
     {
-        public override bool Evaluate(
-            PassiveContext context)
+
+        public override CombatStateChange OwnerDependencies => CombatStateChange.None;
+
+        public override CombatStateChange TargetDependencies => CombatStateChange.None;
+
+        public override bool UsesSpatialQuery => false;
+
+        public override bool Evaluate(PassiveContext context)
         {
             return true;
         }

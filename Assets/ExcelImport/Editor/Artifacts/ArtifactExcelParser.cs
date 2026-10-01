@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Units;
 
-// 세 시트를 모두 검사한 후 가져오기 데이터 반환
+// 네 시트를 모두 검사한 후 가져오기 데이터 반환
 public static class ArtifactExcelParser
 {
     public class Data
@@ -15,6 +15,7 @@ public static class ArtifactExcelParser
         public int MaxStacks;
         public List<Effect> UnitEffects = new List<Effect>();
         public List<Effect> CurrencyEffects = new List<Effect>();
+        public List<int> ConsumableSlotEffects = new List<int>();
     }
 
     public class Effect
@@ -51,9 +52,43 @@ public static class ArtifactExcelParser
             data.Add(item);
             byId.Add(id, item);
         }
-        if (!ReadEffects(path, true, byId, out error) || !ReadEffects(path, false, byId, out error))
+        if (!ReadEffects(path, true, byId, out error) || !ReadEffects(path, false, byId, out error) ||
+            !ReadConsumableSlotEffects(path, byId, out error))
         {
             return false;
+        }
+        return true;
+    }
+
+    private static bool ReadConsumableSlotEffects(string path, Dictionary<string, Data> byId, out string error)
+    {
+        const string sheet = "ConsumableSlotEffects";
+        if (!Read(path, sheet, new[] { "ArtifactId", "AdditionalSlots" }, out var rows, out error))
+        {
+            return false;
+        }
+        for (int i = 1; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            if (!byId.TryGetValue(Cell(row, 0), out Data owner))
+            {
+                error = $"{sheet}!A{row.Number}: Artifacts 시트에 없는 ID입니다.";
+                return false;
+            }
+            // 양수·음수·0 허용. 소수는 슬롯 수로 사용하지 않음
+            if (!int.TryParse(Cell(row, 1), NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture, out int value))
+            {
+                error = $"{sheet}!B{row.Number}: AdditionalSlots에 정수를 입력하세요. 1은 증가, -1은 감소입니다.";
+                return false;
+            }
+            long stacked = (long)value * owner.MaxStacks;
+            if (stacked < int.MinValue || stacked > int.MaxValue)
+            {
+                error = $"{sheet}!B{row.Number}: 최대 중첩 적용 시 슬롯 보정값이 정수 범위를 벗어납니다.";
+                return false;
+            }
+            owner.ConsumableSlotEffects.Add(value);
         }
         return true;
     }

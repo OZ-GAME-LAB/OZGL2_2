@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-
+using System.Collections.Generic;
 
 
 namespace Units
@@ -10,7 +9,9 @@ namespace Units
         // Source
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
+
+        public CombatSourceSnapshot SourceSnapshot { get; }
 
         public DamageSourceType SourceType { get; }
 
@@ -53,10 +54,7 @@ namespace Units
         // Passive
         // ============================================================
 
-        public IReadOnlyList<PassiveDamageModifier> DamageModifiers
-        {
-            get;
-        }
+        public IReadOnlyList<PassiveDamageModifier> DamageModifiers { get; }
 
 
         // ============================================================
@@ -64,7 +62,7 @@ namespace Units
         // ============================================================
 
         public AttackerContext(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             DamageSourceType sourceType,
             DamageType damageType,
             float attackPower,
@@ -74,40 +72,32 @@ namespace Units
             float defenseIgnore,
             float criticalChance,
             float criticalDamage,
-            IReadOnlyList<PassiveDamageModifier> damageModifiers)
+            IReadOnlyList<PassiveDamageModifier> damageModifiers,
+            CombatSourceSnapshot sourceSnapshot = null)
         {
-            Attacker =
-                attacker;
+            SourceSnapshot = sourceSnapshot;
 
-            SourceType =
-                sourceType;
+            Attacker = attacker;
 
-            DamageType =
-                damageType;
+            SourceType = sourceType;
 
-            AttackPower =
-                attackPower;
+            DamageType = damageType;
 
-            DamageMultiplier =
-                damageMultiplier;
+            AttackPower = attackPower;
 
-            SourceDamageMultiplier =
-                sourceDamageMultiplier;
+            DamageMultiplier = damageMultiplier;
 
-            GeneralDamageMultiplier =
-                generalDamageMultiplier;
+            SourceDamageMultiplier = sourceDamageMultiplier;
 
-            DefenseIgnore =
-                defenseIgnore;
+            GeneralDamageMultiplier = generalDamageMultiplier;
 
-            CriticalChance =
-                criticalChance;
+            DefenseIgnore = defenseIgnore;
 
-            CriticalDamage =
-                criticalDamage;
+            CriticalChance = criticalChance;
 
-            DamageModifiers =
-                damageModifiers;
+            CriticalDamage = criticalDamage;
+
+            DamageModifiers = damageModifiers;
         }
     }
 }

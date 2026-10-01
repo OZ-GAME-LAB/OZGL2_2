@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -11,20 +11,35 @@ namespace Units.Skills
     )]
     public class PassiveSkillData : ScriptableObject
     {
+
+        [SerializeField, HideInInspector]
+        private int _skillSchemaVersion;
+
+        public int SkillSchemaVersion => _skillSchemaVersion;
+
+#if UNITY_EDITOR
+        public void UpgradeSkillSchema()
+        {
+            if (_skillSchemaVersion >= 1)
+                return;
+
+            EnsureEntryIds();
+
+            _skillSchemaVersion = 1;
+        }
+#endif
+
         // ============================================================
         // Trigger
         // ============================================================
 
         [Header("Trigger")]
         [SerializeField]
-        private PassiveSkillTriggerType _triggerType =
-            PassiveSkillTriggerType.Initialize;
-
+        private PassiveSkillTriggerType _triggerType = PassiveSkillTriggerType.Initialize;
 
         [SerializeField]
         [Min(0f)]
-        private float _tickInterval =
-            1f;
+        private float _tickInterval = 1f;
 
 
         // ============================================================
@@ -33,8 +48,7 @@ namespace Units.Skills
 
         [Header("Conditions")]
         [SerializeReference]
-        private List<PassiveSkillConditionData> _conditions =
-            new();
+        private List<PassiveSkillConditionData> _conditions = new();
 
 
         // ============================================================
@@ -43,8 +57,7 @@ namespace Units.Skills
 
         [Header("Mode")]
         [SerializeField]
-        private PassiveSkillEffectMode _effectMode =
-            PassiveSkillEffectMode.WhileCondition;
+        private PassiveSkillEffectMode _effectMode = PassiveSkillEffectMode.WhileCondition;
 
 
         // ============================================================
@@ -53,28 +66,56 @@ namespace Units.Skills
 
         [Header("Actions")]
         [SerializeReference]
-        private List<PassiveSkillActionData> _actions =
-            new();
+        private List<PassiveSkillActionData> _actions = new();
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public PassiveSkillTriggerType TriggerType =>
-            _triggerType;
+        public PassiveSkillTriggerType TriggerType => _triggerType;
 
-        public float TickInterval =>
-            _tickInterval;
+        [SerializeField, Min(0.05f)]
+        private float _conditionCheckInterval = 0.2f;
 
-        public IReadOnlyList<PassiveSkillConditionData> Conditions =>
-            _conditions;
+        public void EnsureEntryIds()
+        {
+            var entries = new List<SkillEffectEntry>();
 
-        public PassiveSkillEffectMode EffectMode =>
-            _effectMode;
+            foreach (var action in _actions)
+                if (action is PassiveAdditionalAttackActionData extra && extra.Attack != null)
+                {
+                    entries.AddRange(extra.Attack.BaseEffects);
 
-        public IReadOnlyList<PassiveSkillActionData> Actions =>
-            _actions;
+                    entries.AddRange(extra.Attack.ConditionalEffects);
+                }
+
+            var used = new HashSet<int>();
+
+            int next = 1;
+
+            foreach (var entry in entries)
+                if (entry != null)
+                    next = Mathf.Max(next, entry.EntryId + 1);
+
+            foreach (var entry in entries)
+                if (entry != null && (entry.EntryId <= 0 || !used.Add(entry.EntryId)))
+                {
+                    entry.SetEntryId(next++);
+
+                    used.Add(entry.EntryId);
+                }
+        }
+
+        public float ConditionCheckInterval => Mathf.Max(0.05f, _conditionCheckInterval);
+
+        public float TickInterval => _tickInterval;
+
+        public IReadOnlyList<PassiveSkillConditionData> Conditions => _conditions;
+
+        public PassiveSkillEffectMode EffectMode => _effectMode;
+
+        public IReadOnlyList<PassiveSkillActionData> Actions => _actions;
 
 
         // ============================================================
@@ -84,25 +125,20 @@ namespace Units.Skills
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            _tickInterval =
-                Mathf.Max(
-                0.1f,
-                _tickInterval
-                );
+            EnsureEntryIds();
+
+            _tickInterval = Mathf.Max(0.1f, _tickInterval);
 
             ValidateConditions();
+
             ValidateActions();
         }
 
-
         private void ValidateConditions()
         {
-            for (int i = 0;
-                 i < _conditions.Count;
-                 i++)
+            for (int i = 0; i < _conditions.Count; i++)
             {
-                if (_conditions[i]
-                    is PassiveUnitCountConditionData unitCountCondition)
+                if (_conditions[i] is PassiveUnitCountConditionData unitCountCondition)
                 {
                     unitCountCondition.Validate();
                 }
@@ -111,9 +147,7 @@ namespace Units.Skills
 
         private void ValidateActions()
         {
-            for (int i = 0;
-                 i < _actions.Count;
-                 i++)
+            for (int i = 0; i < _actions.Count; i++)
             {
                 _actions[i]?.Validate();
             }

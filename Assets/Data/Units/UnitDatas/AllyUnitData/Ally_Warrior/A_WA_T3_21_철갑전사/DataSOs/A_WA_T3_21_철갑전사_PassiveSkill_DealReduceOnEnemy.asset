@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "A_WA_T3_21_\uCCA0\uAC11\uC804\uC0AC_PassiveSkill_DealReduceOnEnemy"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 5
+  _tickInterval: 7
+  _conditions:
+  - rid: 4844432377880510565
+  _effectMode: 0
+  _actions:
+  - rid: 4844432377880510566
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432377880510565
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4844432377880510566
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 2
+        _targetRelation: 0
+        _maxEffectTargetCount: 10
+        _areaType: 1
+        _areaRadius: 8
+        _areaAngle: 90
+        _effects:
+        - rid: 4844432377880510567
+    - rid: 4844432377880510567
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 0d6c7fcce385ca54d9962662583ceca7, type: 2}

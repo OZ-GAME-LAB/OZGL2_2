@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -54,6 +55,8 @@ namespace Units
             GroupAIState.Idle;
 
         private bool _isPaused;
+        private bool _eliminated;
+        private readonly List<CombatTargetSnapshot> _dyingMembers = new();
 
 
         // =========================
@@ -201,7 +204,7 @@ namespace Units
 
         private void Update()
         {
-            if (_isPaused)
+            if (_isPaused || _eliminated)
                 return;
 
             if (_state != GroupAIState.Advancing &&
@@ -336,6 +339,8 @@ namespace Units
         public bool AddMember(
             Unit_Gateway unit)
         {
+            if (_eliminated)
+                return false;
             if (!_memberController.Add(
                 unit))
             {
@@ -428,6 +433,11 @@ namespace Units
         private void HandleMemberDied(
             Unit_Gateway unit)
         {
+            // 생존 목록에서는 즉시 제외하고, 사망 연출 중인 수명만 별도로 추적한다.
+            _dyingMembers.RemoveAll(snapshot => !IsDeathPresentationPending(snapshot));
+            _dyingMembers.Add(new CombatTargetSnapshot(unit));
+            if (unit != null && unit.transform.IsChildOf(transform))
+                unit.transform.SetParent(transform.parent, true);
             RemoveMember(
                 unit
             );
@@ -436,22 +446,49 @@ namespace Units
 
         private void CheckEliminated()
         {
-            if (_members.Count > 0)
+            if (_eliminated || _members.Count > 0
+                || (_state == GroupAIState.Spawning && !_isSpawnCompleted))
                 return;
+
+            _eliminated = true;
+            _isPaused = true;
+            _advanceController?.StopAdvance();
 
             Debug.Log(
                 $"[GroupAI] {name} → 그룹이 전멸했습니다."
             );
 
-            Eliminated?.Invoke(
-                this
-            );
+            try
+            {
+                Eliminated?.Invoke(this);
+            }
+            finally
+            {
+                if (this != null && gameObject.activeInHierarchy)
+                    StartCoroutine(DestroyAfterDeathPresentations());
+            }
         }
 
 
         // =========================
         // Spawn
         // =========================
+
+        private static bool IsDeathPresentationPending(CombatTargetSnapshot snapshot)
+        {
+            return snapshot.MatchesLifetime && snapshot.Target is Unit_Gateway unit
+                && unit != null && unit.gameObject.activeInHierarchy && !unit.IsAlive;
+        }
+
+        private IEnumerator DestroyAfterDeathPresentations()
+        {
+            // 재사용된 유닛의 새 수명은 기다리거나 제거하지 않는다.
+            while (_dyingMembers.Exists(IsDeathPresentationPending))
+                yield return null;
+
+            _dyingMembers.Clear();
+            Destroy(gameObject);
+        }
 
         public void NotifySpawnCompleted()
         {
@@ -466,8 +503,9 @@ namespace Units
             _isSpawnCompleted =
                 true;
 
-
-            TryCompleteSpawning();
+            CheckEliminated();
+            if (!_eliminated)
+                TryCompleteSpawning();
         }
 
 
@@ -671,6 +709,8 @@ namespace Units
 
         private void EnterAdvancing()
         {
+            if (_eliminated)
+                return;
             if (_state == GroupAIState.Advancing)
                 return;
 
@@ -697,6 +737,8 @@ namespace Units
 
         private void EnterEngaged()
         {
+            if (_eliminated)
+                return;
             if (_state == GroupAIState.Engaged)
                 return;
 
@@ -1193,7 +1235,7 @@ namespace Units
 
         public void Pause()
         {
-            if (_isPaused)
+            if (_isPaused || _eliminated)
                 return;
 
 

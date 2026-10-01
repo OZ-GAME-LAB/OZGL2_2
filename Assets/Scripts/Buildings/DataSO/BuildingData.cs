@@ -14,6 +14,10 @@ namespace OZGL.KDH
         [Header("식별")]
         [Tooltip("세이브/해금/건설 메뉴 조회용. 한 번 정하면 바꾸지 마세요. 예: barracks_melee_1")]
         [SerializeField] private string buildingId = "building_id";
+        // Current date KDH 2026-09-22
+        // 업그레이드해도 같은 계열로 조회합니다. melee1/melee2 → melee_barracks.
+        [Tooltip("업그레이드 전후를 묶는 계열 ID입니다. 예: melee_barracks. 비우면 가문 조회에 안 잡힙니다.")]
+        [SerializeField] private string buildingFamilyId;
         [SerializeField] private string displayName = "새 건물";
         [TextArea(2, 4)]
         [SerializeField] private string description;
@@ -30,6 +34,10 @@ namespace OZGL.KDH
         [SerializeField] private bool buildFromEmptySlot = true;
         [Tooltip("빈 칸에서 이 건물을 지을 때 필요한 코어 레벨입니다. 0이면 처음부터 가능합니다.")]
         [Min(0)] [SerializeField] private int requiredCoreLevel;
+        // Current date KDH 2026-09-22
+        // A가 있어야 B를 짓는 조건입니다. melee1이 아니라 melee_barracks처럼 가문 ID를 적습니다.
+        [Tooltip("이 가문이 하나 이상 있어야 빈 칸에 지을 수 있습니다. 비우면 제한 없습니다.")]
+        [SerializeField] private string[] requiredFamilyIds;
 
         [Header("코어")]
         [Tooltip("Core 타입일 때만 사용합니다. Core2면 2처럼, 도달 비교에 씁니다.")]
@@ -45,6 +53,9 @@ namespace OZGL.KDH
         [SerializeField] private BuildingUpgradeOption[] upgrades;
 
         public string BuildingId => buildingId;
+        public string BuildingFamilyId => buildingFamilyId;
+        public string[] RequiredFamilyIds => requiredFamilyIds;
+        public bool HasFamilyId => !string.IsNullOrWhiteSpace(buildingFamilyId);
         public string DisplayName => displayName;
         public string Description => description;
         public BuildingType BuildingType => buildingType;
@@ -73,6 +84,42 @@ namespace OZGL.KDH
                 return false;
 
             return currentCoreLevel >= requiredCoreLevel;
+        }
+
+        // Current date KDH 2026-09-22
+        // 코어 해금과 가문 선행을 한 번에 봅니다. 기존 1인자 호출은 그대로 둡니다.
+        public bool CanBuildFromEmptySlot(int currentCoreLevel, BuildingCensus census)
+        {
+            if (!CanBuildFromEmptySlot(currentCoreLevel))
+                return false;
+
+            return MeetsFamilyRequirements(census);
+        }
+
+        public bool MeetsFamilyRequirements(BuildingCensus census)
+        {
+            if (requiredFamilyIds == null || requiredFamilyIds.Length == 0)
+                return true;
+
+            for (int i = 0; i < requiredFamilyIds.Length; i++)
+            {
+                string familyId = requiredFamilyIds[i];
+                if (string.IsNullOrWhiteSpace(familyId))
+                    continue;
+
+                if (census == null || !census.HasFamily(familyId))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public bool IsSameFamily(BuildingData other)
+        {
+            if (other == null || !HasFamilyId || !other.HasFamilyId)
+                return false;
+
+            return buildingFamilyId == other.buildingFamilyId;
         }
 
         public void CollectUpgrades(List<BuildingData> results, int currentCoreLevel)
@@ -198,6 +245,31 @@ namespace OZGL.KDH
             if (string.IsNullOrWhiteSpace(buildingId))
             {
                 Debug.LogWarning($"[BuildingData] buildingId가 비어 있습니다. 에셋: {name}", this);
+            }
+
+            // Current date KDH 2026-09-22
+            // 가문이 비어 있으면 HasFamily로 찾을 수 없습니다. 업그레이드 계열은 같은 ID를 넣습니다.
+            if (string.IsNullOrWhiteSpace(buildingFamilyId))
+            {
+                Debug.LogWarning($"[BuildingData] buildingFamilyId가 비어 있습니다. 가문 조회에서 빠집니다. 에셋: {name}", this);
+            }
+
+            if (requiredFamilyIds != null)
+            {
+                for (int i = 0; i < requiredFamilyIds.Length; i++)
+                {
+                    string familyId = requiredFamilyIds[i];
+                    if (string.IsNullOrWhiteSpace(familyId))
+                    {
+                        Debug.LogWarning($"[BuildingData] requiredFamilyIds[{i}]가 비어 있습니다. 에셋: {name}", this);
+                        continue;
+                    }
+
+                    if (buildFromEmptySlot && HasFamilyId && familyId == buildingFamilyId)
+                    {
+                        Debug.LogWarning($"[BuildingData] 자기 가문을 선행 조건으로 두면 첫 건물을 지을 수 없습니다: {familyId}. 에셋: {name}", this);
+                    }
+                }
             }
 
             if (string.IsNullOrWhiteSpace(displayName))

@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64e65a2564c63d64b9c40f7acfa6bb6b, type: 3}
+  m_Name: Trait_AttackSpeed
+  m_EditorClassIdentifier: Assembly-CSharp::TraitData
+  _id: 12007
+  _displayName: "\uC2E0\uC18D\uD55C \uC190\uB180\uB9BC"
+  _description: "\uC544\uAD70\uC774 \uB354\uC6B1 \uBE60\uB974\uAC8C \uACF5\uACA9\uD569\uB2C8\uB2E4."
+  _icon: {fileID: 0}
+  _effectLabel: "\uC544\uAD70 \uACF5\uACA9 \uC18D\uB3C4 \uC99D\uAC00"
+  _valuePerLevel: 2
+  _valueUnit: '%'
+  _maxLevel: 5
+  _upgradeCost: 200
+  _upgradeCosts: 
+  _prerequisite: {fileID: 11400000, guid: 3c32e6dd6e37c5f429847040b65ac7b5, type: 2}
+  _prerequisiteLevel: 1
+  _statEffects:
+  - _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0
+    _statType: 170
+    _modifierType: 1
+    _valuePerLevel: 2
+  - _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0
+    _statType: 170
+    _modifierType: 1
+    _valuePerLevel: 4
+  - _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0
+    _statType: 170
+    _modifierType: 1
+    _valuePerLevel: 6
+  - _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0
+    _statType: 170
+    _modifierType: 1
+    _valuePerLevel: 8
+  - _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0
+    _statType: 170
+    _modifierType: 1
+    _valuePerLevel: 10
+  _currencyEffects: []
+  _startingCurrencies: []
