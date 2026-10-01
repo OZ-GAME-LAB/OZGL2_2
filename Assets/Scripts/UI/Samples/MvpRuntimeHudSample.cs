@@ -1,5 +1,6 @@
 using System;
 using Cysharp.Threading.Tasks;
+using Game.Cameras;
 using Game.Core;
 using OZGL.KDH;
 using TMPro;
@@ -41,7 +42,6 @@ namespace Game.UI.Samples
         [SerializeField] private ArtifactRewardBinding _artifactRewards;
         [SerializeField] private ArtifactManager _artifactManager;
         [SerializeField] private EffectManager _effectManager;
-
         private string _runId;
         private string _pendingRewardId;
         private int _awardedGold;
@@ -97,7 +97,7 @@ namespace Game.UI.Samples
             }
             var rewardLabel = _rewardButton.GetComponentInChildren<TMP_Text>(true);
             if (rewardLabel != null) rewardLabel.text = UsesArtifactRewards ? "승리 보상 다시 열기" : "웨이브 보상 지급";
-            _flow.BeginRun();
+            _flow.NewGame();
             _statusText.text = "실제 재화·코어 연결 / 전투 판정은 테스트 입력 · 승리 유물 연동: " + UsesArtifactRewards;
         }
 

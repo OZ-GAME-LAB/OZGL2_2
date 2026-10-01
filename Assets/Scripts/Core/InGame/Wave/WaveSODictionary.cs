@@ -13,6 +13,7 @@ public class WaveGroup
 [Serializable]
 public class FactionWaveGroup
 {
+    // SO 목록을 분류하는 기준. 실제 노드의 팩션은 WaveSO.Faction을 사용한다.
     public EnemyUnitFaction Faction;
     public List<WaveGroup> Groups = new List<WaveGroup>();
 }
@@ -59,26 +60,44 @@ public class WaveSODictionary : ScriptableObject
         }
     }
 
+    public bool TryGetWaveSO(int waveId, out WaveSO result)
+    {
+        result = null;
+        if (Groups == null) return false;
+
+        foreach (FactionWaveGroup factionGroup in Groups)
+        {
+            if (factionGroup == null || factionGroup.Groups == null)
+                continue;
+
+            foreach (WaveGroup group in factionGroup.Groups)
+            {
+                if (group == null || group.Presets == null)
+                    continue;
+
+                foreach (WaveSO preset in group.Presets)
+                {
+                    if (preset == null || preset.WaveID != waveId)
+                        continue;
+
+                    result = preset;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
     public bool TryGetRandomWaveSO(
         int currentQuarter,
         WaveBattleType battleType,
         out WaveSO result)
-    {
-        return TryGetRandomWaveSO(currentQuarter, battleType, out result, out _);
-    }
-
-    public bool TryGetRandomWaveSO(
-        int currentQuarter,
-        WaveBattleType battleType,
-        out WaveSO result,
-        out EnemyUnitFaction faction)
     {
         if (_waveDictionary == null)
             RebuildDictionary();
 
         var candidates = new List<WaveSO>();
         var seen = new HashSet<WaveSO>();
-        var factions = new List<EnemyUnitFaction>();
 
         foreach (var entry in _waveDictionary)
         {
@@ -96,7 +115,6 @@ public class WaveSODictionary : ScriptableObject
                     if (seen.Add(preset))
                     {
                         candidates.Add(preset);
-                        factions.Add(entry.Key);
                     }
                 }
             }
@@ -105,14 +123,12 @@ public class WaveSODictionary : ScriptableObject
         if (candidates.Count == 0)
         {
             result = null;
-            faction = default;
             return false;
         }
 
         // 허용된 모든 세력의 중복 없는 프리셋 후보를 균등 추첨한다.
         int index = UnityEngine.Random.Range(0, candidates.Count);
         result = candidates[index];
-        faction = factions[index];
         return true;
     }
 }

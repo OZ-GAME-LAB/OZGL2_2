@@ -20,6 +20,10 @@ namespace OZGL.KDH
 
         public int OccupiedCount => _known.Count;
 
+        // Current date KDH 2026-10-01
+        // 코어를 뺀 일반 건물 수입니다. 이미 이벤트로 갱신되는 카운트를 읽기만 하므로 추가 비용이 없습니다.
+        public int BuiltCount => OccupiedCount - CountType(BuildingType.Core);
+
         public void Register(BuildingSlot slot)
         {
             if (slot == null)
