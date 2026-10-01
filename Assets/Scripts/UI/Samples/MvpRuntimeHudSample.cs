@@ -1,5 +1,6 @@
 using System;
 using Cysharp.Threading.Tasks;
+using Game.Cameras;
 using Game.Core;
 using OZGL.KDH;
 using TMPro;
@@ -41,7 +42,6 @@ namespace Game.UI.Samples
         [SerializeField] private ArtifactRewardBinding _artifactRewards;
         [SerializeField] private ArtifactManager _artifactManager;
         [SerializeField] private EffectManager _effectManager;
-
         private string _runId;
         private string _pendingRewardId;
         private int _awardedGold;
