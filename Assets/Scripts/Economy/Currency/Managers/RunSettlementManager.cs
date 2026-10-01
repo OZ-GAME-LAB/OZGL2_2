@@ -9,32 +9,29 @@ public class RunSettlementManager : MonoBehaviour, IRunSettlementRewards
 
     private PersistentCurrencyManager _persistentWallet;
     private EffectManager _effectManager;
-    private WaveController _waveController;
+    private TotemRunApplier _totemRunApplier;
     private readonly CurrencyRewardCalculator _rewardCalculator = new CurrencyRewardCalculator();
 
     public void Initialize(WaveController waveController, EffectManager effectManager,
-        PersistentCurrencyManager persistentWallet)
+        PersistentCurrencyManager persistentWallet, TotemRunApplier totemRunApplier)
     {
-        _waveController = waveController;
         _effectManager = effectManager;
         _persistentWallet = persistentWallet;
+        _totemRunApplier = totemRunApplier;
     }
 
-    // 종료한 전투의 웨이브·분기 번호를 변경하기 전에 호출
-    public UniTask TryApplyReward()
+    // 게임 종료 시 확정된 기록으로 보상을 계산합니다.
+    public UniTask TryApplyReward(RunSummary summary)
     {
-        // 추후 구조체로 변경 예정 부분 (현재는 waveController의 웨이브·분기 번호 검증용)
-        if (_waveController == null || _waveController.CurQuarter < 1 ||
-            _waveController.CurWave < 1 || _waveController.CurWave > WaveController.MAX_WAVE)
+        if (summary == null || summary.ClearWaveCount < 0 || summary.ClearBossCount < 0 ||
+            summary.ClearBossCount > summary.ClearWaveCount)
         {
-            Debug.LogError("[Economy/RunSettlementManager] 정산할 웨이브 위치를 확인하세요.", this);
+            Debug.LogError("[Economy/RunSettlementManager] 정산 기록의 웨이브·보스 클리어 횟수를 확인하세요.", this);
             return UniTask.CompletedTask;
         }
 
-        // 규성님이 게임 플로우에서 제공할 구조체로 교체. 현재는 waveController의 프로퍼티들 사용
-        int totalWaveCleared = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE
-            + _waveController.CurWave;
-        int totalBossesCleared = totalWaveCleared / WaveController.MAX_WAVE;
+        int totalWaveCleared = summary.ClearWaveCount;
+        int totalBossesCleared = summary.ClearBossCount;
 
         if (_currencyCatalog == null ||
             !_currencyCatalog.TryGetByType(CurrencyType.Bloodstone, out CurrencyData currency))
@@ -43,16 +40,20 @@ public class RunSettlementManager : MonoBehaviour, IRunSettlementRewards
             return UniTask.CompletedTask;
         }
 
+
         CurrencyAmount reward = _rewardCalculator.CalculateRunSettlementReward(
             currency, totalWaveCleared, totalBossesCleared,
             _effectManager != null ? _effectManager.CurrencyModifiers : null);
 
+        // 계산식 이후 토템 및 제단 적용
+        int finalAmouont = _totemRunApplier.CalculateBonusBloodstone(reward.Amount);
+
         // 정산 UI를 Open하는 함수를 호출해야하는 부분. 
-        // 계산된 reward와 totalWaveCleared, totalBossesCleared 등 전체 항목 전달해야함
+        // 계산된 reward와 summary(진행도·처치 수·등급별 아티팩트 기록)를 전달해야함
         // Figma UI 기준으로는 토템 내역, 진행도, 아티팩트 내역(희귀도 기준), 계산식 전달해야함
 
         // 정산 부분
-        if (_persistentWallet == null || !_persistentWallet.TryAdd(currency.Type, reward.Amount))
+        if (_persistentWallet == null || !_persistentWallet.TryAdd(currency.Type, finalAmouont))
         {
             Debug.LogError("[Economy/RunSettlementManager] 혈석 정산 보상 지급에 실패했습니다. 지갑 초기화 상태와 보상 금액을 확인하세요.", this);
             return UniTask.CompletedTask;

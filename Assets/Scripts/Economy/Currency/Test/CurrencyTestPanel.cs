@@ -510,7 +510,7 @@ public class CurrencyTestPanel : MonoBehaviour
         {
             InitializePersistentManagers();
             int before = _persistent.GetBalance(_bloodstone.Type);
-            await _settlement.TryApplyReward();
+            await _settlement.TryApplyReward(CreateTestRunSummary());
             int after = _persistent.GetBalance(_bloodstone.Type);
             _result = $"정산 호출 완료: 혈석 {before} → {after} (실패 여부는 Console 확인)";
         }
@@ -523,9 +523,9 @@ public class CurrencyTestPanel : MonoBehaviour
     private async UniTask CheckSettlementReward()
     {
         int before = _persistent.GetBalance(_bloodstone.Type);
-        int clearedWaves = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE + _waveController.CurWave;
-        int expectedReward = clearedWaves * (1 + clearedWaves / WaveController.MAX_WAVE);
-        await _settlement.TryApplyReward();
+        RunSummary summary = CreateTestRunSummary();
+        int expectedReward = summary.ClearWaveCount * (1 + summary.ClearBossCount);
+        await _settlement.TryApplyReward(summary);
         int balance = _persistent.GetBalance(_bloodstone.Type);
         Check(balance == before + expectedReward, "현재 웨이브 포함 임시 정산 수량 확인");
         if (balance < before || !_persistent.TrySpend(_bloodstone.Type, balance - before))
@@ -533,6 +533,19 @@ public class CurrencyTestPanel : MonoBehaviour
             throw new InvalidOperationException("혈석 정산 검사 후 잔액 복원 실패");
         }
     }
+    // 테스트 패널에서는 현재 웨이브까지 클리어했다고 가정한 기록을 전달합니다.
+    private RunSummary CreateTestRunSummary()
+    {
+        int clearedWaves = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE + _waveController.CurWave;
+        return new RunSummary(new RunStats
+        {
+            ClearWaveCount = clearedWaves,
+            ClearBossCount = clearedWaves / WaveController.MAX_WAVE,
+            MaxQuarter = _waveController.CurQuarter,
+            MaxWave = _waveController.CurWave
+        });
+    }
+
     private void CheckBalanceAccess(CurrencyData currency, CurrencyType expectedType)
     {
         var balances = currency.Lifetime == CurrencyLifetime.Run ? _run.Balances : _persistent.Balances;

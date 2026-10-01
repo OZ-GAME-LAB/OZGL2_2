@@ -6,7 +6,7 @@ using Units.Skills;
 using UnityEngine;
 
 // 소모성 아이템 획득, 슬롯 관리 및 사용 요청
-public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, IConsumableItemInventory, IConsumableItemUser
+public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, IConsumableItemInventory, IConsumableItemUser, ISaveDataProvider<ConsumableItemSaveData>
 {
     public bool IsInitialized => _inventory != null;
     public ConsumableItemCatalog Catalog => _itemCatalog;
@@ -228,4 +228,47 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
         }
     }
 
+    public ConsumableItemSaveData CaptureSaveData()
+    {
+        if (!IsInitialized || IsUsing) throw new InvalidOperationException("아이템 초기화 및 사용 처리가 끝난 뒤 저장하세요.");
+        var data = new ConsumableItemSaveData { Capacity = Capacity };
+        foreach (var slot in Slots) data.SlotItemIds.Add(slot.IsEmpty ? "" : slot.Item.Id);
+        return data;
+    }
+
+    // 아티팩트·제단·토템 효과를 먼저 복원한 다음 호출하세요.
+    public void RestoreSaveData(ConsumableItemSaveData data)
+    {
+        if (!IsInitialized || IsUsing) throw new InvalidOperationException("아이템 초기화 및 사용 처리가 끝난 뒤 복원하세요.");
+        if (data == null || data.SlotItemIds == null || data.Capacity < 0 || data.SlotItemIds.Count < data.Capacity)
+            throw new ArgumentException("아이템 저장 데이터의 슬롯 수가 올바르지 않습니다.");
+        var items = new List<ConsumableItemData>();
+        int count = 0;
+        foreach (string id in data.SlotItemIds)
+        {
+            if (string.IsNullOrEmpty(id)) { items.Add(null); continue; }
+            if (!_itemCatalog.TryGetById(id, out var item)) throw new ArgumentException("카탈로그에 없는 아이템 ID: " + id);
+            items.Add(item);
+            count++;
+        }
+        if (items.Count > data.Capacity && (count <= data.Capacity || items[items.Count - 1] == null))
+            throw new ArgumentException("아이템 초과 슬롯 상태가 올바르지 않습니다.");
+        var restored = new ConsumableItemInventory(data.Capacity, items);
+        _inventory.InventoryChanged -= HandleInventoryChanged;
+        _inventory = restored;
+        _inventory.InventoryChanged += HandleInventoryChanged;
+        _capacityRefreshPending = false;
+        // 저장된 최종 Capacity를 다시 기본 슬롯 + 효과로 더하지 않습니다.
+        IsUsing = true;
+        try { HandleInventoryChanged(); }
+        finally
+        {
+            IsUsing = false;
+            if (_capacityRefreshPending)
+            {
+                _capacityRefreshPending = false;
+                HandleEffectsChanged();
+            }
+        }
+    }
 }
