@@ -42,6 +42,10 @@ namespace OZGL.KDH
         [Header("코어")]
         [Tooltip("Core 타입일 때만 사용합니다. Core2면 2처럼, 도달 비교에 씁니다.")]
         [Min(0)] [SerializeField] private int coreLevel;
+        // Current date KDH 2026-10-01
+        // 코어 단계마다 동시에 세울 수 있는 일반 건물 수입니다. 코어 업그레이드 = 다른 SO이므로 한도도 같이 바뀝니다.
+        [Tooltip("Core 타입일 때만 사용합니다. 이 코어 단계에서 세울 수 있는 일반 건물(코어 제외) 최대 개수입니다. 0이면 제한 없음.")]
+        [Min(0)] [SerializeField] private int buildLimit;
 
         [Header("모듈 - 쓰는 기능만 enabled")]
         [SerializeField] private BuildingProductionSettings production = new BuildingProductionSettings();
@@ -66,6 +70,7 @@ namespace OZGL.KDH
         public bool BuildFromEmptySlot => buildFromEmptySlot;
         public int RequiredCoreLevel => requiredCoreLevel;
         public int CoreLevel => coreLevel;
+        public int BuildLimit => buildLimit;
         public BuildingProductionSettings Production => production;
         public BuildingSpawnSettings Spawn => spawn;
         public BuildingUpgradeOption[] Upgrades => upgrades;
@@ -210,6 +215,9 @@ namespace OZGL.KDH
             if (coreLevel < 0)
                 coreLevel = 0;
 
+            if (buildLimit < 0)
+                buildLimit = 0;
+
             if (requiredCoreLevel < 0)
                 requiredCoreLevel = 0;
 
@@ -300,6 +308,17 @@ namespace OZGL.KDH
             if (buildingType != BuildingType.Core && coreLevel > 0)
             {
                 Debug.LogWarning($"[BuildingData] Core가 아닌데 coreLevel이 들어 있습니다. 에셋: {name}", this);
+            }
+
+            // Current date KDH 2026-10-01
+            if (buildingType == BuildingType.Core && buildLimit <= 0)
+            {
+                Debug.LogWarning($"[BuildingData] Core인데 buildLimit이 0이라 건설 개수 제한이 없습니다. 에셋: {name}", this);
+            }
+
+            if (buildingType != BuildingType.Core && buildLimit > 0)
+            {
+                Debug.LogWarning($"[BuildingData] Core가 아닌데 buildLimit이 들어 있습니다. 에셋: {name}", this);
             }
 
             if (buildCost == null || buildCost.Length == 0)

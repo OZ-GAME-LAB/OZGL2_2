@@ -25,7 +25,9 @@ MonoBehaviour:
     amount: 99999
   buildFromEmptySlot: 0
   requiredCoreLevel: 1
+  requiredFamilyIds: []
   coreLevel: 2
+  buildLimit: 7
   production:
     enabled: 0
     resourceType: 0
@@ -39,6 +41,6 @@ MonoBehaviour:
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 636c035baa190cd4eaa966366026b806, type: 2}
     cost:
-    - type: 1
-      amount: 3
+    - type: 0
+      amount: 300
     requiredCoreLevel: 2
