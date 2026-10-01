@@ -85,6 +85,8 @@ namespace Game.Core
         private WaveController _waveController; //인게임 전투 담당
         private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
         private RunSettlementManager _runSettlementManager; //게임 종료 후 정산 담당
+        private ArchiveManager _archiveManager;
+        private IRunSettlementRewards _settlementRewards;
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
         private bool _isTransitioning;
@@ -102,11 +104,15 @@ namespace Game.Core
             WaveController waveController, 
             TestWaitingScript testScript, 
             ArtifactManager artifactManager, 
+            ArchiveManager archiveManager = null,
+            IRunSettlementRewards settlementRewards = null,
             InGameCameraController cameraController = null )
         {
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
+            _archiveManager = archiveManager;
+            _settlementRewards = settlementRewards;
             _cameraController = cameraController;
             _nodeController = new NodeController(waveController.WaveCatalog);
             ClearToken();
@@ -409,6 +415,15 @@ namespace Game.Core
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
             ChangePhase(GamePhase.Finished);
+            _archiveManager.CompleteRun();
+            if (!_archiveManager.TryGetRunSummary(out RunSummary summary))
+            {
+                Debug.LogError("[GameFlowController : FinishRun] 게임 결산을 불러올 수 없습니다!");
+                //바로 메인화면 보내기
+                return;
+            }
+
+            //_runSettlementManager.TryApplyReward(summary);
         }
 
         private void ChangePhase(GamePhase phase)

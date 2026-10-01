@@ -107,7 +107,7 @@ namespace Game.UI.InGame
             Refresh();
         }
 
-        private void HandleWaveChanged(WaveChangedInfo info) => Refresh();
+        private void HandleWaveChanged(WaveInfo info) => Refresh();
 
         private void HandleWaveStartRequested()
         {
