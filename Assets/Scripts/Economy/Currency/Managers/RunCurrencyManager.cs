@@ -4,7 +4,7 @@ using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
 
-public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunCurrencyRewards
+public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunCurrencyRewards, ISaveDataProvider<RunCurrencySaveData>
 {
     public event Action<CurrencyData, int, int> BalanceChanged;
 
@@ -605,5 +605,80 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         }
 
         return true;
+    }
+
+    public RunCurrencySaveData CaptureSaveData()
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("런 재화 초기화 및 거래 완료 후 저장하세요.");
+        var data = new RunCurrencySaveData {
+            HasPreparedReward = _preparedRewards != null, PreparedQuarter = _preparedQuarter,
+            PreparedWave = _preparedWave, WaveRewardApplied = _waveRewardApplied
+        };
+        foreach (var balance in _wallet.Balances)
+            data.Balances.Add(new RunCurrencySaveEntry { Type = balance.Key.Type, Amount = balance.Value });
+        if (_preparedRewards != null)
+            foreach (var reward in _preparedRewards)
+                data.PreparedRewards.Add(new RunCurrencySaveEntry { Type = reward.Currency.Type, Amount = reward.Amount });
+        return data;
+    }
+
+    public void RestoreSaveData(RunCurrencySaveData data)
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("런 재화 초기화 및 거래 완료 후 복원하세요.");
+        if (data == null || data.Balances == null || data.PreparedRewards == null)
+            throw new ArgumentException("런 재화 저장 데이터가 없습니다.");
+        var wallet = new CurrencyWallet(CurrencyLifetime.Run);
+        if (!TryRegisterRunCurrencies(wallet)) throw new InvalidOperationException("런 재화 카탈로그를 확인하세요.");
+        var seen = new HashSet<CurrencyType>();
+        foreach (var entry in data.Balances)
+        {
+            CurrencyData currency = ResolveSavedCurrency(entry, seen);
+            if (!wallet.TrySetBalance(currency, entry.Amount)) throw new ArgumentException("런 재화 잔액 복원 실패");
+        }
+        if (seen.Count != wallet.Balances.Count) throw new ArgumentException("저장 데이터에 런 재화 잔액이 누락되었습니다.");
+        if (data.HasPreparedReward)
+        {
+            if (data.PreparedQuarter < 1 || data.PreparedWave < 1 || data.PreparedWave > WaveController.MAX_WAVE)
+                throw new ArgumentException("저장된 보상 웨이브가 올바르지 않습니다.");
+        }
+        else if (data.WaveRewardApplied || data.PreparedQuarter != 0 || data.PreparedWave != 0 || data.PreparedRewards.Count != 0)
+            throw new ArgumentException("준비되지 않은 웨이브 보상 데이터입니다.");
+        seen.Clear();
+        var rewards = new List<CurrencyAmount>();
+        int gold = 0, gem = 0;
+        foreach (var entry in data.PreparedRewards)
+        {
+            CurrencyData currency = ResolveSavedCurrency(entry, seen);
+            rewards.Add(new CurrencyAmount(currency, entry.Amount));
+            if (entry.Type == CurrencyType.Gold) gold = entry.Amount;
+            if (entry.Type == CurrencyType.Gem) gem = entry.Amount;
+        }
+        var previous = _wallet;
+        _isTrading = true;
+        try
+        {
+            _wallet = wallet;
+            _preparedRewards = data.HasPreparedReward ? rewards.ToArray() : null;
+            _preparedQuarter = data.PreparedQuarter;
+            _preparedWave = data.PreparedWave;
+            _waveRewardApplied = data.WaveRewardApplied;
+            CurrentGoldReward = gold;
+            CurrentGemReward = gem;
+            foreach (var balance in wallet.Balances)
+            {
+                int before = previous.GetBalance(balance.Key);
+                if (before != balance.Value) BalanceChanged?.Invoke(balance.Key, before, balance.Value);
+            }
+        }
+        finally { _isTrading = false; }
+    }
+
+    private CurrencyData ResolveSavedCurrency(RunCurrencySaveEntry entry, HashSet<CurrencyType> seen)
+    {
+        if (entry == null || entry.Amount < 0 || !seen.Add(entry.Type) ||
+            !_currencyCatalog.TryGetByType(entry.Type, out var currency) || currency.Lifetime != CurrencyLifetime.Run ||
+            !_wallet.Balances.ContainsKey(currency))
+            throw new ArgumentException("저장 재화의 종류·잔액·중복을 확인하세요.");
+        return currency;
     }
 }

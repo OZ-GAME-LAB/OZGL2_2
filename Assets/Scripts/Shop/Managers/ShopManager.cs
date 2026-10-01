@@ -5,7 +5,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 // 상점 품목을 보관하고 재화·아티팩트·소모성 아이템 매니저에 거래 요청
-public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
+public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, ISaveDataProvider<ShopSaveData>
 {
     public bool IsInitialized => _selector != null && _artifactManager != null &&
         _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized &&
@@ -282,5 +282,77 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
         ShopChanged?.Invoke();
         _isTrading = false;
         return true;
+    }
+
+    public ShopSaveData CaptureSaveData()
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("상점 초기화 및 거래 완료 후 저장하세요.");
+        var data = new ShopSaveData { HasStock = HasStock };
+        foreach (var slot in _purchaseSlots)
+            data.Artifacts.Add(new ShopPurchaseSaveEntry { ItemId = slot.Artifact.Id, Currency = slot.Currency, Price = slot.Price, Purchased = slot.IsPurchased });
+        foreach (var slot in _consumableSlots)
+            data.Consumables.Add(new ShopPurchaseSaveEntry { ItemId = slot.Item.Id, Currency = slot.Currency, Price = slot.Price, Purchased = slot.IsPurchased });
+        foreach (var slot in _exchangeSlots)
+            data.Exchanges.Add(new ShopExchangeSaveEntry { ArtifactId = slot.Artifact.Id, Exchanged = slot.IsExchanged });
+        return data;
+    }
+
+    public void RestoreSaveData(ShopSaveData data)
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("상점 초기화 및 거래 완료 후 복원하세요.");
+        if (data == null || data.Artifacts == null || data.Consumables == null || data.Exchanges == null)
+            throw new ArgumentException("상점 저장 데이터가 없습니다.");
+        if (!data.HasStock && (data.Artifacts.Count != 0 || data.Consumables.Count != 0 || data.Exchanges.Count != 0))
+            throw new ArgumentException("미생성 상점에 저장 상품이 있습니다.");
+        var artifacts = new List<ShopArtifactSlot>();
+        var consumables = new List<ShopConsumableSlot>();
+        var exchanges = new List<ShopArtifactExchangeSlot>();
+        var seen = new HashSet<string>();
+        foreach (var entry in data.Artifacts)
+        {
+            ValidateSavedPurchase(entry, seen);
+            if (!_artifactManager.ArtifactCatalog.TryGetById(entry.ItemId, out var artifact))
+                throw new ArgumentException("상점 아티팩트 ID를 찾을 수 없습니다: " + entry.ItemId);
+            var slot = new ShopArtifactSlot(artifact, entry.Currency, entry.Price);
+            if (entry.Purchased) slot.MarkPurchased();
+            artifacts.Add(slot);
+        }
+        seen.Clear();
+        foreach (var entry in data.Consumables)
+        {
+            ValidateSavedPurchase(entry, seen);
+            if (_consumables == null || _consumables.Catalog == null || !_consumables.Catalog.TryGetById(entry.ItemId, out var item))
+                throw new ArgumentException("상점 소모성 아이템 ID를 찾을 수 없습니다: " + entry.ItemId);
+            var slot = new ShopConsumableSlot(item, entry.Currency, entry.Price);
+            if (entry.Purchased) slot.MarkPurchased();
+            consumables.Add(slot);
+        }
+        seen.Clear();
+        foreach (var entry in data.Exchanges)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.ArtifactId) || !seen.Add(entry.ArtifactId) ||
+                !_artifactManager.ArtifactCatalog.TryGetById(entry.ArtifactId, out var artifact))
+                throw new ArgumentException("상점 교환 아티팩트 ID·중복을 확인하세요.");
+            var slot = new ShopArtifactExchangeSlot(artifact);
+            if (entry.Exchanged) slot.MarkExchanged();
+            exchanges.Add(slot);
+        }
+        _isTrading = true;
+        try
+        {
+            _purchaseSlots = artifacts;
+            _consumableSlots = consumables;
+            _exchangeSlots = exchanges;
+            HasStock = data.HasStock;
+            ShopChanged?.Invoke();
+        }
+        finally { _isTrading = false; }
+    }
+
+    private void ValidateSavedPurchase(ShopPurchaseSaveEntry entry, HashSet<string> seen)
+    {
+        if (entry == null || string.IsNullOrWhiteSpace(entry.ItemId) || !seen.Add(entry.ItemId) || entry.Price < 0 ||
+            (entry.Currency != CurrencyType.Gold && entry.Currency != CurrencyType.Gem) || !_runCurrencyManager.CanSpend(entry.Currency, 0))
+            throw new ArgumentException("저장 상품의 ID·가격·재화·중복을 확인하세요.");
     }
 }

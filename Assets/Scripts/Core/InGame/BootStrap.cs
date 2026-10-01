@@ -78,7 +78,7 @@ public class BootStrap : MonoBehaviour
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager);
+        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier);
         _cameraController.Initialize(_buildController,_gameFlowController);
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())
