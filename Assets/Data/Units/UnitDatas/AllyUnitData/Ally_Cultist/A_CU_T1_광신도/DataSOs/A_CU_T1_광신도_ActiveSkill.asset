@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: "A_CU_T1_\uAD11\uC2E0\uB3C4_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
   _skillRange: 7
-  _skillCooldown: 5
+  _skillCooldown: 6
   _targetSide: 1
   _targetPolicy: 2
   _actionType: 0
@@ -43,7 +43,7 @@ MonoBehaviour:
         _target:
           _source: 6
           _relation: 1
-          _includeSelf: 0
+          _includeSelf: 1
           _range: 7
           _maxTargetCount: 1
           _clusterRadius: 2
