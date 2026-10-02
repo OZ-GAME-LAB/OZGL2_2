@@ -60,8 +60,23 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 73a42d1b9a729c14bbf6ef56db6d60de, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 016c9bd54fbdf4141a75f2a1b6d21610, type: 2}
+  _activeSkills:
+  - _id: ChargeStun_T3
+    _skill: {fileID: 11400000, guid: 016c9bd54fbdf4141a75f2a1b6d21610, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 1961398275fc45c4fbe560f9ac8ddb7e, type: 2}
   - {fileID: 11400000, guid: 4f42618c957349246a734f53358f075e, type: 2}
   - {fileID: 11400000, guid: 935674e3f4b9e9441b7cf028963df6f3, type: 2}
+  references:
+    version: 2
+    RefIds: []

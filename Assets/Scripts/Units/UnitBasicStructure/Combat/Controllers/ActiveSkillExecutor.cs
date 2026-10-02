@@ -112,6 +112,24 @@ namespace Units
             return source == SkillTargetSource.None || source == SkillTargetSource.Self || source == SkillTargetSource.Search || CombatTargetUtility.IsValid(target);
         }
 
+        public bool TryPreview(ICombatTarget initial, out SkillTargetResult targets)
+        {
+            targets = null;
+            if (!CanExecute(initial)) return false;
+            var preview = new Execution
+            {
+                Owner = new CombatTargetSnapshot(_core.CombatTarget),
+                Initial = new CombatTargetSnapshot(initial),
+                Current = new CombatTargetSnapshot(initial),
+                Engagement = new SkillEngagementSession(null, null),
+                Actions = SkillActionPlan.Create(_data)
+            };
+            var first = preview.Actions[0];
+            if (first.Origin == SkillAreaOrigin.PreviousResult) return false;
+            targets = SelectTargets(preview, first, false, true);
+            return targets.Success;
+        }
+
         public bool TryPrepare(
             ICombatTarget initial,
             SkillEngagementSession engagement,
@@ -800,7 +818,7 @@ namespace Units
         private SkillTargetResult SelectTargets(
             Execution run,
             SkillActionData action,
-            bool reselect)
+            bool reselect, bool previewOnly = false)
         {
             var settings = reselect ? action.Target.WithSource(SkillTargetSource.Search) : action.Target;
 
@@ -823,6 +841,8 @@ namespace Units
 
             if (settings.Relation != SkillTargetRelation.Hostile || settings.Source == SkillTargetSource.None || !selected.Success)
                 return selected;
+
+            if (previewOnly) return selected;
 
             var approval = run.Engagement.Ensure(settings.Relation, selected.PrimaryTarget.Target);
 

@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "A_AR_T3_21_\uC77C\uACA9\uC0AC\uC218_PassiveSkill_DefPenetration"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 3
+  _tickInterval: 0.25
+  _conditions:
+  - rid: 4844432426836164609
+  _effectMode: 0
+  _actions:
+  - rid: 4844432426836164610
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432426836164609
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4844432426836164610
+      type: {class: PassiveDefenseModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _ownerType: 0
+        _value: 1

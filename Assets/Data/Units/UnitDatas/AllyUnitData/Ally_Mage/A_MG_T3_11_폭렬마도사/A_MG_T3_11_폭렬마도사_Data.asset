@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "A_MG_T3_11_\uD3ED\uB82C\uB9C8\uB3C4\uC0AC_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "A_MG_T3_11_\uD3ED\uB82C\uB9C8\uB3C4\uC0AC"
+  _unitName: "\uD3ED\uB82C\uB9C8\uB3C4\uC0AC"
+  _team: 0
+  _allyIdentity:
+    _unitClass: 4
+    _unitTier: 2
+    _unitType: 35
+  _enemyIdentity:
+    _unitClass: 0
+    _unitFaction: 0
+    _unitType: 0
+  _stats:
+  - _statType: 0
+    _value: 800
+  - _statType: 10
+    _value: 0
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 60
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.1
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 5
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 
+  _basicAttackData: {fileID: 11400000, guid: 824338d1d529bba49bfb2ffda14da382, type: 2}
+  _activeSkills:
+  - _id: BiiiiigFireBall_T3
+    _skill: {fileID: 11400000, guid: 949601fe271ebe44c8922e6265e0eb16, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 1
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: 9e6de96a6cb4b594494e7f8a145b1cb3, type: 2}
+  - {fileID: 11400000, guid: 872be7cea082f4347be2250eba3a6c0a, type: 2}
+  - {fileID: 11400000, guid: 2b6ea302e12020d43b2b1c5a65641e7f, type: 2}
+  references:
+    version: 2
+    RefIds: []

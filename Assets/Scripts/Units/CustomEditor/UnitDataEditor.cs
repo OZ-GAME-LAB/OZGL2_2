@@ -27,7 +27,6 @@ namespace Units.Editor
         private SerializedProperty _statusImmunities;
 
         private SerializedProperty _basicAttackData;
-        private SerializedProperty _activeSkillData;
         private SerializedProperty _passiveSkillDatas;
 
 
@@ -86,11 +85,6 @@ namespace Units.Editor
             _basicAttackData =
                 serializedObject.FindProperty(
                     "_basicAttackData"
-                );
-
-            _activeSkillData =
-                serializedObject.FindProperty(
-                    "_activeSkillData"
                 );
 
             _passiveSkillDatas =
@@ -1360,9 +1354,11 @@ namespace Units.Editor
                     _basicAttackData
                 );
 
-                EditorGUILayout.PropertyField(
-                    _activeSkillData
-                );
+                SkillAuthoringGUI.Draw(serializedObject.FindProperty("_activeSkills"));
+                var ids = new HashSet<string>();
+                foreach (var entry in ((UnitData)target).ActiveSkills)
+                    if (entry == null || entry.Skill == null || string.IsNullOrWhiteSpace(entry.Id) || !ids.Add(entry.Id))
+                        EditorGUILayout.HelpBox("스킬과 고유 ID를 확인하세요. 페이즈는 이 ID를 참조합니다.", MessageType.Warning);
 
                 EditorGUILayout.PropertyField(
                     _passiveSkillDatas,

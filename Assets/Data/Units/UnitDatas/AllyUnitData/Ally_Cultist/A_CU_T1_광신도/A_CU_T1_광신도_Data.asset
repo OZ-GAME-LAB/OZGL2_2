@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 02236b232b4bba54fae2adf2e363d888, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 5d47fee2cd43e114a8fb77aed539bec8, type: 2}
+  _activeSkills:
+  - _id: AreaHeal_T1
+    _skill: {fileID: 11400000, guid: 5d47fee2cd43e114a8fb77aed539bec8, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: c9adf73232b970d41946db9582f1f4be, type: 2}
+  references:
+    version: 2
+    RefIds: []

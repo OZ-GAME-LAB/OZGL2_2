@@ -16,6 +16,8 @@ namespace Units.Effects
 
         public EffectDefinitionSnapshot Definition { get; }
 
+        public object OwnershipKey { get; }
+
         public ICombatTarget Source { get; }
 
         public ICombatTarget Target { get; }
@@ -32,8 +34,9 @@ namespace Units.Effects
             ICombatTarget source,
             ICombatTarget target,
             CombatEventMetadata metadata = default,
-            EffectDefinitionSnapshot definition = null)
+            EffectDefinitionSnapshot definition = null, object ownershipKey = null)
         {
+            OwnershipKey = ownershipKey;
             Definition = definition ?? (effectData != null ? new EffectDefinitionSnapshot(effectData) : null);
 
             TargetSnapshot = new CombatTargetSnapshot(target);

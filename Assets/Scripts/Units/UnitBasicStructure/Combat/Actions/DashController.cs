@@ -92,6 +92,18 @@ namespace Units
         // Dash
         // ============================================================
 
+        // 대상이 현재 위치에 머무를 때의 예상 도착 위치. 상태·Transform·물리 설정은 변경하지 않는다.
+        internal static Vector2 PredictEndPosition(Vector2 start, Vector2 target, float distance, float speed)
+        {
+            Vector2 offset = target - start;
+            float length = offset.magnitude;
+            if (speed <= 0f || distance <= ArrivalTolerance || length <= TargetStopDistance + ArrivalTolerance)
+                return start;
+
+            float travel = Mathf.Min(Mathf.Max(0f, distance), Mathf.Max(0f, length - TargetStopDistance));
+            return start + offset.normalized * travel;
+        }
+
         public void StartDash(
             ICombatTarget target,
             float distance,

@@ -60,7 +60,22 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 6f1e5d445a62f8647a57bf29b249ff56, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: c8f7d16d913492b419324ecbc5c5e239, type: 2}
+  _activeSkills:
+  - _id: RageCharge_T2
+    _skill: {fileID: 11400000, guid: c8f7d16d913492b419324ecbc5c5e239, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: a17b233fa7fd8804eb0961bfe1b53c92, type: 2}
   - {fileID: 11400000, guid: f54f9176f0a33ca41a5d5c8c5780e1b9, type: 2}
+  references:
+    version: 2
+    RefIds: []

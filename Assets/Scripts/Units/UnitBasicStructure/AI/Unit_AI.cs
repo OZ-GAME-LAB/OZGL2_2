@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -86,6 +86,7 @@ namespace Units
         public void Initialize(
             Unit_Core core)
         {
+            UnbindEvents();
             _core =
                 core;
 
@@ -308,8 +309,10 @@ namespace Units
             }
 
 
-            if (!ValidateCurrentAssignment())
-                return;
+            if (_core.IsCombatBusy) return;
+            if (_core.TrySelectActiveSkill(CurrentTarget, out _))
+            { _currentActionEnded = true; ChangeAction(UnitAIActionType.ActiveSkill); return; }
+            if (!ValidateCurrentAssignment()) return;
 
 
             if (_currentActionEnded)
@@ -342,6 +345,9 @@ namespace Units
 
         private void EvaluateAction()
         {
+            if (_core == null || !_isRunning || _core.IsCombatBusy) return;
+            if (_isRunning && _core.TrySelectActiveSkill(CurrentTarget, out _))
+            { _currentActionEnded = true; ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!HasAssignment)
             {
                 ChangeAction(

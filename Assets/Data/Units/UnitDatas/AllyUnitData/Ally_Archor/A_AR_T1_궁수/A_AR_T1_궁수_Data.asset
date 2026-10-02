@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 901b2e8f6929ea94b9433f7dbecf5a61, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: a85ec66da15cbaa4695f87e605b13f95, type: 2}
+  _activeSkills:
+  - _id: OneShot_T1
+    _skill: {fileID: 11400000, guid: a85ec66da15cbaa4695f87e605b13f95, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: bcf82e534f58b6e4bb818eef203b234c, type: 2}
+  references:
+    version: 2
+    RefIds: []

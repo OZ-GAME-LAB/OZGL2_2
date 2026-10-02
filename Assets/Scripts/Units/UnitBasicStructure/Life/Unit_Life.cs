@@ -31,6 +31,10 @@ namespace Units
 
         private bool _isDead;
 
+        // 사망 직전 활성 상태를 저장해 풀 재사용 시 원래 설정만 복원한다.
+        private readonly System.Collections.Generic.List<Collider2D> _deathColliders = new();
+        private readonly System.Collections.Generic.List<Rigidbody2D> _deathBodies = new();
+
         private int _damageDepth;
 
         private int _lifeGeneration;
@@ -118,6 +122,8 @@ namespace Units
             StopAllCoroutines();
 
             _core = core;
+
+            RestoreDeathPhysics();
 
             SubscribeRuntimeStatusEvents();
 
@@ -412,6 +418,8 @@ namespace Units
 
             _isDead = true;
 
+            DisableDeathPhysics();
+
             Debug.Log($"[Unit_Life] {name} 사망");
 
             int generation = _lifeGeneration;
@@ -429,6 +437,41 @@ namespace Units
             StartCoroutine(DisableAfterDeath());
         }
 
+
+        private void DisableDeathPhysics()
+        {
+            foreach (var collider in GetComponentsInChildren<Collider2D>(true))
+            {
+                if (!collider.enabled || collider.GetComponentInParent<Unit_Core>() != _core)
+                    continue;
+
+                _deathColliders.Add(collider);
+                collider.enabled = false;
+            }
+
+            foreach (var body in GetComponentsInChildren<Rigidbody2D>(true))
+            {
+                if (!body.simulated || body.GetComponentInParent<Unit_Core>() != _core)
+                    continue;
+
+                _deathBodies.Add(body);
+                body.linearVelocity = Vector2.zero;
+                body.angularVelocity = 0f;
+                body.simulated = false;
+            }
+        }
+
+        private void RestoreDeathPhysics()
+        {
+            foreach (var collider in _deathColliders)
+                if (collider != null) collider.enabled = true;
+
+            foreach (var body in _deathBodies)
+                if (body != null) body.simulated = true;
+
+            _deathColliders.Clear();
+            _deathBodies.Clear();
+        }
 
         // 사망 애니메이션을 2초 동안 표시한 뒤 비활성화한다.
         private IEnumerator DisableAfterDeath()
