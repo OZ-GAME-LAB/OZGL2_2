@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
-  m_Name: "A_MG_T3_31_\uCC9C\uACF5\uB9C8\uB3C4\uC0AC_ElecBurstCoolDown"
+  m_Name: "A_MG_T3_31_\uCC9C\uACF5\uB9C8\uB3C4\uC0AC_CoolDownOnKill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
   _skillSchemaVersion: 1
   _effectId: "A_MG_T3_31_\uCC9C\uACF5\uB9C8\uB3C4\uC0AC_CoolDownOnKill"
@@ -31,5 +31,5 @@ MonoBehaviour:
       type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
         _statType: 180
-        _modifierType: 1
+        _modifierType: 0
         _value: 0.25

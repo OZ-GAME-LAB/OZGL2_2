@@ -19,15 +19,16 @@ MonoBehaviour:
   - rid: 4844432426836164611
   _effectMode: 0
   _actions:
-  - rid: 4844432426836164610
+  - rid: 4617381546080337920
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4844432426836164610
-      type: {class: PassiveDefenseModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
+    - rid: 4617381546080337920
+      type: {class: PassiveDamageValueModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _ownerType: 0
+        _modifierType: 1
         _value: 0.3
     - rid: 4844432426836164611
       type: {class: PassiveDistanceConditionData, ns: Units.Skills, asm: Assembly-CSharp}
