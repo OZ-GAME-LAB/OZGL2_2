@@ -57,8 +57,10 @@ public static class ManagerSaveValidation
                 HasRewardCandidates = true, RewardQuarter = 1, RewardWave = 1, CandidateIds = new List<string> { artifact.Id }
             };
             object otherSource = new object();
-            Check(effects.TrySetEffects(otherSource, new List<UnitStatEffectData>(), new List<CurrencyEffectData>(),
-                new List<ConsumableSlotEffectData> { (ConsumableSlotEffectData)slotEffect }), "다른 출처 효과 준비");
+            Check(effects.TrySetEffects(otherSource, new EffectDataGroup
+            {
+                SlotEffects = new List<ConsumableSlotEffectData> { (ConsumableSlotEffectData)slotEffect }
+            }), "다른 출처 효과 준비");
             int effectEvents = 0; effects.EffectsChanged += () => effectEvents++;
             artifacts.RestoreSaveData(Clone(artifactData));
             artifacts.RestoreSaveData(Clone(artifactData));
