@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: e8763ed210894e918683fdac5c87f3f6, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 5ed5064eb2c04384811400717a017f01, type: 2}
+  _activeSkills:
+  - _id: DashAttack_IR
+    _skill: {fileID: 11400000, guid: 5ed5064eb2c04384811400717a017f01, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 9c515f6b2779412391e65f736d57c404, type: 2}
+  references:
+    version: 2
+    RefIds: []

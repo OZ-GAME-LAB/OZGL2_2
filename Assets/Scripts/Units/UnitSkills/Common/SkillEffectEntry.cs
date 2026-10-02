@@ -128,17 +128,12 @@ namespace Units.Skills
         [SerializeReference]
         private List<SkillConditionData> _conditions = new();
 
-        [SerializeField]
-        private bool _consumeStacks;
-
-        [SerializeField]
-        private SkillConditionSubject _consumeSubject = SkillConditionSubject.Target;
-
-        [SerializeField]
-        private EffectStackQuery _stackQuery = new();
-
-        [SerializeField, Min(1)]
-        private int _stackCount = 1;
+        // 투사체에서 조건을 고정한 뒤에도 소비할 상태를 보존하는 실행 전용 정보.
+        private bool _consumptionFrozen;
+        private bool _frozenConsumeStacks;
+        private SkillConditionSubject _frozenConsumeSubject;
+        private EffectStackQuery _frozenStackQuery;
+        private int _frozenStackCount;
 
         [SerializeField]
         private List<SkillFXEntry> _fxEntries = new();
@@ -157,6 +152,12 @@ namespace Units.Skills
 
         internal void FreezeConditions(SkillConditionContext context)
         {
+            // Owner 조건이 FrozenCondition으로 바뀌기 전에 소비 정보를 보존한다.
+            _frozenConsumeStacks = ConsumeStacks;
+            _frozenConsumeSubject = ConsumeSubject;
+            _frozenStackQuery = StackQuery;
+            _frozenStackCount = StackCount;
+            _consumptionFrozen = true;
             _conditions = new List<SkillConditionData>(CombatSourceSnapshot.FreezeConditions(_conditions, context));
         }
 
@@ -164,13 +165,38 @@ namespace Units.Skills
         // Properties
         // ============================================================
 
-        public bool ConsumeStacks => _consumeStacks;
+        private SkillStackCondition ConsumptionCondition
+        {
+            get
+            {
+                SkillStackCondition selected = null;
+                foreach (var condition in _conditions)
+                {
+                    if (condition is not SkillStackCondition stack || !stack.ConsumeOnApply) continue;
+                    // 여러 소비를 부분 실행하지 않고 잘못된 설정을 거부한다.
+                    if (selected != null) return null;
+                    selected = stack;
+                }
+                return selected;
+            }
+        }
 
-        public SkillConditionSubject ConsumeSubject => _consumeSubject;
+        public bool ConsumeStacks
+        {
+            get
+            {
+                if (_consumptionFrozen) return _frozenConsumeStacks;
+                foreach (var condition in _conditions)
+                    if (condition is SkillStackCondition stack && stack.ConsumeOnApply) return true;
+                return false;
+            }
+        }
 
-        public EffectStackQuery StackQuery => _stackQuery;
+        public SkillConditionSubject ConsumeSubject => _consumptionFrozen ? _frozenConsumeSubject : ConsumptionCondition?.Subject ?? SkillConditionSubject.Target;
 
-        public int StackCount => _stackCount;
+        public EffectStackQuery StackQuery => _consumptionFrozen ? _frozenStackQuery : ConsumptionCondition?.Query;
+
+        public int StackCount => _consumptionFrozen ? _frozenStackCount : ConsumptionCondition?.ConsumeCount ?? 0;
 
         public IReadOnlyList<SkillFXEntry> FXEntries => _fxEntries;
     }

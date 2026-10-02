@@ -54,6 +54,16 @@ namespace Units.Effects
         // Execution
         // ============================================================
 
+        // 상태 분류는 문자열 태그나 EffectId가 아닌 상태 부여 Action의 Enum으로 판정한다.
+        public bool HasStatus(UnitStatusEffectType statusType)
+        {
+            foreach (var action in Actions)
+                if (action is StatusEffectActionData status && status.StatusType == statusType)
+                    return true;
+
+            return false;
+        }
+
         public bool HasCategory(string category)
         {
             foreach (var value in Categories)

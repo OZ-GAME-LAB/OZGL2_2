@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 93557e14d91e4804187cd1bbdb683a55, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 275d2a382853cd54c9bdf44cdc99c1a2, type: 2}
+  _activeSkills:
+  - _id: Explosion_T1
+    _skill: {fileID: 11400000, guid: 275d2a382853cd54c9bdf44cdc99c1a2, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: e7ad71b0e3d66ba4e959b5e62c2e8124, type: 2}
+  references:
+    version: 2
+    RefIds: []

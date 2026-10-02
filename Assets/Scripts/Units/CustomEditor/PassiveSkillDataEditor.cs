@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -146,7 +146,16 @@ namespace Units.Editor
             {
                 EditorGUI.indentLevel++;
 
-                if (element.managedReferenceValue is PassiveCommonConditionData)
+                if (element.managedReferenceValue is PassiveDistanceConditionData)
+                {
+                    var distance = element.FindPropertyRelative("_minimumDistance");
+                    EditorGUILayout.PropertyField(distance, new GUIContent("최소 거리", "유닛 중심 사이의 2D 월드 거리입니다. 경계값을 포함합니다."));
+                    if (float.IsNaN(distance.floatValue) || float.IsInfinity(distance.floatValue))
+                        distance.floatValue = 0f;
+                    distance.floatValue = Mathf.Max(0f, distance.floatValue);
+                    EditorGUILayout.HelpBox("거리 ≥ 최소 거리일 때 충족합니다. 즉시 피해와 투사체 모두 피해 발생 시 공격자와 피격자의 현재 위치를 사용합니다. 피해 증가는 실행 효과의 Damage 보정에서 설정하세요.", MessageType.Info);
+                }
+                else if (element.managedReferenceValue is PassiveCommonConditionData)
                 {
                     SkillAuthoringGUI.Draw(element);
                 }
@@ -185,6 +194,11 @@ namespace Units.Editor
             menu.AddItem(new GUIContent("Shield"), false, () =>
             {
                 AddManagedReferenceElement(_conditions, new PassiveShieldConditionData());
+            });
+
+            menu.AddItem(new GUIContent("거리 이상 · Distance"), false, () =>
+            {
+                AddManagedReferenceElement(_conditions, new PassiveDistanceConditionData());
             });
 
             menu.AddItem(new GUIContent("Unit Count"), false, () =>

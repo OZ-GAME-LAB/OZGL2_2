@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
-  m_Name: "E_IR_RP_사냥꾼_Data"
+  m_Name: "E_IR_RP_\uC0AC\uB0E5\uAFBC_Data"
   m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
-  _unitId: "E_IR_RP_사냥꾼"
-  _unitName: "사냥꾼"
+  _unitId: "E_IR_RP_\uC0AC\uB0E5\uAFBC"
+  _unitName: "\uC0AC\uB0E5\uAFBC"
   _team: 1
   _allyIdentity:
     _unitClass: 0
@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 98221c3ae8574836a19fbb5850d18ebb, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 05f65ac8e2534d75a8d034c6136f0d8b, type: 2}
+  _activeSkills:
+  - _id: OneShot_IR
+    _skill: {fileID: 11400000, guid: 05f65ac8e2534d75a8d034c6136f0d8b, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 3638b998f1de41bdb4663f3df3c2ad1a, type: 2}
+  references:
+    version: 2
+    RefIds: []

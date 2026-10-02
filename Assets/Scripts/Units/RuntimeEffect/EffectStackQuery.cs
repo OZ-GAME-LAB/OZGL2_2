@@ -1,13 +1,13 @@
 using System;
 using UnityEngine;
 
-// 효과 ID 또는 Category로 스택을 조회하며 실제 소비는 대상 API에 요청한다.
+// 상태이상 또는 효과 ID로 스택을 조회하며 실제 소비는 대상 API에 요청한다.
 namespace Units.Effects
 {
     public enum EffectStackQueryKind
     {
-        EffectId,
-        Category
+        EffectId = 0,
+        Status = 2
     }
     [Serializable]
     public sealed class EffectStackQuery
@@ -18,10 +18,13 @@ namespace Units.Effects
         // ============================================================
 
         [SerializeField]
-        private EffectStackQueryKind _kind;
+        private EffectStackQueryKind _kind = EffectStackQueryKind.Status;
 
         [SerializeField]
         private string _key;
+
+        [SerializeField]
+        private UnitStatusEffectType _statusType;
 
         // ============================================================
         // Properties
@@ -31,11 +34,24 @@ namespace Units.Effects
 
         public string Key => _key;
 
-        public bool IsValid => !string.IsNullOrWhiteSpace(_key);
+        public UnitStatusEffectType StatusType => _statusType;
+
+        public bool IsValid => _kind switch
+        {
+            EffectStackQueryKind.EffectId => !string.IsNullOrWhiteSpace(_key),
+            EffectStackQueryKind.Status => Enum.IsDefined(typeof(UnitStatusEffectType), _statusType),
+            _ => false
+        };
 
         // ============================================================
         // Constructor
         // ============================================================
+
+        public EffectStackQuery(UnitStatusEffectType statusType)
+        {
+            _kind = EffectStackQueryKind.Status;
+            _statusType = statusType;
+        }
 
         public EffectStackQuery()
         {
@@ -54,9 +70,19 @@ namespace Units.Effects
         // Execution
         // ============================================================
 
-        public bool Matches(EffectDefinitionSnapshot data) => IsValid && data != null && (_kind == EffectStackQueryKind.EffectId ? data.EffectId == _key : data.HasCategory(_key));
+        public bool Matches(EffectDefinitionSnapshot data) => IsValid && data != null && (_kind switch
+        {
+            EffectStackQueryKind.EffectId => data.EffectId == _key,
+            EffectStackQueryKind.Status => data.HasStatus(_statusType),
+            _ => false
+        });
 
-        public bool Matches(EffectData data) => IsValid && data != null && (_kind == EffectStackQueryKind.EffectId ? data.EffectId == _key : data.HasCategory(_key));
+        public bool Matches(EffectData data) => IsValid && data != null && (_kind switch
+        {
+            EffectStackQueryKind.EffectId => data.EffectId == _key,
+            EffectStackQueryKind.Status => data.HasStatus(_statusType),
+            _ => false
+        });
     }
 
     public readonly struct EffectStackConsumeRequest

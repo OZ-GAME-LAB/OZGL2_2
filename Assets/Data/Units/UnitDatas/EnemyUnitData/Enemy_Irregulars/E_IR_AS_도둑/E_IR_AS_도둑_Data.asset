@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: b69e985fda1e4373a249dfdf58fdf018, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 56a522ac9f6a414dab9cdba9ae68dcfb, type: 2}
+  _activeSkills:
+  - _id: Smite_IR
+    _skill: {fileID: 11400000, guid: 56a522ac9f6a414dab9cdba9ae68dcfb, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 547e6047be284ee99e13ed5e6193b3bd, type: 2}
+  references:
+    version: 2
+    RefIds: []

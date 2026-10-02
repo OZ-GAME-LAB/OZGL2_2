@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "A_MG_T3_11_\uD3ED\uB82C\uB9C8\uB3C4\uC0AC_PassiveSkill_ExplosionOnKill"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 11
+  _tickInterval: 0.25
+  _conditions:
+  - rid: 4617381537709031519
+  _effectMode: 0
+  _actions:
+  - rid: 4617381537709031520
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381537709031519
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4617381537709031520
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 2
+        _targetRelation: 0
+        _maxEffectTargetCount: 10
+        _areaType: 1
+        _areaRadius: 3
+        _areaAngle: 90
+        _effects:
+        - rid: 4617381537709031521
+    - rid: 4617381537709031521
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _damageType: 1
+        _damageMultiplier: 3

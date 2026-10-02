@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "A_SW_T3_21_\uADF8\uB9BC\uC790\uAC80_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "A_SW_T3_21_\uADF8\uB9BC\uC790\uAC80"
+  _unitName: "\uADF8\uB9BC\uC790\uAC80"
+  _team: 0
+  _allyIdentity:
+    _unitClass: 2
+    _unitTier: 1
+    _unitType: 15
+  _enemyIdentity:
+    _unitClass: 0
+    _unitFaction: 0
+    _unitType: 0
+  _stats:
+  - _statType: 0
+    _value: 1200
+  - _statType: 10
+    _value: 10
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 85
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.15
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 6
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 
+  _basicAttackData: {fileID: 11400000, guid: fa8141451e5229a4d9f7da6b8e2f7a05, type: 2}
+  _activeSkills:
+  - _id: ShadowCharge_T3
+    _skill: {fileID: 11400000, guid: e9d7a5ada56577f4397b7e6f25f3a634, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: d53758e9e6896914ba83fbcde0c3e4fa, type: 2}
+  - {fileID: 11400000, guid: f8b4aa96f4559b64980a7d83de567442, type: 2}
+  - {fileID: 11400000, guid: a170e7e2779edb54b910ce0872adc87b, type: 2}
+  references:
+    version: 2
+    RefIds: []

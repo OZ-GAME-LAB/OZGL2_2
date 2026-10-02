@@ -32,6 +32,8 @@ namespace Units.Effects
 
         public EffectDefinitionSnapshot Definition { get; }
 
+        public object OwnershipKey { get; }
+
         private readonly ICombatTarget _source;
 
         private readonly ICombatTarget _target;
@@ -91,8 +93,9 @@ namespace Units.Effects
             ICombatTarget target,
             float currentTime,
             CombatEventMetadata metadata = default,
-            EffectDefinitionSnapshot definition = null)
+            EffectDefinitionSnapshot definition = null, object ownershipKey = null)
         {
+            OwnershipKey = ownershipKey;
             Definition = definition ?? new EffectDefinitionSnapshot(data);
 
             _metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(source);

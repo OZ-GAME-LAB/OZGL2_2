@@ -27,6 +27,9 @@ namespace Units.Skills
 
         public virtual bool UsesSpatialQuery => false;
 
+        // 양쪽 주체를 읽는 조건이 저장된 공격자 정보로도 평가 가능한지 명시한다.
+        public virtual bool SupportsSourceSnapshot => false;
+
         // ============================================================
         // Execution
         // ============================================================
@@ -242,6 +245,18 @@ namespace Units.Skills
         [SerializeField, Min(0)]
         private int _count = 1;
 
+        [SerializeField]
+        private bool _consumeOnApply;
+
+        [SerializeField, Min(1)]
+        private int _consumeCount = 1;
+
+        public SkillConditionSubject Subject => _subject;
+        public EffectStackQuery Query => _query;
+        public bool ConsumeOnApply => _consumeOnApply;
+        public int ConsumeCount => _consumeCount;
+
+
         // ============================================================
         // Properties
         // ============================================================
@@ -366,6 +381,8 @@ namespace Units.Skills
         public override CombatStateChange TargetDependencies => _condition?.TargetDependencies ?? CombatStateChange.None;
 
         public override bool UsesSpatialQuery => _condition?.UsesSpatialQuery ?? false;
+
+        public override bool SupportsSourceSnapshot => _condition?.SupportsSourceSnapshot ?? false;
 
         // ============================================================
         // Execution
