@@ -147,6 +147,49 @@ public class EffectConverter
         return modifiers;
     }
 
+    // 패시브는 수치를 중첩하지 않고 S.O와 적용 조건을 출처별로 전달합니다.
+    public bool TryConvertPassiveSkillEffects(object source, IReadOnlyList<PassiveSkillEffectData> effects,
+        out List<AllyPassiveSkillModifier> allyModifiers, out List<EnemyPassiveSkillModifier> enemyModifiers)
+    {
+        allyModifiers = null;
+        enemyModifiers = null;
+        if (source == null)
+        {
+            Debug.LogError("[Effects/EffectConverter] Source가 없습니다.");
+            return false;
+        }
+
+        var allies = new List<AllyPassiveSkillModifier>();
+        var enemies = new List<EnemyPassiveSkillModifier>();
+        if (effects != null)
+        {
+            foreach (var effect in effects)
+            {
+                bool ally = effect.TargetTeam == UnitTeam.Ally;
+                bool enemy = effect.TargetTeam == UnitTeam.Enemy;
+                bool validApplyType = effect.ApplyType == UnitModifierApplyType.All ||
+                    effect.ApplyType == UnitModifierApplyType.Class || effect.ApplyType == UnitModifierApplyType.Type ||
+                    (ally && effect.ApplyType == UnitModifierApplyType.Tier) ||
+                    (enemy && effect.ApplyType == UnitModifierApplyType.Faction);
+                if (effect.PassiveSkill == null || (!ally && !enemy) || !validApplyType)
+                {
+                    Debug.LogError("[Effects/EffectConverter] 패시브 S.O·대상 팀·적용 조건을 확인하세요.");
+                    return false;
+                }
+
+                if (ally)
+                    allies.Add(new AllyPassiveSkillModifier(source, effect.PassiveSkill, effect.ApplyType,
+                        effect.AllyClass, effect.AllyType, effect.AllyTier));
+                else
+                    enemies.Add(new EnemyPassiveSkillModifier(source, effect.PassiveSkill, effect.ApplyType,
+                        effect.EnemyClass, effect.EnemyType, effect.EnemyFaction));
+            }
+        }
+        allyModifiers = allies;
+        enemyModifiers = enemies;
+        return true;
+    }
+
     private bool ValidateEffect(UnitStatEffectData effect, float value)
     {
         if (effect.TargetTeam != UnitTeam.Ally && effect.TargetTeam != UnitTeam.Enemy)

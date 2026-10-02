@@ -13,6 +13,7 @@ public class ArtifactData : ScriptableObject
     public IReadOnlyList<UnitStatEffectData> UnitStatEffects => _unitStatEffects;
     public IReadOnlyList<CurrencyEffectData> CurrencyEffects => _currencyEffects;
     public IReadOnlyList<ConsumableSlotEffectData> ConsumableSlotEffects => _consumableSlotEffects;
+    public IReadOnlyList<PassiveSkillEffectData> PassiveSkillEffects => _passiveSkillEffects;
 
     [SerializeField] private string _id;
     [SerializeField] private string _displayName;
@@ -28,4 +29,7 @@ public class ArtifactData : ScriptableObject
         new List<CurrencyEffectData>();
     [SerializeField] private List<ConsumableSlotEffectData> _consumableSlotEffects =
         new List<ConsumableSlotEffectData>();
+    [Tooltip("이후 생성되는 유닛에게 부여할 패시브 목록입니다. 실제 등록 연동은 별도로 처리합니다.")]
+    [SerializeField] private List<PassiveSkillEffectData> _passiveSkillEffects =
+        new List<PassiveSkillEffectData>();
 }

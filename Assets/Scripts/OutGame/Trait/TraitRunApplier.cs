@@ -159,7 +159,7 @@ public class TraitRunApplier : MonoBehaviour
 
         // 레벨을 stackCount로 넘겨 "1레벨당 수치 × 레벨"로 변환합니다.
         if (!_effectManager.TryConvertEffects(
-            trait, Array.Empty<UnitStatEffectData>(), currencyEffects, level, out ConvertedEffects converted))
+            trait, new EffectDataGroup { CurrencyEffects = currencyEffects }, level, out ConvertedEffects converted))
         {
             Debug.LogError($"[OutGame/TraitRunApplier] 특성 재화 효과 변환 실패. ID: {trait.Id}", trait);
             return false;

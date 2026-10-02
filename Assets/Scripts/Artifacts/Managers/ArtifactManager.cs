@@ -334,8 +334,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         }
 
         int currentStacks = previousStacks + 1;
-        if (!_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects,
-            artifact.CurrencyEffects, artifact.ConsumableSlotEffects, currentStacks, out ConvertedEffects effects))
+        if (!_effectManager.TryConvertEffects(instance, new EffectDataGroup
+            {
+                StatEffects = artifact.UnitStatEffects,
+                CurrencyEffects = artifact.CurrencyEffects,
+                SlotEffects = artifact.ConsumableSlotEffects,
+                PassiveEffects = artifact.PassiveSkillEffects
+            }, currentStacks, out ConvertedEffects effects))
         {
             return false;
         }
@@ -363,8 +368,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
 
         int currentStacks = instance.StackCount - 1;
         ConvertedEffects effects = null;
-        if (currentStacks > 0 && !_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects,
-            artifact.CurrencyEffects, artifact.ConsumableSlotEffects, currentStacks, out effects))
+        if (currentStacks > 0 && !_effectManager.TryConvertEffects(instance, new EffectDataGroup
+            {
+                StatEffects = artifact.UnitStatEffects,
+                CurrencyEffects = artifact.CurrencyEffects,
+                SlotEffects = artifact.ConsumableSlotEffects,
+                PassiveEffects = artifact.PassiveSkillEffects
+            }, currentStacks, out effects))
         {
             return false;
         }
@@ -480,8 +490,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             var instance = new ArtifactInstance(artifact);
             for (int i = 0; i < entry.StackCount; i++)
                 if (!inventory.TryAdd(instance)) throw new ArgumentException("아티팩트 중첩 복원 실패: " + entry.ArtifactId);
-            if (!_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects, artifact.CurrencyEffects,
-                artifact.ConsumableSlotEffects, entry.StackCount, out var converted))
+            if (!_effectManager.TryConvertEffects(instance, new EffectDataGroup
+                {
+                    StatEffects = artifact.UnitStatEffects,
+                    CurrencyEffects = artifact.CurrencyEffects,
+                    SlotEffects = artifact.ConsumableSlotEffects,
+                    PassiveEffects = artifact.PassiveSkillEffects
+                }, entry.StackCount, out var converted))
                 throw new ArgumentException("아티팩트 효과 복원 실패: " + entry.ArtifactId);
             effects.Add(instance, converted);
         }

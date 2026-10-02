@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5944b9673db241ddb1fb2ad77881c095, type: 3}
+  m_Name: PassiveArtifactTest_001
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
+  _id: PassiveArtifactTest_001
+  _displayName: "\uD14C\uC2A4\uD2B8\uC544\uD2F0\uD329\uD2B8"
+  _description: "\uD14C\uC2A4\uD2B8\uC544\uD2F0\uD329\uD2B8"
+  _icon: {fileID: 0}
+  _rarity: 0
+  _maxStacks: 1
+  _unitStatEffects: []
+  _currencyEffects: []
+  _consumableSlotEffects: []
+  _passiveSkillEffects:
+  - _passiveSkill: {fileID: 11400000, guid: a24ceb27af4c4ac2ad3a675d05e18301, type: 2}
+    _targetTeam: 0
+    _applyType: 0
+    _allyClass: 0
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0

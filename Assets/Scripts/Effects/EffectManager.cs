@@ -8,6 +8,8 @@ public class EffectManager : MonoBehaviour
 {
     public IReadOnlyList<AllyStatModifier> AllyModifiers => _allyModifiers;
     public IReadOnlyList<EnemyStatModifier> EnemyModifiers => _enemyModifiers;
+    public IReadOnlyList<AllyPassiveSkillModifier> AllyPassiveSkillModifiers => _allyPassiveSkillModifiers;
+    public IReadOnlyList<EnemyPassiveSkillModifier> EnemyPassiveSkillModifiers => _enemyPassiveSkillModifiers;
     public IReadOnlyList<CurrencyModifier> CurrencyModifiers => _currencyModifiers;
     public IReadOnlyList<ConsumableSlotModifier> ConsumableSlotModifiers => _consumableSlotModifiers;
     // 기본 슬롯 수는 포함하지 않은 전체 출처의 보정 합계
@@ -21,21 +23,15 @@ public class EffectManager : MonoBehaviour
         new Dictionary<object, ConvertedEffects>();
     private readonly List<AllyStatModifier> _allyModifiers = new List<AllyStatModifier>();
     private readonly List<EnemyStatModifier> _enemyModifiers = new List<EnemyStatModifier>();
+    private readonly List<AllyPassiveSkillModifier> _allyPassiveSkillModifiers = new List<AllyPassiveSkillModifier>();
+    private readonly List<EnemyPassiveSkillModifier> _enemyPassiveSkillModifiers = new List<EnemyPassiveSkillModifier>();
     private readonly List<CurrencyModifier> _currencyModifiers = new List<CurrencyModifier>();
     private readonly List<ConsumableSlotModifier> _consumableSlotModifiers = new List<ConsumableSlotModifier>();
 
-    // 같은 Source의 효과를 교체. 변환 실패 시 기존 효과 유지
-    public bool TrySetEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
-        IReadOnlyList<CurrencyEffectData> currencyEffects, int stackCount = 1)
+    // 같은 Source의 전체 효과를 교체합니다. 생략한 효과도 제거하며, 변환 실패 시 기존 효과를 유지합니다.
+    public bool TrySetEffects(object source, EffectDataGroup effects, int stackCount = 1)
     {
-        return TrySetEffects(source, effects, currencyEffects, null, stackCount);
-    }
-
-    public bool TrySetEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
-        IReadOnlyList<CurrencyEffectData> currencyEffects,
-        IReadOnlyList<ConsumableSlotEffectData> slotEffects, int stackCount = 1)
-    {
-        if (!TryConvertEffects(source, effects, currencyEffects, slotEffects, stackCount, out ConvertedEffects converted))
+        if (!TryConvertEffects(source, effects, stackCount, out ConvertedEffects converted))
         {
             return false;
         }
@@ -45,39 +41,45 @@ public class EffectManager : MonoBehaviour
     }
 
     // 효과 데이터 변환만 처리 (기존 효과 변경 및 이벤트 발생 X)
-    public bool TryConvertEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
-        IReadOnlyList<CurrencyEffectData> currencyEffects, int stackCount, out ConvertedEffects converted)
-    {
-        return TryConvertEffects(source, effects, currencyEffects, null, stackCount, out converted);
-    }
-
-    public bool TryConvertEffects(object source, IReadOnlyList<UnitStatEffectData> effects,
-        IReadOnlyList<CurrencyEffectData> currencyEffects,
-        IReadOnlyList<ConsumableSlotEffectData> slotEffects, int stackCount, out ConvertedEffects converted)
+    public bool TryConvertEffects(object source, EffectDataGroup effects,
+        int stackCount, out ConvertedEffects converted)
     {
         converted = null;
-        ConvertedUnitStatEffects unitModifiers = _converter.ConvertUnitStatEffects(source, effects, stackCount);
+        if (source == null || effects == null || stackCount < 1)
+        {
+            Debug.LogError("[Effects/EffectManager] 출처·효과 묶음·중첩 수(1 이상)를 확인하세요.");
+            return false;
+        }
+
+        ConvertedUnitStatEffects unitModifiers = _converter.ConvertUnitStatEffects(
+            source, effects.StatEffects ?? Array.Empty<UnitStatEffectData>(), stackCount);
         if (unitModifiers == null)
         {
             return false;
         }
 
-        List<CurrencyModifier> currencyModifiers = _converter.ConvertCurrencyEffects(source, currencyEffects, stackCount);
+        List<CurrencyModifier> currencyModifiers = _converter.ConvertCurrencyEffects(
+            source, effects.CurrencyEffects ?? Array.Empty<CurrencyEffectData>(), stackCount);
         if (currencyModifiers == null)
         {
             return false;
         }
 
         List<ConsumableSlotModifier> slotModifiers =
-            _converter.ConvertConsumableSlotEffects(source, slotEffects, stackCount);
+            _converter.ConvertConsumableSlotEffects(source, effects.SlotEffects ?? Array.Empty<ConsumableSlotEffectData>(), stackCount);
         if (slotModifiers == null)
         {
             return false;
         }
 
+        if (!_converter.TryConvertPassiveSkillEffects(source, effects.PassiveEffects ?? Array.Empty<PassiveSkillEffectData>(),
+            out var allyPassives, out var enemyPassives))
+            return false;
+
         // 모든 변환이 성공한 경우에만 해당 Source의 결과 전체를 교체
         converted = new ConvertedEffects(
-            unitModifiers.AllyModifiers, unitModifiers.EnemyModifiers, currencyModifiers, slotModifiers);
+            unitModifiers.AllyModifiers, unitModifiers.EnemyModifiers, currencyModifiers, slotModifiers,
+            allyPassives, enemyPassives);
         return true;
     }
 
@@ -130,12 +132,18 @@ public class EffectManager : MonoBehaviour
     {
         _allyModifiers.Clear();
         _enemyModifiers.Clear();
+        _allyPassiveSkillModifiers.Clear();
+        _enemyPassiveSkillModifiers.Clear();
         _currencyModifiers.Clear();
         _consumableSlotModifiers.Clear();
         long slotAdjustment = 0;
 
         foreach (ConvertedEffects effects in _effectsBySource.Values)
         {
+            if (effects.AllyPassiveSkillModifiers != null)
+                _allyPassiveSkillModifiers.AddRange(effects.AllyPassiveSkillModifiers);
+            if (effects.EnemyPassiveSkillModifiers != null)
+                _enemyPassiveSkillModifiers.AddRange(effects.EnemyPassiveSkillModifiers);
             if (effects.AllyModifiers != null)
             {
                 _allyModifiers.AddRange(effects.AllyModifiers);

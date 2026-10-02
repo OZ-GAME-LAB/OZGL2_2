@@ -222,8 +222,11 @@ public class AltarManager : MonoBehaviour
 
         if (!_effectManager.TryConvertEffects(
             instance,
-            _selected.UnitStatEffects,
-            _selected.CurrencyEffects,
+            new EffectDataGroup
+            {
+                StatEffects = _selected.UnitStatEffects,
+                CurrencyEffects = _selected.CurrencyEffects
+            },
             1,
             out ConvertedEffects converted))
         {
