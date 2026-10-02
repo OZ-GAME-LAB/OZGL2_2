@@ -10,35 +10,32 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
-  m_Name: "A_WA_T3_22_\uB9C8\uAC11\uC804\uC0AC_PassiveSkill_ShieldOnHpRatio"
+  m_Name: "A_AR_T3_12_\uC18D\uC0AC\uC218_PassiveSkill_AdditionalAttack"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
   _skillSchemaVersion: 1
-  _triggerType: 5
-  _tickInterval: 5
+  _triggerType: 3
+  _tickInterval: 0.25
   _conditions:
-  - rid: 4844432377880510559
+  - rid: 4844432426836164617
   _effectMode: 0
   _actions:
-  - rid: 4844432377880510573
+  - rid: 4844432426836164618
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4844432377880510559
-      type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
-      data:
-        _subjectType: 0
-        _comparisonType: 1
-        _healthRatio: 0.5
-    - rid: 4844432377880510573
+    - rid: 4844432426836164617
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4844432426836164618
       type: {class: PassiveAdditionalAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _attack:
           _target:
-            _source: 6
+            _source: 2
             _relation: 0
             _includeSelf: 0
-            _range: 5
+            _range: 3
             _maxTargetCount: 1
             _clusterRadius: 1
             _filters: []
@@ -62,19 +59,19 @@ MonoBehaviour:
               _filters: []
               _priorities: []
             _effects:
-            - rid: 4844432377880510575
+            - rid: 4844432426836164619
           _conditionalEffects: []
           _fxEntries: []
-          _delivery: 0
-          _area: 2
-          _radius: 5
+          _delivery: 1
+          _area: 0
+          _radius: 1
           _angle: 90
-          _maxEffectTargets: 5
+          _maxEffectTargets: 1
           _projectileSpeed: 10
           _isLegacy: 0
         _useTriggerPosition: 0
-    - rid: 4844432377880510575
+    - rid: 4844432426836164619
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _damageType: 0
-        _damageMultiplier: 1.5
+        _damageMultiplier: 1
