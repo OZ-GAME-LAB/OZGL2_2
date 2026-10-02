@@ -37,7 +37,7 @@ public class TestWaveViewer : MonoBehaviour
             _gameFlowController.PhaseChanged -= UpdatePhase;
     }
 
-    private void UpdateWave(WaveChangedInfo info) => Refresh();
+    private void UpdateWave(WaveInfo info) => Refresh();
     private void UpdatePhase(GamePhase phase) => Refresh();
 
     private void Refresh()

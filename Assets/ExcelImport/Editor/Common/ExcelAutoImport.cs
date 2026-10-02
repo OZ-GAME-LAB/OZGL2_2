@@ -95,6 +95,10 @@ public static class ExcelAutoImport
                 succeeded = ArtifactExcelImporter.TryImport(entry.ExcelPath, entry.Target as ArtifactCatalog,
                     entry.OutputFolder, out result);
                 break;
+            case ExcelImportType.Consumables:
+                succeeded = ConsumableExcelImporter.TryImport(entry.ExcelPath, entry.Target as ConsumableItemCatalog,
+                    entry.OutputFolder, out result);
+                break;
             default:
                 result = "지원하지 않는 가져오기 종류입니다.";
                 return false;

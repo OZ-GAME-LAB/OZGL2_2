@@ -6,7 +6,7 @@ using Game.Core;
 using UnityEngine;
 
 // 아티팩트 후보 생성·보유 상태를 관리하고 공통 창구에 효과를 등록
-public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IArtifactInventory
+public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IArtifactInventory, ISaveDataProvider<ArtifactSaveData>
 {
      // 보유 상태 변경 전에 준비한 중첩 수량과 효과
     private struct PreparedChange
@@ -43,6 +43,9 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     private CancellationTokenSource _selectionWait;
     private List<ArtifactData> _selectionCandidates = new List<ArtifactData>();
     private bool _rewardApplied;
+    private bool _hasRewardCandidates;
+    private int _rewardQuarter;
+    private int _rewardWave;
     public bool IsSelectingReward => _selectionWait != null;
     public bool IsRewardApplied => _rewardApplied;
     public IReadOnlyList<ArtifactData> SelectionCandidates => _selectionCandidates;
@@ -101,7 +104,16 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return false;
         }
 
-        return _candidateSelector.TryCreateCandidates(IsBossWave, out candidates);
+        PrepareRewardPosition();
+        if (_hasRewardCandidates || _rewardApplied)
+        {
+            candidates = _selectionCandidates.ToArray();
+            return true;
+        }
+        if (!_candidateSelector.TryCreateCandidates(IsBossWave, out candidates)) return false;
+        _selectionCandidates = new List<ArtifactData>(candidates);
+        _hasRewardCandidates = true;
+        return true;
     }
 
     // 후보 생성 → UI 선택 및 지급 대기 → 완료. UI는 TrySelectReward로 선택 전달
@@ -113,7 +125,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return false;
         }
 
-        IReadOnlyList<ArtifactData> candidates = _testCandidates;
+        PrepareRewardPosition();
+        IReadOnlyList<ArtifactData> candidates = _testCandidates ?? (_hasRewardCandidates ? _selectionCandidates : null);
         _testCandidates = null;
         if (!_rewardApplied && candidates == null &&
             !_candidateSelector.TryCreateCandidates(battleType == WaveBattleType.Boss, out candidates))
@@ -123,15 +136,17 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         // 지급 직후 취소된 요청은 재지급 없이 완료
         if (_rewardApplied)
         {
-            _rewardApplied = false;
             return true;
         }
         if (candidates.Count == 0)
         {
+            _hasRewardCandidates = true;
+            _rewardApplied = true;
             return true;
         }
 
         _selectionCandidates = new List<ArtifactData>(candidates);
+        _hasRewardCandidates = true;
         CancellationTokenSource wait = CancellationTokenSource.CreateLinkedTokenSource(token);
         CancellationToken waitToken = wait.Token;
         _selectionWait = wait;
@@ -142,11 +157,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         if (_selectionWait == wait)
         {
             _selectionWait = null;
-            _selectionCandidates.Clear();
-            if (!waitToken.IsCancellationRequested)
-            {
-                _rewardApplied = false;
-            }
+            if (_rewardApplied) _selectionCandidates.Clear();
             // TODO: 선택 UI 닫기. 취소된 경우에도 정리
         }
         wait.Dispose();
@@ -163,6 +174,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return UniTask.FromResult(false);
         }
         _testCandidates = new List<ArtifactData>(candidates);
+        _rewardApplied = false;
+        _hasRewardCandidates = false;
         return SelectAndApplyAsync(default, token);
     }
 
@@ -382,6 +395,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             wait.Cancel();
         }
         _rewardApplied = false;
+        _hasRewardCandidates = false;
+        _rewardQuarter = _rewardWave = 0;
         _selectionCandidates.Clear();
         _inventory = null;
         _waveController = null;
@@ -414,5 +429,90 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     private void OnDestroy()
     {
         TryEndRun();
+    }
+
+    private void PrepareRewardPosition()
+    {
+        int quarter = _waveController.CurQuarter, wave = _waveController.CurWave;
+        if (_rewardQuarter == quarter && _rewardWave == wave) return;
+        _rewardQuarter = quarter;
+        _rewardWave = wave;
+        _rewardApplied = false;
+        _hasRewardCandidates = false;
+        _selectionCandidates.Clear();
+    }
+
+    public ArtifactSaveData CaptureSaveData()
+    {
+        if (!IsInitialized || _isChanging) throw new InvalidOperationException("아티팩트 초기화 및 변경 완료 후 저장하세요.");
+        var data = new ArtifactSaveData {
+            HasRewardCandidates = _hasRewardCandidates, RewardApplied = _rewardApplied,
+            RewardQuarter = _rewardQuarter, RewardWave = _rewardWave
+        };
+        foreach (var instance in Instances)
+            data.Owned.Add(new ArtifactSaveEntry { ArtifactId = instance.Data.Id, StackCount = instance.StackCount });
+        if (!_rewardApplied)
+            foreach (var candidate in _selectionCandidates) data.CandidateIds.Add(candidate.Id);
+        return data;
+    }
+
+    // 전체 데이터와 효과 변환 검증 후에만 보유 상태를 교체합니다.
+    public void RestoreSaveData(ArtifactSaveData data)
+    {
+        if (!IsInitialized || _isChanging || IsSelectingReward)
+            throw new InvalidOperationException("아티팩트 초기화 후, 선택 대기를 취소하고 복원하세요.");
+        if (data == null || data.Owned == null || data.CandidateIds == null)
+            throw new ArgumentException("아티팩트 저장 데이터가 없습니다.");
+        if (data.RewardQuarter < 0 || data.RewardWave < 0 || data.RewardWave > WaveController.MAX_WAVE ||
+            ((data.RewardQuarter == 0) != (data.RewardWave == 0)) ||
+            ((data.HasRewardCandidates || data.RewardApplied) && data.RewardQuarter == 0) ||
+            (data.RewardApplied && !data.HasRewardCandidates) ||
+            ((!data.HasRewardCandidates || data.RewardApplied) && data.CandidateIds.Count != 0))
+            throw new ArgumentException("아티팩트 보상 상태가 올바르지 않습니다.");
+        var inventory = new ArtifactInventory(_artifactCatalog);
+        var effects = new Dictionary<object, ConvertedEffects>();
+        var seen = new HashSet<string>();
+        foreach (var entry in data.Owned)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.ArtifactId) || !seen.Add(entry.ArtifactId) ||
+                !_artifactCatalog.TryGetById(entry.ArtifactId, out var artifact) || entry.StackCount < 1 || entry.StackCount > artifact.MaxStacks)
+                throw new ArgumentException("보유 아티팩트 ID·중첩 수·중복을 확인하세요.");
+            var instance = new ArtifactInstance(artifact);
+            for (int i = 0; i < entry.StackCount; i++)
+                if (!inventory.TryAdd(instance)) throw new ArgumentException("아티팩트 중첩 복원 실패: " + entry.ArtifactId);
+            if (!_effectManager.TryConvertEffects(instance, artifact.UnitStatEffects, artifact.CurrencyEffects,
+                artifact.ConsumableSlotEffects, entry.StackCount, out var converted))
+                throw new ArgumentException("아티팩트 효과 복원 실패: " + entry.ArtifactId);
+            effects.Add(instance, converted);
+        }
+        var candidates = new List<ArtifactData>();
+        seen.Clear();
+        foreach (string id in data.CandidateIds)
+        {
+            if (string.IsNullOrWhiteSpace(id) || !seen.Add(id) || !_artifactCatalog.TryGetById(id, out var artifact))
+                throw new ArgumentException("보상 후보 ID·중복을 확인하세요.");
+            candidates.Add(artifact);
+        }
+        var removed = new List<ArtifactInstance>(_inventory.Instances);
+        _isChanging = true;
+        try
+        {
+            _inventory.Cleared -= HandleCleared;
+            _inventory = inventory;
+            _inventory.Cleared += HandleCleared;
+            _candidateSelector = new ArtifactCandidateSelector(_artifactCatalog, _inventory, _rewardTable);
+            _testCandidates = null;
+            _selectionCandidates = candidates;
+            _hasRewardCandidates = data.HasRewardCandidates;
+            _rewardApplied = data.RewardApplied;
+            _rewardQuarter = data.RewardQuarter;
+            _rewardWave = data.RewardWave;
+            // 제거·추가 사이의 임시 슬롯 감소를 노출하지 않습니다. 다른 시스템 효과는 유지합니다.
+            _effectManager.ReplaceSourceEffects(removed, effects);
+            if (removed.Count > 0) Cleared?.Invoke(removed);
+            foreach (var instance in _inventory.Instances) StackChanged?.Invoke(instance, 0, instance.StackCount);
+        }
+        finally { _isChanging = false; }
+        // 대기 작업은 저장하지 않습니다. 게임 흐름에서 SelectAndApplyAsync를 다시 호출하면 저장 후보를 사용합니다.
     }
 }

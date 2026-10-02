@@ -9,14 +9,19 @@ using UnityEngine;
 /// 이번 Run에 켠 토템 레벨만큼 유닛 스탯을 넣고, 끝날 때 해제합니다.
 /// 추가 혈석 퍼센트는 여기서 계산만 합니다. 정산 혈석이 나온 뒤에 TryGrantBonus로 지급합니다.
 /// PhaseChanged만 구독하며 Update에서 레벨을 확인하지 않습니다.
+/// 저장 파일 입출력은 하지 않습니다. 세이브 담당이 CaptureSaveData와 RestoreSaveData만 호출합니다.
 /// </summary>
-public class TotemRunApplier : MonoBehaviour
+public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData>
 {
     [Tooltip("아웃게임 시작 정보 없이 인게임 씬만 테스트할 때 사용할 레벨입니다. SetLevels가 호출되면 무시됩니다.")]
     [SerializeField] private List<TotemLevelEntry> _testLevels = new List<TotemLevelEntry>();
 
     // 이번 Run의 추가 혈석 퍼센트입니다. 격노 3레벨(10%×3)이면 30입니다.
     public int RewardBonusPercent => _rewardBonusPercent;
+
+    // Current date KDH 2026-10-02
+    // 아웃게임에서 레벨 1 이상으로 켠 토템입니다. UI는 Data와 Level만 읽습니다.
+    public IReadOnlyList<ActiveTotem> ActiveTotems => _activeTotems;
 
     private TotemEffectCatalog _catalog;
     private UnitStatModifierManager _unitStatModifierManager;
@@ -25,6 +30,10 @@ public class TotemRunApplier : MonoBehaviour
     // 아웃게임에서 전달받은 레벨 사본입니다. 원본 목록이 나중에 바뀌어도 이번 Run에 영향이 없습니다.
     private readonly List<TotemLevelEntry> _levels = new List<TotemLevelEntry>();
     private bool _hasLevels;
+
+    // Current date KDH 2026-10-02
+    // 선택을 받을 때 한 번 채우고 다시 씁니다. Update마다 새로 만들지 않습니다.
+    private readonly List<ActiveTotem> _activeTotems = new List<ActiveTotem>();
 
     // 이번 Run에 스탯을 넣은 토템입니다. 리스트를 재사용해 Run마다 새로 만들지 않습니다.
     private readonly List<TotemId> _appliedIds = new List<TotemId>();
@@ -69,6 +78,7 @@ public class TotemRunApplier : MonoBehaviour
         _unitStatModifierManager = unitStatModifierManager;
         _gameFlow = gameFlow;
         _gameFlow.PhaseChanged += HandlePhaseChanged;
+        BuildActiveTotems();
     }
 
     private void HandlePhaseChanged(GamePhase phase)
@@ -112,6 +122,41 @@ public class TotemRunApplier : MonoBehaviour
         }
 
         _hasLevels = true;
+        BuildActiveTotems();
+    }
+
+    // Current date KDH 2026-10-02
+    // 저장 시점에만 목록을 새로 만듭니다. Update마다 만들지 않으므로 프레임 중 쓰레기 수집이 늘지 않습니다.
+    // 살아있는 _levels를 그대로 넘기면, 저장 뒤에 레벨이 바뀌었을 때 이미 써 둔 데이터까지 같이 바뀝니다.
+    public TotemRunSaveData CaptureSaveData()
+    {
+        TotemRunSaveData data = new TotemRunSaveData();
+        for (int i = 0; i < _levels.Count; i++)
+        {
+            TotemLevelEntry entry = _levels[i];
+            if (entry == null)
+            {
+                continue;
+            }
+
+            data.Totems.Add(new TotemLevelEntry { Id = entry.Id, Level = entry.Level });
+        }
+
+        return data;
+    }
+
+    // Current date KDH 2026-10-02
+    // 레벨만 되돌립니다. 스탯은 이후 첫 Preparation의 ApplyAll이 넣습니다.
+    // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    public void RestoreSaveData(TotemRunSaveData data)
+    {
+        if (data == null)
+        {
+            Debug.LogError("[OutGame/TotemRunApplier] 복원할 토템 저장 데이터가 없습니다.", this);
+            return;
+        }
+
+        SetLevels(data.Totems);
     }
 
     // 정산으로 받은 혈석에 이번 Run 퍼센트를 곱한 추가분입니다. 10혈석의 10%는 1입니다.
@@ -129,6 +174,65 @@ public class TotemRunApplier : MonoBehaviour
         }
 
         return (int)Math.Min(amount, int.MaxValue);
+    }
+
+    // Current date KDH 2026-10-02
+    // 레벨 1 이상만 카탈로그의 TotemData와 함께 담습니다. 보너스 수치는 계산하지 않습니다.
+    private void BuildActiveTotems()
+    {
+        _activeTotems.Clear();
+        if (_catalog == null)
+        {
+            return;
+        }
+
+        List<TotemLevelEntry> levels = _hasLevels ? _levels : _testLevels;
+        if (levels == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < levels.Count; i++)
+        {
+            TotemLevelEntry entry = levels[i];
+            if (entry == null || entry.Id == TotemId.None || entry.Level <= 0)
+            {
+                continue;
+            }
+
+            if (ContainsActiveId(entry.Id))
+            {
+                continue;
+            }
+
+            if (!_catalog.TryGetTotem(entry.Id, out TotemData totem) || totem == null)
+            {
+                Debug.LogWarning($"[OutGame/TotemRunApplier] 활성 토템의 TotemData가 없습니다. ID: {entry.Id}", this);
+                continue;
+            }
+
+            int level = Mathf.Min(entry.Level, totem.MaxLevel);
+            if (level <= 0)
+            {
+                continue;
+            }
+
+            _activeTotems.Add(new ActiveTotem { Data = totem, Level = level });
+        }
+    }
+
+    // Current date KDH 2026-10-02
+    private bool ContainsActiveId(TotemId id)
+    {
+        for (int i = 0; i < _activeTotems.Count; i++)
+        {
+            if (_activeTotems[i].Data != null && _activeTotems[i].Data.Id == id)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // 같은 Run의 보너스를 두 번 넣지 않습니다. 정산 혈석이 0이면 나중에 다시 호출할 수 있습니다.
@@ -222,14 +326,9 @@ public class TotemRunApplier : MonoBehaviour
             return;
         }
 
-        float perLevel = totem.RewardBonusPerLevel;
-        if (float.IsNaN(perLevel) || float.IsInfinity(perLevel) || perLevel <= 0f)
-        {
-            return;
-        }
-
-        // 10% × 3레벨 = 30처럼, 표시 퍼센트를 정수로 모읍니다.
-        long bonus = (long)Math.Round(perLevel * level, MidpointRounding.AwayFromZero);
+        // Current date KDH 2026-10-02
+        // 결산 항목과 같은 퍼센트를 합산합니다. 10% × 3레벨 = 30처럼 정수로 모읍니다.
+        int bonus = CalculateRewardPercent(totem, level);
         if (bonus <= 0)
         {
             return;
@@ -237,6 +336,29 @@ public class TotemRunApplier : MonoBehaviour
 
         long sum = (long)_rewardBonusPercent + bonus;
         _rewardBonusPercent = (int)Math.Min(sum, int.MaxValue);
+    }
+
+    // Current date KDH 2026-10-02
+    private static int CalculateRewardPercent(TotemData totem, int level)
+    {
+        if (totem == null || level <= 0)
+        {
+            return 0;
+        }
+
+        float perLevel = totem.RewardBonusPerLevel;
+        if (float.IsNaN(perLevel) || float.IsInfinity(perLevel) || perLevel <= 0f)
+        {
+            return 0;
+        }
+
+        long bonus = (long)Math.Round(perLevel * level, MidpointRounding.AwayFromZero);
+        if (bonus <= 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Min(bonus, int.MaxValue);
     }
 
     // 군세·궁핍·메아리처럼 스탯이 아닌 토템은 목록이 비어 있어 여기서 넘어갑니다.
@@ -346,4 +468,20 @@ public class TotemRunApplier : MonoBehaviour
 
         public TotemId Id { get; }
     }
+}
+
+// Current date KDH 2026-10-02
+// 인게임 저장에 실을 이번 판 토템입니다. TotemData 참조는 담지 않습니다.
+[Serializable]
+public class TotemRunSaveData
+{
+    public List<TotemLevelEntry> Totems = new List<TotemLevelEntry>();
+}
+
+// Current date KDH 2026-10-02
+// 아웃게임에서 켠 토템입니다. 표시 문구와 보너스 계산은 담지 않습니다.
+public struct ActiveTotem
+{
+    public TotemData Data;
+    public int Level;
 }

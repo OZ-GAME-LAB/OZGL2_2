@@ -20,7 +20,7 @@ public class InGameSaveCoordinator : MonoBehaviour
 
     private SaveManager _saveManager;
     private ISaveDataProvider<GameFlowSaveData> _flowController;
-
+    
     public void Initialize(SaveManager saveManager, ISaveDataProvider<GameFlowSaveData> gameFlowController)
     {
         _saveManager = saveManager;

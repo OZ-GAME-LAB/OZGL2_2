@@ -117,6 +117,15 @@ public class EffectManager : MonoBehaviour
         RefreshModifiers();
     }
 
+    // 저장 복원 시 한 시스템의 출처들만 교체하고 최종 상태를 한 번 알립니다.
+    internal void ReplaceSourceEffects(IReadOnlyList<object> removed,
+        IReadOnlyDictionary<object, ConvertedEffects> restored)
+    {
+        foreach (var source in removed) _effectsBySource.Remove(source);
+        foreach (var pair in restored) _effectsBySource[pair.Key] = pair.Value;
+        RefreshModifiers();
+    }
+
     private void RefreshModifiers()
     {
         _allyModifiers.Clear();

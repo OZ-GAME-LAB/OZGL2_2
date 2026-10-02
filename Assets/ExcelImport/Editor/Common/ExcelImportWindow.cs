@@ -37,13 +37,23 @@ public class ExcelImportWindow : EditorWindow
                         case ExcelImportType.ShopArtifactPrices: entry.SheetName = "ArtifactPrices"; break;
                         case ExcelImportType.ShopArtifactExchanges: entry.SheetName = "ArtifactExchanges"; break;
                         case ExcelImportType.Artifacts: entry.SheetName = "Artifacts"; break;
+                        case ExcelImportType.Consumables:
+                            entry.SheetName = "Items";
+                            entry.OutputFolder = "Assets/Data/ConsumableItems";
+                            break;
                         default: entry.SheetName = "WaveRewards"; break;
                     }
                     entry.TargetGuid = "";
                     entry.CatalogGuid = "";
                 }
                 Object excel = EditorGUILayout.ObjectField("엑셀 파일", entry.Excel, typeof(DefaultAsset), false);
-                if (entry.Type == ExcelImportType.Artifacts)
+                if (entry.Type == ExcelImportType.Consumables)
+                {
+                    EditorGUILayout.LabelField("시트", "Items / ItemEffects / RuntimeEffects / RuntimeActions");
+                    entry.OutputFolder = EditorGUILayout.TextField("출력 루트 폴더", entry.OutputFolder);
+                    EditorGUILayout.HelpBox("루트 아래 Items·Effects 폴더가 필요합니다. 대상은 ConsumableItemCatalog입니다. ID로 기존 S.O를 갱신하며 아이콘과 엑셀에 없는 항목은 유지합니다. 효과 목록은 시트 행 순서대로 교체합니다.", MessageType.Info);
+                }
+                else if (entry.Type == ExcelImportType.Artifacts)
                 {
                     EditorGUILayout.LabelField("시트", "Artifacts / UnitStatEffects / CurrencyEffects / ConsumableSlotEffects");
                     EditorGUILayout.HelpBox("ConsumableSlotEffects: ArtifactId / AdditionalSlots. 양수는 증가, 음수는 감소. 해당 ID의 행이 없으면 슬롯 효과를 제거합니다.", MessageType.Info);
@@ -74,6 +84,10 @@ public class ExcelImportWindow : EditorWindow
                 else if (entry.Type == ExcelImportType.Artifacts)
                 {
                     targetType = typeof(ArtifactCatalog);
+                }
+                else if (entry.Type == ExcelImportType.Consumables)
+                {
+                    targetType = typeof(ConsumableItemCatalog);
                 }
                 Object target = EditorGUILayout.ObjectField("대상 S.O", entry.Target, targetType, false);
                 Object catalog = entry.Catalog;

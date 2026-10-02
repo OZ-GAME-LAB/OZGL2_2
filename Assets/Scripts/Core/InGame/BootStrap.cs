@@ -24,11 +24,14 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private TestWaitingScript _testScript; //테스트용으로 , 실제 구현시 삭제할것
     [SerializeField] private GameFlowController _gameFlowController;
     [SerializeField] private WaveController _waveController;
+    [SerializeField] private ArchiveManager _archiveManager;
     [SerializeField] private ArtifactManager _artifactManager;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private SpawnManager _spawnManager;
     [SerializeField] private RuntimeUnitManager _runtimeUnitManager;
     [SerializeField] private RunCurrencyManager _runCurrencyManager;
+    [SerializeField] private RunSettlementManager _runSettlementManager;
+    [SerializeField] private PersistentCurrencyManager _persistentCurrencyManager;
     [SerializeField] private InGameCameraController _cameraController;
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
@@ -70,11 +73,12 @@ public class BootStrap : MonoBehaviour
         }
 
         _testScript.Initialize(_gameFlowController, _waveController);
-        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _cameraController);
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
+        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier);
         _cameraController.Initialize(_buildController,_gameFlowController);
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())

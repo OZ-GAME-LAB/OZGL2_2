@@ -62,6 +62,20 @@ public class ConsumableItemInventory
         }
     }
 
+    // 검증된 저장 상태를 위치 이동·알림 없이 준비합니다.
+    internal ConsumableItemInventory(int capacity, IReadOnlyList<ConsumableItemData> items)
+    {
+        if (capacity < 0 || items == null || items.Count < capacity)
+            throw new ArgumentException("저장된 슬롯 개수를 확인하세요.");
+        Capacity = capacity;
+        foreach (var item in items)
+        {
+            var slot = new ConsumableItemSlot();
+            if (item != null) slot.TryAdd(item);
+            _slots.Add(slot);
+        }
+    }
+
     // 빈 슬롯이거나 범위를 벗어난 경우 false 반환
     public bool TryGetItem(int slotIndex, out ConsumableItemData item)
     {
