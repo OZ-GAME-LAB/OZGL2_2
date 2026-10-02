@@ -22,6 +22,7 @@ namespace Game.UI.InGame.Editor
     public static class InGameUIValidation
     {
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+        private const BindingFlags StaticPrivate = BindingFlags.Static | BindingFlags.NonPublic;
         private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
         public static string LastResult { get; private set; } = "Not run";
 
@@ -41,46 +42,39 @@ namespace Game.UI.InGame.Editor
                 host.SetActive(false);
                 validationEvents = CreateObject("Test EventSystem", host.transform, preview).AddComponent<EventSystem>();
                 var manager = host.AddComponent<InGameUIManager>();
-                UIScreen hud = CreateScreen("Hud", host.transform, preview);
-                UIScreen alternateHud = CreateScreen("Alternate HUD", host.transform, preview);
-                UIScreen parent = CreateScreen("Catalog", host.transform, preview);
-                UIScreen other = CreateScreen("Info", host.transform, preview);
-                UIScreen child = CreateScreen("Detail", host.transform, preview);
-                UIScreen required = CreateScreen("Required reward", host.transform, preview);
-                SetField(manager, "_screens", new[]
-                {
-                    Registration(UIId.Hud, hud, UILayer.Hud),
-                    Registration(UIId.RunResult, alternateHud, UILayer.Hud),
-                    Registration(UIId.BuildingCatalog, parent, UILayer.Popup),
-                    Registration(UIId.BuildingInfo, other, UILayer.Popup),
-                    Registration(UIId.Detail, child, UILayer.Popup),
-                    Registration(UIId.ArtifactReward, required, UILayer.Modal, false)
-                });
+                Transform popupRoot = CreateObject("PopupRoot", host.transform, preview, typeof(RectTransform)).transform;
+                UIScreen hud = CreateScreen("Hud", UIId.Hud, host.transform, preview, true);
+                UIScreen alternateHud = CreateScreen("Alternate HUD", UIId.RunResult, host.transform, preview, true);
+                UIScreen parent = CreateScreen("Catalog", UIId.BuildingCatalog, popupRoot, preview);
+                UIScreen other = CreateScreen("Info", UIId.BuildingInfo, popupRoot, preview);
+                UIScreen child = CreateScreen("Detail", UIId.Detail, popupRoot, preview);
+                UIScreen required = CreateScreen("Required reward", UIId.ArtifactReward, popupRoot, preview, false, false, true);
+                SetField(manager, "_screenInstances", new[] { hud, alternateHud, parent, other, child, required });
                 host.SetActive(true);
                 RebindLifecycle(validationEvents);
                 EventSystem.current = validationEvents;
                 Check(manager.InitializeScreens(), "screen registry initializes without game services", checks);
-                Check(manager.ShowHud().IsValid && hud.IsVisible, "HUD opens independently", checks);
-
-                UIHandle stale = manager.Open(UIId.BuildingCatalog);
-                Check(stale.IsValid && parent.IsVisible, "optional popup opens", checks);
-                Check(manager.Close(stale, UICloseReason.Completed), "current handle closes its screen", checks);
-                UIHandle current = manager.Open(UIId.BuildingCatalog);
-                Check(!current.Equals(stale) && !manager.Close(stale, UICloseReason.Completed) && parent.IsVisible,
-                    "stale handle cannot close a later opening of the same screen", checks);
+                Check(manager.ShowHud() && hud.IsVisible, "HUD opens independently", checks);
+                Check(manager.OpenPopup(UIId.BuildingCatalog) && parent.IsVisible, "optional popup opens", checks);
+                Check(manager.OpenPopup(UIId.BuildingCatalog) && manager.OpenPopupCount == 1 && manager.TopPopup == parent,
+                    "opening the same popup does not duplicate its stack entry", checks);
+                Check(parent.transform.GetSiblingIndex() == popupRoot.childCount - 1,
+                    "the top popup is the last sibling under PopupRoot", checks);
+                Check(manager.ShowHud() && parent.IsVisible && manager.OpenPopupCount == 1,
+                    "showing the same HUD preserves the current popup", checks);
                 UICloseReason? replacedReason = null;
                 parent.Closed += (_, reason) => replacedReason = reason;
-                manager.Replace(UIId.BuildingInfo);
+                manager.ReplacePopup(UIId.BuildingInfo);
                 Check(!parent.IsVisible && other.IsVisible && replacedReason == UICloseReason.Replaced,
                     "Replace closes the previous popup with the replacement reason", checks);
 
-                current = manager.Replace(UIId.BuildingCatalog);
-                UIHandle childHandle = manager.Push(UIId.Detail);
+                manager.ReplacePopup(UIId.BuildingCatalog);
+                manager.OpenPopup(UIId.Detail);
                 Check(parent.IsVisible && child.IsVisible && !InputEnabled(parent) && InputEnabled(child),
-                    "Push preserves the parent and gives input to its child", checks);
-                Check(manager.Close(childHandle, UICloseReason.UserCancel) && parent.IsVisible &&
-                      parent.Handle.Equals(current) && !child.IsVisible && InputEnabled(parent),
-                    "closing a pushed child restores its unchanged parent", checks);
+                    "OpenPopup preserves the parent and gives input to its child", checks);
+                Check(manager.ClosePopup(UIId.Detail, UICloseReason.UserCancel) && parent.IsVisible &&
+                      manager.TopPopup == parent && !child.IsVisible && InputEnabled(parent),
+                    "closing a stacked child restores its parent", checks);
 
                 // Edit Mode에서는 일반 MonoBehaviour의 이벤트 연결을 명시적으로 재현한다.
                 var closeObject = CreateObject("Owned close", parent.Root.transform, preview, typeof(RectTransform), typeof(Button));
@@ -88,21 +82,48 @@ namespace Game.UI.InGame.Editor
                 SetField(ownedClose, "_button", closeObject.GetComponent<Button>());
                 SetField(ownedClose, "_screen", parent);
                 RebindLifecycle(ownedClose);
-                childHandle = manager.Push(UIId.Detail);
+                manager.OpenPopup(UIId.Detail);
                 ownedClose.Close();
-                Check(parent.IsVisible && child.IsVisible && child.Handle.Equals(childHandle),
+                Check(parent.IsVisible && child.IsVisible && manager.TopPopup == child,
                     "a covered owner's CloseUtility cannot close an unrelated top screen", checks);
-                manager.Close(childHandle, UICloseReason.Completed);
+                manager.ClosePopup(UIId.Detail, UICloseReason.Completed);
                 closeObject.GetComponent<Button>().onClick.Invoke();
                 Check(!parent.IsVisible, "CloseUtility closes its own current screen", checks);
 
-                UIHandle requiredHandle = manager.Open(UIId.ArtifactReward);
-                Check(required.IsVisible && !manager.CloseTop() && required.IsVisible,
-                    "CloseTop cannot dismiss a mandatory modal", checks);
-                Check(!manager.Open(UIId.BuildingCatalog).IsValid && !parent.IsVisible,
-                    "a mandatory modal blocks an optional Open request", checks);
-                Check(manager.Close(requiredHandle, UICloseReason.Completed) && !required.IsVisible,
+                manager.OpenPopup(UIId.ArtifactReward);
+                Check(required.IsVisible && !manager.CloseTopPopup() && required.IsVisible,
+                    "CloseTopPopup cannot dismiss a mandatory popup", checks);
+                Check(!manager.ReplacePopup(UIId.BuildingCatalog) && !parent.IsVisible,
+                    "a mandatory popup blocks replacement with an optional popup", checks);
+                manager.OpenPopup(UIId.Detail);
+                Check(manager.HasBlockingPopup && !InputEnabled(hud),
+                    "detail above a mandatory parent preserves the HUD input block", checks);
+                SimulateEscape(manager);
+                Check(!child.IsVisible && required.IsVisible && manager.TopPopup == required,
+                    "a synthetic Escape input runs Update and closes only the newest popup", checks);
+                SimulateEscape(manager);
+                Check(required.IsVisible && !InputEnabled(hud),
+                    "Escape cannot bypass the required selection", checks);
+                Check(manager.ClosePopup(UIId.ArtifactReward, UICloseReason.Completed) && !required.IsVisible,
                     "the owning presenter can complete a mandatory modal", checks);
+
+                manager.OpenPopup(UIId.BuildingCatalog);
+                manager.OpenPopup(UIId.Detail);
+                Check(manager.ClosePopup(UIId.BuildingCatalog, UICloseReason.Completed) && !parent.IsVisible && !child.IsVisible &&
+                    manager.OpenPopupCount == 0, "completing a parent also closes its stacked detail", checks);
+
+                manager.OpenPopup(UIId.BuildingCatalog);
+                validationEvents.SetSelectedGameObject(closeObject);
+                manager.OpenPopup(UIId.Detail);
+                Check(validationEvents.currentSelectedGameObject == null,
+                    "covering a selected parent clears its EventSystem selection", checks);
+                bool reentered = true;
+                Action<UIScreen, UICloseReason> reopen = (_, __) => reentered = manager.OpenPopup(UIId.BuildingInfo);
+                child.Closed += reopen;
+                manager.CloseAllPopups(UICloseReason.ContextLost);
+                child.Closed -= reopen;
+                Check(!reentered && manager.OpenPopupCount == 0 && !other.IsVisible,
+                    "close callbacks cannot reopen a screen during stack cleanup", checks);
 
                 var slotObject = CreateObject("Reusable slot", host.transform, preview, typeof(RectTransform), typeof(Button));
                 slot = slotObject.AddComponent<UIItemSlot>();
@@ -125,16 +146,22 @@ namespace Game.UI.InGame.Editor
                 button.onClick.Invoke();
                 Check(second == 2, "a non-interactable slot does not dispatch selection", checks);
                 Check(hud.IsVisible, "popup transitions preserve the HUD", checks);
-                manager.Open(UIId.BuildingCatalog);
+                manager.OpenPopup(UIId.BuildingCatalog);
+                bool reopenedDuringHudChange = true;
+                Action<UIScreen, UICloseReason> reopenForOldHud = (_, __) => reopenedDuringHudChange = manager.OpenPopup(UIId.Detail);
+                parent.Closed += reopenForOldHud;
                 manager.ShowHud(UIId.RunResult);
-                Check(alternateHud.IsVisible && !hud.IsVisible && !parent.IsVisible && !manager.TopHandle.IsValid,
+                parent.Closed -= reopenForOldHud;
+                Check(alternateHud.IsVisible && !hud.IsVisible && !parent.IsVisible && manager.TopPopup == null,
                     "replacing the HUD closes popups from the previous UI context", checks);
+                Check(!reopenedDuringHudChange && !child.IsVisible,
+                    "HUD replacement callbacks cannot reopen a popup for the old HUD", checks);
                 manager.ShowHud();
                 Check(hud.IsVisible && !alternateHud.IsVisible,
                     "the previous HUD can be shown again without creating another instance", checks);
 
                 LastResult = "PASS: " + checks.Count + " isolated common API checks.\n" + string.Join("\n", checks) +
-                    "\nEdit Mode callbacks were invoked explicitly. Physical keyboard, pointer routing and gameplay are not covered.\n";
+                    "\nEdit Mode callbacks were invoked explicitly. Escape uses synthetic InputSystem state and the real manager Update branch. Physical keyboard and gameplay are not covered here.\n";
                 File.WriteAllText(Output("common-tests.txt"), LastResult);
                 Debug.Log("[InGameUIValidation] " + LastResult);
             }
@@ -571,17 +598,22 @@ namespace Game.UI.InGame.Editor
 
         private static void PrepareFonts(PreviewPair pair)
         {
+            PrepareFontsForRoots(new[] { pair.Old, pair.New }, pair.Assets);
+        }
+
+        internal static void PrepareFontsForRoots(IEnumerable<GameObject> roots, List<Object> assets)
+        {
             var fonts = new Dictionary<TMP_FontAsset, TMP_FontAsset>();
             var textures = new Dictionary<Texture, Texture>();
-            foreach (TMP_Text label in pair.Old.GetComponentsInChildren<TMP_Text>(true).Concat(pair.New.GetComponentsInChildren<TMP_Text>(true)))
+            foreach (TMP_Text label in roots.SelectMany(root => root.GetComponentsInChildren<TMP_Text>(true)))
             {
-                TMP_FontAsset font = CopyFont(label.font != null ? label.font : TMP_Settings.defaultFontAsset, fonts, textures, pair.Assets);
+                TMP_FontAsset font = CopyFont(label.font != null ? label.font : TMP_Settings.defaultFontAsset, fonts, textures, assets);
                 if (font == null) throw new InvalidOperationException("Snapshot text has no font: " + label.name);
                 var fallbacks = new List<TMP_FontAsset>(font.fallbackFontAssetTable ?? new List<TMP_FontAsset>());
                 if (TMP_Settings.fallbackFontAssets != null)
                     foreach (TMP_FontAsset fallback in TMP_Settings.fallbackFontAssets)
-                        if (fallback != null) fallbacks.Add(CopyFont(fallback, fonts, textures, pair.Assets));
-                TMP_FontAsset defaultFont = CopyFont(TMP_Settings.defaultFontAsset, fonts, textures, pair.Assets);
+                        if (fallback != null) fallbacks.Add(CopyFont(fallback, fonts, textures, assets));
+                TMP_FontAsset defaultFont = CopyFont(TMP_Settings.defaultFontAsset, fonts, textures, assets);
                 if (defaultFont != null && defaultFont != font) fallbacks.Add(defaultFont);
                 font.fallbackFontAssetTable = fallbacks.Distinct().ToList();
 
@@ -597,7 +629,7 @@ namespace Game.UI.InGame.Editor
 
                 Material material = label.fontSharedMaterial;
                 label.font = font;
-                if (material != null) label.fontSharedMaterial = CopyMaterial(material, textures, pair.Assets);
+                if (material != null) label.fontSharedMaterial = CopyMaterial(material, textures, assets);
             }
         }
 
@@ -715,19 +747,61 @@ namespace Game.UI.InGame.Editor
             return font.fallbackFontAssetTable != null && font.fallbackFontAssetTable.Any(item => PrepareCharacter(item, unicode, visited));
         }
 
-        private static UIScreen CreateScreen(string name, Transform parent, Scene scene)
+        private static UIScreen CreateScreen(string name, UIId id, Transform parent, Scene scene,
+            bool isHud = false, bool canClose = true, bool blocksHud = false)
         {
             GameObject owner = CreateObject(name, parent, scene, typeof(RectTransform));
             GameObject panel = CreateObject("Root", owner.transform, scene, typeof(RectTransform));
             UIScreen screen = owner.AddComponent<UIScreen>();
+            SetField(screen, "_id", id);
+            SetField(screen, "_isHud", isHud);
+            SetField(screen, "_canCloseByUser", canClose);
+            SetField(screen, "_blocksHudInput", blocksHud);
             SetField(screen, "_root", panel);
-            SetField(screen, "_window", panel.GetComponent<RectTransform>());
-            SetField(screen, "_inputRoots", new[] { panel.GetComponent<RectTransform>() });
+            SetField(screen, "_inputGroup", panel.AddComponent<CanvasGroup>());
             return screen;
         }
 
-        private static UIRegistration Registration(UIId id, UIScreen screen, UILayer layer, bool allowClose = true) =>
-            new UIRegistration { Id = id, Instance = screen, Layer = layer, AllowUserClose = allowClose };
+        internal static void SimulateEscape(InGameUIManager manager)
+        {
+#if ENABLE_INPUT_SYSTEM
+            // Edit Mode 또는 백그라운드 Editor 갱신은 Editor 상태 버퍼를 사용한다.
+            // 테스트 동안만 Input System의 플레이어 갱신 허용 플래그를 켜고 Dynamic 프레임을 직접 보낸다.
+            Type inputType = typeof(UnityEngine.InputSystem.InputSystem);
+            object inputManager = inputType.GetField("s_Manager", StaticPrivate).GetValue(null);
+            PropertyInfo runPlayerUpdates = inputManager.GetType().GetProperty("runPlayerUpdatesInEditMode",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            bool previousRunPlayerUpdates = (bool)runPlayerUpdates.GetValue(inputManager);
+            MethodInfo update = inputType.GetMethod("Update", StaticPrivate, null,
+                new[] { typeof(UnityEngine.InputSystem.LowLevel.InputUpdateType) }, null);
+            Action dynamicUpdate = () => update.Invoke(null, new object[] { UnityEngine.InputSystem.LowLevel.InputUpdateType.Dynamic });
+            var previous = UnityEngine.InputSystem.Keyboard.current;
+            var keyboard = UnityEngine.InputSystem.InputSystem.AddDevice<UnityEngine.InputSystem.Keyboard>();
+            try
+            {
+                runPlayerUpdates.SetValue(inputManager, true);
+                keyboard.MakeCurrent();
+                dynamicUpdate();
+                _ = keyboard.escapeKey.wasPressedThisFrame;
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(keyboard,
+                    new UnityEngine.InputSystem.LowLevel.KeyboardState(UnityEngine.InputSystem.Key.Escape));
+                dynamicUpdate();
+                if (UnityEngine.InputSystem.Keyboard.current != keyboard || !keyboard.escapeKey.wasPressedThisFrame)
+                    throw new InvalidOperationException("Synthetic Dynamic Escape was not observed by the Input System.");
+                InvokeLifecycle(manager, "Update");
+                UnityEngine.InputSystem.InputSystem.QueueStateEvent(keyboard, new UnityEngine.InputSystem.LowLevel.KeyboardState());
+                dynamicUpdate();
+            }
+            finally
+            {
+                UnityEngine.InputSystem.InputSystem.RemoveDevice(keyboard);
+                if (previous != null && previous.added) previous.MakeCurrent();
+                runPlayerUpdates.SetValue(inputManager, previousRunPlayerUpdates);
+            }
+#else
+            throw new NotSupportedException("Synthetic Escape validation requires the configured Input System.");
+#endif
+        }
         private static bool InputEnabled(UIScreen screen)
         {
             CanvasGroup group = screen.Root.GetComponent<CanvasGroup>();

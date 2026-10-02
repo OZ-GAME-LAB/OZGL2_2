@@ -136,14 +136,14 @@ namespace Game.UI.Editor
                 await WaitForPhase(flow, GamePhase.Finished);
                 AssertLocked(panel, build, upgrade, dismantle, requests, "종료");
 
-                flow.ResetRun();
+                flow.QuitRun();
                 Check(panel.TargetId == null, "reset None phase clears stale selected target");
                 await WaitForPhase(flow, GamePhase.Preparation);
                 Check(!build.interactable && !upgrade.interactable, "reset requires a fresh selection quote");
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
                 build.onClick.Invoke();
                 pending = requests[requests.Count - 1];
-                flow.ResetRun();
+                flow.QuitRun();
                 await WaitForPhase(flow, GamePhase.Preparation);
                 Check(panel.TargetId == null && panel.IsRequestPending, "reset clears selection but preserves request ownership");
                 panel.TryResolveRequest(pending.RequestId, true, "이전 플레이 성공");
@@ -173,7 +173,7 @@ namespace Game.UI.Editor
                 AssertLocked(panel, build, upgrade, dismantle, requests, "종료");
 
                 // 다음 프레임 예약 작업의 취소와 새 실행으로의 누출을 검사한다.
-                flow.ResetRun();
+                flow.QuitRun();
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
                 binding.enabled = false;
                 flow.TrySpawnUnits().Forget();
@@ -181,7 +181,7 @@ namespace Game.UI.Editor
                 Check(!build.interactable, "cancelled preparation refresh cannot unlock later battle");
                 binding.enabled = true;
                 AssertLocked(panel, build, upgrade, dismantle, requests, "전투 중");
-                flow.ResetRun();
+                flow.QuitRun();
                 await WaitForPhase(flow, GamePhase.Preparation);
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
                 flow.enabled = false;
@@ -195,7 +195,7 @@ namespace Game.UI.Editor
                 await WaitForPhase(flow, GamePhase.Battle);
                 panel.gameObject.SetActive(true);
                 AssertLocked(panel, build, upgrade, dismantle, requests, "전투 중");
-                flow.ResetRun();
+                flow.QuitRun();
                 await WaitForPhase(flow, GamePhase.Preparation);
 
                 flow.PhaseChanged -= observePreparation;
@@ -204,7 +204,7 @@ namespace Game.UI.Editor
                 var replacementFlow = replacement.AddComponent<GameFlowController>();
                 binding.Initialize(panel, replacementFlow);
                 panel.ShowActions(MvpBuildingPhaseSample.CreateSlot());
-                flow.ResetRun();
+                flow.QuitRun();
                 await WaitForPhase(flow, GamePhase.Preparation);
                 Check(!build.interactable && panel.TargetId == "sample-slot", "old core event is detached after rebind");
                 Object.DestroyImmediate(replacement);

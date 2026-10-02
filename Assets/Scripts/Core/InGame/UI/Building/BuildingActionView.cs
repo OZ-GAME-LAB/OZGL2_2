@@ -47,7 +47,6 @@ namespace Game.UI.InGame
         [SerializeField] private ActionRow _upgrade = new ActionRow();
         [SerializeField] private ActionRow _dismantle = new ActionRow();
 
-        [SerializeField] private UIScreen _playerPopup;
         [SerializeField] private bool _compactPresentation;
 
         private Action<BuildingActionRequest> _actionRequested;
@@ -62,7 +61,6 @@ namespace Game.UI.InGame
 
         private void OnEnable()
         {
-            if (_playerPopup != null) _playerPopup.Closed += HandlePopupClosed;
             _build.Button.onClick.RemoveListener(HandleBuildClicked);
             _upgrade.Button.onClick.RemoveListener(HandleUpgradeClicked);
             _dismantle.Button.onClick.RemoveListener(HandleDismantleClicked);
@@ -74,7 +72,6 @@ namespace Game.UI.InGame
 
         private void OnDisable()
         {
-            if (_playerPopup != null) _playerPopup.Closed -= HandlePopupClosed;
             _build.Button.onClick.RemoveListener(HandleBuildClicked);
             _upgrade.Button.onClick.RemoveListener(HandleUpgradeClicked);
             _dismantle.Button.onClick.RemoveListener(HandleDismantleClicked);
@@ -89,13 +86,11 @@ namespace Game.UI.InGame
             _awaitingRefresh = false;
             _resultMessage = null;
             Refresh();
-            if (_playerPopup != null) _playerPopup.Show();
         }
 
         public void HideActions()
         {
             ClearDisplay();
-            if (_playerPopup != null) _playerPopup.Hide();
         }
 
         private void ClearDisplay()
@@ -130,8 +125,6 @@ namespace Game.UI.InGame
             Refresh();
             return true;
         }
-
-        private void HandlePopupClosed(UIScreen popup, UICloseReason reason) => ClearDisplay();
 
         private void HandleBuildClicked() => RequestAction(_data?.Build);
         private void HandleUpgradeClicked() => RequestAction(_data?.Upgrade);

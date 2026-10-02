@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Game.Cameras;
 using Game.Core;
-using Game.UI;
 using Game.UI.InGame;
 using OZGL.KDH;
 using Units;
@@ -30,15 +29,24 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private SpawnManager _spawnManager;
     [SerializeField] private RuntimeUnitManager _runtimeUnitManager;
     [SerializeField] private RunCurrencyManager _runCurrencyManager;
+    [SerializeField] private ShopManager _shopManager;
+    [SerializeField] private ConsumableItemManager _consumableItemManager;
     [SerializeField] private RunSettlementManager _runSettlementManager;
     [SerializeField] private PersistentCurrencyManager _persistentCurrencyManager;
     [SerializeField] private InGameCameraController _cameraController;
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
+    [Header("Save")]
     [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
+    [SerializeField] private PersistentSaveCoordinator _persistentSaveCoordinator;
+    [SerializeField] private SaveManager _saveManager;
+    
+    [SerializeField] private OutGameTraitController _persistentTraits;
     // [SerializeField] private TeamBuildingUiStartup _uiManager;
-    [SerializeField] private InGameUIManager _inGameUIManager;
+    [Header("UI Connections")]
+    [SerializeField] private InGameUIStartup _uiStartup;
+    public bool IsUIConnected => _uiStartup != null && _uiStartup.IsReady;
     // Current date KDH 2026-09-29
     // 아웃게임 효과(특성·토템·제단)입니다. 연결하지 않아도 게임은 시작됩니다.
     [Header("OutGame Effects (KDH)")]
@@ -72,26 +80,44 @@ public class BootStrap : MonoBehaviour
             context.SelectedAltar = AltarId.Abundance;
         }
 
+        if (!InitializePersistentData()) return;
+
         _testScript.Initialize(_gameFlowController, _waveController);
-        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController);
+        _gameFlowController.Initialize
+            (_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController, _shopManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
-        _artifactManager.Initialize(_waveController, _effectManager);
+        _artifactManager.Initialize(_waveController, _effectManager, _uiStartup.ArtifactSelectionUI);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier);
+        _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager,
+            Units.Skills.SkillEffectResolver.Instance);
+        if (!_consumableItemManager.IsInitialized)
+        {
+            Debug.LogError("[BootStrap] 상점에 연결할 소모품 매니저 초기화에 실패했습니다.", this);
+            return;
+        }
+        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _consumableItemManager, _uiStartup.ShopUI);
+        if (!_shopManager.IsInitialized)
+        {
+            Debug.LogError("[BootStrap] 상점 매니저 초기화에 실패했습니다.", this);
+            return;
+        }
+        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier,
+            _uiStartup.SettlementUI, _persistentSaveCoordinator);
+        _archiveManager.Initialize(_artifactManager,_runtimeUnitManager,_waveController);
         _cameraController.Initialize(_buildController,_gameFlowController);
+        
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
-        // 기존 UI 연결 (전환 내역을 확인할 수 있도록 보존)
-        // _uiManager.Initialize(_runCurrencyManager, _waveController, _gameFlowController,
-        //     _effectManager, _buildingCoreProgress, _testScript, _buildController, buildingSlots.ToArray());
-        // if (!_uiManager.IsReady) return;
-        // _uiManager.gameObject.SetActive(true);
-        _inGameUIManager.Initialize(_runCurrencyManager, _waveController, _gameFlowController,
-            _artifactManager, _buildingCoreProgress, _testScript, _buildController, buildingSlots.ToArray());
-        if (!_inGameUIManager.IsReady) return;
-        _inGameUIManager.gameObject.SetActive(true);
+        if (!_uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
+                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray()))
+        {
+            Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
+            return;
+        }
+        _uiStartup.UIManager.gameObject.SetActive(true);
+        
         // Current date KDH 2026-09-29
         // GameFlow·RunCurrency 초기화 뒤, BeginRun 전에 연결해야 첫 Preparation 이벤트를 받습니다.
         InitializeOutGameEffects(context, fromOutGame);
@@ -103,6 +129,7 @@ public class BootStrap : MonoBehaviour
         {
             case StartMode.NewGame:
                 _data.SetOutGameData(context);
+                _archiveManager.NewGame();
                 _gameFlowController.NewGame();
                 break;
 
@@ -118,12 +145,40 @@ public class BootStrap : MonoBehaviour
         }
     }
 
+    // 저장용 특성은 런 효과용 선택 목록과 별개다. 파일에서 복원한 특성을 그대로 보존한다.
+    private bool InitializePersistentData()
+    {
+        _persistentCurrencyManager.Initialize();
+        _persistentTraits.Initialize(_persistentCurrencyManager, _persistentSaveCoordinator);
+        _persistentSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager);
+        if (_persistentSaveCoordinator.TryLoadOrCreate(out string error)) 
+            return true;
+        Debug.LogError("[BootStrap] 영구 데이터 초기화 실패: " + error, this);
+        return false;
+    }
+    public bool InitializeUI(BuildingSlot[] slots)
+    {
+        return _uiStartup != null && _uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
+            _waveController, _buildController, _buildingCoreProgress, slots);
+    }
+
     private bool ValidateReferences()
     {
         bool valid = true;
-        if (_inGameUIManager == null)
+        if (_shopManager == null || _consumableItemManager == null)
         {
-            Debug.LogError("[BootStrap] _inGameUIManager 참조가 없습니다. 새 UI 루트를 연결해주세요.", this);
+            Debug.LogError("[BootStrap] ShopManager와 ConsumableItemManager 참조를 연결해주세요.", this);
+            valid = false;
+        }
+        if (_persistentCurrencyManager == null || _runSettlementManager == null || _saveManager == null ||
+            _persistentSaveCoordinator == null || _persistentTraits == null)
+        {
+            Debug.LogError("[BootStrap] 정산 매니저·혈석 지갑·SaveManager·영구 저장·특성 데이터 참조를 연결해주세요.", this);
+            valid = false;
+        }
+        if (_uiStartup == null)
+        {
+            Debug.LogError("[BootStrap] _uiStartup 참조가 없습니다. UI 초기화 컴포넌트를 연결해주세요.", this);
             valid = false;
         }
         if (_testScript == null)

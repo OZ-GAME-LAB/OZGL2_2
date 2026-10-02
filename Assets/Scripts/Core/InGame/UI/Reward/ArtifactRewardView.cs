@@ -10,18 +10,20 @@ namespace Game.UI.InGame
     [DisallowMultipleComponent]
     public sealed class ArtifactRewardView : MonoBehaviour
     {
-        public event Action<ArtifactRewardRequest> ChoiceRequested
+        public event Action<ArtifactData> ChoiceRequested
         {
             add { _choiceRequested += value; Refresh(); }
             remove { _choiceRequested -= value; Refresh(); }
         }
 
+        public UIScreen Screen => _screen;
         public bool IsVisible => _screen != null && _screen.IsVisible;
-        public bool IsRequestPending => _pendingRequest != null;
+        public bool IsRequestPending => _isRequestPending;
+        public IReadOnlyList<ArtifactData> Candidates => _candidates;
         public int CurrentPageIndex => _pageIndex;
-        public int PageCount => _data == null ? 0 : (_data.Candidates.Count - 1) / CardsPerPage + 1;
-        public string SelectedArtifactId => _data != null && _selectedIndex >= 0
-            ? _data.Candidates[_selectedIndex].ArtifactId : null;
+        public int PageCount => _candidates.Count == 0 ? 0 : (_candidates.Count - 1) / CardsPerPage + 1;
+        public string SelectedArtifactId => _selectedIndex >= 0 && _selectedIndex < _candidates.Count
+            ? _candidates[_selectedIndex].Id : null;
 
         [Serializable]
         private sealed class Card
@@ -62,9 +64,9 @@ namespace Game.UI.InGame
         }
         [SerializeField] private DisplayNameOverride[] _displayNames = Array.Empty<DisplayNameOverride>();
 
-        private Action<ArtifactRewardRequest> _choiceRequested;
-        private ArtifactRewardViewData _data;
-        private ArtifactRewardRequest _pendingRequest;
+        private Action<ArtifactData> _choiceRequested;
+        private IReadOnlyList<ArtifactData> _candidates = Array.Empty<ArtifactData>();
+        private bool _isRequestPending;
         private bool _allowForfeit = true;
         private int _selectedIndex = -1;
         private int _pageIndex;
@@ -105,7 +107,7 @@ namespace Game.UI.InGame
             if (_cards != null)
                 foreach (var card in _cards)
                     if (card != null && card.Slot != null) card.Slot.Unbind();
-            // 숨김은 실제 요청 취소가 아니다. 늦게 도착하는 응답도 동일 ID로 처리한다.
+            // 화면 종료 통지를 받은 Presenter가 현재 요청의 취소를 처리한다.
             HideView();
         }
 
@@ -115,36 +117,62 @@ namespace Game.UI.InGame
             Refresh();
         }
 
-        public void ShowReward(ArtifactRewardViewData data)
+        /// <summary>실패 후 같은 후보를 다시 요청하면 페이지와 선택을 보존한다.</summary>
+        public void ShowSelection(IReadOnlyList<ArtifactData> candidates, bool allowForfeit, string message)
         {
-            if (data == null) throw new ArgumentNullException(nameof(data));
+            if (candidates == null) throw new ArgumentNullException(nameof(candidates));
+            if (candidates.Count == 0)
+                throw new ArgumentException("At least one artifact candidate is required.", nameof(candidates));
             if (!HasView()) throw new InvalidOperationException("Artifact reward view references are incomplete.");
-            if (_data == null || _data.RewardId != data.RewardId)
+            if (IsRequestPending)
+                throw new InvalidOperationException("Resolve or explicitly end the pending selection first.");
+
+            var snapshot = new ArtifactData[candidates.Count];
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < candidates.Count; i++)
             {
-                if (IsRequestPending) throw new InvalidOperationException("Resolve or explicitly reset the pending reward first.");
-                _data = data;
+                ArtifactData candidate = candidates[i];
+                if (candidate == null || string.IsNullOrWhiteSpace(candidate.Id) || !ids.Add(candidate.Id))
+                    throw new ArgumentException("Candidates must be non-null with distinct IDs.", nameof(candidates));
+                snapshot[i] = candidate;
+            }
+
+            bool preserveSelection = !string.IsNullOrWhiteSpace(message) && SameCandidates(snapshot);
+            if (!preserveSelection)
+            {
                 _selectedIndex = -1;
                 _pageIndex = 0;
-                _completed = false;
-                _message = null;
             }
-            // 같은 보상 재오픈은 선택/대기/완료 상태와 최초 후보 스냅샷을 유지한다.
-            _showRequested = !_completed;
+            _candidates = Array.AsReadOnly(snapshot);
+            _isRequestPending = false;
+            _completed = false;
+            _allowForfeit = allowForfeit;
+            _message = message;
+            _showRequested = true;
             Refresh();
         }
 
-        public void HideReward()
+        public void EndSelection()
         {
+            _isRequestPending = false;
             _showRequested = false;
             Refresh();
+        }
+
+        private bool SameCandidates(IReadOnlyList<ArtifactData> candidates)
+        {
+            if (_candidates.Count != candidates.Count) return false;
+            for (int i = 0; i < candidates.Count; i++)
+                if (!ReferenceEquals(_candidates[i], candidates[i])) return false;
+            return true;
         }
 
         /// <summary>실제 소유자가 이전 플레이/보상 요청을 무효화한 후 호출한다. 게임 상태를 취소하지 않는다.</summary>
         public void ResetReward()
         {
             _allowForfeit = true;
-            _data = null;
-            _pendingRequest = null;
+            _candidates = Array.Empty<ArtifactData>();
+            _isRequestPending = false;
             _selectedIndex = -1;
             _pageIndex = 0;
             _completed = false;
@@ -153,10 +181,11 @@ namespace Game.UI.InGame
             Refresh();
         }
 
-        public bool TryResolveRequest(Guid requestId, bool succeeded, string message = null)
+        /// <summary>Presenter가 ChoiceRequested 콜백 안에서 동기적으로 선택을 승인/거부한다. 게임 적용의 비동기 완료 응답에는 사용하지 않는다.</summary>
+        public bool TryResolveSelection(bool succeeded, string message = null)
         {
-            if (_pendingRequest == null || _pendingRequest.RequestId != requestId) return false;
-            _pendingRequest = null;
+            if (!IsRequestPending) return false;
+            _isRequestPending = false;
             _completed = succeeded;
             if (succeeded) _showRequested = false;
             _message = succeeded ? null : string.IsNullOrWhiteSpace(message)
@@ -179,17 +208,18 @@ namespace Game.UI.InGame
         private void HandleConfirmClicked()
         {
             if (!CanInteract() || _choiceRequested == null || (!_allowForfeit && _selectedIndex < 0)) return;
-            var request = new ArtifactRewardRequest(_data.RewardId, SelectedArtifactId);
-            _pendingRequest = request;
+            ArtifactData selected = _selectedIndex >= 0 ? _candidates[_selectedIndex] : null;
+            Action<ArtifactData> choiceRequested = _choiceRequested;
+            _isRequestPending = true;
             _message = null;
             Refresh(); // 동기 응답/재진입에도 중복 요청이 발생하지 않도록 먼저 잠근다.
-            _choiceRequested.Invoke(request);
+            choiceRequested.Invoke(selected);
         }
 
         private void SelectCandidate(int index)
         {
             int candidateIndex = _pageIndex * CardsPerPage + index;
-            if (!CanInteract() || index < 0 || index >= CardsPerPage || candidateIndex >= _data.Candidates.Count) return;
+            if (!CanInteract() || index < 0 || index >= CardsPerPage || candidateIndex >= _candidates.Count) return;
             _selectedIndex = candidateIndex;
             _message = null;
             Refresh();
@@ -202,7 +232,7 @@ namespace Game.UI.InGame
             Refresh(); // 선택은 전체 후보 기준으로 유지하며 페이지 변경은 요청을 전송하지 않는다.
         }
 
-        private bool CanInteract() => isActiveAndEnabled && IsVisible && _data != null &&
+        private bool CanInteract() => isActiveAndEnabled && IsVisible && _candidates.Count > 0 &&
             !_completed && !IsRequestPending;
 
         private bool HasView()
@@ -229,19 +259,19 @@ namespace Game.UI.InGame
         private void Refresh()
         {
             if (!HasView()) return;
-            if (!isActiveAndEnabled || !_showRequested || _data == null || _completed)
+            if (!isActiveAndEnabled || !_showRequested || _candidates.Count == 0 || _completed)
             {
                 HideView();
                 return;
             }
             bool opening = !IsVisible;
-            _rewardText.text = BuildRewardSummary(_data.AwardedGold, _data.AwardedGems);
-            _instructionText.text = _data.Candidates.Count == 1
+            _rewardText.text = "유물 보상";
+            _instructionText.text = _candidates.Count == 1
                 ? "유물을 확인하세요"
-                : $"{_data.Candidates.Count}개의 유물 중 하나를 선택하세요";
+                : $"{_candidates.Count}개의 유물 중 하나를 선택하세요";
             bool unlocked = !IsRequestPending;
             int offset = _pageIndex * CardsPerPage;
-            int visibleCount = Math.Min(CardsPerPage, _data.Candidates.Count - offset);
+            int visibleCount = Math.Min(CardsPerPage, _candidates.Count - offset);
             LayoutVisibleCards(visibleCount);
             for (int i = 0; i < _cards.Length; i++)
             {
@@ -254,14 +284,14 @@ namespace Game.UI.InGame
                     card.Selection.SetActive(false);
                     continue;
                 }
-                var offer = _data.Candidates[offset + i];
-                var icon = offer.Icon != null ? offer.Icon : _fallbackIcon;
+                ArtifactData candidate = _candidates[offset + i];
+                var icon = candidate.Icon != null ? candidate.Icon : _fallbackIcon;
                 int cardIndex = i;
-                card.Slot.Bind(icon, GetDisplayName(offer), offer.RarityName,
+                card.Slot.Bind(icon, GetDisplayName(candidate), RarityName(candidate.Rarity),
                     offset + i == _selectedIndex, unlocked, () => SelectCandidate(cardIndex));
                 card.Icon.enabled = icon != null;
-                card.Rarity.color = offer.RarityColor;
-                card.Effect.text = offer.EffectDescription;
+                card.Rarity.color = RarityColor(candidate.Rarity);
+                card.Effect.text = GetDescription(candidate);
                 card.MissingIcon.SetActive(icon == null);
             }
             _clearButton.gameObject.SetActive(_selectedIndex >= 0);
@@ -279,13 +309,13 @@ namespace Game.UI.InGame
             ConfigureNavigation(visibleCount);
             _statusText.text = IsRequestPending ? "선택을 적용하는 중…" : _message ?? (_choiceRequested == null
                 ? "잠시만 기다려주세요" : _selectedIndex >= 0
-                ? GetDisplayName(_data.Candidates[_selectedIndex]) + " 선택됨"
+                ? GetDisplayName(_candidates[_selectedIndex]) + " 선택됨"
                 : "");
             if (_compactPresentation && _showCardEffects && !IsRequestPending && _message == null && _selectedIndex >= 0)
-                _statusText.text = _data.Candidates[_selectedIndex].EffectDescription;
+                _statusText.text = GetDescription(_candidates[_selectedIndex]);
 
-            // 내용 준비를 끝낸 뒤 중앙 관리자에게 표시와 포커스를 요청한다.
-            if (opening) _screen.Show();
+            // 내용 준비를 끝낸 뒤 기존 보상 화면을 교체한다.
+            if (opening) _screen.Manager?.ReplacePopup(_screen.Id);
             if (!IsVisible) return;
             int focusIndex = _selectedIndex >= offset && _selectedIndex < offset + visibleCount ? _selectedIndex - offset : 0;
             if (opening && EventSystem.current != null)
@@ -300,10 +330,30 @@ namespace Game.UI.InGame
             }
         }
 
-        private string GetDisplayName(ArtifactRewardOffer offer)
+        private string GetDisplayName(ArtifactData data)
         {
-            return ResolveDisplayName(offer.ArtifactId, offer.DisplayName);
+            return ResolveDisplayName(data.Id, data.DisplayName);
         }
+
+        private static string GetDescription(ArtifactData data) => string.IsNullOrWhiteSpace(data.Description)
+            ? "효과 설명 미등록" : data.Description.Replace("\\n", "\n");
+
+        internal static string RarityName(ArtifactRarity rarity) => rarity switch
+        {
+            ArtifactRarity.Common => "일반",
+            ArtifactRarity.Rare => "희귀",
+            ArtifactRarity.Legendary => "전설",
+            ArtifactRarity.Mythic => "신화",
+            _ => rarity.ToString()
+        };
+
+        internal static Color RarityColor(ArtifactRarity rarity) => rarity switch
+        {
+            ArtifactRarity.Rare => new Color32(112, 186, 255, 255),
+            ArtifactRarity.Legendary => new Color32(255, 205, 99, 255),
+            ArtifactRarity.Mythic => new Color32(246, 136, 172, 255),
+            _ => new Color32(200, 214, 220, 255)
+        };
 
         internal string ResolveDisplayName(string artifactId, string fallback)
         {
@@ -404,17 +454,9 @@ namespace Game.UI.InGame
 
         private void HideView()
         {
-            // 화면 상태와 닫힌 뒤의 포커스 복원은 중앙 관리자가 소유한다.
-            if (_screen != null) _screen.Hide(_completed ? UICloseReason.Completed : UICloseReason.ContextLost);
+            if (_screen != null)
+                _screen.Manager?.ClosePopup(_screen.Id, _completed ? UICloseReason.Completed : UICloseReason.ContextLost);
         }
 
-        private static string BuildRewardSummary(int? gold, int? gems)
-        {
-            var rewards = new List<string>(2);
-            if (gold.GetValueOrDefault() > 0) rewards.Add("골드 +" + gold.Value);
-            if (gems.GetValueOrDefault() > 0) rewards.Add("보석 +" + gems.Value);
-            if (rewards.Count > 0) return string.Join("  ·  ", rewards);
-            return gold.HasValue && gems.HasValue ? "추가 재화 없음" : "보상 집계 중";
-        }
     }
 }

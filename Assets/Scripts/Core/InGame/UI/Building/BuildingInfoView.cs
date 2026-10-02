@@ -9,8 +9,7 @@ namespace Game.UI.InGame
     /// <summary>선택된 건물의 표시만 담당한다. 선택 판정/재화/건설 규칙은 외부 소유다.</summary>
     public sealed class BuildingInfoView : MonoBehaviour
     {
-        public event Action<string> InfoPanelClosed;
-
+        public UIScreen Popup => _playerPopup;
         public string SelectionId { get; private set; }
         public bool HasSelection => SelectionId != null;
 
@@ -36,16 +35,6 @@ namespace Game.UI.InGame
         [SerializeField] private string _effectFormat = "건물 효과\n{0}";
 
         [SerializeField] private UIScreen _playerPopup;
-
-        private void OnEnable()
-        {
-            if (_playerPopup != null) _playerPopup.Closed += HandlePopupClosed;
-        }
-
-        private void OnDisable()
-        {
-            if (_playerPopup != null) _playerPopup.Closed -= HandlePopupClosed;
-        }
 
         public void ShowBuildingInfo(BuildingInfoData data)
         {
@@ -73,8 +62,6 @@ namespace Game.UI.InGame
             _iconPlaceholder.SetActive(data.Icon == null);
             _emptyState.SetActive(false);
             _contentPanel.SetActive(true);
-            if (_playerPopup != null) _playerPopup.Show();
-
             if (selectionChanged)
             {
                 _detailsScroll.StopMovement();
@@ -85,7 +72,6 @@ namespace Game.UI.InGame
         public void HideBuildingInfo()
         {
             ClearDisplay();
-            if (_playerPopup != null) _playerPopup.Hide();
         }
 
         private void ClearDisplay()
@@ -111,13 +97,5 @@ namespace Game.UI.InGame
             _emptyState.SetActive(_playerPopup == null);
         }
 
-        private void HandlePopupClosed(UIScreen popup, UICloseReason reason)
-        {
-            if (!HasSelection) return;
-            var id = SelectionId;
-            ClearDisplay();
-            // 상세 창을 떠나면 선택도 정리한다. 후보 목록에서 넘어오는 전환은 목록에서 처리한다.
-            InfoPanelClosed?.Invoke(id);
-        }
     }
 }

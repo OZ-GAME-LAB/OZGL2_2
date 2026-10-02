@@ -434,7 +434,7 @@ namespace Game.UI.Editor
                 //wallet.Initialize(waves, flow, null);
 
                 wallet.Initialize(waves, flow, null, UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>());
-                flow.ResetRun();
+                flow.QuitRun();
                 startup.Refresh();
                 Check(wallet.GetBalance(CurrencyType.Gold) == 100 && wallet.GetBalance(CurrencyType.Gem) == 0 &&
                     goldText.text == "100" && gemText.text == "보석 0", "explicit new run refreshes both HUD currencies");
@@ -476,7 +476,7 @@ namespace Game.UI.Editor
                 Check(wallet.TryEndRun(), "test owner ends the completed victory run");
                 wallet.Initialize(waves, flow, null,
                     UnityEngine.Object.FindFirstObjectByType<BuildingCoreProgress>());
-                flow.ResetRun();
+                flow.QuitRun();
                 startup.Refresh();
                 Check(flow.CurPhase == GamePhase.Preparation && !resultPanel.activeInHierarchy,
                     "test reset returns to building preparation after the victory result");

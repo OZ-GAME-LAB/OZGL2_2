@@ -298,7 +298,7 @@ namespace Game.UI.Samples
                 _rewardPaid = false;
                 _gateReleased = false;
                 _rewardFaulted = false;
-                _flow.ResetRun();
+                _flow.QuitRun();
                 _statusText.text = "실제 재화·코어·유물 리셋 완료";
             }
             finally { _isApplyingReward = false; }

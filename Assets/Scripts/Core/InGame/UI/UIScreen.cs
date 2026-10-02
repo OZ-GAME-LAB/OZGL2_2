@@ -1,132 +1,60 @@
 using System;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace Game.UI.InGame
 {
-    /// <summary>화면의 표시만 담당한다. 열림 순서와 닫기 정책은 매니저가 관리한다.</summary>
+    /// <summary>화면 하나의 표시와 입력만 담당한다. 순서와 닫기 정책은 매니저가 관리한다.</summary>
     public sealed class UIScreen : MonoBehaviour
     {
+        [SerializeField] private UIId _id;
+        [SerializeField] private bool _isHud;
+        [SerializeField] private bool _canCloseByUser = true;
+        [SerializeField] private bool _blocksHudInput;
         [SerializeField] private GameObject _root;
-        [SerializeField] private RectTransform _window;
-        [SerializeField] private Selectable _initialFocus;
-        [SerializeField] private RectTransform[] _inputRoots = Array.Empty<RectTransform>();
-        [SerializeField] private Button _detailsButton;
-        [SerializeField] private TMP_Text _detailsLabel;
-        [SerializeField] private GameObject _detailsRoot;
-        [SerializeField] private float _collapsedHeight = 300;
-        [SerializeField] private float _expandedHeight = 440;
+        [SerializeField] private CanvasGroup _inputGroup;
 
-        private CanvasGroup[] _inputGroups;
-        private Canvas _canvas;
-        private int _sortingOrder;
-        private bool _overrideSorting;
         public InGameUIManager Manager { get; private set; }
-        public UIId Id { get; private set; }
-        public UIHandle Handle { get; private set; }
-        public bool IsVisible => _root != null && _root.activeInHierarchy;
-        public bool IsExpanded { get; private set; }
-        public RectTransform Window => _window;
-        public Selectable InitialFocus => _initialFocus;
+        public UIId Id => _id;
+        public bool IsHud => _isHud;
+        public bool CanCloseByUser => _canCloseByUser;
+        public bool BlocksHudInput => _blocksHudInput;
         public GameObject Root => _root;
-        public event Action<UIScreen> Shown;
+        public bool IsVisible => _root != null && _root.activeInHierarchy;
         public event Action<UIScreen, UICloseReason> Closed;
 
-        private void OnEnable()
+        internal bool Attach(InGameUIManager manager)
         {
-            if (_detailsButton != null) _detailsButton.onClick.AddListener(HandleDetails);
-        }
-
-        private void OnDisable()
-        {
-            if (_detailsButton != null) _detailsButton.onClick.RemoveListener(HandleDetails);
-        }
-
-        internal bool Attach(InGameUIManager manager, UIId id)
-        {
-            if (_root == null) return false;
-            Manager = manager;
-            Id = id;
-            foreach (OpenUtility utility in GetComponentsInChildren<OpenUtility>(true)) utility.Initialize(manager);
-            if (_inputGroups == null)
+            if (_root == null || _inputGroup == null)
             {
-                int count = _inputRoots.Length == 0 ? 1 : _inputRoots.Length;
-                _inputGroups = new CanvasGroup[count];
-                for (int i = 0; i < count; i++)
-                {
-                    GameObject inputRoot = _inputRoots.Length == 0 ? _root :
-                        _inputRoots[i] != null ? _inputRoots[i].gameObject : null;
-                    if (inputRoot == null) continue;
-                    if (!inputRoot.TryGetComponent(out CanvasGroup group)) group = inputRoot.AddComponent<CanvasGroup>();
-                    _inputGroups[i] = group;
-                }
-                _canvas = GetComponent<Canvas>();
-                if (_canvas != null)
-                {
-                    _sortingOrder = _canvas.sortingOrder;
-                    _overrideSorting = _canvas.overrideSorting;
-                }
+                Debug.LogError($"[InGameUI] {_id} 화면의 Root 또는 CanvasGroup 참조가 없습니다.", this);
+                return false;
             }
+            Manager = manager;
+            foreach (OpenUtility utility in GetComponentsInChildren<OpenUtility>(true)) utility.Initialize(manager);
             return true;
         }
 
-        public void Show() => Manager?.Open(Id);
-        public void Hide(UICloseReason reason = UICloseReason.ContextLost) => Manager?.Close(Handle, reason);
-
-        internal void Display(UIHandle handle, int aboveSortingOrder = -1)
-        {
-            Handle = handle;
-            if (_detailsRoot != null) SetExpanded(false);
-            if (_canvas != null && aboveSortingOrder >= _sortingOrder)
-            {
-                _canvas.overrideSorting = true;
-                _canvas.sortingOrder = aboveSortingOrder + 1;
-            }
-            _root.SetActive(true);
-            Shown?.Invoke(this);
-        }
+        internal void Display() => _root.SetActive(true);
 
         internal void Conceal(UICloseReason reason, bool notify)
         {
-            Handle = default;
+            SetInputEnabled(false);
             if (_root != null) _root.SetActive(false);
-            if (_detailsRoot != null) SetExpanded(false);
-            if (_canvas != null)
-            {
-                _canvas.sortingOrder = _sortingOrder;
-                _canvas.overrideSorting = _overrideSorting;
-            }
             if (notify) Closed?.Invoke(this, reason);
         }
 
-        internal int SortingOrder => _canvas != null ? _canvas.sortingOrder :
-            GetComponentInParent<Canvas>() != null ? GetComponentInParent<Canvas>().sortingOrder : 0;
-
         internal void SetInputEnabled(bool enabled)
         {
-            if (_inputGroups == null) return;
-            foreach (CanvasGroup group in _inputGroups)
-                if (group != null) { group.interactable = enabled; group.blocksRaycasts = enabled; }
+            if (_inputGroup != null)
+            {
+                _inputGroup.interactable = enabled;
+                _inputGroup.blocksRaycasts = enabled;
+            }
+            if (enabled || _root == null || EventSystem.current == null) return;
+            GameObject selected = EventSystem.current.currentSelectedGameObject;
+            if (selected != null && selected.transform.IsChildOf(_root.transform))
+                EventSystem.current.SetSelectedGameObject(null);
         }
-
-        public void SetExpanded(bool expanded)
-        {
-            IsExpanded = expanded && _detailsRoot != null;
-            if (_detailsRoot != null) _detailsRoot.SetActive(IsExpanded);
-            if (_detailsLabel != null) _detailsLabel.text = IsExpanded ? "접기" : "자세히";
-            if (_window != null)
-                _window.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, IsExpanded ? _expandedHeight : _collapsedHeight);
-        }
-
-        public void SetContentHeights(float collapsed, float expanded)
-        {
-            if (collapsed <= 0 || expanded < collapsed) throw new ArgumentOutOfRangeException(nameof(collapsed));
-            _collapsedHeight = collapsed;
-            _expandedHeight = expanded;
-            SetExpanded(IsExpanded);
-        }
-
-        private void HandleDetails() => SetExpanded(!IsExpanded);
     }
 }

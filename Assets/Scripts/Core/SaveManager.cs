@@ -14,7 +14,9 @@ public class SaveManager : MonoBehaviour
 {
     private string _directory;
 
-    public string DirectoryPath => _directory ?? Path.Combine(Application.persistentDataPath, "Saves");
+    // Editor의 도메인 재로드에서 null 문자열이 빈 값으로 복원될 수 있다.
+    public string DirectoryPath => string.IsNullOrWhiteSpace(_directory)
+        ? Path.Combine(Application.persistentDataPath, "Saves") : _directory;
 
     // 테스트에서는 실제 플레이어 저장소와 분리된 디렉터리를 주입합니다.
     public void ConfigureDirectory(string absoluteDirectory)

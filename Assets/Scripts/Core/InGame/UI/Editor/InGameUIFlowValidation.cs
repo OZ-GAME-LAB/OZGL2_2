@@ -43,11 +43,14 @@ namespace Game.UI.InGame.Editor
             ArtifactRewardPresenter rewardPresenter = null;
             ArtifactRewardView rewardView = null;
             var temporaryAssets = new List<UnityEngine.Object>();
+            var temporaryFonts = new List<UnityEngine.Object>();
             var checks = new List<string>();
             try
             {
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, preview);
                 instance.name = "InGameUIFlowValidation";
+                instance.SetActive(false);
+                InGameUIValidation.PrepareFontsForRoots(new[] { instance }, temporaryFonts);
                 instance.SetActive(true);
 
                 var eventRoot = new GameObject("Validation EventSystem", typeof(EventSystem));
@@ -58,7 +61,7 @@ namespace Game.UI.InGame.Editor
 
                 var manager = Require<InGameUIManager>(instance);
                 Check(manager.InitializeScreens(), "screen registry initializes without game systems", checks);
-                Check(manager.ShowHud().IsValid, "HUD opens without starting game flow", checks);
+                Check(manager.ShowHud(), "HUD opens without starting game flow", checks);
                 rewardView = Require<ArtifactRewardView>(instance);
                 rewardPresenter = Require<ArtifactRewardPresenter>(instance);
                 var actions = Require<BuildingActionView>(instance);
@@ -73,7 +76,7 @@ namespace Game.UI.InGame.Editor
                 RebindLifecycle(actions);
                 RebindLifecycle(hud);
 
-                ValidateRewardView(rewardView, checks);
+                ValidateRewardView(rewardView, temporaryAssets, checks);
                 await ValidateRewardInterface(rewardPresenter, rewardView, temporaryAssets, checks);
                 ValidateBuildingActions(actions, Require<BuildingInfoView>(instance), checks);
                 ValidateHud(hud, checks);
@@ -88,13 +91,15 @@ namespace Game.UI.InGame.Editor
             }
             finally
             {
-                if (rewardPresenter != null) rewardPresenter.Close();
+                if (rewardPresenter != null) rewardPresenter.ResetReward();
                 if (rewardView != null) rewardView.ResetReward();
                 foreach (UnityEngine.Object asset in temporaryAssets)
                     if (asset != null) UnityEngine.Object.DestroyImmediate(asset);
                 if (validationEvents != null)
                     validationEvents.GetType().GetMethod("OnDisable", PrivateInstance)?.Invoke(validationEvents, null);
                 EditorSceneManager.ClosePreviewScene(preview);
+                for (int i = temporaryFonts.Count - 1; i >= 0; i--)
+                    if (temporaryFonts[i] != null) UnityEngine.Object.DestroyImmediate(temporaryFonts[i]);
                 if (previousEvents != null) EventSystem.current = previousEvents;
                 if (previousEvents != null && previousFocus != null && previousFocus.activeInHierarchy)
                     previousEvents.SetSelectedGameObject(previousFocus);
@@ -102,10 +107,11 @@ namespace Game.UI.InGame.Editor
             }
         }
 
-        private static void ValidateRewardView(ArtifactRewardView view, List<string> checks)
+        private static void ValidateRewardView(ArtifactRewardView view,
+            List<UnityEngine.Object> temporaryAssets, List<string> checks)
         {
-            var requests = new List<ArtifactRewardRequest>();
-            Action<ArtifactRewardRequest> receive = requests.Add;
+            var requests = new List<ArtifactData>();
+            Action<ArtifactData> receive = requests.Add;
             var confirm = Field<UnityEngine.UI.Button>(view, "_confirmButton");
             var next = Field<UnityEngine.UI.Button>(view, "_nextPageButton");
             var previous = Field<UnityEngine.UI.Button>(view, "_previousPageButton");
@@ -113,12 +119,14 @@ namespace Game.UI.InGame.Editor
             UnityEngine.UI.Button[] cards = RewardButtons(view);
             var fields = new SerializedObject(view);
             fields.FindProperty("_fallbackIcon").objectReferenceValue = null;
+            fields.FindProperty("_showCardEffects").boolValue = true;
             fields.ApplyModifiedPropertiesWithoutUndo();
             view.ChoiceRequested += receive;
             try
             {
-                ArtifactRewardViewData data = RewardData("validation-view", 5);
-                view.ShowReward(data);
+                ArtifactData[] candidates = RewardCandidates("validation-view", 5, temporaryAssets);
+                var mutableCandidates = new List<ArtifactData>(candidates);
+                view.ShowSelection(mutableCandidates, true, null);
                 Check(view.IsVisible && view.PageCount == 2 && view.CurrentPageIndex == 0,
                     "reward candidates use multiple pages", checks);
                 SerializedProperty firstCard = fields.FindProperty("_cards").GetArrayElementAtIndex(0);
@@ -126,40 +134,52 @@ namespace Game.UI.InGame.Editor
                 var missingIcon = (GameObject)firstCard.FindPropertyRelative("MissingIcon").objectReferenceValue;
                 Check(!icon.enabled && missingIcon.activeSelf,
                     "missing reward icon uses its placeholder without an empty image", checks);
+                var rarity = (TMP_Text)firstCard.FindPropertyRelative("Rarity").objectReferenceValue;
+                var effect = (TMP_Text)firstCard.FindPropertyRelative("Effect").objectReferenceValue;
+                Check(rarity.text == "희귀" && rarity.color == (Color)new Color32(112, 186, 255, 255) &&
+                    effect.text == "검증용\n설명",
+                    "view formats the source rarity and escaped description newline", checks);
+                SerializedProperty secondCard = fields.FindProperty("_cards").GetArrayElementAtIndex(1);
+                var missingDescription = (TMP_Text)secondCard.FindPropertyRelative("Effect").objectReferenceValue;
+                Check(missingDescription.text == "효과 설명 미등록",
+                    "empty source description uses the display fallback", checks);
+                mutableCandidates.Clear();
+                Check(view.Candidates.Count == candidates.Length &&
+                    ReferenceEquals(view.Candidates[0], candidates[0]),
+                    "view snapshots the caller list while preserving original artifact references", checks);
                 Click(next);
                 Click(cards[1]);
-                Check(view.SelectedArtifactId == data.Candidates[4].ArtifactId && requests.Count == 0,
+                Check(view.SelectedArtifactId == candidates[4].Id && requests.Count == 0,
                     "browsing chooses an item without submitting a reward", checks);
-                view.HideReward();
-                view.ShowReward(data);
-                Check(view.CurrentPageIndex == 1 && view.SelectedArtifactId == data.Candidates[4].ArtifactId,
-                    "reward reopen preserves page and selection", checks);
-                view.ShowReward(RewardData(data.RewardId, 1));
-                Check(view.PageCount == 2, "same reward ID retains its original candidates", checks);
+                view.EndSelection();
+                view.ShowSelection(candidates, true, "validation retry");
+                Check(view.CurrentPageIndex == 1 && view.SelectedArtifactId == candidates[4].Id,
+                    "retrying the same candidates preserves page and selection", checks);
                 Click(previous);
                 Click(confirm);
-                Check(requests.Count == 1 && requests[0].ArtifactId == data.Candidates[4].ArtifactId,
-                    "confirmation preserves selection from another page", checks);
+                Check(requests.Count == 1 && ReferenceEquals(requests[0], candidates[4]),
+                    "confirmation returns the original artifact selected on another page", checks);
                 confirm.onClick.Invoke();
                 Check(requests.Count == 1 && view.IsRequestPending && !next.interactable,
                     "pending reward prevents duplicate submit and page changes", checks);
-                Check(!view.TryResolveRequest(Guid.NewGuid(), true) && view.IsRequestPending,
-                    "unrelated reward response does not resolve current request", checks);
-                Check(view.TryResolveRequest(requests[0].RequestId, false, "validation rejection") &&
-                    view.SelectedArtifactId == data.Candidates[4].ArtifactId,
+                Check(view.TryResolveSelection(false, "validation rejection") &&
+                    view.SelectedArtifactId == candidates[4].Id,
                     "rejected reward keeps the selected candidate", checks);
+                Check(!view.TryResolveSelection(true) && view.IsVisible,
+                    "response without a pending selection does not close the view", checks);
                 Click(clear);
-                view.SetForfeitAllowed(false);
+                view.ShowSelection(candidates, false, null);
                 confirm.onClick.Invoke();
                 Check(!confirm.interactable && requests.Count == 1,
                     "required reward cannot submit an empty selection", checks);
                 Click(cards[0]);
                 Click(confirm);
-                ArtifactRewardRequest oldRequest = requests[1];
+                Check(requests.Count == 2 && ReferenceEquals(requests[1], candidates[0]),
+                    "a rejected selection can be replaced with another original artifact", checks);
                 view.ResetReward();
-                view.ShowReward(RewardData("validation-next-reward", 1));
-                Check(!view.TryResolveRequest(oldRequest.RequestId, true) && view.IsVisible,
-                    "old reward response cannot close a new reward", checks);
+                view.ShowSelection(RewardCandidates("validation-next-reward", 1, temporaryAssets), false, null);
+                Check(!view.TryResolveSelection(true) && view.IsVisible,
+                    "reset removes the pending response before the next selection", checks);
             }
             finally
             {
@@ -186,34 +206,39 @@ namespace Game.UI.InGame.Editor
             screen.Closed += onClosed;
             try
             {
-                selectionUI.Open();
                 bool emptyRejected = false;
                 try { await selectionUI.SelectAsync(Array.Empty<ArtifactData>(), CancellationToken.None); }
                 catch (ArgumentException) { emptyRejected = true; }
                 Check(emptyRejected && !presenter.IsChoosing, "empty interface candidates do not start a reward", checks);
-                UniTask<ArtifactData> selected = selectionUI.SelectAsync(candidates, CancellationToken.None);
+                var mutableCandidates = new List<ArtifactData>(candidates);
+                UniTask<ArtifactData> selected = selectionUI.SelectAsync(mutableCandidates, CancellationToken.None);
                 Check(view.IsVisible && presenter.IsChoosing, "interface shows reward selection", checks);
-                Check(!screen.Manager.CloseTop() && view.IsVisible && selected.Status == UniTaskStatus.Pending,
+                mutableCandidates[1] = candidates[0];
+                mutableCandidates.Clear();
+                Check(presenter.CurrentCandidates.Count == candidates.Length &&
+                    ReferenceEquals(presenter.CurrentCandidates[1], candidates[1]) &&
+                    view.Candidates.Count == candidates.Length && ReferenceEquals(view.Candidates[1], candidates[1]),
+                    "caller list mutation cannot replace the pending request candidates", checks);
+                Check(!screen.Manager.CloseTopPopup() && view.IsVisible && selected.Status == UniTaskStatus.Pending,
                     "ESC cannot dismiss required reward selection", checks);
                 Click(cards[1]);
                 Click(confirm);
+                confirm.onClick.Invoke();
                 Check(selected.Status != UniTaskStatus.Pending, "selection task resolves after confirmation", checks);
-                Check(await selected == candidates[1] && !view.IsVisible && closed == 1,
-                    "interface returns selected data and closes once without granting", checks);
-                selectionUI.Close();
-                selectionUI.Close();
+                Check(ReferenceEquals(await selected, candidates[1]) && !view.IsVisible && closed == 1,
+                    "interface returns the original artifact and closes once despite repeated confirmation", checks);
+                presenter.ResetReward();
+                presenter.ResetReward();
                 Check(closed == 1, "repeated interface Close does not duplicate close notification", checks);
 
-                selectionUI.Open();
-                UniTask<ArtifactData> forfeited = selectionUI.SelectAsync(candidates, CancellationToken.None);
+                UniTask<ArtifactData> forfeited = selectionUI.SelectAsync(candidates, CancellationToken.None, allowForfeit: true);
                 Click(confirm);
                 Check(forfeited.Status != UniTaskStatus.Pending && await forfeited == null,
                     "interface allows explicit forfeit when its contract permits it", checks);
-                selectionUI.Close();
+                presenter.ResetReward();
 
                 using (var cancellation = new CancellationTokenSource())
                 {
-                    selectionUI.Open();
                     UniTask<ArtifactData> pending = selectionUI.SelectAsync(candidates, cancellation.Token);
                     bool overlapRejected = false;
                     try { await selectionUI.SelectAsync(candidates, CancellationToken.None); }
@@ -225,21 +250,20 @@ namespace Game.UI.InGame.Editor
                     Check(pending.Status != UniTaskStatus.Pending, "token cancellation resolves pending task", checks);
                     Check(await WasCanceled(pending) && !view.IsVisible && !presenter.IsChoosing && closed == before + 1,
                         "token cancellation clears the reward and closes once", checks);
-                    selectionUI.Close();
+                    presenter.ResetReward();
                     Check(closed == before + 1, "Close after cancellation is idempotent", checks);
                 }
 
-                selectionUI.Open();
                 UniTask<ArtifactData> closedTask = selectionUI.SelectAsync(candidates, CancellationToken.None);
                 int beforeClose = closed;
-                selectionUI.Close();
+                screen.Manager.ClosePopup(screen.Id, UICloseReason.ContextLost);
                 Check(closedTask.Status != UniTaskStatus.Pending && await WasCanceled(closedTask) &&
                     closed == beforeClose + 1 && !presenter.IsChoosing,
-                    "explicit interface Close cancels its pending task once", checks);
+                    "external screen close cancels its pending task once", checks);
             }
             finally
             {
-                selectionUI.Close();
+                presenter.ResetReward();
                 screen.Closed -= onClosed;
             }
         }
@@ -258,6 +282,7 @@ namespace Game.UI.InGame.Editor
             {
                 // 실제 Presenter와 동일하게 상세 내용 부모를 먼저 연다.
                 // ShowActions는 행동 행만 갱신하며 숨겨진 상세 부모의 수명을 소유하지 않는다.
+                info.Popup.Manager.OpenPopup(info.Popup.Id);
                 info.ShowBuildingInfo(new BuildingInfoData("slot-a", "검증 건물", "검증 분류", 1));
                 view.SetActionsAllowed(true);
                 view.ShowActions(new BuildingActionViewData("slot-a", "A 슬롯", build: offer));
@@ -321,13 +346,19 @@ namespace Game.UI.InGame.Editor
             catch (OperationCanceledException) { return true; }
         }
 
-        private static ArtifactRewardViewData RewardData(string id, int count)
+        private static ArtifactData[] RewardCandidates(string prefix, int count,
+            List<UnityEngine.Object> temporaryAssets)
         {
-            var offers = new ArtifactRewardOffer[count];
+            var candidates = new ArtifactData[count];
             for (int i = 0; i < count; i++)
-                offers[i] = new ArtifactRewardOffer("offer-" + i, "검증 유물 " + i, "일반",
-                    "검증용 설명", null, Color.white);
-            return new ArtifactRewardViewData(id, 50, 2, offers);
+            {
+                candidates[i] = Artifact(prefix + "-" + i, "검증 유물 " + i, temporaryAssets);
+                var fields = new SerializedObject(candidates[i]);
+                fields.FindProperty("_rarity").intValue = (int)ArtifactRarity.Rare;
+                fields.FindProperty("_description").stringValue = i == 1 ? "" : "검증용\\n설명";
+                fields.ApplyModifiedPropertiesWithoutUndo();
+            }
+            return candidates;
         }
 
         private static ArtifactData Artifact(string id, string name, List<UnityEngine.Object> temporaryAssets)

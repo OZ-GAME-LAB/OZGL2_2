@@ -21,6 +21,12 @@ public class TestWaitingScript : MonoBehaviour
     [SerializeField] private Button _lastWaveButton;
     [SerializeField] private Button _lastQuarterButton;
 
+    // 새 UI의 테스트 입력도 실제 버튼으로 전달하여 진행 중인 비동기 요청을 완료한다.
+    [SerializeField] private Button _artifactConfirmButton;
+    [SerializeField] private Button _contentContinueButton;
+    [SerializeField] private Button _runFinishButton;
+    [SerializeField] private Button _runContinueButton;
+
     private Button[] _phaseButtons;
     private ColorBlock[] _originalColors;
     private bool[] _highlighted;
@@ -53,17 +59,22 @@ public class TestWaitingScript : MonoBehaviour
         bool choice = ready && !_toggle &&
             (_gameFlowController.CurPhase == GamePhase.Reward ||
              _gameFlowController.IsWaitingForArtifactSelection);
+        bool hasPopupButtons = _artifactConfirmButton != null || _contentContinueButton != null;
+        if (hasPopupButtons)
+            choice = CanClick(_artifactConfirmButton) || CanClick(_contentContinueButton);
+        else
+            choice = choice || (ready && IsWaitingForPostBattleContent &&
+                (_gameFlowController.CurPhase == GamePhase.Event ||
+                 _gameFlowController.CurPhase == GamePhase.Store));
 
         SetHighlight(0, ready && _waveController.CurrentPreset != null && _gameFlowController.CanEnterBuildMode());
         SetHighlight(1, battle);
         SetHighlight(2, battle);
-        SetHighlight(3, choice || (ready && IsWaitingForPostBattleContent &&
-            (_gameFlowController.CurPhase == GamePhase.Event ||
-             _gameFlowController.CurPhase == GamePhase.Store)));
+        SetHighlight(3, choice);
         SetHighlight(4, ready);
         bool runChoice = ready && _gameFlowController.CanChooseRunDecision;
-        SetHighlight(5, runChoice);
-        SetHighlight(6, runChoice);
+        SetHighlight(5, _runFinishButton != null ? CanClick(_runFinishButton) : runChoice);
+        SetHighlight(6, _runContinueButton != null ? CanClick(_runContinueButton) : runChoice);
         SetHighlight(7, ready && _waveController.CanJumpToLastWave);
         SetHighlight(8, ready && _waveController.CanJumpToLastQuarter);
     }
@@ -127,11 +138,19 @@ public class TestWaitingScript : MonoBehaviour
     public void ResetBtn()
     {
         Debug.Log($"[TestWaitingScript] 게임 리셋 테스트");
-        _gameFlowController.ResetRun();
+        _gameFlowController.QuitRun();
     }
 
     public void ChooseResultBtn()
     {
+        if (_artifactConfirmButton != null || _contentContinueButton != null)
+        {
+            if (TryClick(_contentContinueButton)) return;
+            TryClick(_artifactConfirmButton);
+            return;
+        }
+
+        // 새 버튼 참조가 없는 구 UI에서만 기존 완료 신호를 사용한다.
         if (_gameFlowController == null) return;
         if (_gameFlowController.CurPhase == GamePhase.Event ||
             _gameFlowController.CurPhase == GamePhase.Store)
@@ -144,6 +163,40 @@ public class TestWaitingScript : MonoBehaviour
             !_gameFlowController.IsWaitingForArtifactSelection) return;
         _toggle = true;
     }
+
+    public void FinishRunBtn()
+    {
+        if (_runFinishButton != null)
+        {
+            TryClick(_runFinishButton);
+            return;
+        }
+        _gameFlowController?.ChooseFinishRun();
+    }
+
+    public void ContinueRunBtn()
+    {
+        if (_runContinueButton != null)
+        {
+            TryClick(_runContinueButton);
+            return;
+        }
+        _gameFlowController?.ChooseContinueRun();
+    }
+
+    private static bool CanClick(Button button)
+    {
+        return button != null && button.isActiveAndEnabled &&
+            button.gameObject.activeInHierarchy && button.IsInteractable();
+    }
+
+    private static bool TryClick(Button button)
+    {
+        if (!CanClick(button)) return false;
+        button.onClick.Invoke();
+        return true;
+    }
+
     public async UniTask WaitToggle(CancellationToken cts)
     {
         _toggle = false;

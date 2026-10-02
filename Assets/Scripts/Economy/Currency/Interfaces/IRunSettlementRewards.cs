@@ -1,8 +1,9 @@
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Core;
 
-// 혈석 정산 및 정산 UI 완료 대기 (UI 연결 예정)
+// 혈석 저장과 정산 UI 확인이 모두 끝났을 때 true를 반환합니다.
 public interface IRunSettlementRewards
 {
-    UniTask TryApplyReward(RunSummary summary);
+    UniTask<bool> TryApplyReward(RunSummary summary, CancellationToken token = default);
 }

@@ -39,10 +39,12 @@ namespace Game.UI.InGame.Editor
             UIItemSlot slot = null;
             CloseUtility close = null;
             var checks = new List<string>();
+            var temporaryFonts = new List<UnityEngine.Object>();
             try
             {
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, preview);
                 instance.SetActive(false);
+                InGameUIValidation.PrepareFontsForRoots(new[] { instance }, temporaryFonts);
                 manager = instance.GetComponent<InGameUIManager>();
                 if (manager == null) throw new InvalidOperationException("The prefab has no InGameUIManager.");
 
@@ -55,44 +57,37 @@ namespace Game.UI.InGame.Editor
                 Check(!instance.activeInHierarchy && manager.InitializeScreens(),
                     "screen registry initializes while the UI root is disabled", checks);
                 instance.SetActive(true);
-                Check(manager.ShowHud().IsValid && GetScreen(manager, UIId.Hud).IsVisible,
+                Check(manager.ShowHud() && GetScreen(manager, UIId.Hud).IsVisible,
                     "activating the root and calling ShowHud displays the existing HUD", checks);
 
-                UIRegistration detailRegistration = Registration(manager, UIId.Detail);
-                Check(detailRegistration.Instance == null && detailRegistration.Prefab != null,
-                    "the example detail popup starts as a prefab-only registration", checks);
+                Check(instance.GetComponentsInChildren<Canvas>(true).Length == 2,
+                    "assembled UI has exactly two shared canvases", checks);
                 UIScreen detail = GetScreen(manager, UIId.Detail);
                 var detailView = detail.GetComponent<DetailPopupView>();
-                Check(detailView != null && !detail.IsVisible && Field<bool>(detailRegistration, "Created"),
-                    "first detail lookup creates a hidden screen with DetailPopupView", checks);
+                Check(detailView != null && !detail.IsVisible,
+                    "the preplaced detail popup stays hidden until opened", checks);
                 Check(ReferenceEquals(GetScreen(manager, UIId.Detail), detail),
                     "repeated detail lookup reuses the same instance", checks);
 
                 UIScreen catalog = GetScreen(manager, UIId.BuildingCatalog);
-                UIHandle catalogHandle = manager.Open(UIId.BuildingCatalog);
-                Check(catalogHandle.IsValid && catalog.IsVisible,
+                Check(manager.OpenPopup(UIId.BuildingCatalog) && catalog.IsVisible,
                     "catalog can act as a parent for a detail popup", checks);
-                Canvas parentCanvas = catalog.GetComponent<Canvas>();
-                Canvas detailCanvas = detail.GetComponent<Canvas>();
-                if (parentCanvas == null || detailCanvas == null)
-                    throw new InvalidOperationException("Expected independent catalog and detail canvases.");
-                int detailOrder = detailCanvas.sortingOrder;
-                // 부모가 기본 상세 창보다 높은 경우에도 Push가 상세 창을 위로 올려야 한다.
-                parentCanvas.sortingOrder = detailOrder + 25;
+                Check(catalog.GetComponent<Canvas>() == null && detail.GetComponent<Canvas>() == null &&
+                    catalog.transform.parent == detail.transform.parent &&
+                    catalog.GetComponentInParent<Canvas>() == detail.GetComponentInParent<Canvas>(),
+                    "catalog and detail share PopupCanvas and have no private Canvas", checks);
                 detailView.SetContent("정렬 테스트", "상세", "부모 위에 표시");
-                UIHandle firstDetailHandle = manager.Push(UIId.Detail);
-                Check(firstDetailHandle.IsValid && detail.IsVisible && catalog.IsVisible &&
-                    detailCanvas.sortingOrder > parentCanvas.sortingOrder,
-                    "Push keeps its parent visible and raises detail canvas above a higher-order parent", checks);
+                Check(manager.OpenPopup(UIId.Detail) && detail.IsVisible && catalog.IsVisible &&
+                    detail.transform.GetSiblingIndex() > catalog.transform.GetSiblingIndex(),
+                    "OpenPopup keeps its parent visible and places detail after its parent", checks);
                 Check(!InputEnabled(catalog) && InputEnabled(detail),
                     "only the top popup accepts input", checks);
-                Check(manager.CloseTop() && manager.TopHandle.Equals(catalogHandle) &&
-                    catalog.IsVisible && !detail.IsVisible && detailCanvas.sortingOrder == detailOrder,
-                    "closing detail returns to its parent and restores the detail canvas order", checks);
+                Check(manager.CloseTopPopup() && manager.TopPopup == catalog && catalog.IsVisible && !detail.IsVisible,
+                    "closing detail returns to its parent without Canvas order changes", checks);
 
                 ValidateMandatoryParent(manager, detail, checks);
 
-                catalogHandle = manager.Open(UIId.BuildingCatalog);
+                manager.OpenPopup(UIId.BuildingCatalog);
                 var catalogView = catalog.GetComponent<BuildingCatalogView>();
                 slot = FirstCatalogSlot(catalogView);
                 slot.gameObject.SetActive(true);
@@ -109,7 +104,7 @@ namespace Game.UI.InGame.Editor
                 {
                     artifactClicks++;
                     detailView.SetContent("유물 테스트", "희귀", "유물 효과 설명");
-                    manager.Push(UIId.Detail);
+                    manager.OpenPopup(UIId.Detail);
                 });
                 validationEvents.SetSelectedGameObject(slotButton.gameObject);
                 Click(slotButton);
@@ -117,18 +112,17 @@ namespace Game.UI.InGame.Editor
                     Text(detailView, "_title") == "유물 테스트" && Text(detailView, "_description") == "유물 효과 설명",
                     "the saved catalog slot opens detail using artifact example data", checks);
                 Click(closeButton);
-                Check(!detail.IsVisible && manager.TopHandle.Equals(catalogHandle) &&
-                    validationEvents.currentSelectedGameObject == slotButton.gameObject,
-                    "the saved CloseUtility closes its owner and returns focus to the clicked slot", checks);
+                Check(!detail.IsVisible && manager.TopPopup == catalog &&
+                    validationEvents.currentSelectedGameObject == null,
+                    "the saved CloseUtility closes its owner without restoring stale focus", checks);
 
                 slot.Bind(null, "스킬 테스트", "액티브", false, true, () =>
                 {
                     skillClicks++;
                     detailView.SetContent("스킬 테스트", "액티브", "스킬 효과와 로어");
-                    manager.Push(UIId.Detail);
+                    manager.OpenPopup(UIId.Detail);
                 });
                 Click(slotButton);
-                UIHandle reboundDetailHandle = detail.Handle;
                 Check(artifactClicks == 1 && skillClicks == 1 &&
                     Text(detailView, "_title") == "스킬 테스트" && Text(detailView, "_subtitle") == "액티브" &&
                     Text(detailView, "_description") == "스킬 효과와 로어",
@@ -138,24 +132,22 @@ namespace Game.UI.InGame.Editor
                 slotButton.onClick.Invoke();
                 Check(artifactClicks == 1 && skillClicks == 1,
                     "a covered parent slot cannot invoke its callback again", checks);
-                Check(!manager.Close(firstDetailHandle) && detail.IsVisible,
-                    "a handle from an earlier detail opening cannot close the rebound detail", checks);
+                Check(manager.OpenPopup(UIId.Detail) && manager.OpenPopupCount == 2,
+                    "opening the rebound detail again keeps one stack entry", checks);
                 Click(closeButton);
                 slot.Unbind();
                 Click(slotButton);
                 Check(artifactClicks == 1 && skillClicks == 1 && !detail.IsVisible,
                     "Unbind removes the old data callback from the reusable slot", checks);
 
-                Check(manager.InitializeScreens() && Field<bool>(detailRegistration, "Created") &&
+                Check(manager.InitializeScreens() &&
                     ReferenceEquals(GetScreen(manager, UIId.Detail), detail),
-                    "registry reinitialization accepts and reuses its previously created lazy instance", checks);
-                Check(manager.ShowHud().IsValid && GetScreen(manager, UIId.Hud).IsVisible,
+                    "registry reinitialization reuses the same preplaced detail instance", checks);
+                Check(manager.ShowHud() && GetScreen(manager, UIId.Hud).IsVisible,
                     "HUD is available again after registry reinitialization", checks);
-                manager.Open(UIId.BuildingCatalog);
-                UIHandle afterReinitialize = manager.Push(UIId.Detail);
-                Check(afterReinitialize.IsValid && !afterReinitialize.Equals(reboundDetailHandle) &&
-                    !manager.Close(reboundDetailHandle) && detail.IsVisible,
-                    "reinitialization keeps handle versions distinct from old detail openings", checks);
+                manager.OpenPopup(UIId.BuildingCatalog);
+                Check(manager.OpenPopup(UIId.Detail) && detail.IsVisible && manager.OpenPopupCount == 2,
+                    "preplaced parent/detail stacking works after registry reinitialization", checks);
 
                 LastResult = "PASS (" + checks.Count + ")\n" +
                     "Edit Mode / isolated Preview Scene / saved replacement prefabs\n" + string.Join("\n", checks);
@@ -177,6 +169,8 @@ namespace Game.UI.InGame.Editor
                 if (manager != null) Lifecycle(manager, "OnDisable");
                 if (validationEvents != null) Lifecycle(validationEvents, "OnDisable");
                 EditorSceneManager.ClosePreviewScene(preview);
+                for (int i = temporaryFonts.Count - 1; i >= 0; i--)
+                    if (temporaryFonts[i] != null) UnityEngine.Object.DestroyImmediate(temporaryFonts[i]);
                 if (previousEvents != null) EventSystem.current = previousEvents;
                 if (previousEvents != null && previousFocus != null && previousFocus.activeInHierarchy)
                     previousEvents.SetSelectedGameObject(previousFocus);
@@ -187,18 +181,16 @@ namespace Game.UI.InGame.Editor
         private static void ValidateMandatoryParent(InGameUIManager manager, UIScreen detail, List<string> checks)
         {
             UIScreen reward = GetScreen(manager, UIId.ArtifactReward);
-            UIHandle rewardHandle = manager.Open(UIId.ArtifactReward);
-            Check(rewardHandle.IsValid && reward.IsVisible && manager.HasModalOpen,
+            Check(manager.ReplacePopup(UIId.ArtifactReward) && reward.IsVisible && manager.HasBlockingPopup,
                 "required reward opens as a modal parent", checks);
-            UIHandle detailHandle = manager.Push(UIId.Detail);
-            Check(detailHandle.IsValid && reward.IsVisible && detail.IsVisible && manager.HasModalOpen &&
-                detail.GetComponent<Canvas>().sortingOrder > reward.GetComponent<Canvas>().sortingOrder,
+            Check(manager.OpenPopup(UIId.Detail) && reward.IsVisible && detail.IsVisible && manager.HasBlockingPopup &&
+                detail.transform.GetSiblingIndex() > reward.transform.GetSiblingIndex() && !InputEnabled(GetScreen(manager, UIId.Hud)),
                 "detail can be pushed above a required reward while retaining its modal block", checks);
-            Check(manager.CloseTop() && manager.TopHandle.Equals(rewardHandle) && reward.IsVisible && InputEnabled(reward),
+            Check(manager.CloseTopPopup() && manager.TopPopup == reward && reward.IsVisible && InputEnabled(reward),
                 "closing the modal's detail restores the required reward and its input", checks);
-            Check(!manager.CloseTop() && reward.IsVisible,
+            Check(!manager.CloseTopPopup() && reward.IsVisible,
                 "CloseTop cannot dismiss the required reward itself", checks);
-            Check(manager.Close(rewardHandle, UICloseReason.Completed) && !reward.IsVisible,
+            Check(manager.ClosePopup(UIId.ArtifactReward, UICloseReason.Completed) && !reward.IsVisible,
                 "the owning presenter can still close the required reward with Completed", checks);
         }
 
@@ -207,13 +199,6 @@ namespace Game.UI.InGame.Editor
             if (!manager.TryGetScreen(id, out UIScreen screen) || screen == null)
                 throw new InvalidOperationException("Screen is not registered: " + id);
             return screen;
-        }
-
-        private static UIRegistration Registration(InGameUIManager manager, UIId id)
-        {
-            foreach (UIRegistration entry in Field<UIRegistration[]>(manager, "_screens"))
-                if (entry.Id == id) return entry;
-            throw new InvalidOperationException("Screen registration is missing: " + id);
         }
 
         private static UIItemSlot FirstCatalogSlot(BuildingCatalogView view)

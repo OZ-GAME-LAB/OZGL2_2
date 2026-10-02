@@ -16,6 +16,18 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     public int CurrentGoldReward { get; private set; }
     public int CurrentGemReward { get; private set; }
 
+    /// <summary>지정한 전투에서 이미 지급한 재화만 조회한다. 준비 예정 보상은 반환하지 않는다.</summary>
+    public bool TryGetAppliedWaveReward(int quarter, int wave, out int gold, out int gems)
+    {
+        gold = 0;
+        gems = 0;
+        if (!IsInitialized || !_waveRewardApplied || _preparedRewards == null ||
+            _preparedQuarter != quarter || _preparedWave != wave) return false;
+        gold = CurrentGoldReward;
+        gems = CurrentGemReward;
+        return true;
+    }
+
     [SerializeField] private CurrencyCatalog _currencyCatalog;
     [SerializeField] private WaveRewardTable _waveRewardTable;
     private EffectManager _effectManager;

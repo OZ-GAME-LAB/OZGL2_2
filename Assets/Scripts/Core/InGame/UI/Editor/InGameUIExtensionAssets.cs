@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Linq;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -23,16 +24,21 @@ namespace Game.UI.InGame.Editor
             GameObject root = null;
             try
             {
-                root = new GameObject("DetailPopup", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+                var existing = AssetDatabase.LoadAssetAtPath<GameObject>(folder + "DetailPopup.prefab");
+                if (existing != null)
+                {
+                    if (existing.GetComponentsInChildren<Canvas>(true).Length != 0)
+                        throw new InvalidOperationException("기존 상세 창은 두 Canvas 이전 도구로 먼저 변환하세요.");
+                    RegisterExisting(rootPath, existing);
+                    return folder + "DetailPopup.prefab";
+                }
+                root = new GameObject("DetailPopup", typeof(RectTransform));
                 SceneManager.MoveGameObjectToScene(root, preview);
                 root.SetActive(false);
-                Canvas canvas = root.GetComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                canvas.sortingOrder = 150;
-                CanvasScaler scaler = root.GetComponent<CanvasScaler>();
-                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                scaler.referenceResolution = new Vector2(1920, 1080);
-                scaler.matchWidthOrHeight = .5f;
+                var host = (RectTransform)root.transform;
+                host.anchorMin = Vector2.zero;
+                host.anchorMax = Vector2.one;
+                host.offsetMin = host.offsetMax = Vector2.zero;
                 RectTransform overlay = Rect("Overlay", root.transform, Vector2.zero, Vector2.zero);
                 overlay.anchorMin = Vector2.zero;
                 overlay.anchorMax = Vector2.one;
@@ -56,8 +62,13 @@ namespace Game.UI.InGame.Editor
                 closeIcon.raycastTarget = false;
                 UIScreen screen = root.AddComponent<UIScreen>();
                 Set(screen, "_root", overlay.gameObject);
-                Set(screen, "_initialFocus", closeButton);
-                // 상세 창에는 접기 기능이 없으므로 _window 높이 조절을 사용하지 않는다.
+                Set(screen, "_inputGroup", overlay.gameObject.AddComponent<CanvasGroup>());
+                var screenData = new SerializedObject(screen);
+                screenData.FindProperty("_id").intValue = (int)UIId.Detail;
+                screenData.FindProperty("_isHud").boolValue = false;
+                screenData.FindProperty("_canCloseByUser").boolValue = true;
+                screenData.FindProperty("_blocksHudInput").boolValue = false;
+                screenData.ApplyModifiedPropertiesWithoutUndo();
                 var detail = root.AddComponent<DetailPopupView>();
                 Set(detail, "_title", title);
                 Set(detail, "_subtitle", subtitle);
@@ -68,32 +79,45 @@ namespace Game.UI.InGame.Editor
                 overlay.gameObject.SetActive(false);
                 root.SetActive(true);
                 GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, folder + "DetailPopup.prefab");
-                UIScreen detailPrefab = saved.GetComponent<UIScreen>();
-
-                GameObject contents = PrefabUtility.LoadPrefabContents(rootPath);
-                try
-                {
-                    var manager = contents.GetComponent<InGameUIManager>();
-                    var serialized = new SerializedObject(manager);
-                    SerializedProperty list = serialized.FindProperty("_screens");
-                    int index = -1;
-                    for (int i = 0; i < list.arraySize; i++)
-                        if (list.GetArrayElementAtIndex(i).FindPropertyRelative("Id").intValue == (int)UIId.Detail) index = i;
-                    if (index < 0) { index = list.arraySize; list.arraySize++; }
-                    SerializedProperty entry = list.GetArrayElementAtIndex(index);
-                    entry.FindPropertyRelative("Id").intValue = (int)UIId.Detail;
-                    entry.FindPropertyRelative("Instance").objectReferenceValue = null;
-                    entry.FindPropertyRelative("Prefab").objectReferenceValue = detailPrefab;
-                    entry.FindPropertyRelative("Parent").objectReferenceValue = contents.transform;
-                    entry.FindPropertyRelative("Layer").intValue = (int)UILayer.Popup;
-                    entry.FindPropertyRelative("AllowUserClose").boolValue = true;
-                    serialized.ApplyModifiedPropertiesWithoutUndo();
-                    PrefabUtility.SaveAsPrefabAsset(contents, rootPath);
-                }
-                finally { PrefabUtility.UnloadPrefabContents(contents); }
+                RegisterExisting(rootPath, saved);
                 return folder + "DetailPopup.prefab";
             }
             finally { EditorSceneManager.ClosePreviewScene(preview); }
+        }
+
+        private static void RegisterExisting(string rootPath, GameObject detailPrefab)
+        {
+            GameObject contents = PrefabUtility.LoadPrefabContents(rootPath);
+            try
+            {
+                Transform popupRoot = contents.transform.Find("PopupCanvas/PopupRoot");
+                if (popupRoot == null) throw new InvalidOperationException("두 Canvas 구조로 먼저 이전하세요.");
+                UIScreen[] existing = popupRoot.GetComponentsInChildren<UIScreen>(true)
+                    .Where(screen => new SerializedObject(screen).FindProperty("_id").intValue == (int)UIId.Detail).ToArray();
+                if (existing.Length > 1) throw new InvalidOperationException("상세 화면이 중복 배치되어 있습니다.");
+                UIScreen detail;
+                if (existing.Length == 1) detail = existing[0];
+                else
+                {
+                    var instance = (GameObject)PrefabUtility.InstantiatePrefab(detailPrefab, popupRoot);
+                    instance.SetActive(true);
+                    detail = instance.GetComponent<UIScreen>();
+                }
+                var manager = new SerializedObject(contents.GetComponent<InGameUIManager>());
+                SerializedProperty list = manager.FindProperty("_screenInstances");
+                if (list == null) throw new InvalidOperationException("새 UI 화면 등록 필드가 없습니다.");
+                bool registered = false;
+                for (int i = 0; i < list.arraySize; i++)
+                    if (list.GetArrayElementAtIndex(i).objectReferenceValue == detail) registered = true;
+                if (!registered)
+                {
+                    int index = list.arraySize++;
+                    list.GetArrayElementAtIndex(index).objectReferenceValue = detail;
+                }
+                manager.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(contents, rootPath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(contents); }
         }
 
         private static RectTransform Rect(string name, Transform parent, Vector2 size, Vector2 position)

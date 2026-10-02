@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using Cysharp.Threading.Tasks;
@@ -38,7 +39,11 @@ namespace Game.UI.InGame.Editor
         private sealed class Context
         {
             public InGameUIManager Manager;
-            public BuildingUIPresenter Building;
+            public BuildingUIConnection Building;
+            public ContinueView Continue;
+            public ShopView Shop;
+            public BootStrap Bootstrap;
+            public InGameUIStartup Startup;
             public BuildingCatalogView Catalog;
             public BuildingActionView Actions;
             public GameHudView Hud;
@@ -56,20 +61,24 @@ namespace Game.UI.InGame.Editor
             public Context(InGameUIManager manager)
             {
                 Manager = manager;
-                Building = Read<BuildingUIPresenter>(manager, "_building");
-                Catalog = Read<BuildingCatalogView>(Building, "_catalog");
-                Actions = Read<BuildingActionView>(Building, "_actions");
-                Hud = Read<GameHudView>(manager, "_hud");
-                Decision = Read<RunDecisionView>(manager, "_decision");
-                Reward = Read<ArtifactRewardPresenter>(manager, "_artifact");
+                Bootstrap = manager.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
+                Startup = Read<InGameUIStartup>(Bootstrap, "_uiStartup");
+                Building = Read<BuildingUIConnection>(Startup, "_buildingUIConnection");
+                var buildingView = Read<BuildingUIPresenter>(Startup, "_buildingUI");
+                Catalog = Read<BuildingCatalogView>(buildingView, "_catalog");
+                Actions = Read<BuildingActionView>(buildingView, "_actions");
+                Hud = Read<GameHudView>(Startup, "_hudView");
+                Continue = Read<ContinueView>(Startup, "_continueUI");
+                Shop = Read<ShopView>(Startup, "_shopView");
+                Reward = Read<ArtifactRewardPresenter>(Startup, "_artifactSelectionUI");
                 RewardView = Read<ArtifactRewardView>(Reward, "_panel");
-                var presenter = Read<RunFlowPresenter>(manager, "_flow");
-                Flow = Read<GameFlowController>(presenter, "_flow");
-                Waves = Read<WaveController>(presenter, "_waves");
-                Wallet = Read<RunCurrencyManager>(presenter, "_wallet");
-                Artifacts = Read<ArtifactManager>(presenter, "_artifacts");
-                Controller = Read<BuildingBuildController>(Building, "_controller");
-                Slots = Read<BuildingSlot[]>(Building, "_slots");
+                Flow = Read<GameFlowController>(Bootstrap, "_gameFlowController");
+                Waves = Read<WaveController>(Bootstrap, "_waveController");
+                Wallet = Read<RunCurrencyManager>(Bootstrap, "_runCurrencyManager");
+                Artifacts = Read<ArtifactManager>(Bootstrap, "_artifactManager");
+                Controller = Read<BuildingBuildController>(Bootstrap, "_buildController");
+                Slots = manager.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BuildingSlot>(true)).ToArray();
+                Decision = Read<RunDecisionView>(Startup, "_runDecisionUI");
                 Camera = Read<InGameCameraController>(Flow, "_cameraController");
             }
 
@@ -162,16 +171,10 @@ namespace Game.UI.InGame.Editor
                     "second quarter decision");
                 AssertRequiredModal(c, UIId.RunDecision);
                 Click(Read<UnityEngine.UI.Button>(c.Decision, "_finishButton"), "decision Finish");
-                await WaitFor(() => c.Flow.CurPhase == GamePhase.Finished && c.Screen(UIId.RunResult).IsVisible,
-                    "Finish result screen");
-                Check(c.Flow.HasClearedMainGame && !c.Decision.IsVisible,
-                    "Finish keeps main-game clear state and closes its decision");
-                AssertRequiredModal(c, UIId.RunResult);
-                Check(Read<UnityEngine.UI.Button>(c.Hud, "_restartButton").IsInteractable(),
-                    "finished result offers the real restart button");
-                Limit("Defeat uses RunDefeatTest after a separate restart; a finished run is not reset silently.");
-                Limit("GameFlowController.Continue save-resume remains its existing placeholder; no save/load test is claimed.");
-                Note("END", "Play Mode remains running on the result screen. RunRestartTest is explicit and separate.");
+                await WaitFor(() => c.Flow.CurPhase == GamePhase.Finished, "Finish phase");
+                Check(c.Flow.HasClearedMainGame && !c.Decision.IsVisible, "Finish preserves clear state and closes its decision");
+                Limit("Actual settlement payout, result request from FinishRun and scene navigation are outside this change; verified separately as a UI-only request.");
+
             }
             finally { if (c.Flow != null) c.Flow.AutoContinue = autoContinue; }
         }
@@ -184,7 +187,7 @@ namespace Game.UI.InGame.Editor
             Check(expected != null, "the initialized Test scene has a live empty construction slot");
 
             BuildingShortcut shortcut = null;
-            foreach (BuildingShortcut candidate in Read<BuildingShortcut[]>(c.Manager, "_shortcuts"))
+            foreach (BuildingShortcut candidate in Read<BuildingShortcut[]>(c.Startup, "_buildingShortcuts"))
                 if (candidate != null && Read<bool>(candidate, "_selectFirstEmptySlot")) { shortcut = candidate; break; }
             Check(shortcut != null, "HUD has its configured first-empty-slot shortcut");
             Click(Read<UnityEngine.UI.Button>(shortcut, "_button"), "HUD construction shortcut");
@@ -197,6 +200,7 @@ namespace Game.UI.InGame.Editor
                 c.Building.SelectedSlot == expected && c.Quote.Build?.OptionId == buildingId,
                 "candidate slot button opens building details without losing the selected world slot");
             ValidateInsufficientFunds(c, expected);
+            ValidateDirectBuildingRejections(c, expected);
 
             int selectedEvents = 0;
             int deselectedEvents = 0;
@@ -294,6 +298,71 @@ namespace Game.UI.InGame.Editor
             }
         }
 
+        private static void ValidateDirectBuildingRejections(Context c, BuildingSlot slot)
+        {
+            BuildingData option = Read<BuildingData>(c.Building, "_candidate");
+            var originalBalance = Balance(c);
+            Fund(c, c.Quote.Build);
+            BuildingInteractionTarget target = c.Controller.QueryInteraction(slot, option).Target;
+            var before = Balance(c);
+            Building original = slot.CurrentBuilding;
+            BuildingData outside = UnityEngine.Object.Instantiate(option);
+            Collider2D collider = slot.GetComponent<Collider2D>();
+            bool colliderEnabled = collider.enabled;
+            bool slotEnabled = slot.enabled;
+            bool active = slot.gameObject.activeSelf;
+            FieldInfo phaseField = typeof(GameFlowController).GetField("_curPhase", Fields);
+            object phase = phaseField.GetValue(c.Flow);
+            try
+            {
+                // Clone은 후보 목록의 원본 참조가 아니다. SO 원본은 수정하지 않는다.
+                AssertDirectBuildingRejection(c, target, BuildingInteractionAction.Build, outside,
+                    BuildingInteractionFailure.CandidateUnavailable, "out-of-catalog clone");
+                collider.enabled = false;
+                AssertDirectBuildingRejection(c, target, BuildingInteractionAction.Build, option,
+                    BuildingInteractionFailure.InvalidTarget, "disabled Collider");
+                collider.enabled = colliderEnabled;
+                slot.enabled = false;
+                AssertDirectBuildingRejection(c, target, BuildingInteractionAction.Build, option,
+                    BuildingInteractionFailure.InvalidTarget, "disabled slot component");
+                slot.enabled = slotEnabled;
+                slot.gameObject.SetActive(false);
+                AssertDirectBuildingRejection(c, target, BuildingInteractionAction.Build, option,
+                    BuildingInteractionFailure.InvalidTarget, "inactive slot object");
+                slot.gameObject.SetActive(active);
+                // 동기 검증 범위에서 조건 필드만 바꾼다. 페이즈 이벤트/노드 진행은 실행하지 않는다.
+                phaseField.SetValue(c.Flow, GamePhase.Battle);
+                AssertDirectBuildingRejection(c, target, BuildingInteractionAction.Build, option,
+                    BuildingInteractionFailure.PhaseBlocked, "phase changed after query");
+                Check(Balance(c) == before && ReferenceEquals(slot.CurrentBuilding, original),
+                    "all direct rejection probes preserve wallet and occupation");
+            }
+            finally
+            {
+                phaseField.SetValue(c.Flow, phase);
+                collider.enabled = colliderEnabled;
+                slot.enabled = slotEnabled;
+                slot.gameObject.SetActive(active);
+                UnityEngine.Object.Destroy(outside);
+                if (before.gold > originalBalance.gold && !c.Wallet.TrySpend(CurrencyType.Gold, before.gold - originalBalance.gold))
+                    throw new InvalidOperationException("Could not restore direct-probe Gold funding.");
+                if (before.gems > originalBalance.gems && !c.Wallet.TrySpend(CurrencyType.Gem, before.gems - originalBalance.gems))
+                    throw new InvalidOperationException("Could not restore direct-probe Gem funding.");
+            }
+            Check(Balance(c) == originalBalance, "direct rejection probes restore their original runtime funding");
+            c.Building.Refresh();
+        }
+
+        private static void AssertDirectBuildingRejection(Context c, BuildingInteractionTarget target,
+            BuildingInteractionAction action, BuildingData option, BuildingInteractionFailure failure, string label)
+        {
+            var balance = Balance(c);
+            Building occupant = target.Slot.CurrentBuilding;
+            BuildingInteractionResult result = c.Controller.TryExecuteInteraction(target, action, option);
+            Check(result.Failure == failure && !result.MayHaveChangedState && Balance(c) == balance &&
+                ReferenceEquals(target.Slot.CurrentBuilding, occupant), label + " is rejected by the new execution API without mutation");
+        }
+
         private static void ValidateInsufficientFunds(Context c, BuildingSlot slot)
         {
             BuildingActionOffer offer = c.Quote.Build;
@@ -303,6 +372,8 @@ namespace Game.UI.InGame.Editor
                 return;
             }
             var before = Balance(c);
+            BuildingData option = Read<BuildingData>(c.Building, "_candidate");
+            BuildingInteractionTarget target = c.Controller.QueryInteraction(slot, option).Target;
             int removedGold = 0;
             int removedGems = 0;
             try
@@ -324,6 +395,8 @@ namespace Game.UI.InGame.Editor
                 button.onClick.Invoke(); // 비활성 버튼 콜백을 우회 호출해도 실제 명령을 보내지 않아야 한다.
                 Check(!slot.IsOccupied && Balance(c) == (0, 0) && !c.Actions.IsRequestPending,
                     "an unaffordable callback cannot occupy a slot or change currency");
+                AssertDirectBuildingRejection(c, target, BuildingInteractionAction.Build, option,
+                    BuildingInteractionFailure.InsufficientFunds, "balance changed after query");
             }
             finally
             {
@@ -345,6 +418,8 @@ namespace Game.UI.InGame.Editor
             Check(c.Quote.Dismantle == null && !ActionButton(c, "_dismantle").interactable,
                 "core details do not offer demolition");
             ActionButton(c, "_dismantle").onClick.Invoke();
+            AssertDirectBuildingRejection(c, c.Controller.QueryInteraction(core).Target,
+                BuildingInteractionAction.Demolish, null, BuildingInteractionFailure.CoreProtected, "core demolition");
             Note("EXPECTED WARNING", "The following original controller rejection says the core cannot be demolished.");
             bool accepted = c.Controller.TryDemolish(core);
             Check(!accepted && core.CurrentBuilding == original && Balance(c) == before,
@@ -357,19 +432,19 @@ namespace Game.UI.InGame.Editor
             await StartBattle(c, label);
             c.Waves.SetSuccess();
             Note("INPUT", label + ": existing WaveController.SetSuccess test input.");
-            await WaitFor(() => c.Flow.CurPhase == GamePhase.Reward && c.Screen(UIId.WaveReward).IsVisible,
-                label + " reward prompt");
-            AssertRequiredModal(c, UIId.WaveReward);
+            await WaitFor(() => c.RewardView.IsVisible || c.Flow.CurPhase == GamePhase.Event ||
+                c.Flow.CurPhase == GamePhase.Store || c.Flow.CanEnterBuildMode() || c.Flow.CanChooseRunDecision,
+                label + " direct artifact selection or empty-pool completion");
+            Check(c.Flow.CurPhase != GamePhase.Reward || !c.Screen(UIId.WaveReward).IsVisible,
+                label + ": reward confirmation is skipped before artifact selection");
             var rewardBalance = Balance(c);
-            Check(!c.Wallet.TryApplyWaveReward() && Balance(c) == rewardBalance,
-                label + ": prepared currency reward cannot be granted twice");
-            int clickedFrame = Time.frameCount;
-            Click(Read<UnityEngine.UI.Button>(c.Hud, "_continueButton"), "reward Continue");
-            Check(!c.RewardView.IsVisible && !c.Screen(UIId.WaveReward).IsVisible,
-                label + ": Continue hides the prompt before opening artifact candidates on the next frame");
-            await WaitFor(() => c.RewardView.IsVisible || c.Flow.CurPhase != GamePhase.Reward,
-                label + " artifact opening or empty-pool completion");
-            Check(Time.frameCount > clickedFrame, label + ": candidate lookup waits for a later frame");
+            if (c.Flow.CurPhase == GamePhase.Reward)
+            {
+                Check(c.Wallet.TryGetAppliedWaveReward(c.Flow.CurrentQuarter, c.Flow.CurrentWave, out _, out _),
+                    label + ": currency remains paid at the existing Reward phase timing");
+                Check(!c.Wallet.TryApplyWaveReward() && Balance(c) == rewardBalance,
+                    label + ": current wave currency cannot be granted twice");
+            }
             if (c.RewardView.IsVisible)
             {
                 Check(c.Artifacts.IsSelectingReward, label + ": artifact UI is using the real manager selection");
@@ -380,17 +455,10 @@ namespace Game.UI.InGame.Editor
                 Click(Read<UnityEngine.UI.Button>(cards.GetValue(0), "Button"), "artifact candidate");
                 string id = c.RewardView.SelectedArtifactId;
                 int stacks = StackCount(c.Artifacts, id);
-                int completed = 0;
-                Action<string> completion = rewardId => completed++;
-                c.Reward.Completed += completion;
-                try
-                {
-                    Click(confirm, "artifact Confirm");
-                    confirm.onClick.Invoke();
-                    Check(completed == 1 && StackCount(c.Artifacts, id) == stacks + 1 && !c.RewardView.IsVisible,
-                        label + ": confirm grants the chosen real artifact once and completes once");
-                }
-                finally { c.Reward.Completed -= completion; }
+                Click(confirm, "artifact Confirm");
+                confirm.onClick.Invoke();
+                Check(StackCount(c.Artifacts, id) == stacks + 1 && !c.RewardView.IsVisible,
+                    label + ": confirm grants the chosen real artifact once and closes before flow resumes");
             }
             else Limit(label + ": current artifact pool has no candidates; existing empty-pool completion was used.");
 
@@ -399,9 +467,19 @@ namespace Game.UI.InGame.Editor
             if (c.Flow.CurPhase == GamePhase.Event || c.Flow.CurPhase == GamePhase.Store)
             {
                 GamePhase phase = c.Flow.CurPhase;
-                AssertRequiredModal(c, UIId.WaveReward);
-                Click(Read<UnityEngine.UI.Button>(c.Hud, "_continueButton"), phase + " Continue");
-                Note("PASS", label + ": " + phase + " prompt forwards its real content completion.");
+                if (phase == GamePhase.Store)
+                {
+                    await WaitFor(() => c.Shop.IsPending && c.Screen(UIId.Shop).IsVisible,
+                        label + " shop request");
+                    AssertRequiredModal(c, UIId.Shop);
+                    Click(Read<UnityEngine.UI.Button>(c.Shop, "_leaveButton"), "Shop Leave");
+                }
+                else
+                {
+                    AssertRequiredModal(c, UIId.WaveReward);
+                    Click(Read<UnityEngine.UI.Button>(c.Continue, "_continueButton"), phase + " Continue");
+                }
+                Note("PASS", label + ": " + phase + " screen forwards its real content completion.");
                 _checks++;
                 await WaitFor(() => c.Flow.CanEnterBuildMode() || c.Flow.CanChooseRunDecision,
                     label + " after attached content");
@@ -448,45 +526,26 @@ namespace Game.UI.InGame.Editor
             await StartBattle(c, "defeat branch");
             c.Waves.SetFail();
             Note("INPUT", "Existing WaveController.SetFail test input.");
-            await WaitFor(() => c.Flow.CurPhase == GamePhase.Finished && c.Screen(UIId.RunResult).IsVisible,
-                "defeat result");
+            SettlementView settlement = Read<SettlementView>(c.Startup, "_settlementUI");
+            await WaitFor(() => settlement.IsVisible && settlement.IsPending,
+                "defeat settlement request");
+            Check(c.Flow.CurPhase != GamePhase.Finished, "settlement waits before Finished clears run effects");
             Check(!c.RewardView.IsVisible && !c.Screen(UIId.WaveReward).IsVisible && !c.Decision.IsVisible,
-                "defeat opens the result without a reward or quarter decision");
-            AssertRequiredModal(c, UIId.RunResult);
-            Note("END", "Play Mode remains running on the defeat result.");
+                "defeat bypasses artifact and quarter selection");
+            Check(c.Manager.TopPopup == c.Screen(UIId.RunResult) && c.Manager.HasBlockingPopup,
+                "defeat opens the registered mandatory settlement screen");
+            Note("SCOPE", "Scene return and isolated bloodstone persistence are checked by RunSettlementPlayValidation.");
         }
 
-        private static async UniTask RunRestart(Context c)
+        private static UniTask RunRestart(Context c)
         {
-            Check(c.Flow.CurPhase == GamePhase.Finished && c.Screen(UIId.RunResult).IsVisible,
-                "restart is requested only from the actual finished result");
-            Scene previousScene = c.Manager.gameObject.scene;
-            int previousHandle = previousScene.handle;
-            string path = previousScene.path;
-            bool loaded = false;
-            UnityEngine.Events.UnityAction<Scene, LoadSceneMode> onLoaded = (scene, mode) =>
-            {
-                if (scene.path == path && scene.handle != previousHandle) loaded = true;
-            };
-            SceneManager.sceneLoaded += onLoaded;
-            try
-            {
-                Click(Read<UnityEngine.UI.Button>(c.Hud, "_restartButton"), "result Restart");
-                await WaitFor(() => loaded, "same Test scene reload");
-                InGameUIManager next = FindManager();
-                await WaitFor(() => next != null && next.IsReady, "reloaded Bootstrap UI initialization");
-                var replacement = new Context(next);
-                await WaitFor(replacement.Flow.CanEnterBuildMode, "reloaded Preparation");
-                Check(next != c.Manager && replacement.Screen(UIId.Hud).IsVisible && !next.HasModalOpen,
-                    "restart loads a fresh scene, initializes its new UI, and shows a usable HUD");
-                Note("END", "Play Mode remains running in fresh Preparation; RunDefeatTest can now be called.");
-            }
-            finally { SceneManager.sceneLoaded -= onLoaded; }
+            Limit("Result restart/navigation is outside the request-only settlement contract.");
+            return UniTask.CompletedTask;
         }
 
         private static async UniTask RunContinue(Context c)
         {
-            Check(c.Flow.CurPhase == GamePhase.Finished && c.Screen(UIId.RunResult).IsVisible,
+            Check(c.Flow.CurPhase == GamePhase.Finished,
                 "in-memory Continue starts from the actual finished result");
             await WaitFor(() => !Read<bool>(c.Flow, "_isTransitioning"), "finished flow transition unlock");
             GameFlowSaveData snapshot = c.Flow.CaptureSaveData();
@@ -497,7 +556,7 @@ namespace Game.UI.InGame.Editor
             c.Flow.Continue();
             await WaitFor(c.Flow.CanEnterBuildMode, "existing Continue Preparation");
             await UniTask.NextFrame();
-            Check(c.Screen(UIId.Hud).IsVisible && !c.Screen(UIId.RunResult).IsVisible && !c.Manager.HasModalOpen,
+            Check(c.Screen(UIId.Hud).IsVisible && !c.Screen(UIId.RunResult).IsVisible && !c.Manager.HasBlockingPopup,
                 "existing Continue phase notification restores the HUD and closes the result");
             Check(c.Flow.CurrentQuarter == quarter && c.Flow.CurrentWave == wave,
                 "in-memory Continue preserves the restored node instead of starting a new run");
@@ -510,7 +569,7 @@ namespace Game.UI.InGame.Editor
         private static void AssertRequiredModal(Context c, UIId id)
         {
             UIScreen screen = c.Screen(id);
-            Check(screen.IsVisible && c.Manager.HasModalOpen && !c.Manager.CloseTop() && screen.IsVisible,
+            Check(screen.IsVisible && c.Manager.HasBlockingPopup && !c.Manager.CloseTopPopup() && screen.IsVisible,
                 id + " blocks the same CloseTop path used by ESC");
             Check(!Read<UnityEngine.UI.Button>(c.Hud, "_waveStartButton").IsInteractable(),
                 id + " blocks HUD interaction while its mandatory choice is open");
