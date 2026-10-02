@@ -57,13 +57,14 @@ namespace Game.UI.InGame.Editor
             {
                 UI = ui;
                 Bootstrap = ui.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
-                Building = Read<BuildingUIConnection>(Bootstrap, "_buildingUIConnection");
-                var buildingView = Read<BuildingUIPresenter>(Bootstrap, "_buildingUI");
+                var startup = Read<InGameUIStartup>(Bootstrap, "_uiStartup");
+                Building = Read<BuildingUIConnection>(startup, "_buildingUIConnection");
+                var buildingView = Read<BuildingUIPresenter>(startup, "_buildingUI");
                 Catalog = Read<BuildingCatalogView>(buildingView, "_catalog");
                 Actions = Read<BuildingActionView>(buildingView, "_actions");
-                Hud = Read<GameHudView>(Bootstrap, "_hudView");
-                Continue = Read<ContinueView>(Bootstrap, "_continueUI");
-                Reward = Read<ArtifactRewardPresenter>(Bootstrap, "_artifactSelectionUI");
+                Hud = Read<GameHudView>(startup, "_hudView");
+                Continue = Read<ContinueView>(startup, "_continueUI");
+                Reward = Read<ArtifactRewardPresenter>(startup, "_artifactSelectionUI");
                 RewardView = Read<ArtifactRewardView>(Reward, "_panel");
                 Flow = Read<GameFlowController>(Bootstrap, "_gameFlowController");
                 Waves = Read<WaveController>(Bootstrap, "_waveController");
@@ -71,7 +72,7 @@ namespace Game.UI.InGame.Editor
                 Artifacts = Read<ArtifactManager>(Bootstrap, "_artifactManager");
                 Controller = Read<BuildingBuildController>(Bootstrap, "_buildController");
                 Slots = ui.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BuildingSlot>(true)).ToArray();
-                HudPresenter = Read<HudPresenter>(Bootstrap, "_hudPresenter");
+                HudPresenter = Read<HudPresenter>(startup, "_hudPresenter");
                 Gate = Read<TestWaitingScript>(Bootstrap, "_testScript");
                 Core = Read<BuildingCoreProgress>(Bootstrap, "_buildingCoreProgress");
             }

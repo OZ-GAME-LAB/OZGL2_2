@@ -185,22 +185,25 @@ namespace Game.UI.InGame.Editor
         private static void ConnectBootstrap(BootStrap bootstrap, InGameUIManager manager)
         {
             GameObject root = manager.gameObject;
-            Set(bootstrap, "_inGameUIManager", manager);
-            Set(bootstrap, "_hudView", root.GetComponentInChildren<GameHudView>(true));
-            Set(bootstrap, "_hudPresenter", root.GetComponent<HudPresenter>());
-            Set(bootstrap, "_artifactSelectionUI", root.GetComponent<ArtifactRewardPresenter>());
-            Set(bootstrap, "_continueUI", root.GetComponentInChildren<ContinueView>(true));
-            Set(bootstrap, "_runDecisionUI", root.GetComponentInChildren<RunDecisionView>(true));
-            Set(bootstrap, "_settlementUI", root.GetComponentInChildren<SettlementView>(true));
-            Set(bootstrap, "_buildingUI", root.GetComponent<BuildingUIPresenter>());
-            Set(bootstrap, "_buildingUIConnection", GetOrAdd<BuildingUIConnection>(bootstrap.gameObject));
-            var data = new SerializedObject(bootstrap);
+            InGameUIStartup startup = GetOrAdd<InGameUIStartup>(bootstrap.gameObject);
+            Set(startup, "_uiManager", manager);
+            Set(startup, "_hudView", root.GetComponentInChildren<GameHudView>(true));
+            Set(startup, "_hudPresenter", root.GetComponent<HudPresenter>());
+            Set(startup, "_artifactSelectionUI", root.GetComponent<ArtifactRewardPresenter>());
+            Set(startup, "_continueUI", root.GetComponentInChildren<ContinueView>(true));
+            Set(startup, "_runDecisionUI", root.GetComponentInChildren<RunDecisionView>(true));
+            Set(startup, "_settlementUI", root.GetComponentInChildren<SettlementView>(true));
+            Set(startup, "_shopView", root.GetComponentInChildren<ShopView>(true));
+            Set(startup, "_buildingUI", root.GetComponent<BuildingUIPresenter>());
+            Set(startup, "_buildingUIConnection", GetOrAdd<BuildingUIConnection>(bootstrap.gameObject));
+            Set(bootstrap, "_uiStartup", startup);
+            var data = new SerializedObject(startup);
             var field = data.FindProperty("_buildingShortcuts");
             BuildingShortcut[] shortcuts = root.GetComponentsInChildren<BuildingShortcut>(true);
             field.arraySize = shortcuts.Length;
             for (int i = 0; i < shortcuts.Length; i++) field.GetArrayElementAtIndex(i).objectReferenceValue = shortcuts[i];
             data.ApplyModifiedPropertiesWithoutUndo();
-            PrefabUtility.RecordPrefabInstancePropertyModifications(bootstrap);
+            RecordOverride(startup);
         }
 
         private static void ValidateRoot(GameObject root)

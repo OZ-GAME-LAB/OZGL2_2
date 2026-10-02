@@ -92,6 +92,7 @@ namespace Game.Core
         private IRunSettlementRewards _settlementRewards;
         private IContinueUI _continueUI;
         private IRunDecisionUI _decisionUI;
+        private IShopFlow _shopFlow;
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
         private bool _isTransitioning;
@@ -111,7 +112,8 @@ namespace Game.Core
             ArtifactManager artifactManager, 
             ArchiveManager archiveManager = null,
             IRunSettlementRewards settlementRewards = null,
-            InGameCameraController cameraController = null )
+            InGameCameraController cameraController = null,
+            IShopFlow shopFlow = null)
         {
             _testScript = testScript;
             _waveController = waveController;
@@ -119,6 +121,7 @@ namespace Game.Core
             _archiveManager = archiveManager;
             _settlementRewards = settlementRewards;
             _cameraController = cameraController;
+            _shopFlow = shopFlow;
             _nodeController = new NodeController(waveController.WaveCatalog);
             ClearToken();
             ResetDecisionState();
@@ -416,15 +419,23 @@ namespace Game.Core
             token.ThrowIfCancellationRequested();
             if (completedNode.PostBattleEvent == PostBattleEventType.None) return;
 
-            GamePhase phase = completedNode.PostBattleEvent == PostBattleEventType.Shop
-                ? GamePhase.Store : GamePhase.Event;
+            if (completedNode.PostBattleEvent == PostBattleEventType.Shop)
+            {
+                if (_shopFlow == null)
+                    throw new InvalidOperationException("상점 진행 계약을 먼저 연결해주세요.");
+                ChangePhase(GamePhase.Store);
+                token.ThrowIfCancellationRequested();
+                await _shopFlow.OpenShopAsync(token);
+                token.ThrowIfCancellationRequested();
+                return;
+            }
+
+            GamePhase phase = GamePhase.Event;
             if (_continueUI != null)
             {
                 ChangePhase(phase);
                 token.ThrowIfCancellationRequested();
-                await _continueUI.ShowAsync(phase == GamePhase.Store
-                    ? "상점 이용을 마쳤습니다.\n계속해서 다음 전투를 준비합니다."
-                    : "돌발 이벤트를 확인했습니다.\n계속해서 다음 전투를 준비합니다.", token);
+                await _continueUI.ShowAsync("돌발 이벤트를 확인했습니다.\n계속해서 다음 전투를 준비합니다.", token);
                 token.ThrowIfCancellationRequested();
                 return;
             }

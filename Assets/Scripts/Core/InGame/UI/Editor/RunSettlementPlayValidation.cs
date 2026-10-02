@@ -324,6 +324,7 @@ namespace Game.UI.InGame.Editor
         private sealed class Context
         {
             public readonly BootStrap Bootstrap;
+            public readonly InGameUIStartup Startup;
             public readonly InGameUIManager UI;
             public readonly GameFlowController Flow;
             public readonly WaveController Waves;
@@ -349,27 +350,28 @@ namespace Game.UI.InGame.Editor
             {
                 if (scene.name != "Test") throw new InvalidOperationException("Run in the Test scene.");
                 Bootstrap = InScene<BootStrap>(scene).Single();
-                UI = Read<InGameUIManager>(Bootstrap, "_inGameUIManager");
+                Startup = Read<InGameUIStartup>(Bootstrap, "_uiStartup");
+                UI = Startup.UIManager;
                 Flow = Read<GameFlowController>(Bootstrap, "_gameFlowController");
                 Waves = Read<WaveController>(Bootstrap, "_waveController");
                 Runtime = Read<RuntimeUnitManager>(Bootstrap, "_runtimeUnitManager");
                 Archive = Read<ArchiveManager>(Bootstrap, "_archiveManager");
                 Rewards = Read<RunSettlementManager>(Bootstrap, "_runSettlementManager");
-                Settlement = Read<SettlementView>(Bootstrap, "_settlementUI");
+                Settlement = Read<SettlementView>(Startup, "_settlementUI");
                 Persistent = Read<PersistentCurrencyManager>(Bootstrap, "_persistentCurrencyManager");
                 Coordinator = Read<PersistentSaveCoordinator>(Bootstrap, "_persistentSaveCoordinator");
                 Save = Read<SaveManager>(Bootstrap, "_saveManager");
                 Traits = Read<OutGameTraitController>(Bootstrap, "_persistentTraits");
-                Hud = Read<GameHudView>(Bootstrap, "_hudView");
-                Buildings = Read<BuildingUIConnection>(Bootstrap, "_buildingUIConnection");
+                Hud = Read<GameHudView>(Startup, "_hudView");
+                Buildings = Read<BuildingUIConnection>(Startup, "_buildingUIConnection");
                 Controller = Read<BuildingBuildController>(Bootstrap, "_buildController");
-                var presenter = Read<BuildingUIPresenter>(Bootstrap, "_buildingUI");
+                var presenter = Read<BuildingUIPresenter>(Startup, "_buildingUI");
                 Catalog = Read<BuildingCatalogView>(presenter, "_catalog");
                 Actions = Read<BuildingActionView>(presenter, "_actions");
                 Wallet = Read<RunCurrencyManager>(Bootstrap, "_runCurrencyManager");
-                ArtifactView = Read<ArtifactRewardView>(Read<ArtifactRewardPresenter>(Bootstrap, "_artifactSelectionUI"), "_panel");
-                Continue = Read<ContinueView>(Bootstrap, "_continueUI");
-                Decision = Read<RunDecisionView>(Bootstrap, "_runDecisionUI");
+                ArtifactView = Read<ArtifactRewardView>(Read<ArtifactRewardPresenter>(Startup, "_artifactSelectionUI"), "_panel");
+                Continue = Read<ContinueView>(Startup, "_continueUI");
+                Decision = Read<RunDecisionView>(Startup, "_runDecisionUI");
                 Slots = InScene<BuildingSlot>(scene).ToArray();
             }
             public UIScreen Screen(UIId id) => UI.TryGetScreen(id, out UIScreen screen) ? screen :
@@ -379,7 +381,7 @@ namespace Game.UI.InGame.Editor
         private static async UniTask EnsureArmyBuilding(Context c)
         {
             if (c.Slots.Any(slot => slot.IsOccupied && slot.CurrentBuilding.Data.HasSpawn)) return;
-            var shortcut = Read<BuildingShortcut[]>(c.Bootstrap, "_buildingShortcuts").First(item => item.SelectsFirstEmptySlot);
+            var shortcut = Read<BuildingShortcut[]>(c.Startup, "_buildingShortcuts").First(item => item.SelectsFirstEmptySlot);
             await PointerClick(Read<Button>(shortcut, "_button"), "construction shortcut");
             var candidates = Read<Dictionary<string, BuildingData>>(c.Buildings, "_byId");
             var items = Read<List<BuildingCatalogItem>>(c.Catalog, "_items");

@@ -41,7 +41,9 @@ namespace Game.UI.InGame.Editor
             public InGameUIManager Manager;
             public BuildingUIConnection Building;
             public ContinueView Continue;
+            public ShopView Shop;
             public BootStrap Bootstrap;
+            public InGameUIStartup Startup;
             public BuildingCatalogView Catalog;
             public BuildingActionView Actions;
             public GameHudView Hud;
@@ -60,13 +62,15 @@ namespace Game.UI.InGame.Editor
             {
                 Manager = manager;
                 Bootstrap = manager.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BootStrap>(true)).Single();
-                Building = Read<BuildingUIConnection>(Bootstrap, "_buildingUIConnection");
-                var buildingView = Read<BuildingUIPresenter>(Bootstrap, "_buildingUI");
+                Startup = Read<InGameUIStartup>(Bootstrap, "_uiStartup");
+                Building = Read<BuildingUIConnection>(Startup, "_buildingUIConnection");
+                var buildingView = Read<BuildingUIPresenter>(Startup, "_buildingUI");
                 Catalog = Read<BuildingCatalogView>(buildingView, "_catalog");
                 Actions = Read<BuildingActionView>(buildingView, "_actions");
-                Hud = Read<GameHudView>(Bootstrap, "_hudView");
-                Continue = Read<ContinueView>(Bootstrap, "_continueUI");
-                Reward = Read<ArtifactRewardPresenter>(Bootstrap, "_artifactSelectionUI");
+                Hud = Read<GameHudView>(Startup, "_hudView");
+                Continue = Read<ContinueView>(Startup, "_continueUI");
+                Shop = Read<ShopView>(Startup, "_shopView");
+                Reward = Read<ArtifactRewardPresenter>(Startup, "_artifactSelectionUI");
                 RewardView = Read<ArtifactRewardView>(Reward, "_panel");
                 Flow = Read<GameFlowController>(Bootstrap, "_gameFlowController");
                 Waves = Read<WaveController>(Bootstrap, "_waveController");
@@ -74,7 +78,7 @@ namespace Game.UI.InGame.Editor
                 Artifacts = Read<ArtifactManager>(Bootstrap, "_artifactManager");
                 Controller = Read<BuildingBuildController>(Bootstrap, "_buildController");
                 Slots = manager.gameObject.scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BuildingSlot>(true)).ToArray();
-                Decision = Read<RunDecisionView>(Bootstrap, "_runDecisionUI");
+                Decision = Read<RunDecisionView>(Startup, "_runDecisionUI");
                 Camera = Read<InGameCameraController>(Flow, "_cameraController");
             }
 
@@ -183,7 +187,7 @@ namespace Game.UI.InGame.Editor
             Check(expected != null, "the initialized Test scene has a live empty construction slot");
 
             BuildingShortcut shortcut = null;
-            foreach (BuildingShortcut candidate in Read<BuildingShortcut[]>(c.Bootstrap, "_buildingShortcuts"))
+            foreach (BuildingShortcut candidate in Read<BuildingShortcut[]>(c.Startup, "_buildingShortcuts"))
                 if (candidate != null && Read<bool>(candidate, "_selectFirstEmptySlot")) { shortcut = candidate; break; }
             Check(shortcut != null, "HUD has its configured first-empty-slot shortcut");
             Click(Read<UnityEngine.UI.Button>(shortcut, "_button"), "HUD construction shortcut");
@@ -463,9 +467,19 @@ namespace Game.UI.InGame.Editor
             if (c.Flow.CurPhase == GamePhase.Event || c.Flow.CurPhase == GamePhase.Store)
             {
                 GamePhase phase = c.Flow.CurPhase;
-                AssertRequiredModal(c, UIId.WaveReward);
-                Click(Read<UnityEngine.UI.Button>(c.Continue, "_continueButton"), phase + " Continue");
-                Note("PASS", label + ": " + phase + " prompt forwards its real content completion.");
+                if (phase == GamePhase.Store)
+                {
+                    await WaitFor(() => c.Shop.IsPending && c.Screen(UIId.Shop).IsVisible,
+                        label + " shop request");
+                    AssertRequiredModal(c, UIId.Shop);
+                    Click(Read<UnityEngine.UI.Button>(c.Shop, "_leaveButton"), "Shop Leave");
+                }
+                else
+                {
+                    AssertRequiredModal(c, UIId.WaveReward);
+                    Click(Read<UnityEngine.UI.Button>(c.Continue, "_continueButton"), phase + " Continue");
+                }
+                Note("PASS", label + ": " + phase + " screen forwards its real content completion.");
                 _checks++;
                 await WaitFor(() => c.Flow.CanEnterBuildMode() || c.Flow.CanChooseRunDecision,
                     label + " after attached content");
@@ -512,7 +526,7 @@ namespace Game.UI.InGame.Editor
             await StartBattle(c, "defeat branch");
             c.Waves.SetFail();
             Note("INPUT", "Existing WaveController.SetFail test input.");
-            SettlementView settlement = Read<SettlementView>(c.Bootstrap, "_settlementUI");
+            SettlementView settlement = Read<SettlementView>(c.Startup, "_settlementUI");
             await WaitFor(() => settlement.IsVisible && settlement.IsPending,
                 "defeat settlement request");
             Check(c.Flow.CurPhase != GamePhase.Finished, "settlement waits before Finished clears run effects");

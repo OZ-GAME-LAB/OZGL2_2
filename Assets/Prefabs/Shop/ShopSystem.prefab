@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5925548993962309194}
   - component: {fileID: 6230687844021399268}
+  - component: {fileID: 3894835477709725292}
   m_Layer: 0
   m_Name: ShopSystem
   m_TagString: Untagged
@@ -45,3 +46,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopManager
   _shopTable: {fileID: 11400000, guid: ab829f9dacc6e974c805df7aa357d9e0, type: 2}
+--- !u!114 &3894835477709725292
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3865479773014489151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eae52273fece4d31978e4a9f824e4932, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemManager
+  _itemCatalog: {fileID: 11400000, guid: dc723dd2747c0007edcc0ef685aaf111, type: 2}
+  _itemCasterPrefab: {fileID: 900000104, guid: 111244b0639946dc8703a0e7fd186559, type: 3}

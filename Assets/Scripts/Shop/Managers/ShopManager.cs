@@ -29,10 +29,14 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
     private List<ShopArtifactSlot> _purchaseSlots = new List<ShopArtifactSlot>();
     private List<ShopArtifactExchangeSlot> _exchangeSlots = new List<ShopArtifactExchangeSlot>();
     private bool _isTrading;
+    private IShopUI _shopUI;
+    private bool _isOpen;
+    private CancellationTokenSource _openCancellation;
+
 
     // 판매에 사용하는 매니저 초기화 후 호출. 소모성 판매 설정이 있으면 소모성 매니저도 필요
     public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager,
-        ConsumableItemManager consumableItemManager = null)
+        ConsumableItemManager consumableItemManager = null, IShopUI shopUI = null)
     {
         if (_isTrading || IsInitialized)
         {
@@ -58,6 +62,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         _consumableSelector = new ShopConsumableSelector(
             _consumables != null ? _consumables.Catalog : null, _shopTable);
         _runCurrencyManager = runCurrencyManager;
+        _shopUI = shopUI;
         _selector = new ShopArtifactSelector(artifactManager.ArtifactCatalog, artifactManager, _shopTable);
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
@@ -65,34 +70,40 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         HasStock = false;
     }
 
-    // 게임 플로우에서 호출 : 상점 UI를 열고 종료 버튼을 누를 때까지 대기 (UI 연결 예정)
-    public UniTask OpenShopAsync(CancellationToken token)
+    // 게임 플로우에서 호출 : 상점 UI를 열고 나가기 버튼을 누를 때까지 대기.
+    public async UniTask OpenShopAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (_isOpen) throw new InvalidOperationException("상점이 이미 열려 있습니다.");
+        if (_shopUI == null) throw new InvalidOperationException("상점 UI를 먼저 연결해주세요.");
 
         if (!IsInitialized || _isTrading)
         {
-            Debug.LogWarning("[Shop/ShopManager] 초기화 및 거래 처리 완료 후 상점을 열어주세요.", this);
-            return UniTask.CompletedTask;
+            throw new InvalidOperationException("초기화 및 거래 처리 완료 후 상점을 열어주세요.");
         }
 
         if (!HasStock && !TryGenerateStock())
         {
-            Debug.LogError("[Shop/ShopManager] 상점 품목 생성에 실패했습니다.", this);
-            return UniTask.CompletedTask;
+            throw new InvalidOperationException("상점 품목 생성에 실패했습니다.");
         }
 
-        // UI 연결 시 async UniTask로 변경
-        // UI에 이 ShopManager를 전달하여 목록 조회 및 구매·판매·교환 요청 연결
-        // 상점 UI Open 및 Close 버튼 대기를 한 함수로 제공받는 경우의 예시
-        // await _shopUI.OpenAndWaitForCloseAsync(this, token);
-        // token.ThrowIfCancellationRequested();
-        // UI 연결 시 중복 Open 요청 방지 및 Run 종료·취소 시 UI 닫기와 대기 상태 정리 필요
-        // UI를 열어둔 동안에는 구매·판매가 가능해야 하므로 _isTrading으로 대기 잠금 X
-
-        // UI Close 이후 완료. 현재는 UI 미연결로 즉시 완료
-        return UniTask.CompletedTask;
+        // 화면 대기는 별도 상태로 관리한다. _isTrading으로 잠그면 구매할 수 없다.
+        _isOpen = true;
+        _openCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        try
+        {
+            await _shopUI.OpenAndWaitForCloseAsync(this, _openCancellation.Token);
+            _openCancellation.Token.ThrowIfCancellationRequested();
+        }
+        finally
+        {
+            _openCancellation.Dispose();
+            _openCancellation = null;
+            _isOpen = false;
+        }
     }
+
+    private void OnDestroy() => _openCancellation?.Cancel();
 
     // 최초 생성 또는 명시적인 갱신 시 호출. UI를 다시 열 때는 기존 목록 사용
     public bool TryGenerateStock()
@@ -269,6 +280,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             return false;
         }
 
+        _openCancellation?.Cancel();
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
         _selector = null;

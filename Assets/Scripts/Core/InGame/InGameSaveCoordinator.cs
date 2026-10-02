@@ -20,14 +20,16 @@ public class InGameSaveCoordinator : MonoBehaviour
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
 
     private SaveManager _saveManager;
+    
     private ISaveDataProvider<GameFlowSaveData> _flowController;
     private ISaveDataProvider<RunCurrencySaveData> _runCurrency;
     private ISaveDataProvider<ArtifactSaveData> _artifact;
     private ISaveDataProvider<ShopSaveData> _shop;
-    private ISaveDataProvider<BuildingSaveData> _building;
     private ISaveDataProvider<ConsumableItemSaveData> _consumableItem;
-    private ISaveDataProvider<PersistentSaveData> _persistent;
+    private ISaveDataProvider<BuildingSaveData> _building;
     private ISaveDataProvider<ArchiveSaveData> _archive;
+    private ISaveDataProvider<PersistentSaveData> _persistent;
+    
     
     public void Initialize(SaveManager saveManager, ISaveDataProvider<GameFlowSaveData> gameFlowController)
     {
