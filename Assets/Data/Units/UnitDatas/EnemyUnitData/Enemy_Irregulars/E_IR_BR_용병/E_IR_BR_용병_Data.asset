@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: b677048316dc48d180d185305f00f3c5, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: c01cccc8263b4766af68611007c58442, type: 2}
+  _activeSkills:
+  - _id: ChargeAttack_IR
+    _skill: {fileID: 11400000, guid: c01cccc8263b4766af68611007c58442, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 5096adda60ec42b0915d62d406054f19, type: 2}
+  references:
+    version: 2
+    RefIds: []

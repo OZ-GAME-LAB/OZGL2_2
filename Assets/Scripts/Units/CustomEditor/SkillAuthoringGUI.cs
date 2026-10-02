@@ -73,7 +73,23 @@ namespace Units.Editor
                     return;
             }
 
-            if (property.FindPropertyRelative("_baseEffects") != null)
+            if (property.propertyType == SerializedPropertyType.ManagedReference && property.managedReferenceValue is SkillStackCondition)
+            {
+                Field(property, "_subject");
+                Field(property, "_query");
+                Field(property, "_comparison");
+                Field(property, "_count");
+            }
+            else if (property.FindPropertyRelative("_kind") != null && property.FindPropertyRelative("_statusType") != null && property.FindPropertyRelative("_key") != null)
+            {
+                var kind = property.FindPropertyRelative("_kind");
+                EditorGUILayout.PropertyField(kind, new GUIContent("조회 기준"));
+                if (kind.intValue == (int)EffectStackQueryKind.Status)
+                    EditorGUILayout.PropertyField(property.FindPropertyRelative("_statusType"), new GUIContent("상태이상"));
+                else
+                    EditorGUILayout.PropertyField(property.FindPropertyRelative("_key"), new GUIContent("효과 ID"));
+            }
+            else if (property.FindPropertyRelative("_baseEffects") != null)
                 DrawAction(property);
             else if (property.FindPropertyRelative("_entryId") != null)
                 DrawEntry(property);
@@ -96,6 +112,11 @@ namespace Units.Editor
 
             object value = list.name switch
             {
+                "_activeSkills" => new UnitActiveSkillEntry(),
+                "_phases" => new Hero_PhaseData(),
+                "_transitions" => new Hero_PhaseTransitionData(),
+                "_skillPolicies" => new Hero_PhaseSkillPolicy(),
+                "_statModifiers" => new Hero_PhaseStatModifier(),
                 "_baseEffects" => new SkillEffectEntry(),
                 "_conditionalEffects" => new SkillConditionalEffectEntry(),
                 "_fxEntries" => new SkillFXEntry(),
@@ -105,8 +126,8 @@ namespace Units.Editor
                 _ => null
             };
 
-            if (value != null)
-                SkillInspectorUI.Add(list, value);
+            if (value != null) SkillInspectorUI.Add(list, value);
+            else if (list.name == "_maintainedEffects") SkillInspectorUI.Add(list, null);
         }
         // Action의 동작과 효과 정의를 분리해 현재 동작에 필요한 설정만 보여 준다.
         private static void DrawAction(SerializedProperty action)
@@ -227,24 +248,41 @@ namespace Units.Editor
             if (subject == (int)SkillEffectSubject.SnapshotArea)
                 Field(entry, "_snapshotAreaTarget");
 
-            Field(entry, "_conditions");
-
-            Field(entry, "_consumeStacks");
-
-            var consume = entry.FindPropertyRelative("_consumeStacks");
-
-            if (consume != null && consume.boolValue)
-            {
-                Field(entry, "_consumeSubject");
-
-                Field(entry, "_stackQuery");
-
-                Field(entry, "_stackCount");
-            }
+            var conditions = entry.FindPropertyRelative("_conditions");
+            if (conditions != null)
+                DrawConditionalConditions(entry, conditions);
 
             Field(entry, "_effects");
 
             Field(entry, "_fxEntries");
+        }
+
+        private static void DrawConditionalConditions(SerializedProperty entry, SerializedProperty conditions)
+        {
+            SkillInspectorUI.Cards(conditions, (condition, _) =>
+            {
+                DrawBody(condition);
+                if (condition.managedReferenceValue is not SkillStackCondition) return;
+
+                var consume = condition.FindPropertyRelative("_consumeOnApply");
+                EditorGUI.BeginChangeCheck();
+                bool next = EditorGUILayout.Toggle("조건 충족 시 중첩 소비", consume.boolValue);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    if (next)
+                        for (int i = 0; i < conditions.arraySize; i++)
+                        {
+                            var flag = conditions.GetArrayElementAtIndex(i).FindPropertyRelative("_consumeOnApply");
+                            if (flag != null) flag.boolValue = false;
+                        }
+                    consume.boolValue = next;
+                }
+                if (consume.boolValue)
+                {
+                    EditorGUILayout.PropertyField(condition.FindPropertyRelative("_consumeCount"), new GUIContent("소비 개수"));
+                    EditorGUILayout.LabelField("위 조건의 대상과 조회 기준을 그대로 사용합니다. 소비할 중첩이 부족하면 효과를 적용하지 않습니다.", EditorStyles.wordWrappedMiniLabel);
+                }
+            }, () => AddItem(conditions), "조건", conditions.arraySize > 0);
         }
 
         private static void DrawTarget(SerializedProperty target)

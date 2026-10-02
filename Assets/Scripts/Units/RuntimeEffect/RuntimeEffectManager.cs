@@ -117,9 +117,19 @@ namespace Units.Effects
                     "Duplicate EffectId: " + id
                 );
 
+            if (request.Target.RuntimeStatus.IsImmuneToEffect(request.Definition))
+                return new CombatApplicationResult(
+                    CombatApplicationKind.RuntimeEffect,
+                    request.Target,
+                    1f,
+                    request.Metadata,
+                    CombatApplicationStatus.NoChange,
+                    "Immune to effect status"
+                );
+
             _knownIds[id] = request.EffectData;
 
-            var existing = FindEffect(request.Target, request.EffectData);
+            var existing = FindEffect(request.Target, request.EffectData, request.OwnershipKey);
 
             int count = existing != null ? existing.StackCount : 0;
 
@@ -147,7 +157,7 @@ namespace Units.Effects
 
                     else
                     {
-                        var current = FindEffect(request.Target, request.EffectData);
+                        var current = FindEffect(request.Target, request.EffectData, request.OwnershipKey);
 
                         bool changed = current != null && (existing == null || current.StackCount != count || current.ExpireTime != expiry);
 
@@ -253,7 +263,7 @@ namespace Units.Effects
 
             float currentTime = Time.time;
 
-            RuntimeEffectInstance existingEffect = FindEffect(request.Target, request.EffectData);
+            RuntimeEffectInstance existingEffect = FindEffect(request.Target, request.EffectData, request.OwnershipKey);
 
             if (existingEffect != null)
             {
@@ -268,7 +278,8 @@ namespace Units.Effects
                 request.Target,
                 currentTime,
                 request.Metadata,
-                request.Definition
+                request.Definition,
+                request.OwnershipKey
             );
 
             if (!RegisterEffect(newEffect))
@@ -297,6 +308,14 @@ namespace Units.Effects
             RemoveEffectAt(index);
 
             return true;
+        }
+
+        public void RemoveOwnedEffects(ICombatTarget target, object ownershipKey)
+        {
+            if (ownershipKey == null) return;
+            foreach (var instance in _activeEffects.ToArray())
+                if (ReferenceEquals(instance.Target, target) && ReferenceEquals(instance.OwnershipKey, ownershipKey))
+                    RemoveEffect(instance);
         }
 
         public void RemoveEffects(ICombatTarget target)
@@ -645,7 +664,7 @@ namespace Units.Effects
 
         private RuntimeEffectInstance FindEffect(
             ICombatTarget target,
-            EffectData effectData)
+            EffectData effectData, object ownershipKey = null)
         {
             for (int i = 0; i < _activeEffects.Count; i++)
             {
@@ -655,6 +674,9 @@ namespace Units.Effects
                     continue;
 
                 if (instance.Target != target)
+                    continue;
+
+                if (!ReferenceEquals(instance.OwnershipKey, ownershipKey))
                     continue;
 
                 if (instance.Data != effectData)

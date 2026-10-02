@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Units.Effects;
@@ -244,6 +244,18 @@ namespace Units.Skills
 
         [SerializeField, Min(0)]
         private int _count = 1;
+
+        [SerializeField]
+        private bool _consumeOnApply;
+
+        [SerializeField, Min(1)]
+        private int _consumeCount = 1;
+
+        public SkillConditionSubject Subject => _subject;
+        public EffectStackQuery Query => _query;
+        public bool ConsumeOnApply => _consumeOnApply;
+        public int ConsumeCount => _consumeCount;
+
 
         // ============================================================
         // Properties

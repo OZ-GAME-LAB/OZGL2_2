@@ -69,7 +69,9 @@ namespace Units.UnitDatas
         private BasicAttackData _basicAttackData;
 
         [SerializeField]
-        private ActiveSkillData _activeSkillData;
+        private List<UnitActiveSkillEntry> _activeSkills = new();
+
+        public IReadOnlyList<UnitActiveSkillEntry> ActiveSkills => _activeSkills.AsReadOnly();
 
         [SerializeField]
         private List<PassiveSkillData> _passiveSkillDatas =
@@ -95,8 +97,6 @@ namespace Units.UnitDatas
         public BasicAttackData BasicAttackData =>
             _basicAttackData;
 
-        public ActiveSkillData ActiveSkillData =>
-            _activeSkillData;
 
         public IReadOnlyList<PassiveSkillData> PassiveSkillDatas =>
             _passiveSkillDatas;

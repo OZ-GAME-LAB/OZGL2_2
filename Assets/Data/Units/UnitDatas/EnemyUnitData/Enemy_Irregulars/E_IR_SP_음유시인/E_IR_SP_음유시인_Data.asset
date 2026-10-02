@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
-  m_Name: "E_IR_SP_음유시인_Data"
+  m_Name: "E_IR_SP_\uC74C\uC720\uC2DC\uC778_Data"
   m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
-  _unitId: "E_IR_SP_음유시인"
-  _unitName: "음유시인"
+  _unitId: "E_IR_SP_\uC74C\uC720\uC2DC\uC778"
+  _unitName: "\uC74C\uC720\uC2DC\uC778"
   _team: 1
   _allyIdentity:
     _unitClass: 0
@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: b6ef20f87d524ebd832d2acbc0c58482, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: ec8fab05edaa4da4b875b5ea65790747, type: 2}
+  _activeSkills:
+  - _id: AreaHeal_IR
+    _skill: {fileID: 11400000, guid: ec8fab05edaa4da4b875b5ea65790747, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 2fe4ec230f9746c39b29f91b8ea3c243, type: 2}
+  references:
+    version: 2
+    RefIds: []

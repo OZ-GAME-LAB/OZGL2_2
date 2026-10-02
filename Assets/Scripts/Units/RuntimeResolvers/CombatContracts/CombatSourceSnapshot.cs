@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -87,9 +87,11 @@ namespace Units
         // Data / Runtime State
         // ============================================================
 
-        private readonly Dictionary<string, int> _ids = new(), _categories = new();
+        private readonly Dictionary<string, int> _ids = new();
 
         private readonly HashSet<UnitStatusEffectType> _statuses = new();
+
+        private readonly Dictionary<UnitStatusEffectType, int> _statusStacks = new();
 
         // ============================================================
         // Execution
@@ -97,9 +99,13 @@ namespace Units
 
         public int StackCount(Units.Effects.EffectStackQuery query)
         {
-            var map = query.Kind == Units.Effects.EffectStackQueryKind.EffectId ? _ids : _categories;
+            if (query == null || !query.IsValid)
+                return 0;
 
-            return map.TryGetValue(query.Key, out var count) ? count : 0;
+            if (query.Kind == EffectStackQueryKind.Status)
+                return _statusStacks.TryGetValue(query.StatusType, out var stacks) ? stacks : 0;
+
+            return _ids.TryGetValue(query.Key, out var count) ? count : 0;
         }
 
         public bool HasEffect(string id) => id != null && _ids.ContainsKey(id);
@@ -124,10 +130,12 @@ namespace Units
 
             foreach (var effect in stats.ActiveEffects)
             {
-                _ids[effect.Definition.EffectId] = effect.StackCount;
+                _ids[effect.Definition.EffectId] = (_ids.TryGetValue(effect.Definition.EffectId, out var existing) ? existing : 0) + effect.StackCount;
 
-                foreach (var category in effect.Definition.Categories)
-                    _categories[category] = (_categories.TryGetValue(category, out var count) ? count : 0) + effect.StackCount;
+                foreach (UnitStatusEffectType status in Enum.GetValues(typeof(UnitStatusEffectType)))
+                    if (effect.Definition.HasStatus(status))
+                        _statusStacks[status] = (_statusStacks.TryGetValue(status, out var stacks) ? stacks : 0) + effect.StackCount;
+
             }
 
             foreach (UnitStatusEffectType status in Enum.GetValues(typeof(UnitStatusEffectType)))

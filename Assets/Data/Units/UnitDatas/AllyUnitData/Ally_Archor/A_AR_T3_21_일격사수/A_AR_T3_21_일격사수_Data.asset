@@ -33,7 +33,7 @@ MonoBehaviour:
   - _statType: 30
     _value: 1
   - _statType: 100
-    _value: 80
+    _value: 100
   - _statType: 110
     _value: 1
   - _statType: 120
@@ -60,8 +60,23 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: da41d0c0aaa195941b2e2be52d0a5918, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: ea344b5b501da6847a6dc748dd719842, type: 2}
+  _activeSkills:
+  - _id: FocusShot_T3
+    _skill: {fileID: 11400000, guid: ea344b5b501da6847a6dc748dd719842, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 958ce2b4a47bd894ca18ecb19cafc351, type: 2}
   - {fileID: 11400000, guid: b857729c7ba1f8a47b2f511aff2009a8, type: 2}
   - {fileID: 11400000, guid: 5f5a87366384c6647bdf041ca950cb1f, type: 2}
+  references:
+    version: 2
+    RefIds: []

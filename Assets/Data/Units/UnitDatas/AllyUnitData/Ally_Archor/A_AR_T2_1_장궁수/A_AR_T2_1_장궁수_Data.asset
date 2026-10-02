@@ -60,7 +60,22 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: c51a94f7038826b43b34ba99277db6d4, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 25546d84357120049bc6d2d2f3130a46, type: 2}
+  _activeSkills:
+  - _id: DoubleShot_T2
+    _skill: {fileID: 11400000, guid: 25546d84357120049bc6d2d2f3130a46, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: dee2adf11efea9a40b6c82343d81d7d6, type: 2}
   - {fileID: 11400000, guid: 053a6618bef0b93478bc2a096399a152, type: 2}
+  references:
+    version: 2
+    RefIds: []

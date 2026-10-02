@@ -33,7 +33,7 @@ MonoBehaviour:
   - _statType: 30
     _value: 1
   - _statType: 100
-    _value: 30
+    _value: 35
   - _statType: 110
     _value: 1
   - _statType: 120
@@ -60,6 +60,21 @@ MonoBehaviour:
     _value: 10
   _statusImmunities: 
   _basicAttackData: {fileID: 11400000, guid: 88ece887976f8864e961667fea767606, type: 2}
-  _activeSkillData: {fileID: 11400000, guid: 5a51faf66f026d1478a23595cb516a59, type: 2}
+  _activeSkills:
+  - _id: SpinAttack_T1
+    _skill: {fileID: 11400000, guid: 5a51faf66f026d1478a23595cb516a59, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 1
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
   _passiveSkillDatas:
   - {fileID: 11400000, guid: 5895ae49d4b88744d9ec121be65480a3, type: 2}
+  references:
+    version: 2
+    RefIds: []
