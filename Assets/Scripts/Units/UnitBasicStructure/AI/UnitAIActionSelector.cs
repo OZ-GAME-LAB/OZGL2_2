@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 
 
@@ -35,25 +35,10 @@ namespace Units
                 return UnitAIActionType.Idle;
 
 
-            if (!IsTargetValid(
-                assignment.Target))
-            {
-                return UnitAIActionType.Idle;
-            }
-
-
-            float distance =
-                GetDistanceToTarget(
-                    assignment.Target
-                );
-
-
-            if (CanUseActiveSkill(
-                distance))
-            {
+            if (_core.TrySelectActiveSkill(assignment.Target, out _))
                 return UnitAIActionType.ActiveSkill;
-            }
-
+            if (!IsTargetValid(assignment.Target)) return UnitAIActionType.Idle;
+            float distance = GetDistanceToTarget(assignment.Target);
 
             if (CanUseBasicAttack(
                 distance))
@@ -75,30 +60,6 @@ namespace Units
 
         // ============================================================
         // Active Skill
-        // ============================================================
-
-        private bool CanUseActiveSkill(
-            float distance)
-        {
-            if (!_core.CanUseActiveSkill)
-                return false;
-
-
-            if (_core.RuntimeStatus == null)
-                return false;
-
-
-            if (_core.RuntimeStatus.ActiveSkillData == null)
-                return false;
-
-
-            return distance <=
-                _core.RuntimeStatus.ActiveSkillData.SkillRange;
-        }
-
-
-        // ============================================================
-        // Basic Attack
         // ============================================================
 
         private bool CanUseBasicAttack(

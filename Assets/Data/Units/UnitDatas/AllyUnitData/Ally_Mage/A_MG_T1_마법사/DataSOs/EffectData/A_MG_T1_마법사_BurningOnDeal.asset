@@ -20,6 +20,7 @@ MonoBehaviour:
   _stackType: 3
   _maxStack: 3
   _actions:
+  - rid: 4617381525916483666
   - rid: 4844432381217865738
   _categories:
   - Alignment.Harmful
@@ -27,6 +28,10 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 4617381525916483666
+      type: {class: StatusEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
+      data:
+        _statusType: 3
     - rid: 4844432381217865738
       type: {class: PeriodicDamageEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:

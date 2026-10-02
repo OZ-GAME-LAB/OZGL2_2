@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "A_AR_T3_21_\uC77C\uACA9\uC0AC\uC218_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "A_AR_T3_21_\uC77C\uACA9\uC0AC\uC218"
+  _unitName: "\uC77C\uACA9\uC0AC\uC218"
+  _team: 0
+  _allyIdentity:
+    _unitClass: 3
+    _unitTier: 2
+    _unitType: 26
+  _enemyIdentity:
+    _unitClass: 0
+    _unitFaction: 0
+    _unitType: 0
+  _stats:
+  - _statType: 0
+    _value: 900
+  - _statType: 10
+    _value: 0
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 100
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.1
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 4
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 
+  _basicAttackData: {fileID: 11400000, guid: da41d0c0aaa195941b2e2be52d0a5918, type: 2}
+  _activeSkills:
+  - _id: FocusShot_T3
+    _skill: {fileID: 11400000, guid: ea344b5b501da6847a6dc748dd719842, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: 958ce2b4a47bd894ca18ecb19cafc351, type: 2}
+  - {fileID: 11400000, guid: b857729c7ba1f8a47b2f511aff2009a8, type: 2}
+  - {fileID: 11400000, guid: 5f5a87366384c6647bdf041ca950cb1f, type: 2}
+  references:
+    version: 2
+    RefIds: []

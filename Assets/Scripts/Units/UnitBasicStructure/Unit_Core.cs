@@ -16,6 +16,31 @@ namespace Units
 
         [SerializeField]
         private Unit_Gateway _gateway;
+        private Hero_Phase _heroPhase;
+        public bool HasHeroPhase => _heroPhase != null && _heroPhase.IsInitialized;
+        public int HeroPhaseVersion => _heroPhase != null ? _heroPhase.Version : 0;
+        public bool IsCombatBusy => _combat != null && _combat.IsBusy;
+        internal bool BlocksNewExecution => _heroPhase != null && _heroPhase.BlocksNewExecution;
+        public UnitDecision SelectedSkillDecision { get; private set; }
+        internal SkillUsePolicyData GetSkillPolicy(UnitActiveSkillEntry entry)
+            => HasHeroPhase ? _heroPhase.GetPolicy(entry) : entry.Policy;
+        public bool TryGetHeroPhaseInfo(out Hero_PhaseInfo info)
+        { info = default; return _heroPhase != null && _heroPhase.TryGetInfo(out info); }
+        internal void NotifyHeroPhaseChanged()
+        {
+            if (_gateway is Hero_Gateway hero && TryGetHeroPhaseInfo(out var info))
+                hero.NotifyHeroPhaseChanged(info);
+        }
+        internal void InterruptCombatForPhase() => _combat?.InterruptForPhase();
+        public bool TrySelectActiveSkill(ICombatTarget target, out UnitDecision decision)
+        {
+            decision = default;
+            bool found = _combat != null && _combat.TrySelectActiveSkill(target, out decision);
+            SelectedSkillDecision = decision;
+            return found;
+        }
+        public bool TryActiveSkill(UnitDecision decision) => _combat != null && _combat.TryActiveSkill(decision);
+
 
         [SerializeField]
         private Unit_RuntimeStatus _runtimeStatus;
@@ -186,6 +211,8 @@ namespace Units
             _facingDirection = Vector2.left;
 
             InitComponents();
+            _heroPhase?.Stop();
+            SelectedSkillDecision = default;
 
             UnbindComponentEvents();
 
@@ -245,10 +272,12 @@ namespace Units
             _gateway?.NotifyCombatStateChanged(CombatStateChange.Status);
 
             RefreshStatusRestrictions();
+            if (_heroPhase != null && _heroPhase.isActiveAndEnabled) _heroPhase.Initialize(this);
         }
 
         private void InitComponents()
         {
+            _heroPhase = GetComponent<Hero_Phase>();
             if (_gateway == null)
             {
                 _gateway = GetComponent<Unit_Gateway>();
@@ -468,16 +497,6 @@ namespace Units
             return _runtimeStatus.BasicAttackData.BasicAttackRange;
         }
 
-        public float GetSkillRange()
-        {
-            if (_runtimeStatus == null)
-                return 0f;
-
-            if (_runtimeStatus.ActiveSkillData == null)
-                return 0f;
-
-            return _runtimeStatus.ActiveSkillData.SkillRange;
-        }
 
 
         // ============================================================
@@ -573,6 +592,7 @@ namespace Units
 
         public void NotifyDeath()
         {
+            _heroPhase?.Stop();
             _gateway?.NotifyCombatStateChanged(CombatStateChange.Lifetime);
 
             _ai?.Stop();
@@ -795,6 +815,7 @@ namespace Units
 
         public void StartAI()
         {
+            _heroPhase?.StartPhase();
             _ai?.StartAI();
         }
 
@@ -875,6 +896,7 @@ namespace Units
 
         public void Pause()
         {
+            _heroPhase?.PausePhase();
             _ai?.PauseAI();
 
             _movement?.Stop();
@@ -886,6 +908,7 @@ namespace Units
 
         public void Resume()
         {
+            _heroPhase?.ResumePhase();
             _combat?.Resume();
 
             _passive?.Resume();

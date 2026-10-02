@@ -7,6 +7,7 @@ using UnityEngine;
 
 namespace Units
 {
+    [DisallowMultipleComponent]
     public class Unit_Gateway :
         MonoBehaviour,
         ICombatTarget
@@ -114,12 +115,12 @@ namespace Units
         // Unity Lifecycle
         // ============================================================
 
-        private void OnDisable()
+        protected virtual void OnDisable()
         {
             NotifyCombatStateChanged(CombatStateChange.Lifetime);
         }
 
-        private void OnDestroy()
+        protected virtual void OnDestroy()
         {
             NotifyCombatStateChanged(CombatStateChange.Lifetime);
 
@@ -200,6 +201,12 @@ namespace Units
         internal void ClearGroupAI()
         {
             _groupAI = null;
+        }
+
+        // 클릭시 UI에 정보를 표시하기 위해 그룹 멤버를 가져오는 메서드
+        public IReadOnlyList<Unit_Gateway> GetGroupMembers()
+        {
+            return _groupAI != null ? _groupAI.Members: new List<Unit_Gateway>();
         }
 
 

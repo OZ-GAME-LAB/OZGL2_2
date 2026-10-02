@@ -1,0 +1,82 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "A_AR_T3_11_\uBA85\uC0AC\uC218_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "A_AR_T3_11_\uBA85\uC0AC\uC218"
+  _unitName: "\uBA85\uC0AC\uC218"
+  _team: 0
+  _allyIdentity:
+    _unitClass: 3
+    _unitTier: 2
+    _unitType: 24
+  _enemyIdentity:
+    _unitClass: 0
+    _unitFaction: 0
+    _unitType: 0
+  _stats:
+  - _statType: 0
+    _value: 1000
+  - _statType: 10
+    _value: 0
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 40
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.1
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 5
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 
+  _basicAttackData: {fileID: 11400000, guid: 196bf8e31f6e57841981065c84d0914f, type: 2}
+  _activeSkills:
+  - _id: DoubleShot_T3
+    _skill: {fileID: 11400000, guid: 71a230650d049ef4694457f5f564710f, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: 90ce19712c420724d805ae9f93df308e, type: 2}
+  - {fileID: 11400000, guid: 64004b57633b0494681b237c6c754f67, type: 2}
+  - {fileID: 11400000, guid: c3abf80ef57947f4996d9c991cdfe3d0, type: 2}
+  references:
+    version: 2
+    RefIds: []

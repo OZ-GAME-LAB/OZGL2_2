@@ -80,6 +80,7 @@ public class EffectDataEditor : Editor
 
         EditorGUILayout.Space(6);
 
+        EditorGUILayout.HelpBox("상태이상은 적용 효과에 '상태 부여'를 추가하고 Enum에서 선택합니다. 서로 다른 ID도 같은 상태로 판정됩니다. 주기 피해는 별도로 추가합니다. 상태 면역 대상에는 이 효과 전체가 적용되지 않습니다.", MessageType.Info);
         DrawActions();
 
         Units.Editor.SkillInspectorUI.Commit(serializedObject);

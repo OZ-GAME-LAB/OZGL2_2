@@ -17,6 +17,8 @@ namespace Units
 
         private readonly Func<UnitStatusEffectType, bool> _isImmuneToStatus;
 
+        private readonly Dictionary<RuntimeEffectInstance, HashSet<UnitStatusEffectType>> _registeredStatuses = new();
+
 
         // ============================================================
         // Properties
@@ -119,44 +121,25 @@ namespace Units
 
         private void AddStatuses(RuntimeEffectInstance instance)
         {
-            IReadOnlyList<EffectActionData> actions = instance.Definition.Actions;
+            var statuses = new HashSet<UnitStatusEffectType>();
+            foreach (var action in instance.Definition.Actions)
+                if (action is StatusEffectActionData status && !IsImmuneToStatus(status.StatusType))
+                    statuses.Add(status.StatusType);
 
-            for (int i = 0; i < actions.Count; i++)
-            {
-                if (actions[i] is not StatusEffectActionData statusAction)
-                {
-                    continue;
-                }
-
-                if (IsImmuneToStatus(statusAction.StatusType))
-                {
-                    continue;
-                }
-
-                AddStatus(statusAction.StatusType);
-            }
+            _registeredStatuses.Add(instance, statuses);
+            foreach (var status in statuses)
+                AddStatus(status);
         }
 
         private void RemoveStatuses(RuntimeEffectInstance instance)
         {
-            IReadOnlyList<EffectActionData> actions = instance.Definition.Actions;
+            // 제거 시 현재 면역을 다시 판정하지 않고 실제 등록했던 상태만 해제한다.
+            if (!_registeredStatuses.TryGetValue(instance, out var statuses))
+                return;
 
-            for (int i = 0; i < actions.Count; i++)
-            {
-                if (actions[i] is not StatusEffectActionData statusAction)
-                {
-                    continue;
-                }
-
-                // 현재는 UnitData 기반의 기본 면역만 사용하므로
-                // Effect의 생존 중 면역 상태가 변하지 않는 것을 전제로 한다.
-                if (IsImmuneToStatus(statusAction.StatusType))
-                {
-                    continue;
-                }
-
-                RemoveStatus(statusAction.StatusType);
-            }
+            _registeredStatuses.Remove(instance);
+            foreach (var status in statuses)
+                RemoveStatus(status);
         }
 
         private void AddStatus(UnitStatusEffectType statusType)

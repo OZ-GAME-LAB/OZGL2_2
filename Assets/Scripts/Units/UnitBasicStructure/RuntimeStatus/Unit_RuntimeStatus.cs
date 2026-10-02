@@ -109,7 +109,8 @@ namespace Units
 
         public BasicAttackData BasicAttackData => _unitData != null ? _unitData.BasicAttackData : null;
 
-        public ActiveSkillData ActiveSkillData => _unitData != null ? _unitData.ActiveSkillData : null;
+        public IReadOnlyList<UnitActiveSkillEntry> ActiveSkills => _unitData != null ? _unitData.ActiveSkills : Array.Empty<UnitActiveSkillEntry>();
+
 
         public IReadOnlyList<PassiveSkillData> PassiveSkillDatas => _spawnPassiveSkills;
 
@@ -308,6 +309,18 @@ namespace Units
             }
         }
 
+        public void ReplaceCombatModifiers(object source, IReadOnlyList<CombatStatModifier> modifiers)
+        {
+            if (_finalStatus == null || source == null) return;
+            var before = _finalStatus.GetAffectedValues(source);
+            if (modifiers != null)
+                foreach (var modifier in modifiers)
+                    if (!before.ContainsKey(modifier.StatType))
+                        before.Add(modifier.StatType, GetStat(modifier.StatType));
+            _finalStatus.ReplaceModifiers(source, modifiers);
+            foreach (var pair in before) NotifyStatChanged(pair.Key, pair.Value);
+        }
+
         public void ClearCombatModifiers()
         {
             if (_finalStatus == null)
@@ -354,7 +367,7 @@ namespace Units
 
         public bool AddRuntimeEffect(RuntimeEffectInstance instance)
         {
-            if (_effectStatus == null || instance == null)
+            if (_effectStatus == null || instance == null || IsImmuneToEffect(instance.Definition))
             {
                 return false;
             }
@@ -462,6 +475,19 @@ namespace Units
         // ============================================================
         // Status Methods
         // ============================================================
+
+        // 하나의 EffectData는 함께 적용/제거되는 단위다. 상태 면역이면 주기 피해와 보정도 적용하지 않는다.
+        public bool IsImmuneToEffect(EffectDefinitionSnapshot definition)
+        {
+            if (definition == null)
+                return false;
+
+            foreach (var action in definition.Actions)
+                if (action is StatusEffectActionData status && IsImmuneToStatus(status.StatusType))
+                    return true;
+
+            return false;
+        }
 
         public bool IsImmuneToStatus(UnitStatusEffectType statusType)
         {

@@ -8,8 +8,9 @@ using UnityEngine;
 /// <summary>
 /// 게임 시작 전 제단 1개를 선택하고, Run 동안 효과를 적용합니다.
 /// Update에서 효과를 계산하지 않고 PhaseChanged 이벤트만 구독합니다.
+/// 저장 파일 입출력은 하지 않습니다. 세이브 담당이 CaptureSaveData와 RestoreSaveData만 호출합니다.
 /// </summary>
-public class AltarManager : MonoBehaviour
+public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 {
     public bool IsInitialized => _catalog != null && _effectManager != null;
     public bool IsApplied => _instance != null;
@@ -154,6 +155,37 @@ public class AltarManager : MonoBehaviour
             return false;
         }
         return TrySelect(altar);
+    }
+
+    // Current date KDH 2026-10-02
+    // 저장 시점에만 객체를 만듭니다. Update에서는 호출하지 않습니다.
+    // 파일에는 AltarId만 담습니다. 에셋 참조는 다음 실행에서 복원되지 않습니다.
+    public AltarRunSaveData CaptureSaveData()
+    {
+        return new AltarRunSaveData
+        {
+            SelectedAltar = _selected != null ? _selected.Id : AltarId.None
+        };
+    }
+
+    // Current date KDH 2026-10-02
+    // ID로 카탈로그의 AltarData를 다시 고릅니다. 인게임은 Selected로 그 에셋을 읽습니다.
+    // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    public void RestoreSaveData(AltarRunSaveData data)
+    {
+        if (data == null)
+        {
+            Debug.LogError("[OutGame/AltarManager] 복원할 제단 저장 데이터가 없습니다.", this);
+            return;
+        }
+
+        if (data.SelectedAltar == AltarId.None)
+        {
+            TryClearSelection();
+            return;
+        }
+
+        TrySelectById(data.SelectedAltar);
     }
 
     public bool TryClearSelection()
@@ -508,4 +540,12 @@ public class AltarManager : MonoBehaviour
 
         TryClearApplied();
     }
+}
+
+// Current date KDH 2026-10-02
+// 인게임 저장에 실을 이번 판 제단입니다. AltarData 참조는 담지 않습니다.
+[Serializable]
+public class AltarRunSaveData
+{
+    public AltarId SelectedAltar;
 }

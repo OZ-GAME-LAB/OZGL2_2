@@ -1,119 +1,20 @@
-﻿
-
-
 namespace Units
 {
     public class UnitAIAction_ActiveSkill : IUnitAIAction
     {
-        // ============================================================
-        // Reference
-        // ============================================================
-
         private readonly Unit_Core _core;
-
         private bool _started;
-
-
-        // ============================================================
-        // Properties
-        // ============================================================
-
-        public UnitAIActionType ActionType
-            => UnitAIActionType.ActiveSkill;
-
-
-        // ============================================================
-        // Constructor
-        // ============================================================
-
-        public UnitAIAction_ActiveSkill(
-            Unit_Core core)
+        public UnitAIActionType ActionType => UnitAIActionType.ActiveSkill;
+        public UnitAIAction_ActiveSkill(Unit_Core core) { _core = core; }
+        public void Enter(UnitAssignment? assignment)
         {
-            _core = core;
-        }
-
-
-        // ============================================================
-        // Action
-        // ============================================================
-
-        public void Enter(
-            UnitAssignment? assignment)
-        {
-            _started =
-                false;
-
-
-            if (!assignment.HasValue)
-                return;
-
-
-            if (_core == null
-                || !_core.CanUseActiveSkill)
-            {
-                return;
-            }
-
-
-            ICombatTarget target =
-                assignment.Value.Target;
-
-
-            if (!IsTargetValid(
-                target))
-            {
-                return;
-            }
-
-
+            _started = false;
+            if (_core == null || !_core.CanUseActiveSkill) return;
             _core.StopMovement();
-
-
-            _started =
-                _core.TryActiveSkill(
-                    target
-                );
+            _started = _core.TryActiveSkill(_core.SelectedSkillDecision);
         }
-
-
-        public UnitAIActionType? Evaluate(
-            UnitAssignment? assignment)
-        {
-            if (!_started
-                || !assignment.HasValue)
-            {
-                return UnitAIActionType.Idle;
-            }
-
-
-            if (!IsTargetValid(
-                assignment.Value.Target))
-            {
-                return UnitAIActionType.Idle;
-            }
-
-
-            return null;
-        }
-
-
-        public void Exit()
-        {
-            _started =
-                false;
-        }
-
-
-        // ============================================================
-        // Validation
-        // ============================================================
-
-        private bool IsTargetValid(
-            ICombatTarget target)
-        {
-            return target != null
-                && target.IsTargetable
-                && target.Transform != null;
-        }
+        public UnitAIActionType? Evaluate(UnitAssignment? assignment)
+            => !_started || !_core.IsCombatBusy ? UnitAIActionType.Idle : (UnitAIActionType?)null;
+        public void Exit() { _started = false; }
     }
 }
