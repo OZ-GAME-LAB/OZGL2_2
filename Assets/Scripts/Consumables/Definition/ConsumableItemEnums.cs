@@ -8,7 +8,6 @@ public enum ConsumableTargetTeam
 
 public enum ConsumableTargetMode
 {
-    Single = 0, // 선택한 유닛 한 명
     Area = 1,   // 선택한 위치의 반경 내 유닛
     All = 2     // 대상 팀에 해당하는 전체 유닛
 }
