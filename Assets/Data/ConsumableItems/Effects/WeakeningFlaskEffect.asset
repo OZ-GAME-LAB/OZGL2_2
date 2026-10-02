@@ -16,20 +16,20 @@ MonoBehaviour:
   _effectId: consumable_WeakeningFlaskEffect
   _alignment: 1
   _durationType: 0
-  _duration: 8
+  _duration: 6
   _stackType: 1
   _maxStack: 1
   _actions:
-  - rid: 1967714623333597264
+  - rid: 1967714645891350669
   _categories:
   - Alignment.Harmful
   - StatModifier
   references:
     version: 2
     RefIds:
-    - rid: 1967714623333597264
+    - rid: 1967714645891350669
       type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
         _statType: 100
         _modifierType: 1
-        _value: -0.25
+        _value: -0.2

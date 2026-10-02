@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c191f9509a824484ad0c8dd52897de14, type: 3}
+  m_Name: consumable_020
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemData
+  _id: consumable_020
+  _displayName: "\uB3C5\uC131 \uD50C\uB77C\uC2A4\uD06C"
+  _description: "6\uCD08 \uB3D9\uC548 \uBC94\uC704 \uB0B4 \uC801\uC5D0\uAC8C 1\uCD08\uB9C8\uB2E4
+    \uAE30\uBCF8 \uC9C0\uC18D \uD53C\uD574 15\uB97C \uC90D\uB2C8\uB2E4."
+  _icon: {fileID: 0}
+  _targetTeam: 1
+  _targetMode: 1
+  _radius: 3
+  _effects:
+  - rid: 1967714645891350709
+  references:
+    version: 2
+    RefIds:
+    - rid: 1967714645891350709
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 41b108526df812347a1b2af0fcf17e5a, type: 2}
