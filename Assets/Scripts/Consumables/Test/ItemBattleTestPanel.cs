@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Game.Core;
 using TMPro;
@@ -19,8 +19,7 @@ public class ItemBattleTestPanel : MonoBehaviour
     private Canvas _canvas;
     private RectTransform _panel, _popup, _slots, _choices;
     private TMP_Text _status, _detail, _message, _popupTitle, _toggleLabel;
-    private Button _use, _choose, _discard;
-    private Unit_Gateway _target;
+    private Button _use, _discard;
     private int _slot = -1;
     private bool _dirty = true;
     private readonly Color _surface = new Color(.07f, .10f, .15f, .97f);
@@ -72,15 +71,14 @@ public class ItemBattleTestPanel : MonoBehaviour
         MakeButton(_panel, "아이템 추가", 318, 244, 110, 30, ShowCatalog);
         _slots = Scroll(_panel, "Slots", 16, 130, 412, 102, true);
         _detail = Label(_panel, "아이템을 선택하세요.", 16, 65, 412, 60, 14);
-        _use = MakeButton(_panel, "사용", 16, 30, 160, 30, UseSelected);
+        _use = MakeButton(_panel, "사용", 16, 30, 200, 30, UseSelected);
         _use.GetComponent<Image>().color = _accent;
-        _choose = MakeButton(_panel, "대상 선택", 184, 30, 120, 30, ShowTargets);
-        _discard = MakeButton(_panel, "버리기", 312, 30, 116, 30, () =>
+        _discard = MakeButton(_panel, "버리기", 228, 30, 200, 30, () =>
         {
             if (_items != null) Report(_items.TryRemove(_slot) ? "아이템을 버렸습니다." : "버릴 수 없습니다.");
         });
         _message = Label(_panel, "초기화 중", 16, 3, 412, 24, 12);
-        _use.interactable = _choose.interactable = _discard.interactable = false;
+        _use.interactable = _discard.interactable = false;
         _popup = Box(root.transform, "Item Choices", 18, 362, 444, 270, _surface);
         _popupTitle = Label(_popup, "아이템 추가", 16, 230, 310, 28, 18);
         MakeButton(_popup, "닫기", 358, 230, 70, 28, () => _popup.gameObject.SetActive(false));
@@ -116,12 +114,10 @@ public class ItemBattleTestPanel : MonoBehaviour
         _status.text = $"소모성 아이템  {_items.ItemCount} / {_items.Capacity}";
         bool selected = _items.TryGetItem(_slot, out ConsumableItemData item);
         _use.interactable = selected && _flow.CanBattle() && !_items.IsUsing;
-        _choose.interactable = selected && item.TargetMode == ConsumableTargetMode.Single;
         _discard.interactable = selected && !_items.IsUsing;
         if (!selected) { _detail.text = "슬롯을 선택하세요. 아이템은 전투 중 사용할 수 있습니다."; return; }
         string target = item.TargetMode == ConsumableTargetMode.Area ? $"범위 · 반경 {item.Radius}" :
-            item.TargetMode == ConsumableTargetMode.All ? "전체 대상" :
-            _target != null ? $"{_target.name} · HP {_target.CurrentHp:0.#}" : "단일 대상 · 대상을 선택하세요";
+            "전체 대상";
         _detail.text = $"<b>{item.DisplayName}</b>  <color=#8ED6D0>{target}</color>\n{item.Description}";
         _use.GetComponentInChildren<TMP_Text>().text = item.TargetMode == ConsumableTargetMode.Area ? "범위 지정" : "사용";
     }
@@ -156,12 +152,10 @@ public class ItemBattleTestPanel : MonoBehaviour
     {
         _areaUse.Cancel();
         _slot = index;
-        _target = null;
         _dirty = true;
         _popup.gameObject.SetActive(false);
         if (!_items.TryGetItem(index, out ConsumableItemData item)) return;
         if (item.TargetMode == ConsumableTargetMode.Area) BeginAreaUse();
-        else if (item.TargetMode == ConsumableTargetMode.Single) ShowTargets();
     }
 
     private void ShowCatalog()
@@ -172,26 +166,6 @@ public class ItemBattleTestPanel : MonoBehaviour
             Choice(item.DisplayName, () => Report(_items.TryAdd(item) ? "아이템을 추가했습니다." : "빈 슬롯이 없거나 추가할 수 없습니다."));
     }
 
-    private void ShowTargets()
-    {
-        if (_items == null || !_items.TryGetItem(_slot, out ConsumableItemData item)) return;
-        OpenPopup("사용 대상 선택");
-        AddTargets(_units.AllyUnits, item);
-        AddTargets(_units.EnemyUnits, item);
-        if (_choices.childCount == 0) Choice("선택 가능한 유닛이 없습니다.", null).interactable = false;
-    }
-
-    private void AddTargets(IReadOnlyList<Unit_Gateway> units, ConsumableItemData item)
-    {
-        foreach (Unit_Gateway unit in units)
-        {
-            if (unit == null || !unit.IsAlive || !unit.IsTargetable) continue;
-            if (item.TargetTeam == ConsumableTargetTeam.Ally && unit.Team != UnitTeam.Ally) continue;
-            if (item.TargetTeam == ConsumableTargetTeam.Enemy && unit.Team != UnitTeam.Enemy) continue;
-            Choice($"{unit.name} · HP {unit.CurrentHp:0.#}", () => { _target = unit; _popup.gameObject.SetActive(false); });
-        }
-    }
-
     private void UseSelected()
     {
         if (_items == null || !_items.TryGetItem(_slot, out ConsumableItemData item)) return;
@@ -199,7 +173,7 @@ public class ItemBattleTestPanel : MonoBehaviour
         try
         {
             if (item.TargetMode == ConsumableTargetMode.Area) BeginAreaUse();
-            else Report(_items.TryUse(_slot, _target) ? "사용 완료 · 아이템 1개 소모" : "적용 가능한 대상과 효과 설정을 확인하세요.");
+            else Report(_items.TryUse(_slot) ? "사용 완료 · 아이템 1개 소모" : "적용 가능한 대상과 효과 설정을 확인하세요.");
         }
         catch (Exception exception) { Report("사용 오류 · Console을 확인하세요."); Debug.LogException(exception, this); }
     }

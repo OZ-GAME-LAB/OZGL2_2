@@ -34,13 +34,13 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
     private ConsumableItemEffectExecutor _effectExecutor;
     private bool _capacityRefreshPending;
 
-    public bool TryUse(int slotIndex, ICombatTarget selectedTarget = null, Vector2? selectedPosition = null)
+    public bool TryUse(int slotIndex, Vector2? selectedPosition = null)
     {
         if (IsUsing || !CanUseInBattle() || _targetSelector == null || _effectExecutor == null ||
             !TryGetItem(slotIndex, out ConsumableItemData item) || item.Effects == null || item.Effects.Count == 0)
             return false;
 
-        List<ICombatTarget> targets = _targetSelector.SelectTargets(item, selectedTarget, selectedPosition);
+        List<ICombatTarget> targets = _targetSelector.SelectTargets(item, selectedPosition);
         if (targets.Count == 0) return false;
 
         bool applied = false;

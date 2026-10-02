@@ -12,6 +12,8 @@ public class ConsumableItemData : ScriptableObject
     public Sprite Icon => _icon;
     public ConsumableTargetTeam TargetTeam => _targetTeam;
     public ConsumableTargetMode TargetMode => _targetMode;
+    // UI에서 사용 위치와 범위 표시가 필요한 아이템인지 확인합니다.
+    public bool IsAreaItem => _targetMode == ConsumableTargetMode.Area;
     public float Radius => _radius;
     public IReadOnlyList<SkillEffectData> Effects => _effects;
 
@@ -24,7 +26,7 @@ public class ConsumableItemData : ScriptableObject
     [Header("사용 대상")]
     [Tooltip("플레이어 기준 적용 대상 팀")]
     [SerializeField] private ConsumableTargetTeam _targetTeam = ConsumableTargetTeam.Ally;
-    [SerializeField] private ConsumableTargetMode _targetMode = ConsumableTargetMode.Single;
+    [SerializeField] private ConsumableTargetMode _targetMode = ConsumableTargetMode.Area;
     [Tooltip("Area 방식에서 선택한 위치를 중심으로 적용할 반경")]
     [SerializeField, Min(0f)] private float _radius = 1f;
 

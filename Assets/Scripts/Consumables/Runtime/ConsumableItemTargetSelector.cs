@@ -12,11 +12,10 @@ public class ConsumableItemTargetSelector
         _unitManager = unitManager;
     }
 
-    // Single은 selectedTarget, Area는 selectedPosition이 필요합니다.
+    // Area는 selectedPosition이 필요합니다.
     // All은 추가 입력 없이 조회합니다. 잘못된 입력이나 대상 없음은 빈 목록을 반환합니다.
     public List<ICombatTarget> SelectTargets(
         ConsumableItemData item,
-        ICombatTarget selectedTarget = null,
         Vector2? selectedPosition = null)
     {
         var results = new List<ICombatTarget>();
@@ -25,10 +24,6 @@ public class ConsumableItemTargetSelector
 
         switch (item.TargetMode)
         {
-            case ConsumableTargetMode.Single:
-                if (!CombatTargetUtility.IsValid(selectedTarget) || !selectedTarget.IsAlive)
-                    return results;
-                break;
             case ConsumableTargetMode.Area:
                 if (!selectedPosition.HasValue || !IsFinite(selectedPosition.Value.x) ||
                     !IsFinite(selectedPosition.Value.y) || !IsFinite(item.Radius) || item.Radius < 0f)
@@ -41,15 +36,14 @@ public class ConsumableItemTargetSelector
         }
 
         var seen = new HashSet<ICombatTarget>();
-        Collect(_unitManager.AllyUnits, item, selectedTarget, selectedPosition, seen, results);
-        Collect(_unitManager.EnemyUnits, item, selectedTarget, selectedPosition, seen, results);
+        Collect(_unitManager.AllyUnits, item, selectedPosition, seen, results);
+        Collect(_unitManager.EnemyUnits, item, selectedPosition, seen, results);
         return results;
     }
 
     private static void Collect(
         IReadOnlyList<Unit_Gateway> units,
         ConsumableItemData item,
-        ICombatTarget selectedTarget,
         Vector2? selectedPosition,
         HashSet<ICombatTarget> seen,
         List<ICombatTarget> results)
@@ -58,9 +52,6 @@ public class ConsumableItemTargetSelector
         {
             ICombatTarget target = units[i];
             if (!CombatTargetUtility.IsValid(target) || !target.IsAlive || !MatchesTeam(item.TargetTeam, target.Team))
-                continue;
-
-            if (item.TargetMode == ConsumableTargetMode.Single && !ReferenceEquals(target, selectedTarget))
                 continue;
 
             if (item.TargetMode == ConsumableTargetMode.Area)
