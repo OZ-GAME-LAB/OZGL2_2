@@ -931,6 +931,9 @@ namespace Units
 
         public void ClearRuntime()
         {
+            // 투사체 종료 통지가 끝난 뒤 독립 연출까지 정리한다.
+            ProjectileManager.Instance?.Clear();
+
             ClearGroups(
                 _allyGroups
             );
@@ -948,6 +951,12 @@ namespace Units
                 _enemyUnits
             );
 
+
+            // 사망 통지 후 Runtime 목록에서 빠진 연출 중 유닛도 회수한다.
+            foreach (var member in FindObjectsByType<UnitPoolMember>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (member.IsLeased && member.RuntimeManager == this)
+                    member.GetComponent<Unit_Core>()?.ReturnToPool();
 
             _engagements.Clear();
 
@@ -972,6 +981,8 @@ namespace Units
 
 
             ResetGroupIds();
+            Units.FX.VFXManager.Instance?.Clear();
+            Units.FX.SFXManager.Instance?.Clear();
         }
 
 
@@ -1030,9 +1041,7 @@ namespace Units
                     continue;
 
 
-                group.RemoveMember(
-                    unit
-                );
+                unit.Core.ReturnToPool();
             }
         }
 
@@ -1064,9 +1073,7 @@ namespace Units
                 );
 
 
-                Destroy(
-                    unit.gameObject
-                );
+                unit.Core.ReturnToPool();
             }
         }
     }

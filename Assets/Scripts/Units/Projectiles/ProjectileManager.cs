@@ -115,6 +115,17 @@ namespace Units
         // Projectile Return
         // ============================================================
 
+        // 전투 초기화에서는 먼저 비행을 종료하여 지연 명중과 부착 FX가 남지 않게 한다.
+        public void Clear()
+        {
+            foreach (var projectile in GetComponentsInChildren<Projectile_Controller>(true))
+            {
+                if (projectile == _fallbackPrefab) continue;
+                projectile.gameObject.SetActive(false);
+                Destroy(projectile.gameObject);
+            }
+        }
+
         public void Release(Projectile_Controller projectile)
         {
             // 추후 Pooling을 적용할 때는 이 반환 경로에서 처리한다.

@@ -1,0 +1,131 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
+  m_Name: "E_CR_TK_\uC131\uAE30\uC0AC_ActiveSkill"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _skillRange: 7
+  _skillCooldown: 7
+  _targetSide: 0
+  _targetPolicy: 3
+  _actionType: 0
+  _castTime: 0
+  _deliveryType: 0
+  _maxTargetCount: 1
+  _maxEffectTargetCount: 1
+  _areaType: 0
+  _areaRadius: 1
+  _areaAngle: 90
+  _effects: []
+  _projectileSpeed: 10
+  _dashDistance: 3
+  _dashSpeed: 10
+  _skillFXType: 0
+  _hitFXType: 0
+  _actions:
+  - rid: 4844432386322333700
+  - rid: 4844432386322333701
+  _skillSchemaVersion: 1
+  _usesLegacyTargetSelection: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381582868316248
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: d9e63980ae1556542b7f4082d28ffb8e, type: 2}
+    - rid: 4617381582868316267
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 0e390158ca352804f89447fdd655d017, type: 2}
+    - rid: 4844432386322333700
+      type: {class: SkillDashActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _target:
+          _source: 2
+          _relation: 0
+          _includeSelf: 0
+          _range: 3
+          _maxTargetCount: 1
+          _clusterRadius: 1
+          _filters: []
+          _priorities: []
+        _targetLostPolicy: 0
+        _failurePolicy: 0
+        _origin: 0
+        _conditions: []
+        _baseEffects: []
+        _conditionalEffects: []
+        _fxEntries: []
+        _distance: 7
+        _speed: 14
+    - rid: 4844432386322333701
+      type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _target:
+          _source: 2
+          _relation: 0
+          _includeSelf: 0
+          _range: 3
+          _maxTargetCount: 1
+          _clusterRadius: 1
+          _filters: []
+          _priorities: []
+        _targetLostPolicy: 0
+        _failurePolicy: 0
+        _origin: 0
+        _conditions: []
+        _baseEffects:
+        - _entryId: 1
+          _timing: 1
+          _subject: 0
+          _frequency: 0
+          _snapshotAreaTarget:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 1
+            _maxTargetCount: 10
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _effects:
+          - rid: 4844432386322333702
+          - rid: 4617381582868316267
+        - _entryId: 2
+          _timing: 1
+          _subject: 1
+          _frequency: 1
+          _snapshotAreaTarget:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 1
+            _maxTargetCount: 10
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _effects:
+          - rid: 4617381582868316248
+        _conditionalEffects: []
+        _fxEntries: []
+        _delivery: 0
+        _area: 2
+        _radius: 3
+        _angle: 90
+        _maxEffectTargets: 10
+        _projectileSpeed: 10
+        _isLegacy: 0
+    - rid: 4844432386322333702
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _damageType: 0
+        _damageMultiplier: 2

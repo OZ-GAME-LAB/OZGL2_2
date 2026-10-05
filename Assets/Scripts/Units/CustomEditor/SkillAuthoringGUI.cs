@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using Units.Skills;
@@ -88,6 +88,19 @@ namespace Units.Editor
                     EditorGUILayout.PropertyField(property.FindPropertyRelative("_statusType"), new GUIContent("상태이상"));
                 else
                     EditorGUILayout.PropertyField(property.FindPropertyRelative("_key"), new GUIContent("효과 ID"));
+            }
+            else if (property.FindPropertyRelative("_hook") != null && property.FindPropertyRelative("_endPolicy") != null)
+            {
+                Field(property, "_kind");
+                Field(property, "_key");
+                Field(property, "_hook");
+                Field(property, "_endPolicy");
+                Field(property, "_attachment");
+                if (property.FindPropertyRelative("_kind").intValue == (int)Units.FX.FXKind.VFX
+                    && property.FindPropertyRelative("_attachment").intValue != (int)Units.FX.FXAttachment.World)
+                    Field(property, "_followDirection");
+                if (string.IsNullOrWhiteSpace(property.FindPropertyRelative("_key").stringValue))
+                    EditorGUILayout.HelpBox("재생할 카탈로그 Key를 입력하세요.", MessageType.Info);
             }
             else if (property.FindPropertyRelative("_baseEffects") != null)
                 DrawAction(property);

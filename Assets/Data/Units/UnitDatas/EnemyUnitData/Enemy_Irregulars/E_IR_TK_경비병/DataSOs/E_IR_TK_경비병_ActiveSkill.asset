@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: "E_IR_TK_\uACBD\uBE44\uBCD1_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
   _skillRange: 7
-  _skillCooldown: 5.5
+  _skillCooldown: 7
   _targetSide: 0
-  _targetPolicy: 2
+  _targetPolicy: 3
   _actionType: 0
   _castTime: 0
   _deliveryType: 0
@@ -38,6 +38,10 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 4617381582868316248
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 952f64a31e7c2cb42a38ecb2eca1ec40, type: 2}
     - rid: 4844432386322333700
       type: {class: SkillDashActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -91,6 +95,21 @@ MonoBehaviour:
             _priorities: []
           _effects:
           - rid: 4844432386322333702
+        - _entryId: 2
+          _timing: 1
+          _subject: 1
+          _frequency: 1
+          _snapshotAreaTarget:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 1
+            _maxTargetCount: 10
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _effects:
+          - rid: 4617381582868316248
         _conditionalEffects: []
         _fxEntries: []
         _delivery: 0
