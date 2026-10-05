@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Units.Effects;
+using Units.FX;
 
 // 효과의 시점·대상·빈도와 조건부 소비 설정, FX 요청 계약을 정의한다.
 namespace Units.Skills
@@ -242,6 +243,32 @@ namespace Units.Skills
         // Properties
         // ============================================================
 
+        [SerializeField, Tooltip("VFX 또는 SFX 카탈로그를 선택합니다.")]
+        private FXKind _kind;
+
+        [SerializeField, Tooltip("월드 고정 또는 추적할 대상을 선택합니다.")]
+        private FXAttachment _attachment;
+
+        [SerializeField, Tooltip("위치 추적과 별도로 대상의 방향 변화를 반영합니다.")]
+        private bool _followDirection;
+
+        public FXKind Kind => _kind;
+        public FXAttachment Attachment => _attachment;
+        public bool FollowDirection => _followDirection;
+
+        public SkillFXEntry() { }
+
+        public SkillFXEntry(string key, SkillFXHook hook, SkillFXEndPolicy endPolicy = SkillFXEndPolicy.Independent,
+            FXKind kind = FXKind.VFX, FXAttachment attachment = FXAttachment.World, bool followDirection = false)
+        {
+            _key = key;
+            _hook = hook;
+            _endPolicy = endPolicy;
+            _kind = kind;
+            _attachment = attachment;
+            _followDirection = followDirection;
+        }
+
         public string Key => _key;
 
         public SkillFXHook Hook => _hook;
@@ -262,6 +289,15 @@ namespace Units.Skills
         public Vector2 Position { get; }
 
         public bool IsCleanup { get; }
+        public FXScope Scope { get; }
+        public Vector2 Direction { get; }
+        public Vector2 FacingDirection { get; }
+        public CombatTargetSnapshot Target { get; }
+        public Transform FollowTarget { get; }
+        public FXCleanupReason CleanupReason { get; }
+
+        public SkillFXRequest AsCleanup(FXCleanupReason reason = FXCleanupReason.ActionEnded)
+            => new SkillFXRequest(Entry, Metadata, Position, true, Direction, Target, FollowTarget, Scope, reason, FacingDirection);
 
         // ============================================================
         // Constructor
@@ -271,7 +307,13 @@ namespace Units.Skills
             SkillFXEntry entry,
             CombatEventMetadata metadata,
             Vector2 position,
-            bool cleanup = false)
+            bool cleanup = false,
+            Vector2 direction = default,
+            CombatTargetSnapshot target = default,
+            Transform followTarget = null,
+            FXScope? scope = null,
+            FXCleanupReason cleanupReason = FXCleanupReason.ActionEnded,
+            Vector2 facingDirection = default)
         {
             Entry = entry;
 
@@ -280,6 +322,14 @@ namespace Units.Skills
             Position = position;
 
             IsCleanup = cleanup;
+            Scope = scope ?? new FXScope(metadata);
+            Target = target;
+            FollowTarget = followTarget;
+            CleanupReason = cleanupReason;
+            var facing = facingDirection.sqrMagnitude > 0.0001f ? facingDirection
+                : metadata.Owner.MatchesLifetime ? metadata.Owner.Target.FacingDirection : Vector2.left;
+            FacingDirection = facing.x < 0f ? Vector2.left : Vector2.right;
+            Direction = direction.sqrMagnitude > 0.0001f ? direction.normalized : FacingDirection;
         }
     }
 }

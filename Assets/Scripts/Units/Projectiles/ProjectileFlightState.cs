@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
@@ -25,6 +25,28 @@ namespace Units
         private CombatEventMetadata _metadata;
 
         private Vector2 _position;
+        private Vector2 _direction;
+        private Transform _followTarget;
+        private Units.FX.FXScope _fxScope;
+        private IReadOnlyList<SkillFXEntry> _fxEntries;
+
+        public void ConfigureFX(IReadOnlyList<SkillFXEntry> entries, CombatEventMetadata metadata)
+        {
+            _fxEntries = entries;
+            _metadata = metadata;
+            _fxScope = Units.FX.FXScope.Projectile(metadata);
+        }
+
+        public void BindFX(Transform followTarget, Vector2 direction)
+        {
+            _followTarget = followTarget;
+            _direction = direction;
+            if (_batch != null)
+            {
+                _batch.FXFollowTarget = followTarget;
+                _batch.FXDirection = direction;
+            }
+        }
 
         // ============================================================
         // Execution
@@ -37,6 +59,8 @@ namespace Units
             _batch = batch;
 
             _metadata = metadata;
+            ConfigureFX(batch?.FXEntries, metadata);
+            if (batch != null) batch.FXScope = _fxScope;
         }
 
         // ============================================================
@@ -45,7 +69,8 @@ namespace Units
 
         public void NotifyFX(
             SkillFXHook hook,
-            Vector2 position)
+            Vector2 position,
+            CombatTargetSnapshot target = default)
         {
             if (Ended)
                 return;
@@ -54,16 +79,17 @@ namespace Units
 
             var batch = _batch;
 
-            if (batch == null)
+            if (_fxEntries == null)
                 return;
 
-            foreach (var fx in batch.FXEntries)
+            foreach (var fx in _fxEntries)
             {
                 if (Ended)
                     break;
 
                 if (fx != null && fx.Hook == hook)
-                    batch.FXRequested?.Invoke(new SkillFXRequest(fx, _metadata, position));
+                    Units.FX.UnitFXBridge.Dispatch(new SkillFXRequest(fx, _metadata, position,
+                        direction: _direction, target: target, followTarget: _followTarget, scope: _fxScope));
             }
         }
 
@@ -137,10 +163,14 @@ namespace Units
             {
                 batch?.CleanupConditionalFX();
 
-                if (batch != null)
-                    foreach (var fx in batch.FXEntries)
-                        if (fx != null && (fx.Hook == SkillFXHook.Flight || fx.EndPolicy == SkillFXEndPolicy.Independent))
-                            batch.FXRequested?.Invoke(new SkillFXRequest(fx, _metadata, _position, true));
+                if (_fxEntries != null)
+                    foreach (var fx in _fxEntries)
+                        if (fx != null)
+                            Units.FX.UnitFXBridge.Dispatch(new SkillFXRequest(fx, _metadata, _position, true,
+                                direction: _direction, followTarget: _followTarget, scope: _fxScope,
+                                cleanupReason: Units.FX.FXCleanupReason.ScopeEnded));
+                _fxEntries = null;
+                _followTarget = null;
             }
             finally
             {

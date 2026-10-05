@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "E_CR_BR_\uC774\uB2E8\uC2EC\uD310\uAD00_PassiveSkill_BuffByHpRatio"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 4
+  _tickInterval: 0.25
+  _conditions:
+  - rid: 4617381582868316268
+  _effectMode: 2
+  _actions:
+  - rid: 4844432381217865731
+  - rid: 4617381582868316269
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381582868316268
+      type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _subjectType: 0
+        _comparisonType: 1
+        _healthRatio: 0.4
+    - rid: 4617381582868316269
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 2
+        _targetRelation: 0
+        _maxEffectTargetCount: 10
+        _areaType: 1
+        _areaRadius: 5
+        _areaAngle: 90
+        _effects:
+        - rid: 4617381582868316270
+    - rid: 4617381582868316270
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 87113da00fba179438f1b4acd82e9a1a, type: 2}
+    - rid: 4844432381217865731
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 0
+        _targetRelation: 2
+        _maxEffectTargetCount: 1
+        _areaType: 0
+        _areaRadius: 4
+        _areaAngle: 360
+        _effects:
+        - rid: 4844432381217865732
+    - rid: 4844432381217865732
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _effectData: {fileID: 11400000, guid: 2aa365ed4bef99f4ebc3fc02e4464953, type: 2}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Units.Effects;
 using Units.Skills;
@@ -208,6 +208,7 @@ namespace Units
             FinalStatModifier spawnModifier,
             IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
         {
+            GetComponent<Units.FX.UnitFXBridge>()?.Release();
             _facingDirection = Vector2.left;
 
             InitComponents();
@@ -257,6 +258,9 @@ namespace Units
             {
                 _ai.Initialize(this);
             }
+
+            var fxBridge = GetComponent<Units.FX.UnitFXBridge>() ?? gameObject.AddComponent<Units.FX.UnitFXBridge>();
+            fxBridge.Initialize(this, _combat, _passive);
 
             if (_passive != null)
             {
@@ -588,6 +592,55 @@ namespace Units
             DeathConfirmed?.Invoke(result);
 
             _gateway?.NotifyDeathConfirmed(result);
+        }
+
+        // ============================================================
+        // Pool Return
+        // ============================================================
+
+        private bool _returningToPool;
+
+        public void ReturnToPool()
+        {
+            var member = GetComponent<UnitPoolMember>();
+            if (_returningToPool || (member != null && !member.IsLeased))
+                return;
+
+            _returningToPool = true;
+            long leaseVersion = member != null ? member.LeaseVersion : 0;
+            try
+            {
+                // 전투 정리와 비활성화는 유닛이 담당하고 Manager에는 보관만 요청한다.
+                if (_gateway != null)
+                {
+                    member?.RuntimeManager?.UnregisterUnit(_gateway);
+                    var group = _gateway.GroupAI;
+                    if (group != null)
+                    {
+                        // 마지막 멤버 제거는 그룹 파괴를 시작하므로 먼저 자식에서 분리한다.
+                        // 파괴 중인 부모에서 뒤늦게 꺼내면 비활성화된 컴포넌트가 풀에 남는다.
+                        if (transform.IsChildOf(group.transform))
+                            transform.SetParent(group.transform.parent, true);
+
+                        group.RemoveMember(_gateway);
+                    }
+                }
+                _heroPhase?.Stop();
+                _ai?.Stop();
+                _movement?.Stop();
+                _combat?.Stop();
+                _passive?.Stop();
+                GetComponent<Units.FX.UnitFXBridge>()?.Release();
+                gameObject.SetActive(false);
+
+                if (member == null || member.Owner == null
+                    || !member.Owner.Return(member, leaseVersion))
+                    Destroy(gameObject);
+            }
+            finally
+            {
+                _returningToPool = false;
+            }
         }
 
         public void NotifyDeath()

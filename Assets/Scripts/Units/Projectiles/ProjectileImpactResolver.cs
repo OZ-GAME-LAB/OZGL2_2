@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -109,7 +109,11 @@ namespace Units
                 return;
 
             foreach (var result in DamageResolver.Instance.ResolveWithResults(new DamageRequest(pendingRequest.Attacker, unique, pendingRequest.SourceType, pendingRequest.DamageType, pendingRequest.DamageMultiplier, pendingRequest.Metadata, pendingRequest.SourceSnapshot)))
+            {
                 flight.Record(result);
+                if (result.Status != CombatApplicationStatus.Invalid)
+                    flight.NotifyFX(SkillFXHook.OnHit, result.Target.Position, result.Target);
+            }
         }
 
 
@@ -167,7 +171,7 @@ namespace Units
                         context.Position
                     );
 
-                    flight.NotifyFX(SkillFXHook.OnHit, context.Position);
+                    flight.NotifyFX(SkillFXHook.OnHit, context.Position, snapshots[i]);
 
                     continue;
                 }

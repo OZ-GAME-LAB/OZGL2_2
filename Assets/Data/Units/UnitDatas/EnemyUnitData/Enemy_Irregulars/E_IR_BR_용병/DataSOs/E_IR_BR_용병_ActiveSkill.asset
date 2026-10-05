@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "E_IR_BR_\uC6A9\uBCD1_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
-  _skillRange: 10
-  _skillCooldown: 7
+  _skillRange: 6
+  _skillCooldown: 6
   _targetSide: 0
   _targetPolicy: 2
   _actionType: 0
@@ -57,8 +57,8 @@ MonoBehaviour:
         _baseEffects: []
         _conditionalEffects: []
         _fxEntries: []
-        _distance: 10
-        _speed: 12
+        _distance: 6
+        _speed: 8
     - rid: 4844432386322333698
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -94,9 +94,9 @@ MonoBehaviour:
         _conditionalEffects: []
         _fxEntries: []
         _delivery: 0
-        _area: 2
-        _radius: 3
-        _angle: 90
+        _area: 3
+        _radius: 5
+        _angle: 120
         _maxEffectTargets: 5
         _projectileSpeed: 10
         _isLegacy: 0
