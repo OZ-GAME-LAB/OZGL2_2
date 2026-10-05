@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
@@ -44,6 +44,18 @@ namespace Units
         // ============================================================
         // Executor
         // ============================================================
+
+        public event Action<SkillFXRequest> FXRequested;
+
+        private void DispatchFX(SkillFXRequest request)
+        {
+            if (FXRequested == null) return;
+            foreach (Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
+            {
+                try { listener(request); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
+        }
 
         private BasicAttackExecutor _basicAttackExecutor;
 
@@ -268,6 +280,8 @@ namespace Units
         private void InitializeCombatModules()
         {
             _targetResolver = new TargetResolver();
+            if (_basicAttackExecutor != null) _basicAttackExecutor.FXRequested -= DispatchFX;
+            foreach (var skill in _skills) skill.Executor.FXRequested -= DispatchFX;
             _skills.Clear();
             _selectedSkill = null;
             var ids = new HashSet<string>();
@@ -276,7 +290,9 @@ namespace Units
                 if (entry == null || entry.Skill == null) continue;
                 if (string.IsNullOrWhiteSpace(entry.Id) || !ids.Add(entry.Id))
                 { Debug.LogError("[Unit_Combat] 스킬 ID가 없거나 중복되었습니다.", this); continue; }
-                _skills.Add(new RuntimeActiveSkill(_core, entry, _targetResolver));
+                var runtime = new RuntimeActiveSkill(_core, entry, _targetResolver);
+                runtime.Executor.FXRequested += DispatchFX;
+                _skills.Add(runtime);
             }
             _activeSelector = new ActiveSkillSelector(_core, _targetResolver);
 
@@ -287,6 +303,7 @@ namespace Units
                 _basicAttackData,
                 _targetResolver
             ) : null;
+            if (_basicAttackExecutor != null) _basicAttackExecutor.FXRequested += DispatchFX;
 
             _activeSkillExecutor = null;
         }

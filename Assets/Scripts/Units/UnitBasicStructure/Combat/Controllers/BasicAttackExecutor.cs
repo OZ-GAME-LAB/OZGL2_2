@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 using System;
@@ -29,6 +29,26 @@ namespace Units
         // ============================================================
 
         private int _executionId;
+        private CombatEventMetadata _fxMetadata;
+        private SkillFXEntry[] _fxEntries = Array.Empty<SkillFXEntry>();
+        private Vector2 _fxDirection;
+        public event Action<SkillFXRequest> FXRequested;
+
+        private void EmitFX(SkillFXHook hook, Vector2 position, CombatTargetSnapshot target = default, bool cleanup = false)
+        {
+            foreach (var entry in _fxEntries)
+                if (entry != null && (cleanup || entry.Hook == hook))
+                {
+                    var request = new SkillFXRequest(entry, _fxMetadata, position, cleanup, _fxDirection, target);
+                    if (FXRequested == null) continue;
+                    foreach (Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
+                    {
+                        // 연출 수신자의 오류가 실제 공격 판정을 중단하지 않게 한다.
+                        try { listener(request); }
+                        catch (Exception exception) { Debug.LogException(exception); }
+                    }
+                }
+        }
 
 
         // ============================================================
@@ -79,6 +99,7 @@ namespace Units
             Action onCompleted)
         {
             int executionId = ++_executionId;
+            bool fxStarted = false;
 
             try
             {
@@ -93,6 +114,17 @@ namespace Units
                 _core.SetFacingDirection((Vector2)target.Transform.position - (Vector2)_core.transform.position);
 
                 _core.PlayAnimation_Attack();
+
+                var root = CombatEventMetadata.Create(_core.CombatTarget);
+                _fxMetadata = CombatEventMetadata.Create(_core.CombatTarget, root, executionId: root.EventId, actionIndex: 0);
+                _fxDirection = (Vector2)target.Transform.position - (Vector2)_core.transform.position;
+                var mapping = _core.GetComponent<Units.FX.UnitFXBridge>()?.BasicAttackMapping
+                    ?? Units.FX.VFXManager.Instance?.BasicAttackMapping;
+                _fxEntries = mapping != null ? mapping.Capture(_data.AttackFXType, _data.HitFXType) : Array.Empty<SkillFXEntry>();
+                fxStarted = true;
+                EmitFX(SkillFXHook.OnStart, _core.transform.position, new CombatTargetSnapshot(target));
+                if (_data.ExecutionType == BasicAttackExecutionType.Direct)
+                    EmitFX(SkillFXHook.Fire, _core.transform.position, new CombatTargetSnapshot(target));
 
                 switch (_data.ExecutionType)
                 {
@@ -116,6 +148,11 @@ namespace Units
             }
             finally
             {
+                if (fxStarted && executionId == _executionId && _core != null)
+                {
+                    EmitFX(SkillFXHook.OnComplete, _core.transform.position);
+                    EmitFX(SkillFXHook.OnComplete, _core.transform.position, cleanup: true);
+                }
                 // 공격 행동은 투사체 명중을 기다리지 않고 발사 직후 완료한다.
                 if (executionId == _executionId)
                 {
@@ -198,9 +235,11 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
+            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
+            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -244,9 +283,11 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
+            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
+            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -289,9 +330,11 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
+            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
+            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -342,9 +385,11 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
+            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
+            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -423,7 +468,8 @@ namespace Units
                     null,
                     DamageSourceType.BasicAttack,
                     _data.DamageType,
-                    1f
+                    1f,
+                    _fxMetadata
                 );
 
 
@@ -444,13 +490,16 @@ namespace Units
                         impactType == ProjectileImpactType.Single
                             ? 1
                             : _data.MaxDamageableCount,
-                        damageRequest
+                        damageRequest,
+                        flight: CreateFlight()
                     );
 
 
-                ProjectileManager.GetOrCreate().Fire(
-                    request
-                );
+                if (ProjectileManager.GetOrCreate().Fire(request))
+                {
+                    _fxDirection = (Vector2)_projectileTargetBuffer[i].Transform.position - origin;
+                    EmitFX(SkillFXHook.Fire, origin, new CombatTargetSnapshot(_projectileTargetBuffer[i]));
+                }
             }
 
 
@@ -467,12 +516,20 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
+            // 공통 EmitFX 경로에서 처리한다.
         }
 
 
         // ============================================================
         // Target Team
         // ============================================================
+
+        private ProjectileFlightState CreateFlight()
+        {
+            var flight = new ProjectileFlightState();
+            flight.ConfigureFX(_fxEntries, _fxMetadata);
+            return flight;
+        }
 
         private UnitTeam GetEnemyTeam()
         {
@@ -511,13 +568,14 @@ namespace Units
                     targets,
                     DamageSourceType.BasicAttack,
                     _data.DamageType,
-                    1f
+                    1f,
+                    _fxMetadata
                 );
 
 
-            DamageResolver.Instance.Resolve(
-                request
-            );
+            foreach (var result in DamageResolver.Instance.ResolveWithResults(request))
+                if (result.Status != CombatApplicationStatus.Invalid)
+                    EmitFX(SkillFXHook.OnHit, result.Target.Position, result.Target);
         }
     }
 }

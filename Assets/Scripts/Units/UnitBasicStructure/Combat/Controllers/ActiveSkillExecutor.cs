@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Units.Skills;
 using Units.Effects;
@@ -967,7 +967,7 @@ namespace Units
                     run.Position
                 );
 
-                EmitFX(run, SkillFXHook.OnHit);
+                EmitFX(run, SkillFXHook.OnHit, target, target.Position, direction);
             }
 
             // TODO: Skill FX / Hit FX 실제 재생은 수신 측에서 구현한다.
@@ -1048,7 +1048,7 @@ namespace Units
                 {
                     fired++;
 
-                    EmitFX(run, SkillFXHook.Fire);
+                    EmitFX(run, SkillFXHook.Fire, target, origin, target.Position - origin);
                 }
             }
 
@@ -1109,14 +1109,21 @@ namespace Units
 
         private void EmitFX(
             Execution run,
-            SkillFXHook hook)
+            SkillFXHook hook,
+            CombatTargetSnapshot target = default,
+            Vector2? position = null,
+            Vector2? direction = null)
         {
             if (run.Index >= run.Actions.Count || run.Actions[run.Index] == null)
                 return;
 
+            if (target.ObjectId == 0 && run.Targets != null) target = run.Targets.PrimaryTarget;
+            var origin = Origin(run, run.Actions[run.Index]);
+            var aim = direction ?? (target.MatchesLifetime ? (Vector2)target.Target.Transform.position - origin : _core.FacingDirection);
             foreach (var entry in run.Actions[run.Index].FXEntries)
                 if (entry != null && entry.Hook == hook)
-                    DispatchFX(new SkillFXRequest(entry, run.Metadata, run.Position));
+                    DispatchFX(new SkillFXRequest(entry, run.Metadata, position ?? origin,
+                        direction: aim, target: target, facingDirection: _core.FacingDirection));
         }
 
         private void DispatchFX(SkillFXRequest request)

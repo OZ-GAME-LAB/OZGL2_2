@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace Units
@@ -32,6 +32,8 @@ namespace Units
 
         public bool IsFlying => _isFlying;
 
+        public Vector2 FlightDirection => _direction;
+
 
         // ============================================================
         // Initialize
@@ -61,6 +63,7 @@ namespace Units
 
             _isFlying = true;
 
+            _request.Flight?.BindFX(transform, _direction);
             _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Flight, transform.position);
         }
 
@@ -174,7 +177,7 @@ namespace Units
 
             try
             {
-                _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Collision, position);
+                _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Collision, position, new CombatTargetSnapshot(target));
 
                 if (_request.Flight == null || _request.Flight.Ended)
                     return;

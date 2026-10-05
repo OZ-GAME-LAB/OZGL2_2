@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "E_IR_RP_\uC0AC\uB0E5\uAFBC_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
-  _skillRange: 10
-  _skillCooldown: 5
+  _skillRange: 9
+  _skillCooldown: 6
   _targetSide: 0
   _targetPolicy: 2
   _actionType: 0
@@ -44,7 +44,7 @@ MonoBehaviour:
           _source: 6
           _relation: 0
           _includeSelf: 0
-          _range: 10
+          _range: 9
           _maxTargetCount: 1
           _clusterRadius: 2
           _filters: []
@@ -83,4 +83,4 @@ MonoBehaviour:
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _damageType: 0
-        _damageMultiplier: 2
+        _damageMultiplier: 2.5
