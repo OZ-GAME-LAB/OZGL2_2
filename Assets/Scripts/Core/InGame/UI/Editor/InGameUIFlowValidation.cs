@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Game.Cameras;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -320,7 +321,7 @@ namespace Game.UI.InGame.Editor
 
         private static void ValidateHud(GameHudView hud, List<string> checks)
         {
-            hud.Initialize();
+            //hud.Initialize();
             var button = Field<UnityEngine.UI.Button>(hud, "_waveStartButton");
             int starts = 0;
             Action onStart = () => starts++;

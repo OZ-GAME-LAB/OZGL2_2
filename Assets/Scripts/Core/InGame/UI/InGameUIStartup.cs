@@ -1,3 +1,4 @@
+using Game.Cameras;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
@@ -18,7 +19,6 @@ namespace Game.UI.InGame
         [SerializeField] private ShopView _shopView;
         [SerializeField] private BuildingUIPresenter _buildingUI;
         [SerializeField] private BuildingUIConnection _buildingUIConnection;
-        [SerializeField] private BuildingShortcut[] _buildingShortcuts;
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
@@ -30,7 +30,7 @@ namespace Game.UI.InGame
 
         // 비활성 UI 루트도 연결한다. 게임 시작과 루트 활성화는 Bootstrap이 담당한다.
         public bool Initialize(RunCurrencyManager wallet, GameFlowController flow, WaveController waves,
-            BuildingBuildController controller, BuildingCoreProgress core, BuildingSlot[] slots)
+            BuildingBuildController controller, BuildingCoreProgress core, BuildingSlot[] slots, InGameCameraController cameraController)
         {
             IsReady = false;
             if (_uiManager == null || _hudView == null || _hudPresenter == null ||
@@ -42,10 +42,10 @@ namespace Game.UI.InGame
             }
             if (!_uiManager.InitializeScreens()) return false;
             _shopView.Initialize(wallet);
-            _hudView.Initialize();
+            _hudView.Initialize(cameraController);
             _hudPresenter.Initialize(_hudView, wallet, flow, waves);
             flow.InitializeUI(_continueUI, _runDecisionUI);
-            _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI, _buildingShortcuts);
+            _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI);
             if (!_buildingUIConnection.IsReady) return false;
             IsReady = true;
             _uiManager.ShowHud();

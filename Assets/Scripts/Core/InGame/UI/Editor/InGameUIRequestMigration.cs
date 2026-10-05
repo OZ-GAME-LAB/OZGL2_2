@@ -197,12 +197,6 @@ namespace Game.UI.InGame.Editor
             Set(startup, "_buildingUI", root.GetComponent<BuildingUIPresenter>());
             Set(startup, "_buildingUIConnection", GetOrAdd<BuildingUIConnection>(bootstrap.gameObject));
             Set(bootstrap, "_uiStartup", startup);
-            var data = new SerializedObject(startup);
-            var field = data.FindProperty("_buildingShortcuts");
-            BuildingShortcut[] shortcuts = root.GetComponentsInChildren<BuildingShortcut>(true);
-            field.arraySize = shortcuts.Length;
-            for (int i = 0; i < shortcuts.Length; i++) field.GetArrayElementAtIndex(i).objectReferenceValue = shortcuts[i];
-            data.ApplyModifiedPropertiesWithoutUndo();
             RecordOverride(startup);
         }
 
