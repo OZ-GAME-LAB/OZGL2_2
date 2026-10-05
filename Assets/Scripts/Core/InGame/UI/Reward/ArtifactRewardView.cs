@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
@@ -29,11 +30,11 @@ namespace Game.UI.InGame
         private sealed class Card
         {
             public UIItemSlot Slot;
-            public UnityEngine.UI.Button Button;
+            public Button Button;
             public TMP_Text Name;
             public TMP_Text Rarity;
             public TMP_Text Effect;
-            public UnityEngine.UI.Image Icon;
+            public Image Icon;
             public GameObject MissingIcon;
             public GameObject Selection;
         }
@@ -46,13 +47,13 @@ namespace Game.UI.InGame
         [SerializeField] private TMP_Text _statusText;
         [SerializeField] private Sprite _fallbackIcon;
         [SerializeField] private Card[] _cards;
-        [SerializeField] private UnityEngine.UI.Button _confirmButton;
+        [SerializeField] private Button _confirmButton;
         [SerializeField] private TMP_Text _confirmText;
-        [SerializeField] private UnityEngine.UI.Button _clearButton;
+        [SerializeField] private Button _clearButton;
         [SerializeField] private TMP_Text _instructionText;
         [SerializeField] private TMP_Text _pageText;
-        [SerializeField] private UnityEngine.UI.Button _previousPageButton;
-        [SerializeField] private UnityEngine.UI.Button _nextPageButton;
+        [SerializeField] private Button _previousPageButton;
+        [SerializeField] private Button _nextPageButton;
 
         [SerializeField] private bool _compactPresentation;
         [SerializeField] private bool _showCardEffects;
@@ -400,7 +401,7 @@ namespace Game.UI.InGame
             var rect = (RectTransform)_confirmButton.transform;
             Vector2 size = _defaultConfirmSize;
             Vector2 position = _defaultConfirmPosition;
-            UnityEngine.UI.ColorBlock colors = _defaultConfirmColors;
+            ColorBlock colors = _defaultConfirmColors;
             if (!hasSelection)
             {
                 size.x = Mathf.Min(240, _defaultConfirmSize.x);
@@ -433,9 +434,9 @@ namespace Game.UI.InGame
             var last = _cards[visibleCount - 1].Button;
             for (int i = 0; i < visibleCount; i++)
             {
-                _cards[i].Button.navigation = new UnityEngine.UI.Navigation
+                _cards[i].Button.navigation = new Navigation
                 {
-                    mode = UnityEngine.UI.Navigation.Mode.Explicit,
+                    mode = Navigation.Mode.Explicit,
                     selectOnLeft = i > 0 ? _cards[i - 1].Button : _previousPageButton.interactable ? _previousPageButton : null,
                     selectOnRight = i < visibleCount - 1 ? _cards[i + 1].Button : _nextPageButton.interactable ? _nextPageButton : null,
                     selectOnDown = _confirmButton

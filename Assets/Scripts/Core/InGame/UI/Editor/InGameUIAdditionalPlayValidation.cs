@@ -144,9 +144,10 @@ namespace Game.UI.InGame.Editor
             UIScreen catalog = c.Screen(UIId.BuildingCatalog);
             UIScreen detail = c.Screen(UIId.Detail);
             Check(catalog.IsVisible && c.UI.OpenPopup(UIId.Detail), "detail stacks over the real building catalog");
-            detail.GetComponent<DetailPopupView>().SetContent("입력 검증", "공용 상세", "EventSystem 경로 검사");
+            var detailView = detail.GetComponentInChildren<TextPopupView>(true);
+            detailView.SetContent("입력 검증", "공용 상세", "EventSystem 경로 검사");
             await WaitForCanvasRender();
-            var close = detail.GetComponentInChildren<CloseUtility>(true);
+            var close = detailView.GetComponentInChildren<CloseUtility>(true);
             Button closeButton = Read<Button>(close, "_button");
             var pointer = PointerAt(events, closeButton);
             var hits = new List<RaycastResult>();

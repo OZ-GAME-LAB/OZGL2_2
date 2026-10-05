@@ -9,10 +9,10 @@ namespace Game.UI.InGame
     {
         [SerializeField] private UIId _id;
         [SerializeField] private bool _isHud;
-        [SerializeField] private bool _canCloseByUser = true;
-        [SerializeField] private bool _blocksHudInput;
-        [SerializeField] private GameObject _root;
-        [SerializeField] private CanvasGroup _inputGroup;
+        [Header("유저의 조작(ESC입력 등)으로 닫히는지 여부")][SerializeField] private bool _canCloseByUser = true;
+        [Header("해당 팝업이 열리면 HUD 입력 제한할지 선택")][SerializeField] private bool _blocksHudInput;
+        [Header("실제 출력할 UI 화면 프레펩")][SerializeField] private GameObject _root;
+        [Header("입력을 받을 캔버스그룹")][SerializeField] private CanvasGroup _inputGroup;
 
         public InGameUIManager Manager { get; private set; }
         public UIId Id => _id;
@@ -31,13 +31,14 @@ namespace Game.UI.InGame
                 return false;
             }
             Manager = manager;
-            foreach (OpenUtility utility in GetComponentsInChildren<OpenUtility>(true)) utility.Initialize(manager);
+            foreach (OpenUtility utility in GetComponentsInChildren<OpenUtility>(true)) 
+                utility.Initialize(manager);
             return true;
         }
 
         internal void Display() => _root.SetActive(true);
 
-        internal void Conceal(UICloseReason reason, bool notify)
+        internal void Hide(UICloseReason reason, bool notify)
         {
             SetInputEnabled(false);
             if (_root != null) _root.SetActive(false);

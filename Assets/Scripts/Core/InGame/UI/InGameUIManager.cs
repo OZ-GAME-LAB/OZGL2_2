@@ -29,7 +29,7 @@ namespace Game.UI.InGame
             CloseAllPopups(UICloseReason.ContextLost);
             _screensReady = false;
             _screens.Clear();
-            if (_currentHud != null) _currentHud.Conceal(UICloseReason.ContextLost, false);
+            if (_currentHud != null) _currentHud.Hide(UICloseReason.ContextLost, false);
             _currentHud = null;
             foreach (UIScreen screen in _screenInstances)
             {
@@ -39,7 +39,7 @@ namespace Game.UI.InGame
                     return false;
                 }
                 if (!screen.Attach(this)) return false;
-                screen.Conceal(UICloseReason.ContextLost, false);
+                screen.Hide(UICloseReason.ContextLost, false);
                 _screens.Add(screen.Id, screen);
             }
             _screensReady = true;
@@ -84,7 +84,7 @@ namespace Game.UI.InGame
             _closingPopups = true;
             try
             {
-                if (_currentHud != null) _currentHud.Conceal(UICloseReason.Replaced, true);
+                if (_currentHud != null) _currentHud.Hide(UICloseReason.Replaced, true);
                 _currentHud = screen;
                 screen.Display();
             }
@@ -165,14 +165,14 @@ namespace Game.UI.InGame
             UIScreen screen = TopPopup;
             // 닫힘 알림이 다시 닫기를 요청해도 같은 화면을 두 번 처리하지 않는다.
             _openedPopups.RemoveAt(_openedPopups.Count - 1);
-            screen.Conceal(reason, true);
+            screen.Hide(reason, true);
         }
 
         private void RefreshInput()
         {
             if (_currentHud != null) _currentHud.SetInputEnabled(!HasBlockingPopup);
             for (int i = 0; i < _openedPopups.Count; i++)
-                _openedPopups[i].SetInputEnabled(i == _openedPopups.Count - 1);
+                _openedPopups[i].SetInputEnabled(i == _openedPopups.Count - 1); //가장 최근에 열린 팝업창 이외에는 입력을 제한한다
         }
     }
 }

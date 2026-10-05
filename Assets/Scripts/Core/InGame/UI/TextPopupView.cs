@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
-    public sealed class DetailPopupView : MonoBehaviour
+    public sealed class TextPopupView : MonoBehaviour
     {
         [SerializeField] private TMP_Text _title;
         [SerializeField] private TMP_Text _subtitle;
