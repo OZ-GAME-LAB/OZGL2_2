@@ -2888,6 +2888,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 796016852}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1988025358 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8789348044962764029, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+  m_PrefabInstance: {fileID: 1150398547}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dcbf89000ee79d643a23803bf1e90596, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactInventoryPopupView
 --- !u!1001 &7968771019946275035
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3000,6 +3011,10 @@ PrefabInstance:
       propertyPath: _artifactSelectionUI
       value: 
       objectReference: {fileID: 1665979826}
+    - target: {fileID: 8763287373462392912, guid: 3eb9d8e3798860d4fb422927880dff26, type: 3}
+      propertyPath: _artifactInventoryView
+      value: 
+      objectReference: {fileID: 1988025358}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

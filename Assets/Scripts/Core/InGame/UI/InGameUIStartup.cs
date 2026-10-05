@@ -17,6 +17,7 @@ namespace Game.UI.InGame
         [SerializeField] private RunDecisionView _runDecisionUI;
         [SerializeField] private SettlementView _settlementUI;
         [SerializeField] private ShopView _shopView;
+        [SerializeField] private ArtifactInventoryPopupView _artifactInventoryView;
         [SerializeField] private BuildingUIPresenter _buildingUI;
         [SerializeField] private BuildingUIConnection _buildingUIConnection;
 
@@ -27,6 +28,12 @@ namespace Game.UI.InGame
         public IRunSettlementUI SettlementUI => _settlementUI;
         public IShopUI ShopUI => _shopView;
         public bool IsReady { get; private set; }
+
+        public void InitializeArtifactInventory(IArtifactReader artifactReader)
+        {
+            if (_artifactInventoryView != null)
+                _artifactInventoryView.Initialize(artifactReader);
+        }
 
         // 비활성 UI 루트도 연결한다. 게임 시작과 루트 활성화는 Bootstrap이 담당한다.
         public bool Initialize(RunCurrencyManager wallet, GameFlowController flow, WaveController waves,
