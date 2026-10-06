@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_MG_T3_21_혹한마도사_Data"
+  m_Name: "B_MG_T3_21_\uD639\uD55C\uB9C8\uB3C4\uC0AC_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_MG_T3_21_혹한마도사"
+  buildingId: "B_MG_T3_21_\uD639\uD55C\uB9C8\uB3C4\uC0AC"
   buildingFamilyId: mage_barracks
-  displayName: "혹한마도사"
-  description: "혹한마도사 소환 병영"
+  displayName: "\uD639\uD55C\uB9C8\uB3C4\uC0AC"
+  description: "\uD639\uD55C\uB9C8\uB3C4\uC0AC \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: f9dc64e7d177499da8f57dead849588e, type: 3}
   worldSprite: {fileID: 21300000, guid: f9dc64e7d177499da8f57dead849588e, type: 3}
@@ -36,6 +36,6 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 36
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades: []

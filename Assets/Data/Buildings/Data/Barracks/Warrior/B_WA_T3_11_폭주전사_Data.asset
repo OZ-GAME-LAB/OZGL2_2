@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_WA_T3_11_폭주전사_Data"
+  m_Name: "B_WA_T3_11_\uD3ED\uC8FC\uC804\uC0AC_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_WA_T3_11_폭주전사"
+  buildingId: "B_WA_T3_11_\uD3ED\uC8FC\uC804\uC0AC"
   buildingFamilyId: warrior_barracks
-  displayName: "폭주전사"
-  description: "폭주전사 소환 병영"
+  displayName: "\uD3ED\uC8FC\uC804\uC0AC"
+  description: "\uD3ED\uC8FC\uC804\uC0AC \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 66281a84da3b423084ea985768966de6, type: 3}
   worldSprite: {fileID: 21300000, guid: 66281a84da3b423084ea985768966de6, type: 3}
@@ -36,6 +36,6 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 4
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades: []

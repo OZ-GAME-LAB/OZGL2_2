@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_CU_T2_2_권속_Data"
+  m_Name: "B_CU_T2_2_\uAD8C\uC18D_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_CU_T2_2_권속"
+  buildingId: "B_CU_T2_2_\uAD8C\uC18D"
   buildingFamilyId: cultist_barracks
-  displayName: "권속"
-  description: "권속 소환 병영"
+  displayName: "\uAD8C\uC18D"
+  description: "\uAD8C\uC18D \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 8e0f3e22578a49fb86e8c5d95b56c880, type: 3}
   worldSprite: {fileID: 21300000, guid: 8e0f3e22578a49fb86e8c5d95b56c880, type: 3}
@@ -36,7 +36,7 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 43
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 329a25886bed44e992bd86f3d8fbfb9f, type: 2}

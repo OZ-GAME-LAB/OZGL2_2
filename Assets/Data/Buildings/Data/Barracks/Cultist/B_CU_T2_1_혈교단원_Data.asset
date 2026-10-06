@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_CU_T2_1_혈교단원_Data"
+  m_Name: "B_CU_T2_1_\uD608\uAD50\uB2E8\uC6D0_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_CU_T2_1_혈교단원"
+  buildingId: "B_CU_T2_1_\uD608\uAD50\uB2E8\uC6D0"
   buildingFamilyId: cultist_barracks
-  displayName: "혈교단원"
-  description: "혈교단원 소환 병영"
+  displayName: "\uD608\uAD50\uB2E8\uC6D0"
+  description: "\uD608\uAD50\uB2E8\uC6D0 \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 4c1cbaf2889d45abba987bda1e667e75, type: 3}
   worldSprite: {fileID: 21300000, guid: 4c1cbaf2889d45abba987bda1e667e75, type: 3}
@@ -36,7 +36,7 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 42
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: ad2e64c341c94046a413e79f81c471c1, type: 2}

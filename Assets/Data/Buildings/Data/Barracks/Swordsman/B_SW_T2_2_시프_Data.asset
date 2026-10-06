@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_SW_T2_2_시프_Data"
+  m_Name: "B_SW_T2_2_\uC2DC\uD504_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_SW_T2_2_시프"
+  buildingId: "B_SW_T2_2_\uC2DC\uD504"
   buildingFamilyId: swordsman_barracks
-  displayName: "시프"
-  description: "시프 소환 병영"
+  displayName: "\uC2DC\uD504"
+  description: "\uC2DC\uD504 \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 0b8be0de80f9454b8f59aece007277e1, type: 3}
   worldSprite: {fileID: 21300000, guid: 0b8be0de80f9454b8f59aece007277e1, type: 3}
@@ -36,7 +36,7 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 13
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: f35e33e8a0f54053bb7d39db03de1a0e, type: 2}

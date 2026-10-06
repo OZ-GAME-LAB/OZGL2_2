@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_MG_T2_1_화염술사_Data"
+  m_Name: "B_MG_T2_1_\uD654\uC5FC\uC220\uC0AC_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_MG_T2_1_화염술사"
+  buildingId: "B_MG_T2_1_\uD654\uC5FC\uC220\uC0AC"
   buildingFamilyId: mage_barracks
-  displayName: "화염술사"
-  description: "화염술사 소환 병영"
+  displayName: "\uD654\uC5FC\uC220\uC0AC"
+  description: "\uD654\uC5FC\uC220\uC0AC \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 1b220d6b1be94dd3a5e237415eb150fa, type: 3}
   worldSprite: {fileID: 21300000, guid: 1b220d6b1be94dd3a5e237415eb150fa, type: 3}
@@ -36,7 +36,7 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 32
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 2f5a2e10c3b7455fb9fb6a2361eee947, type: 2}

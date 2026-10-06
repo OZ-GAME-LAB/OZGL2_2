@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_WA_T3_22_마갑전사_Data"
+  m_Name: "B_WA_T3_22_\uB9C8\uAC11\uC804\uC0AC_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_WA_T3_22_마갑전사"
+  buildingId: "B_WA_T3_22_\uB9C8\uAC11\uC804\uC0AC"
   buildingFamilyId: warrior_barracks
-  displayName: "마갑전사"
-  description: "마갑전사 소환 병영"
+  displayName: "\uB9C8\uAC11\uC804\uC0AC"
+  description: "\uB9C8\uAC11\uC804\uC0AC \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 12ac37409ff24902993fe35fecf37a84, type: 3}
   worldSprite: {fileID: 21300000, guid: 12ac37409ff24902993fe35fecf37a84, type: 3}
@@ -36,6 +36,6 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 6
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades: []
