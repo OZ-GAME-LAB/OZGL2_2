@@ -27,7 +27,29 @@ namespace Game.UI.Editor
                 try { action(); } catch (InvalidOperationException) { rejected = true; }
                 Check(rejected, name);
             }
-            string manifest = BalanceAuthoringWindow.CreateWorkspace();
+            Reject(() => BalanceAuthoringWindow.CreateWorkspace(BalanceAuthoringWindow.Root + "/invalid.unity"), "workspace scene cannot become source");
+            var passive = ScriptableObject.CreateInstance<Units.Skills.PassiveSkillData>();
+            try
+            {
+                Check(BalanceAuthoringWindow.Group(passive.GetType().Name) == "유닛", "passive category supported");
+                Check(BalanceAuthoringWindow.NumericPaths(passive).OrderBy(p => p).SequenceEqual(new[] { "_conditionCheckInterval", "_tickInterval" }), "only passive timing fields editable");
+                string structure = BalanceAuthoringWindow.Structure(passive);
+                var serializedPassive = new SerializedObject(passive);
+                serializedPassive.FindProperty("_tickInterval").floatValue = 2f;
+                serializedPassive.ApplyModifiedPropertiesWithoutUndo();
+                Check(BalanceAuthoringWindow.Structure(passive) == structure, "passive timing preserves structure");
+                serializedPassive.FindProperty("_triggerType").intValue = 99;
+                serializedPassive.ApplyModifiedPropertiesWithoutUndo();
+                Check(BalanceAuthoringWindow.Structure(passive) != structure, "passive trigger is protected");
+            }
+            finally { Object.DestroyImmediate(passive); }
+            string dataManifest = BalanceAuthoringWindow.CreateWorkspace();
+            var dataWorkspace = JsonUtility.FromJson<BalanceAuthoringWindow.Workspace>(File.ReadAllText(dataManifest));
+            Check(string.IsNullOrEmpty(dataWorkspace.scene), "data editing requires no scene");
+            Check(dataWorkspace.entries.Count > 0 && dataWorkspace.entries.All(e => !e.source.EndsWith(".unity") && !e.source.EndsWith(".prefab")), "data workspace copies no scenes or prefabs");
+            Check(dataWorkspace.entries.All(e => BalanceAuthoringWindow.Hash(e.source) == e.hash), "data workspace preserves originals");
+            Check(!BalanceAuthoringWindow.Validate(dataWorkspace).Contains("작업 공간이 유효하지 않습니다."), "data-only workspace accepted by validation");
+            string manifest = BalanceAuthoringWindow.CreateWorkspace(BalanceAuthoringWindow.SourceScene);
             var workspace = JsonUtility.FromJson<BalanceAuthoringWindow.Workspace>(File.ReadAllText(manifest));
             Directory.CreateDirectory("Logs/BalanceAuthoring");
             File.WriteAllText("Logs/BalanceAuthoring/manifest-path.txt", manifest);
