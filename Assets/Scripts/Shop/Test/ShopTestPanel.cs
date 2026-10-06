@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Game.Core;
 using UnityEngine;
 
 // Economy 테스트와 같은 매니저를 사용하는 독립 상점 디버그 창
@@ -8,6 +9,7 @@ public class ShopTestPanel : MonoBehaviour
     [SerializeField] private RunCurrencyManager _run;
     [SerializeField] private ArtifactManager _artifacts;
     [SerializeField] private ConsumableItemManager _consumables;
+    [SerializeField] private GameFlowController _gameFlowController;
 
     private Vector2 _scroll;
     private string _result = "기존 재화 패널에서 Run 시작 후 상점을 생성하세요.";
@@ -24,7 +26,9 @@ public class ShopTestPanel : MonoBehaviour
         {
             return false;
         }
-        _shop.Initialize(_artifacts, _run, _consumables);
+        if (_gameFlowController == null)
+            _gameFlowController = FindFirstObjectByType<GameFlowController>(FindObjectsInactive.Include);
+        _shop.Initialize(_artifacts, _run, _gameFlowController, _consumables);
         if (!_shop.TryGenerateStock())
         {
             return false;

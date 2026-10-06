@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using Units.Skills;
 
 public static class ArtifactExcelImporter
 {
@@ -22,6 +23,26 @@ public static class ArtifactExcelImporter
         if (!ArtifactExcelParser.TryParse(path, out List<ArtifactExcelParser.Data> data, out result))
         {
             return false;
+        }
+        if (!ArtifactSkillExcelImport.TryPrepare(path, out var skillPlan, out result)) return false;
+        using var skillPlanScope = skillPlan;
+
+        // 패시브 참조도 모든 S.O를 수정하기 전에 확인합니다.
+        var passiveSkills = new Dictionary<string, PassiveSkillData>();
+        foreach (var item in data)
+        {
+            if (item.PassiveEffects == null) continue;
+            foreach (var effect in item.PassiveEffects)
+            {
+                if (passiveSkills.ContainsKey(effect.SkillPath)) continue;
+                var skill = skillPlan.FindSkill(effect.SkillPath);
+                if (skill == null)
+                {
+                    result = $"PassiveSkillEffects {effect.Row}행: PassiveSkillData S.O를 찾을 수 없습니다. {effect.SkillPath}";
+                    return false;
+                }
+                passiveSkills.Add(effect.SkillPath, skill);
+            }
         }
 
         // 전체 에셋에서 ID 조회. 동일 ID가 여러 파일이면 변경 전에 중단
@@ -63,6 +84,8 @@ public static class ArtifactExcelImporter
         }
 
         // 입력 검증이 모두 끝난 후에만 생성·수정. 엑셀에 없는 에셋과 등록 항목은 유지
+        try { skillPlan.Commit(); }
+        catch (System.Exception ex) { result = "패시브/지속 효과 저장 실패: " + ex.Message; return false; }
         int created = 0;
         foreach (var item in data)
         {
@@ -90,6 +113,22 @@ public static class ArtifactExcelImporter
                 slotEffects.GetArrayElementAtIndex(i).FindPropertyRelative("_additionalSlots").intValue =
                     item.ConsumableSlotEffects[i];
             }
+            if (item.PassiveEffects != null)
+            {
+                var list = serialized.FindProperty("_passiveSkillEffects");
+                list.ClearArray();
+                list.arraySize = item.PassiveEffects.Count;
+                string[] fields = { "_targetTeam", "_applyType", "_allyClass", "_allyType", "_allyTier",
+                    "_enemyClass", "_enemyType", "_enemyFaction" };
+                for (int i = 0; i < item.PassiveEffects.Count; i++)
+                {
+                    var effect = item.PassiveEffects[i];
+                    var entry = list.GetArrayElementAtIndex(i);
+                    entry.FindPropertyRelative("_passiveSkill").objectReferenceValue = passiveSkills[effect.SkillPath];
+                    for (int j = 0; j < fields.Length; j++)
+                        entry.FindPropertyRelative(fields[j]).intValue = effect.Types[j];
+                }
+            }
             serialized.ApplyModifiedProperties();
             if (isNew)
             {
@@ -111,7 +150,7 @@ public static class ArtifactExcelImporter
         typeof(ArtifactCatalog).GetMethod("OnValidate",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.Invoke(catalog, null);
         AssetDatabase.SaveAssetIfDirty(catalog);
-        result = $"아티팩트 {data.Count - created}개 갱신, {created}개 생성 완료. 신규 아이콘은 Inspector에서 연결하세요.";
+        result = $"아티팩트 {data.Count - created}개 갱신, {created}개 생성, 패시브/지속 효과 {skillPlan.Count}개 반영 완료. 신규 아이콘은 Inspector에서 연결하세요.";
         return true;
     }
 
