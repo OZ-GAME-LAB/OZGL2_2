@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: "B_AR_T3_21_일격사수_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: "B_AR_T3_21_일격사수"
+  buildingFamilyId: archer_barracks
+  displayName: "일격사수"
+  description: "일격사수 소환 병영"
+  buildingType: 2
+  icon: {fileID: 21300000, guid: 1c5b7004aac7493599d568503f26ab7f, type: 3}
+  worldSprite: {fileID: 21300000, guid: 1c5b7004aac7493599d568503f26ab7f, type: 3}
+  prefab: {fileID: 7352876927613322475, guid: 7eda981a10284909a48fd047d229cdd9, type: 3}
+  buildCost:
+  - type: 0
+    amount: 10
+  buildFromEmptySlot: 0
+  requiredCoreLevel: 0
+  requiredFamilyIds: []
+  coreLevel: 0
+  buildLimit: 0
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 1
+    unitType: 26
+    countPerWave: 1
+    maxAlive: 3
+  upgrades: []

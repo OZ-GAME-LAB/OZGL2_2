@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: "B_WA_T3_11_폭주전사_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: "B_WA_T3_11_폭주전사"
+  buildingFamilyId: warrior_barracks
+  displayName: "폭주전사"
+  description: "폭주전사 소환 병영"
+  buildingType: 2
+  icon: {fileID: 21300000, guid: 66281a84da3b423084ea985768966de6, type: 3}
+  worldSprite: {fileID: 21300000, guid: 66281a84da3b423084ea985768966de6, type: 3}
+  prefab: {fileID: 4773057103662458221, guid: 16c64d8391834fc98fe6161b67e2ff51, type: 3}
+  buildCost:
+  - type: 0
+    amount: 10
+  buildFromEmptySlot: 0
+  requiredCoreLevel: 0
+  requiredFamilyIds: []
+  coreLevel: 0
+  buildLimit: 0
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 1
+    unitType: 4
+    countPerWave: 1
+    maxAlive: 3
+  upgrades: []

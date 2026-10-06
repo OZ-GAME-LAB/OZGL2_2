@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: "B_SW_T3_21_그림자검_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: "B_SW_T3_21_그림자검"
+  buildingFamilyId: swordsman_barracks
+  displayName: "그림자검"
+  description: "그림자검 소환 병영"
+  buildingType: 2
+  icon: {fileID: 21300000, guid: 3d94441e3d144250acddf1ce65db2935, type: 3}
+  worldSprite: {fileID: 21300000, guid: 3d94441e3d144250acddf1ce65db2935, type: 3}
+  prefab: {fileID: 6418871758776885364, guid: f219ce59023149c493e6ad14f584997a, type: 3}
+  buildCost:
+  - type: 0
+    amount: 10
+  buildFromEmptySlot: 0
+  requiredCoreLevel: 0
+  requiredFamilyIds: []
+  coreLevel: 0
+  buildLimit: 0
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 1
+    unitType: 15
+    countPerWave: 1
+    maxAlive: 3
+  upgrades: []
