@@ -8,8 +8,14 @@ using UnityEngine.InputSystem;
 
 namespace Game.Cameras
 {
+    public enum FocusField
+    {
+        Base, Battlefield, ZoomIn
+    }
     public class InGameCameraController : MonoBehaviour
     {
+        public FocusField FocusField => _focusField;
+        public event Action<FocusField> FocusChanged;
         [SerializeField] private CinemachineBrain _brain;
         [SerializeField] private Camera _worldCamera;
         [SerializeField] private CinemachineCamera _baseCamera;
@@ -17,8 +23,9 @@ namespace Game.Cameras
         [SerializeField] private CinemachineCamera _focusCamera;
         [SerializeField] private GameFlowController _gameFlowController;
         [SerializeField] private BuildingBuildController _buildController;
-        [SerializeField] private Transform _focusTarget;
-
+        [SerializeField] private Transform _focusTarget; // 확대할 자세한 위치를 관리
+        
+        private FocusField _focusField; //현재 출력중인 필드의 종류를 관리
         private void Awake()
         {
             ShowBase();
@@ -75,7 +82,15 @@ namespace Game.Cameras
             _buildController.SlotDeselected += FocusOut;
 
             _gameFlowController = flowController;
+            
+            ShowBase();
         }
+
+        public void GetFocusTarget()
+        {
+            
+        }
+        
         public void Toggle()
         {
             if (!_gameFlowController.CanEnterBuildMode()) return;
@@ -91,6 +106,9 @@ namespace Game.Cameras
             _baseCamera.Priority = 10;
             _battlefieldCamera.Priority = 0;
             _focusCamera.Priority = -1;
+
+            _focusField = FocusField.Base;
+            FocusChanged?.Invoke(_focusField);
         }
 
         public void ShowBattleField()
@@ -98,6 +116,9 @@ namespace Game.Cameras
             _battlefieldCamera.Priority = 10;
             _baseCamera.Priority = 0;
             _focusCamera.Priority = -1;
+
+            _focusField = FocusField.Battlefield;
+            FocusChanged?.Invoke(_focusField);
         }
 
         public void FocusAt(BuildingSlot slot)
@@ -112,11 +133,18 @@ namespace Game.Cameras
                 slot.BuildPosition.x, slot.BuildPosition.y, 0f);
             _focusCamera.Lens.OrthographicSize = 2f;
             _focusCamera.Priority = 20;
+
+            _focusField = FocusField.ZoomIn;
+            FocusChanged?.Invoke(_focusField);
         }
 
         public void FocusOut()
         {
             _focusCamera.Priority = -1;
+
+            _focusField = _baseCamera.Priority >= _battlefieldCamera.Priority
+                ? FocusField.Base
+                : FocusField.Battlefield;
         }
         public void FocusAt(Vector3 worldPosition)
         {
@@ -130,6 +158,9 @@ namespace Game.Cameras
                 worldPosition.x, worldPosition.y, 0f);
 
             _focusCamera.Priority = 20;
+            
+            _focusField = FocusField.ZoomIn;
+            FocusChanged?.Invoke(_focusField);
         }
     }
 }

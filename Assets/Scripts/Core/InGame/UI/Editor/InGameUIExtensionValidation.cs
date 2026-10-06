@@ -63,7 +63,7 @@ namespace Game.UI.InGame.Editor
                 Check(instance.GetComponentsInChildren<Canvas>(true).Length == 2,
                     "assembled UI has exactly two shared canvases", checks);
                 UIScreen detail = GetScreen(manager, UIId.Detail);
-                var detailView = detail.GetComponent<DetailPopupView>();
+                var detailView = detail.GetComponentInChildren<TextPopupView>(true);
                 Check(detailView != null && !detail.IsVisible,
                     "the preplaced detail popup stays hidden until opened", checks);
                 Check(ReferenceEquals(GetScreen(manager, UIId.Detail), detail),
@@ -93,7 +93,7 @@ namespace Game.UI.InGame.Editor
                 slot.gameObject.SetActive(true);
                 RebindLifecycle(slot);
                 Button slotButton = Field<Button>(slot, "_button");
-                close = detail.GetComponentInChildren<CloseUtility>(true);
+                close = detailView.GetComponentInChildren<CloseUtility>(true);
                 if (close == null) throw new InvalidOperationException("Detail popup has no CloseUtility.");
                 RebindLifecycle(close);
                 Button closeButton = Field<Button>(close, "_button");
@@ -226,7 +226,7 @@ namespace Game.UI.InGame.Editor
             button.onClick.Invoke();
         }
 
-        private static string Text(DetailPopupView view, string field) => Field<TMP_Text>(view, field).text;
+        private static string Text(TextPopupView view, string field) => Field<TMP_Text>(view, field).text;
 
         private static T Field<T>(object owner, string field)
         {

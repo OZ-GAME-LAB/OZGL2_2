@@ -381,8 +381,9 @@ namespace Game.UI.InGame.Editor
         private static async UniTask EnsureArmyBuilding(Context c)
         {
             if (c.Slots.Any(slot => slot.IsOccupied && slot.CurrentBuilding.Data.HasSpawn)) return;
-            var shortcut = Read<BuildingShortcut[]>(c.Startup, "_buildingShortcuts").First(item => item.SelectsFirstEmptySlot);
-            await PointerClick(Read<Button>(shortcut, "_button"), "construction shortcut");
+            c.Buildings.SelectFirstEmptySlot();
+            Check(c.Buildings.SelectedSlot != null && c.Catalog.Popup.IsVisible,
+                "first empty world slot selection opens the construction catalog");
             var candidates = Read<Dictionary<string, BuildingData>>(c.Buildings, "_byId");
             var items = Read<List<BuildingCatalogItem>>(c.Catalog, "_items");
             int index = items.FindIndex(item => item.GoldCost.HasValue && candidates[item.Id].HasSpawn && candidates[item.Id].HasWorldVisual);

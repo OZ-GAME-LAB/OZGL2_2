@@ -19,8 +19,6 @@ namespace OZGL.KDH
         private GameFlowController _flow;
         private BuildingUIPresenter _presenter;
         private BuildingSlot[] _slots = Array.Empty<BuildingSlot>();
-        private BuildingShortcut[] _shortcuts = Array.Empty<BuildingShortcut>();
-        private BuildingSlot[] _shortcutSlots = Array.Empty<BuildingSlot>();
         private readonly Dictionary<string, BuildingData> _byId = new Dictionary<string, BuildingData>();
         private readonly List<BuildingCatalogItem> _items = new List<BuildingCatalogItem>();
         private readonly HashSet<BuildingSlot> _observedSlots = new HashSet<BuildingSlot>();
@@ -33,7 +31,7 @@ namespace OZGL.KDH
 
         public void Initialize(BuildingBuildController controller, RunCurrencyManager wallet,
             GameFlowController flow, BuildingCoreProgress coreProgress, BuildingSlot[] slots,
-            BuildingUIPresenter presenter, BuildingShortcut[] shortcuts, BuildingSlot[] shortcutSlots = null)
+            BuildingUIPresenter presenter)
         {
             if (controller == null) throw new ArgumentNullException(nameof(controller));
             if (wallet == null) throw new ArgumentNullException(nameof(wallet));
@@ -41,13 +39,9 @@ namespace OZGL.KDH
             if (coreProgress == null) throw new ArgumentNullException(nameof(coreProgress));
             if (slots == null) throw new ArgumentNullException(nameof(slots));
             if (presenter == null) throw new ArgumentNullException(nameof(presenter));
-            if (shortcuts == null) throw new ArgumentNullException(nameof(shortcuts));
-            if (shortcutSlots != null && shortcutSlots.Length != shortcuts.Length)
-                throw new ArgumentException("Shortcut targets must match the shortcut array.", nameof(shortcutSlots));
             Unbind();
             _controller = controller; _wallet = wallet; _flow = flow; _presenter = presenter;
-            _slots = slots; _shortcuts = shortcuts;
-            _shortcutSlots = shortcutSlots ?? new BuildingSlot[shortcuts.Length];
+            _slots = slots;
             if (isActiveAndEnabled) Bind();
         }
 
@@ -58,7 +52,6 @@ namespace OZGL.KDH
         {
             if (!_bound || _executing) return;
             // 활성화/Collider 변경은 별도 이벤트가 없으므로 이 유효성 확인은 유지한다.
-            RefreshShortcuts();
             if (_selectionId == null) return;
             if (_presenter == null || !_presenter.isActiveAndEnabled || _controller == null ||
                 !_controller.IsInteractionTargetCurrent(_target)) { ClearSelection(); return; }
@@ -192,7 +185,6 @@ namespace OZGL.KDH
                 else ClearSelection();
                 // 기존 Try API의 실패는 부분 차감을 배제하지 않는다. 실패를 자동 재시도하지 않는다.
                 _presenter.ShowFeedback(message);
-                RefreshShortcuts();
             }
         }
 
@@ -205,43 +197,17 @@ namespace OZGL.KDH
         private void HandleOccupationChanged(BuildingSlot slot)
         {
             if (_executing) return;
-            RefreshShortcuts();
             Refresh();
         }
         private void HandlePhaseChanged(GamePhase phase)
         {
             if (phase != GamePhase.Preparation) ClearSelection();
             _presenter.SetActionsAllowed(false, "건설 단계 전환을 기다리고 있습니다.");
-            RefreshShortcuts();
-        }
-
-        private void HandleShortcutClicked(BuildingShortcut shortcut)
-        {
-            if (shortcut.SelectsFirstEmptySlot) { SelectFirstEmptySlot(); return; }
-            int index = Array.IndexOf(_shortcuts, shortcut);
-            if (index >= 0) SelectSlot(_shortcutSlots[index]);
-        }
-
-        private void RefreshShortcuts()
-        {
-            for (int i = 0; i < _shortcuts.Length; i++)
-            {
-                BuildingShortcut shortcut = _shortcuts[i];
-                if (shortcut == null) continue;
-                BuildingSlot slot = _shortcutSlots[i];
-                Building current = slot != null ? slot.CurrentBuilding : null;
-                bool available = _flow != null && _flow.CanEnterBuildMode() &&
-                    (shortcut.SelectsFirstEmptySlot || (slot != null && slot.isActiveAndEnabled));
-                shortcut.Render(available, current != null && current.Data != null ? current.Data.DisplayName : "건설", current == null);
-            }
         }
 
         private void Bind()
         {
             if (_bound || _controller == null || _wallet == null || _flow == null || _presenter == null || !_presenter.IsReady) return;
-            for (int i = 0; i < _shortcuts.Length; i++)
-                if (_shortcuts[i] != null && (!_shortcuts[i].IsReady ||
-                    (!_shortcuts[i].SelectsFirstEmptySlot && _shortcutSlots[i] == null))) return;
             _presenter.CandidateSelected += HandleCandidateSelected;
             _presenter.ActionRequested += HandleAction;
             _presenter.Closed += HandleClosed;
@@ -252,10 +218,7 @@ namespace OZGL.KDH
             _flow.PhaseChanged += HandlePhaseChanged;
             foreach (BuildingSlot slot in _slots)
                 if (slot != null && _observedSlots.Add(slot)) slot.OccupationChanged += HandleOccupationChanged;
-            foreach (BuildingShortcut shortcut in _shortcuts)
-                if (shortcut != null) shortcut.Clicked += HandleShortcutClicked;
             _bound = true;
-            RefreshShortcuts();
         }
 
         private void Unbind()
@@ -277,8 +240,6 @@ namespace OZGL.KDH
                 if (_flow != null) _flow.PhaseChanged -= HandlePhaseChanged;
                 foreach (BuildingSlot slot in _observedSlots)
                     if (slot != null) slot.OccupationChanged -= HandleOccupationChanged;
-                foreach (BuildingShortcut shortcut in _shortcuts)
-                    if (shortcut != null) shortcut.Clicked -= HandleShortcutClicked;
             }
             _observedSlots.Clear();
             _bound = false;

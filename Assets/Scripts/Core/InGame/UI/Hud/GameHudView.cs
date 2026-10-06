@@ -1,7 +1,9 @@
 using System;
+using Game.Cameras;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
@@ -9,26 +11,34 @@ namespace Game.UI.InGame
     public sealed class GameHudView : MonoBehaviour
     {
         public event Action WaveStartRequested;
-
+        
         [SerializeField] private TMP_Text _goldText;
         [SerializeField] private TMP_Text _waveText;
         [SerializeField] private TMP_Text _phaseText;
-        [SerializeField] private UnityEngine.UI.Button _waveStartButton;
+        [SerializeField] private TMP_Text _changeViewText;
+        [SerializeField] private Button _waveStartButton;
+        [SerializeField] private Button _changeViewButton;
 
+        private InGameCameraController _cameraController;
         private bool _isWaveStartRequestPending;
 
         private void OnEnable()
         {
             if (_waveStartButton != null) _waveStartButton.onClick.AddListener(HandleWaveStartButtonClicked);
+            if(_changeViewButton != null) _changeViewButton.onClick.AddListener(HandleChangeViewButtonClicked);
         }
 
         private void OnDisable()
         {
             if (_waveStartButton != null) _waveStartButton.onClick.RemoveListener(HandleWaveStartButtonClicked);
+            if (_changeViewButton != null) _changeViewButton.onClick.RemoveListener(HandleChangeViewButtonClicked);
         }
 
-        public void Initialize()
+        public void Initialize(InGameCameraController cameraController)
         {
+            _cameraController = cameraController;
+            _cameraController.FocusChanged += SetChangeViewText;
+            SetChangeViewText(_cameraController.FocusField);
             _isWaveStartRequestPending = false;
             SetTextIfAssigned(_goldText, "--");
             SetTextIfAssigned(_waveText, "-- / --");
@@ -77,6 +87,22 @@ namespace Game.UI.InGame
         private static void SetTextIfAssigned(TMP_Text text, string value)
         {
             if (text != null && text.text != value) text.text = value;
+        }
+
+        private void HandleChangeViewButtonClicked()
+        {
+            if (_cameraController == null) return;
+            
+            _cameraController.Toggle();
+        }
+        private void SetChangeViewText(FocusField field)
+        {
+            if (field == FocusField.Battlefield)
+            {
+                SetTextIfAssigned(_changeViewText, "기지로 이동");
+                return;
+            }
+            SetTextIfAssigned(_changeViewText,"전장으로 이동");
         }
     }
 }

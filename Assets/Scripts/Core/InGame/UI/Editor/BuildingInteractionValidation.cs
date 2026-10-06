@@ -61,16 +61,6 @@ namespace Game.UI.InGame.Editor
                 slot.GetComponent<Collider2D>().enabled = false;
                 Require(!BuildingBuildController.IsLiveInteractionSlot(slot), "Disabled Collider invalidates interaction", ref checks);
 
-                var shortcutObject = new GameObject("Icon-only shortcut", typeof(RectTransform), typeof(UnityEngine.UI.Button));
-                shortcutObject.transform.SetParent(root.transform);
-                shortcutObject.SetActive(false);
-                BuildingShortcut shortcut = shortcutObject.AddComponent<BuildingShortcut>();
-                var serialized = new SerializedObject(shortcut);
-                serialized.FindProperty("_button").objectReferenceValue = shortcutObject.GetComponent<UnityEngine.UI.Button>();
-                serialized.ApplyModifiedPropertiesWithoutUndo();
-                shortcut.Render(true, "건설", true);
-                Require(shortcut.IsReady && shortcutObject.GetComponent<UnityEngine.UI.Button>().interactable,
-                    "Icon-only shortcut supports absent optional label and icon", ref checks);
             }
             finally
             {

@@ -186,13 +186,9 @@ namespace Game.UI.InGame.Editor
                 if (IsLiveEmpty(slot)) { expected = slot; break; }
             Check(expected != null, "the initialized Test scene has a live empty construction slot");
 
-            BuildingShortcut shortcut = null;
-            foreach (BuildingShortcut candidate in Read<BuildingShortcut[]>(c.Startup, "_buildingShortcuts"))
-                if (candidate != null && Read<bool>(candidate, "_selectFirstEmptySlot")) { shortcut = candidate; break; }
-            Check(shortcut != null, "HUD has its configured first-empty-slot shortcut");
-            Click(Read<UnityEngine.UI.Button>(shortcut, "_button"), "HUD construction shortcut");
+            SelectWorld(c, expected);
             Check(c.Building.SelectedSlot == expected && c.Catalog.Popup.IsVisible && c.Catalog.ItemCount > 0,
-                "HUD shortcut selects the first valid empty slot and opens its catalog");
+                "world slot selection opens the construction catalog for the selected empty slot");
 
             string buildingId = PickBuildCandidate(c);
             ClickCatalog(c, buildingId);

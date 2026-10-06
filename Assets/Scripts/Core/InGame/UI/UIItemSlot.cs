@@ -27,6 +27,11 @@ namespace Game.UI.InGame
             if (_button != null) _button.interactable = interactable;
         }
         public void Unbind() { _onClick = null; }
-        private void HandleClick() { if (_button != null && _button.IsInteractable()) _onClick?.Invoke(); }
+
+        private void HandleClick()
+        {
+            if (_button != null && _button.IsInteractable()) 
+                _onClick?.Invoke();
+        }
     }
 }

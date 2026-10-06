@@ -88,6 +88,7 @@ public class BootStrap : MonoBehaviour
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager, _uiStartup.ArtifactSelectionUI);
+        _uiStartup.InitializeArtifactInventory(_artifactManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
         _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager,
             Units.Skills.SkillEffectResolver.Instance);
@@ -111,7 +112,7 @@ public class BootStrap : MonoBehaviour
         foreach (var root in gameObject.scene.GetRootGameObjects())
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
         if (!_uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
-                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray()))
+                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(), _cameraController))
         {
             Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
             return;
@@ -159,7 +160,7 @@ public class BootStrap : MonoBehaviour
     public bool InitializeUI(BuildingSlot[] slots)
     {
         return _uiStartup != null && _uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
-            _waveController, _buildController, _buildingCoreProgress, slots);
+            _waveController, _buildController, _buildingCoreProgress, slots, _cameraController);
     }
 
     private bool ValidateReferences()
