@@ -57,14 +57,11 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private TotemRunApplier _totemRunApplier;
     [SerializeField] private TotemEffectCatalog _totemCatalog;
     [SerializeField] private AltarManager _altarManager;
-    private IOutGameDataSetter _data;
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
 
     void Start()
     {
         if (!ValidateReferences()) return;
-
-        _data = new TestOutGameDataSetter();
 
         // Current date KDH 2026-09-29
         // Pending을 비우기 전에 아웃게임에서 넘어왔는지 기억합니다.
@@ -123,13 +120,11 @@ public class BootStrap : MonoBehaviour
         // GameFlow·RunCurrency 초기화 뒤, BeginRun 전에 연결해야 첫 Preparation 이벤트를 받습니다.
         InitializeOutGameEffects(context, fromOutGame);
 
-        _data.SetOutGameData(context);
         OutGameStartContext.Pending = null;
         
         switch (context.StartMode)
         {
             case StartMode.NewGame:
-                _data.SetOutGameData(context);
                 _archiveManager.NewGame();
                 _gameFlowController.NewGame();
                 break;

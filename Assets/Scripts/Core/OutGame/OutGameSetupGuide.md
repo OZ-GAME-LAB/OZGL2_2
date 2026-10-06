@@ -261,9 +261,7 @@ Selector는 전체 저장 사본에서 특성과 혈석 영역만 변경하고 `
 | 스크립트 | 역할 |
 |---|---|
 | `OutGameSetupTestBuilder` | Unity Editor API로 기존 패널 프리팹을 중첩하고 필요한 컴포넌트·참조를 연결해 루트 프리팹, 씬, 카탈로그를 저장합니다. 기존 결과물이 있으면 덮어쓰지 않습니다. |
-| `OutGameSetupTestValidation` | `Tools > OutGame > Validate Setup Test` 메뉴에서 저장된 씬을 검사합니다. 검사 상태를 씬이나 프리팹에 저장하지 않으며, 보고서와 화면 이미지는 `.utmp/OutGameSetupValidation`에 출력합니다. |
-| `PersistentSaveValidation` | `Tools > OutGame > Validate Persistent Save` 메뉴에서 저장·복원·구매 실패·잘못된 데이터와 파일 보존을 검사합니다. 보고서는 `.utmp/PersistentSaveValidation/report.txt`에 출력합니다. |
 
-두 검증은 `.utmp` 아래 별도 저장 경로를 사용하며 실제 플레이 저장 파일을 변경하지 않습니다.
+`OutGameSetupTestValidation`과 `PersistentSaveValidation`은 Codex가 작성한 테스트 전용 코드로, 2026-10-07 정리하면서 삭제했습니다. 위의 검증 결과와 로컬 보고서는 당시 실행 기록입니다. 필요할 때 임시 검증을 다시 작성하고 사용 후 삭제합니다.
 
 씬은 `Canvas` 루트 프리팹 인스턴스, `EventSystem`과 Input System UI 입력 모듈, `Main Camera`로 구성됩니다. 런타임 UI 생성 코드는 없습니다.
