@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: "B_WA_T1_전사_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: "B_WA_T1_전사"
+  buildingFamilyId: warrior_barracks
+  displayName: "전사"
+  description: "전사 소환 병영"
+  buildingType: 2
+  icon: {fileID: 21300000, guid: 3c67ee17e1004c0e88fa5d3d8afd4319, type: 3}
+  worldSprite: {fileID: 21300000, guid: 3c67ee17e1004c0e88fa5d3d8afd4319, type: 3}
+  prefab: {fileID: 2229396505209575215, guid: 31740f7462c743a284027b0d02ef9383, type: 3}
+  buildCost:
+  - type: 0
+    amount: 10
+  buildFromEmptySlot: 1
+  requiredCoreLevel: 0
+  requiredFamilyIds: []
+  coreLevel: 0
+  buildLimit: 0
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 1
+    unitType: 1
+    countPerWave: 1
+    maxAlive: 3
+  upgrades:
+  - nextBuilding: {fileID: 11400000, guid: fd8e171420a143c6a853ad9441be5fca, type: 2}
+    cost:
+    - type: 0
+      amount: 50
+    requiredCoreLevel: 2
+  - nextBuilding: {fileID: 11400000, guid: f975e88dd65c43318d29a023b922399a, type: 2}
+    cost:
+    - type: 0
+      amount: 50
+    requiredCoreLevel: 2

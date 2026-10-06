@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: "B_CU_T2_1_혈교단원_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: "B_CU_T2_1_혈교단원"
+  buildingFamilyId: cultist_barracks
+  displayName: "혈교단원"
+  description: "혈교단원 소환 병영"
+  buildingType: 2
+  icon: {fileID: 21300000, guid: 4c1cbaf2889d45abba987bda1e667e75, type: 3}
+  worldSprite: {fileID: 21300000, guid: 4c1cbaf2889d45abba987bda1e667e75, type: 3}
+  prefab: {fileID: 3150728921005204436, guid: 7bddb73e024b42a2b1bfa37e4f27a2ec, type: 3}
+  buildCost:
+  - type: 0
+    amount: 10
+  buildFromEmptySlot: 0
+  requiredCoreLevel: 0
+  requiredFamilyIds: []
+  coreLevel: 0
+  buildLimit: 0
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 1
+    unitType: 42
+    countPerWave: 1
+    maxAlive: 3
+  upgrades:
+  - nextBuilding: {fileID: 11400000, guid: ad2e64c341c94046a413e79f81c471c1, type: 2}
+    cost:
+    - type: 0
+      amount: 50
+    requiredCoreLevel: 2
