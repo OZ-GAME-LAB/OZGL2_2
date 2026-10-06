@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_AR_T1_궁수_Data"
+  m_Name: "B_AR_T1_\uAD81\uC218_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_AR_T1_궁수"
+  buildingId: "B_AR_T1_\uAD81\uC218"
   buildingFamilyId: archer_barracks
-  displayName: "궁수"
-  description: "궁수 소환 병영"
+  displayName: "\uAD81\uC218"
+  description: "\uAD81\uC218 \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: e9e4661fd3ed4ea5938ad2f455bc207d, type: 3}
   worldSprite: {fileID: 21300000, guid: e9e4661fd3ed4ea5938ad2f455bc207d, type: 3}
@@ -36,7 +36,7 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 21
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 352013810b69455ca4e8756f753b4d1e, type: 2}

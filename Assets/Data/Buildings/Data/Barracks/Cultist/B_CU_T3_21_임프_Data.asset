@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_CU_T3_21_임프_Data"
+  m_Name: "B_CU_T3_21_\uC784\uD504_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_CU_T3_21_임프"
+  buildingId: "B_CU_T3_21_\uC784\uD504"
   buildingFamilyId: cultist_barracks
-  displayName: "임프"
-  description: "임프 소환 병영"
+  displayName: "\uC784\uD504"
+  description: "\uC784\uD504 \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 3bd69bc2618b486b8834ba30a0186f64, type: 3}
   worldSprite: {fileID: 21300000, guid: 3bd69bc2618b486b8834ba30a0186f64, type: 3}
@@ -36,6 +36,6 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 45
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades: []

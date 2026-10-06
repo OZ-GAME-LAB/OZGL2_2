@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
-  m_Name: "B_MG_T2_3_뇌전술사_Data"
+  m_Name: "B_MG_T2_3_\uB1CC\uC804\uC220\uC0AC_Data"
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
-  buildingId: "B_MG_T2_3_뇌전술사"
+  buildingId: "B_MG_T2_3_\uB1CC\uC804\uC220\uC0AC"
   buildingFamilyId: mage_barracks
-  displayName: "뇌전술사"
-  description: "뇌전술사 소환 병영"
+  displayName: "\uB1CC\uC804\uC220\uC0AC"
+  description: "\uB1CC\uC804\uC220\uC0AC \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
   icon: {fileID: 21300000, guid: 47b7ee527c2141509deae6bc2b8d9e6b, type: 3}
   worldSprite: {fileID: 21300000, guid: 47b7ee527c2141509deae6bc2b8d9e6b, type: 3}
@@ -36,7 +36,7 @@ MonoBehaviour:
   spawn:
     enabled: 1
     unitType: 34
-    countPerWave: 1
+    countPerWave: 3
     maxAlive: 3
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 3d408d8a324c4c11aa4d7f9134b7a1e3, type: 2}
