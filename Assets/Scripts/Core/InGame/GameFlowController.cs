@@ -38,17 +38,20 @@ namespace Game.Core
     public enum ResultType { Victory, Defeat }
     public enum RunDecision { Finish, Continue }
 
+    [Serializable]
     public class GameFlowSaveData
     {
         public NodeSaveData Node;
         public RunResumeStep ResumeStep;
         public bool HasClearedMainGame;
+        public string RunId;
 
-        public GameFlowSaveData(NodeSaveData node, RunResumeStep resumeStep, bool hasCleared)
+        public GameFlowSaveData(NodeSaveData node, RunResumeStep resumeStep, bool hasCleared, string runId = null)
         {
             Node = node;
             ResumeStep = resumeStep;
             HasClearedMainGame = hasCleared;
+            RunId = runId;
         }
     }
     /// <summary>
@@ -57,7 +60,7 @@ namespace Game.Core
     /// </summary>
     public class GameFlowController : MonoBehaviour, ISaveDataProvider<GameFlowSaveData>
     {
-        private const string MainMenuScene = "OutGameSetupTest";
+        private const string MainMenuScene = "Test_MainScreen";
 
         [Header("테스트용 종료 연출 시간입니다. Play 모드에서 조절하세요.")]
         [Min(0)]
@@ -95,6 +98,14 @@ namespace Game.Core
         private IShopFlow _shopFlow;
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
+        private IRunCheckpointWriter _checkpointWriter;
+        private bool _hasBegun;
+        private bool _restoredStep;
+        private bool _startupBlocked;
+        private bool _settlementViewPrepared;
+        public string RunId { get; private set; }
+        public RunResumeStep ResumeStep => _resumeStep;
+        public bool IsResumingStep { get; private set; }
         private bool _isTransitioning;
         private bool _isResetting;
         private UniTaskCompletionSource _spawnCompletion;
@@ -126,7 +137,28 @@ namespace Game.Core
             ClearToken();
             ResetDecisionState();
             _isTransitioning = false;
-            ChangePhase(GamePhase.None);
+            _curPhase = GamePhase.None;
+            _resumeStep = RunResumeStep.Preparation;
+            HasClearedMainGame = false;
+            RunId = Guid.NewGuid().ToString("N");
+            _hasBegun = false;
+            _restoredStep = false;
+            _startupBlocked = false;
+            _settlementViewPrepared = false;
+            IsResumingStep = false;
+            if (!_nodeController.TryStartQuarter(1, _twoEliteChance, out string error))
+                throw new InvalidOperationException("기본 런 준비 실패: " + error);
+        }
+
+        public void InitializeSave(IRunCheckpointWriter checkpointWriter)
+        {
+            _checkpointWriter = checkpointWriter ?? throw new ArgumentNullException(nameof(checkpointWriter));
+        }
+
+        public void BlockStartup()
+        {
+            _startupBlocked = true;
+            _isTransitioning = true;
         }
 
         /// <summary>호출하고 결과를 기다리는 UI 계약을 연결한다. 게임 데이터는 Flow가 전달한다.</summary>
@@ -144,55 +176,51 @@ namespace Game.Core
             _cts?.Dispose();
         }
         
-        /// <summary> 새로운 게임을 시작하는 메서드</summary>
-        public void NewGame()
+        // 기존 버튼/샘플의 연결은 유지하되 준비된 런을 다시 초기화하지 않는다.
+        public void NewGame() => BeginRun();
+        public void Continue() => BeginRun();
+        public void BeginRun() => BeginRunAsync().Forget();
+
+        public async UniTask BeginRunAsync()
         {
-            if (_isTransitioning) return;
-            if (_curPhase != GamePhase.None && _curPhase != GamePhase.Finished) return;
+            if (_hasBegun || _startupBlocked || _curPhase != GamePhase.None) return;
+            _hasBegun = true;
             _isTransitioning = true;
-            HasClearedMainGame = false;
-            ResetDecisionState();
-            _nodeController.Reset();
-            _waveController.CleanupBattle();
-            if (!StartQuarter(1))
+            var lifetime = _cts;
+            var token = lifetime.Token;
+            try
             {
-                _isTransitioning = false;
-                return;
+                if (_resumeStep == RunResumeStep.Finished)
+                {
+                    await LeaveCompletedRunAsync(token);
+                    return;
+                }
+                NotifyNodeChanged();
+                IsResumingStep = _restoredStep;
+                if (_resumeStep == RunResumeStep.Preparation)
+                    await EnterPreparationAsync(token);
+                else
+                    await ContinueAfterVictoryAsync(_resumeStep, token);
             }
-            ChangePhase(GamePhase.Preparation);
-            _isTransitioning = false;
+            // UI의 OnDisable 취소가 Flow.OnDestroy보다 먼저 도착할 수 있다.
+            catch (OperationCanceledException) { }
+            catch (Exception exception)
+            {
+                BlockStartup();
+                Debug.LogError("[Save/GameFlow] 런 시작 실패: " + exception.Message, this);
+            }
+            finally
+            {
+                IsResumingStep = false;
+                if (ReferenceEquals(_cts, lifetime) && !_startupBlocked) _isTransitioning = false;
+            }
         }
 
-        public void Continue()
+        public void PrepareCompletedRun(string runId)
         {
-            if (_isTransitioning) return;
-            if (_curPhase != GamePhase.None && _curPhase != GamePhase.Finished) return;
-            _isTransitioning = true;
-            ResetDecisionState();
-            switch (_resumeStep)
-            {
-                case RunResumeStep.Preparation:
-
-                    break;
-                case RunResumeStep.RewardSelection:
-
-                    break;
-                case RunResumeStep.Event:
-
-                    break;
-                case RunResumeStep.Store:
-
-                    break;
-                case RunResumeStep.QuarterDecision:
-
-                    break;
-                case RunResumeStep.Finished:
-
-                    break;
-            }
-            ChangePhase(GamePhase.Preparation);
-            _isTransitioning = false;
-
+            if (!string.IsNullOrWhiteSpace(runId)) RunId = runId;
+            _resumeStep = RunResumeStep.Finished;
+            _restoredStep = true;
         }
         //게임을 종료하고 메인으로 이동
         public void QuitRun()
@@ -207,14 +235,23 @@ namespace Game.Core
             return new GameFlowSaveData(
                 _nodeController.CaptureSaveData(),
                 _resumeStep,
-                HasClearedMainGame);
+                HasClearedMainGame, RunId);
         }
         //저장된 값 불러와서 다시 쓸 수 있게 복원
         public void RestoreSaveData(GameFlowSaveData data)
         {
+            if (data == null || !Enum.IsDefined(typeof(RunResumeStep), data.ResumeStep))
+                throw new ArgumentException("게임 진행 저장값이 올바르지 않습니다.");
             _nodeController.RestoreSaveData(data.Node);
+            if ((data.ResumeStep == RunResumeStep.Event && CurrentNode.PostBattleEvent != PostBattleEventType.Event &&
+                 CurrentNode.PostBattleEvent != PostBattleEventType.Curse) ||
+                (data.ResumeStep == RunResumeStep.Store && CurrentNode.PostBattleEvent != PostBattleEventType.Shop) ||
+                (data.ResumeStep == RunResumeStep.QuarterDecision && (!IsLastNode || !data.HasClearedMainGame)))
+                throw new ArgumentException("저장된 재개 단계와 현재 노드가 일치하지 않습니다.");
             _resumeStep = data.ResumeStep;
             HasClearedMainGame = data.HasClearedMainGame;
+            if (!string.IsNullOrWhiteSpace(data.RunId)) RunId = data.RunId;
+            _restoredStep = true;
         }
 
         private async UniTask ReturnToMainMenuAsync()
@@ -268,6 +305,7 @@ namespace Game.Core
             _spawnCompletion = completion;
             try
             {
+                await SaveCheckpointAsync(token);
                 ChangePhase(GamePhase.BattlePreparing);
                 if (token.IsCancellationRequested) return false;
                 _cameraController.ShowBase();
@@ -337,78 +375,75 @@ namespace Game.Core
             // 승리를 확정한 현재 노드의 기록을 다음 노드로 이동하기 전에 한 번 알린다.
             _waveController.NotifyWaveCleared(new WaveInfo(CurrentQuarter, completedNode.WaveNumber,
                 completedNode.BattleType, completedNode.PostBattleEvent));
-            //분기 마지막 웨이브가 아닐경우 그대로 보상처리 후 진행
-            if (!IsLastNode)
+            if (IsLastNode && CurrentQuarter >= NodeController.MainQuarters)
+                HasClearedMainGame = true;
+            await ContinueAfterVictoryAsync(RunResumeStep.RewardSelection, token);
+        }
+
+        // 승리 직후와 저장된 후속 단계가 같은 진행 경로를 사용한다.
+        private async UniTask ContinueAfterVictoryAsync(RunResumeStep startStep, CancellationToken token)
+        {
+            Node completedNode = CurrentNode;
+            if (startStep == RunResumeStep.RewardSelection)
             {
-                //보상 선택
                 await WaitArtifactSelection(completedNode.BattleType, token);
-                //전장정리
                 await CleanupBattleAsync(token);
-                token.ThrowIfCancellationRequested();
-                //이벤트 확인
-                await ProcessEventAsync(completedNode, token);
-                token.ThrowIfCancellationRequested();
-                AdvanceNode();
             }
-            //분기 마지막웨이브일 때 처리
+            if (startStep != RunResumeStep.QuarterDecision)
+                await ProcessEventAsync(completedNode, token);
+            token.ThrowIfCancellationRequested();
+
+            if (!IsLastNode)
+                AdvanceNode();
             else
             {
-                // 기본 구간 클리어 기록은 계속 도전하거나 이후 패배해도 유지한다.
-                if (CurrentQuarter >= NodeController.MainQuarters)
-                    HasClearedMainGame = true;
-
-                ChangePhase(GamePhase.QuarterComplete);
-                token.ThrowIfCancellationRequested();
-                //아티팩트 + 재화 획득
-                await WaitArtifactSelection(completedNode.BattleType, token);
-                
-                //전장정리
-                await CleanupBattleAsync(token);
-                token.ThrowIfCancellationRequested();
-                await ProcessEventAsync(completedNode, token);
-                token.ThrowIfCancellationRequested();
-                ChangePhase(GamePhase.QuarterComplete);
-                token.ThrowIfCancellationRequested();
-                //분기 종료후 계속 진행할지 확인하는 부분
-                if (HasClearedMainGame && !AutoContinue)
+                if (startStep == RunResumeStep.QuarterDecision || (HasClearedMainGame && !AutoContinue))
                 {
-                    _runDecision = null;
-                    IsWaitingForRunDecision = true;
-                    try
-                    {
-                        if (_decisionUI != null)
-                        {
-                            RunDecision decision = await _decisionUI.ChooseAsync(CurrentQuarter, token);
-                            token.ThrowIfCancellationRequested();
-                            if (decision != RunDecision.Finish && decision != RunDecision.Continue)
-                                throw new InvalidOperationException("The run decision UI returned an invalid choice.");
-                            _runDecision = decision;
-                        }
-                        else
-                        {
-                            // 기존 테스트/호환 경로. 새 UI 경로는 이벤트나 외부 버튼 입력을 기다리지 않는다.
-                            QuarterDecisionRequested?.Invoke();
-                            await UniTask.WaitUntil(() => _runDecision.HasValue, cancellationToken: token);
-                        }
-                        token.ThrowIfCancellationRequested();
-                    }
-                    finally
-                    {
-                        if (!token.IsCancellationRequested) IsWaitingForRunDecision = false;
-                    }
-
-                    if (_runDecision.Value == RunDecision.Finish)
+                    RunDecision decision = await ChooseQuarterDecisionAsync(token);
+                    if (decision == RunDecision.Finish)
                     {
                         await FinishRun(ResultType.Victory, token);
                         return;
                     }
                 }
-
-                if (!StartQuarter(CurrentQuarter + 1)) return;
+                if (!StartQuarter(CurrentQuarter + 1))
+                    throw new InvalidOperationException("다음 분기 생성에 실패했습니다.");
             }
-            token.ThrowIfCancellationRequested();
-            _cameraController.ShowBase();
+            await EnterPreparationAsync(token);
+        }
+
+        private async UniTask EnterPreparationAsync(CancellationToken token)
+        {
+            _resumeStep = RunResumeStep.Preparation;
+            _cameraController?.ShowBase();
             ChangePhase(GamePhase.Preparation);
+            await SaveCheckpointAsync(token);
+            IsResumingStep = false;
+        }
+
+        private async UniTask<RunDecision> ChooseQuarterDecisionAsync(CancellationToken token)
+        {
+            _resumeStep = RunResumeStep.QuarterDecision;
+            ChangePhase(GamePhase.QuarterComplete);
+            await SaveCheckpointAsync(token);
+            IsResumingStep = false;
+            _runDecision = null;
+            IsWaitingForRunDecision = true;
+            try
+            {
+                if (_decisionUI != null)
+                    _runDecision = await _decisionUI.ChooseAsync(CurrentQuarter, token);
+                else
+                {
+                    QuarterDecisionRequested?.Invoke();
+                    await UniTask.WaitUntil(() => _runDecision.HasValue, cancellationToken: token);
+                }
+                token.ThrowIfCancellationRequested();
+                if (_runDecision != RunDecision.Finish && _runDecision != RunDecision.Continue)
+                    throw new InvalidOperationException("종료 선택 UI가 유효하지 않은 선택을 반환했습니다.");
+                return _runDecision.Value;
+            }
+            finally { IsWaitingForRunDecision = false; }
         }
 
         /// <summary>
@@ -423,17 +458,24 @@ namespace Game.Core
             {
                 if (_shopFlow == null)
                     throw new InvalidOperationException("상점 진행 계약을 먼저 연결해주세요.");
+                PrepareShopCheckpoint();
+                _resumeStep = RunResumeStep.Store;
                 ChangePhase(GamePhase.Store);
+                await SaveCheckpointAsync(token);
+                IsResumingStep = false;
                 token.ThrowIfCancellationRequested();
                 await _shopFlow.OpenShopAsync(token);
                 token.ThrowIfCancellationRequested();
                 return;
             }
 
+            _resumeStep = RunResumeStep.Event;
             GamePhase phase = GamePhase.Event;
             if (_continueUI != null)
             {
                 ChangePhase(phase);
+                await SaveCheckpointAsync(token);
+                IsResumingStep = false;
                 token.ThrowIfCancellationRequested();
                 await _continueUI.ShowAsync("돌발 이벤트를 확인했습니다.\n계속해서 다음 전투를 준비합니다.", token);
                 token.ThrowIfCancellationRequested();
@@ -442,8 +484,25 @@ namespace Game.Core
             // 페이즈 구독자가 즉시 완료할 수 있도록 대기를 먼저 준비한다.
             var contentWait = _testScript.WaitPostBattleContentAsync(completedNode, token);
             ChangePhase(phase);
+            await SaveCheckpointAsync(token);
+            IsResumingStep = false;
             await contentWait;
             token.ThrowIfCancellationRequested();
+        }
+
+        // 기존 상점 API로 후보를 먼저 확정해 UI 표시 전 체크포인트에 포함한다.
+        private void PrepareShopCheckpoint()
+        {
+            if (_shopFlow is ShopManager shop)
+            {
+                var data = shop.CaptureSaveData();
+                if ((!data.HasStock || (data.StockQuarter != 0 && data.StockQuarter != CurrentQuarter)) &&
+                    !shop.TryGenerateStock())
+                    throw new InvalidOperationException("상점 품목 생성에 실패했습니다.");
+                return;
+            }
+            if (_checkpointWriter != null)
+                throw new InvalidOperationException("저장할 상점 후보를 준비할 수 있는 ShopManager를 연결해주세요.");
         }
 
         // 분기·노드 진행
@@ -486,19 +545,62 @@ namespace Game.Core
                     throw new InvalidOperationException("게임 결산 기록을 불러올 수 없습니다.");
             }
 
+            // 런 ID를 지급 전에 인게임 파일에 확정한다.
+            await SaveCheckpointAsync(token);
             while (!await _settlementRewards.TryApplyReward(summary, token))
             {
+                Debug.LogError("[Save/GameFlow] 정산 확정 또는 표시 실패: 정산 로그를 확인해주세요.", this);
                 token.ThrowIfCancellationRequested();
                 if (_continueUI == null)
                     throw new InvalidOperationException("정산 실패 안내 UI를 먼저 연결해주세요.");
                 await _continueUI.ShowAsync("정산을 완료하지 못했습니다.\n계속 버튼을 누르면 다시 시도합니다.", token);
             }
             token.ThrowIfCancellationRequested();
+            // 저장 연결이 없는 기존 독립 테스트도 종료 상태를 정리한다.
+            await PrepareSettlementViewAsync(token);
+            await LeaveCompletedRunAsync(token);
+        }
 
-            // Finished를 먼저 보내면 제단·특성 효과가 해제되어 정산 배율이 사라진다.
+        // 정산 저장 브리지가 보상·완료 기록 확정 후, 결산 UI 표시 전에 호출한다.
+        public async UniTask PrepareSettlementViewAsync(CancellationToken token)
+        {
+            if (_settlementViewPrepared) return;
+            token.ThrowIfCancellationRequested();
+            _resumeStep = RunResumeStep.Finished;
+            await SaveCheckpointAsync(token);
+            // 보상은 효과 해제 전에 이미 파일에 확정됐다.
             ChangePhase(GamePhase.Finished);
             if (_artifactManager != null && _artifactManager.IsInitialized && !_artifactManager.TryEndRun())
                 throw new InvalidOperationException("정산 후 유물 상태를 정리하지 못했습니다.");
+            _settlementViewPrepared = true;
+        }
+
+        private async UniTask SaveCheckpointAsync(CancellationToken token)
+        {
+            // 저장기를 연결하지 않은 기존 독립 테스트/샘플은 파일을 만들지 않는다.
+            if (_checkpointWriter == null) return;
+            while (!_checkpointWriter.TrySave(out string error))
+            {
+                token.ThrowIfCancellationRequested();
+                Debug.LogError("[Save/GameFlow] 체크포인트 저장 실패: " + error, this);
+                if (_continueUI == null) throw new InvalidOperationException(error);
+                await _continueUI.ShowAsync("진행 상태를 저장하지 못했습니다.\n계속 버튼을 누르면 다시 시도합니다.", token);
+            }
+            token.ThrowIfCancellationRequested();
+        }
+
+        private async UniTask LeaveCompletedRunAsync(CancellationToken token)
+        {
+            if (_checkpointWriter != null)
+            {
+                while (!_checkpointWriter.TryDelete(out string error))
+                {
+                    Debug.LogError("[Save/GameFlow] 완료 런 삭제 실패: " + error, this);
+                    if (_continueUI == null) throw new InvalidOperationException(error);
+                    await _continueUI.ShowAsync("완료된 런의 저장 파일을 정리하지 못했습니다.\n계속 버튼을 누르면 다시 시도합니다.", token);
+                }
+            }
+            token.ThrowIfCancellationRequested();
             await ReturnToMainMenuAsync();
         }
 
@@ -563,10 +665,15 @@ namespace Game.Core
         private async UniTask WaitArtifactSelection(WaveBattleType battleType, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            if (!_artifactManager.TryCreateCandidates(out _))
+                throw new InvalidOperationException("유물 보상 후보를 준비하지 못했습니다.");
+            _resumeStep = RunResumeStep.RewardSelection;
             if (_continueUI != null)
             {
-                // 재화 지급 시점은 기존 Reward 구독에 유지한다. 지급 시점 통합은 저장/로드 작업에서 진행한다.
+                // 정상 진입은 지급 후 저장하고, 복원 진입은 지급을 건너뛴다.
                 ChangePhase(GamePhase.Reward);
+                await SaveCheckpointAsync(token);
+                IsResumingStep = false;
                 token.ThrowIfCancellationRequested();
                 IsWaitingForArtifactSelection = true;
                 try
@@ -588,6 +695,8 @@ namespace Game.Core
             // 페이즈/선택 요청 구독자가 즉시 버튼 입력을 보내도 초기화로 덮어쓰지 않는다.
             var rewardWait = _testScript.WaitToggle(token);
             ChangePhase(GamePhase.Reward);
+            await SaveCheckpointAsync(token);
+            IsResumingStep = false;
             token.ThrowIfCancellationRequested();
             ArtifactSelectionRequested?.Invoke();
             token.ThrowIfCancellationRequested();

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>테스트 혈석 상태를 관리합니다. 파일 저장은 PersistentSaveCoordinator가 담당합니다.</summary>
+/// <summary>테스트 혈석 상태를 관리합니다. 파일 저장은 OutGameSaveCoordinator가 담당합니다.</summary>
 public class PersistentCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, ISaveDataProvider<PersistentWalletSaveData>
 {
     [SerializeField, Min(0)] private int _initialBloodstone = 500;

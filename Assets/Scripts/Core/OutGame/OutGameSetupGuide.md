@@ -20,7 +20,7 @@ OutGameBootstrap.Start
       ├─ UI Controller의 이전 이벤트 연결 해제
       ├─ TestWallet.Initialize                  혈석 초기화
       ├─ Altar/Trait/Totem Selector.Initialize  선택 상태 초기화
-      ├─ PersistentSaveCoordinator.Initialize  저장 매니저와 Provider 연결
+      ├─ OutGameSaveCoordinator.Initialize  저장 매니저와 Provider 연결
       ├─ TryLoadOrCreate                       특성·혈석 복원, 최초 실행만 기본값 저장
       ├─ OutGameController.Initialize          컨텐츠 참조 연결
       └─ OutGameUIController.Initialize        UI 초기화·이벤트 연결 후 제단 화면 표시
@@ -56,8 +56,8 @@ UI의 선택 요청
 
 | 스크립트 | 책임과 주요 메서드 |
 |---|---|
-| `OutGameBootstrap` | 지갑, Selector 3개, Controller, UI Controller, SaveManager, PersistentSaveCoordinator를 Inspector로 받습니다. 기본 초기화 후 특성·혈석을 복원하고 마지막에 UI를 연결합니다. 재호출해도 저장된 영구 상태가 유지됩니다. |
-| `PersistentSaveCoordinator` | `CaptureSaveData`, `TrySave`, `TryLoad`, `TryLoadOrCreate`로 데이터를 수집·검증·저장·복원합니다. 업그레이드나 비용 차감은 처리하지 않습니다. |
+| `OutGameBootstrap` | 지갑, Selector 3개, Controller, UI Controller, SaveManager, OutGameSaveCoordinator를 Inspector로 받습니다. 기본 초기화 후 특성·혈석을 복원하고 마지막에 UI를 연결합니다. 재호출해도 저장된 영구 상태가 유지됩니다. |
+| `OutGameSaveCoordinator` | `CaptureSaveData`, `TrySave`, `TryLoad`, `TryLoadOrCreate`로 데이터를 수집·검증·저장·복원합니다. 업그레이드나 비용 차감은 처리하지 않습니다. |
 | `PersistentSaveData` | 특성 Provider의 `TraitSaveData`와 지갑 Provider의 `PersistentWalletSaveData`를 묶는 저장용 클래스입니다. |
 | `OutGameController` | 선택 결과를 모아 게임 시작을 처리합니다. `CreateStartContext`는 데이터 복사, `StartRun`은 컨텍스트를 보관하고 로그를 출력합니다. UI나 패널 참조를 가지지 않습니다. |
 | `OutGameUIController` | View 초기화, 이벤트 연결, 최초 화면 표시와 화면 이동을 담당합니다. `ShowAltar`, `ShowTraits`, `ShowTotems`에서 해당 View의 GameObject를 표시합니다. `Shutdown`에서 자신이 연결한 이벤트를 해제합니다. |
@@ -193,7 +193,7 @@ public class OutGameStartContext
 1. `OutGameSetupTest` 씬을 실행하고 든든한 밑천을 한 번 구매합니다.
 2. 특성 1레벨, 혈석 400이 됩니다. 이 순간 파일 저장도 완료됩니다.
 3. Play를 종료하고 다시 실행합니다. 특성 1레벨과 혈석 400이 복원됩니다.
-4. Play 중 Systems의 `PersistentSaveCoordinator` 컴포넌트 메뉴에서 `Persistent Save > Save Traits And Bloodstone` 또는 `Load Traits And Bloodstone`을 실행할 수도 있습니다. 완료 로그에 실제 파일 경로가 표시됩니다.
+4. Play 중 Systems의 `OutGameSaveCoordinator` 컴포넌트 메뉴에서 `Persistent Save > Save Traits And Bloodstone` 또는 `Load Traits And Bloodstone`을 실행할 수도 있습니다. 완료 로그에 실제 파일 경로가 표시됩니다.
 
 `CaptureSaveData`는 원본 리스트뿐 아니라 내부 항목까지 복사합니다. 복원은 ID로 대응하므로 저장 목록 순서가 바뀌어도 정상이며, 저장에 없는 신규 특성은 0레벨로 처리합니다. 미등록/중복 ID, null 데이터, 비어 있는 특성 목록, 범위 밖 레벨, 선행 특성이 없는 상태, 음수 혈석은 거부합니다. 두 영역을 모두 검증하기 전에는 어느 쪽도 복원하지 않습니다.
 
