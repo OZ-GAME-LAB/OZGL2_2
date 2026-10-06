@@ -210,10 +210,34 @@ namespace Game.UI.InGame.Editor
                 UniTask external = shop.OpenShopAsync(CancellationToken.None);
                 Check(ui.ClosePopup(UIId.Shop, UICloseReason.Replaced) && await WasCanceled(external) && !view.IsPending,
                     "external popup close cancels the shop request");
+                var previousPurchases = shop.PurchaseSlots;
+                var previousConsumables = shop.ConsumableSlots;
+                var previousExchanges = shop.ExchangeSlots;
                 UniTask reopened = shop.OpenShopAsync(CancellationToken.None);
                 Click(leave);
                 await reopened;
                 Check(!view.IsPending && !screen.IsVisible, "reopen after external close completes normally");
+                Check(ReferenceEquals(previousPurchases, shop.PurchaseSlots) &&
+                    ReferenceEquals(previousConsumables, shop.ConsumableSlots) &&
+                    ReferenceEquals(previousExchanges, shop.ExchangeSlots), "same quarter preserves all stock lists");
+
+                var nodes = Read<NodeController>(flow, "_nodeController");
+                Set(nodes, "<CurrentQuarter>k__BackingField", flow.CurrentQuarter + 1);
+                UniTask nextQuarter = shop.OpenShopAsync(CancellationToken.None);
+                Check(!ReferenceEquals(previousPurchases, shop.PurchaseSlots) &&
+                    !ReferenceEquals(previousConsumables, shop.ConsumableSlots) &&
+                    !ReferenceEquals(previousExchanges, shop.ExchangeSlots) &&
+                    shop.CaptureSaveData().StockQuarter == flow.CurrentQuarter,
+                    "new quarter regenerates all three stock lists and records the quarter");
+                Click(leave);
+                await nextQuarter;
+                var savedShop = shop.CaptureSaveData();
+                shop.RestoreSaveData(savedShop);
+                var restoredPurchases = shop.PurchaseSlots;
+                UniTask restored = shop.OpenShopAsync(CancellationToken.None);
+                Check(ReferenceEquals(restoredPurchases, shop.PurchaseSlots), "restored current-quarter stock is not rerolled");
+                Click(leave);
+                await restored;
                 UniTask ended = shop.OpenShopAsync(CancellationToken.None);
                 Check(shop.TryEndRun() && await WasCanceled(ended) && !view.IsPending && !screen.IsVisible && !shop.IsInitialized,
                     "TryEndRun cancels pending UI before removing shop state");
@@ -338,6 +362,8 @@ namespace Game.UI.InGame.Editor
         }
         private static object Invoke(object owner, string name, params object[] arguments) =>
             owner.GetType().GetMethod(name, Fields).Invoke(owner, arguments);
+        private static void Set(object owner, string name, object value) =>
+            owner.GetType().GetField(name, Fields).SetValue(owner, value);
         private static void Click(Button button)
         {
             if (!button.gameObject.activeInHierarchy || !button.IsInteractable())

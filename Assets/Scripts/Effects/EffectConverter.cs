@@ -171,9 +171,18 @@ public class EffectConverter
                     effect.ApplyType == UnitModifierApplyType.Class || effect.ApplyType == UnitModifierApplyType.Type ||
                     (ally && effect.ApplyType == UnitModifierApplyType.Tier) ||
                     (enemy && effect.ApplyType == UnitModifierApplyType.Faction);
-                if (effect.PassiveSkill == null || (!ally && !enemy) || !validApplyType)
+                if (effect.PassiveSkill == null)
                 {
-                    Debug.LogError("[Effects/EffectConverter] 패시브 S.O·대상 팀·적용 조건을 확인하세요.");
+                    Debug.LogError($"[Effects/EffectConverter] 패시브 S.O 참조가 없습니다. " +
+                        $"대상 팀: {effect.TargetTeam}, 적용 조건: {effect.ApplyType}. " +
+                        "아티팩트의 Passive Skill Effects 참조를 확인하세요.");
+                    return false;
+                }
+                if ((!ally && !enemy) || !validApplyType)
+                {
+                    Debug.LogError($"[Effects/EffectConverter] 패시브 대상 설정이 유효하지 않습니다. " +
+                        $"S.O: {effect.PassiveSkill.name}, 대상 팀: {effect.TargetTeam}, 적용 조건: {effect.ApplyType}",
+                        effect.PassiveSkill);
                     return false;
                 }
 

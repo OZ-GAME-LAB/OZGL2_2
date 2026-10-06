@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5944b9673db241ddb1fb2ad77881c095, type: 3}
+  m_Name: test_passive_002
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
+  _id: test_passive_002
+  _displayName: "[\uD14C\uC2A4\uD2B8] \uC9C8\uC8FC"
+  _description: "\uD68D\uB4DD \uD6C4 \uC0DD\uC131\uB418\uB294 \uC544\uAD70 1\uD2F0\uC5B4:
+    8\uCD08\uB9C8\uB2E4 3\uCD08\uAC04 \uC774\uB3D9\uC18D\uB3C4 +200%. \uC774\uB3D9
+    \uC911 \uD655\uC778."
+  _icon: {fileID: 0}
+  _rarity: 1
+  _maxStacks: 1
+  _unitStatEffects: []
+  _currencyEffects: []
+  _consumableSlotEffects: []
+  _passiveSkillEffects:
+  - _passiveSkill: {fileID: 11400000, guid: 5990d902fcb84d7bb68b02ef322c1486, type: 2}
+    _targetTeam: 0
+    _applyType: 1
+    _allyClass: 1
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0

@@ -97,7 +97,7 @@ public class BootStrap : MonoBehaviour
             Debug.LogError("[BootStrap] 상점에 연결할 소모품 매니저 초기화에 실패했습니다.", this);
             return;
         }
-        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _consumableItemManager, _uiStartup.ShopUI);
+        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI);
         if (!_shopManager.IsInitialized)
         {
             Debug.LogError("[BootStrap] 상점 매니저 초기화에 실패했습니다.", this);
