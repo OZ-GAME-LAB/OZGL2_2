@@ -1,10 +1,13 @@
+using System;
 using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using Game.Cameras;
 using Game.Core;
 using Game.UI.InGame;
 using OZGL.KDH;
 using Units;
 using UnityEngine;
+using UnityEngine.Serialization;
 /// 각 시스템의 참조 연결과 초기화 순서를 관리하고,
 /// 준비가 완료되면 GameFlowController.BeginRun()을 호출한다.
 ///
@@ -20,6 +23,8 @@ using UnityEngine;
 /// 이벤트 구독 해제와 재초기화 시 중복 구독 방지는 각 시스템에서 처리.
 public class BootStrap : MonoBehaviour
 {
+    #region Systems
+    [Header("Systems")]
     [SerializeField] private TestWaitingScript _testScript; //테스트용으로 , 실제 구현시 삭제할것
     [SerializeField] private GameFlowController _gameFlowController;
     [SerializeField] private WaveController _waveController;
@@ -37,18 +42,26 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private BuildingCensus _buildingCensus;
+    #endregion
+
+    #region Save
     [Header("Save")]
     [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
-    [SerializeField] private PersistentSaveCoordinator _persistentSaveCoordinator;
+    [FormerlySerializedAs("_persistentSaveCoordinator")]
+    [SerializeField] private OutGameSaveCoordinator _outGameSaveCoordinator;
     [SerializeField] private SaveManager _saveManager;
-    
-    [SerializeField] private OutGameTraitController _persistentTraits;
-    // [SerializeField] private TeamBuildingUiStartup _uiManager;
-    [Header("UI Connections")]
+    #endregion
+
+    #region UI
+    [Header("UI")]
     [SerializeField] private InGameUIStartup _uiStartup;
     public bool IsUIConnected => _uiStartup != null && _uiStartup.IsReady;
+    #endregion
+
+    #region OutGames
     // Current date KDH 2026-09-29
     // 아웃게임 효과(특성·토템·제단)입니다. 연결하지 않아도 게임은 시작됩니다.
+    [SerializeField] private OutGameTraitController _persistentTraits;
     [Header("OutGame Effects (KDH)")]
     [Tooltip("SpawnManager에 연결된 것과 같은 오브젝트여야 스폰 유닛에 반영됩니다.")]
     [SerializeField] private UnitStatModifierManager _unitStatModifierManager;
@@ -57,32 +70,103 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private TotemRunApplier _totemRunApplier;
     [SerializeField] private TotemEffectCatalog _totemCatalog;
     [SerializeField] private AltarManager _altarManager;
-    private IOutGameDataSetter _data;
+    #endregion
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
+    public bool IsContinue => _isContinue;
 
-    void Start()
+    private bool _isContinue;
+    
+    async void Start()
     {
         if (!ValidateReferences()) return;
-
-        _data = new TestOutGameDataSetter();
-
-        // Current date KDH 2026-09-29
-        // Pending을 비우기 전에 아웃게임에서 넘어왔는지 기억합니다.
-        // 씬을 직접 실행하면 목록이 빈 context가 만들어지므로, 이때는 각 Applier의 _testLevels를 씁니다.
-        bool fromOutGame = OutGameStartContext.Pending != null;
-
-        OutGameStartContext context = OutGameStartContext.Pending;
-        if (context == null)
+        try
         {
-            // 인게임 씬을 직접 실행하면 풍요의 제단만 선택합니다.
-            // 특성·토템 목록은 비어 있고 누적 보너스는 0입니다.
-            context = new OutGameStartContext();
-            context.SelectedAltar = AltarId.Abundance;
+            if (!InitializePersistentData() || !InitializeManagers())
+            {
+                _gameFlowController.BlockStartup();
+                return;
+            }
+            // 모든 슬롯의 Start에서 기본 배치 연결이 끝난 뒤 UI와 저장 상태를 연결한다.
+            await UniTask.NextFrame(cancellationToken: this.GetCancellationTokenOnDestroy());
+            if (!InitializeUI())
+            {
+                _gameFlowController.BlockStartup();
+                return;
+            }
+            _testScript.Initialize(_gameFlowController, _waveController);
+            _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
+                _artifactManager, _shopManager, _consumableItemManager, _buildController, _archiveManager,
+                () => _archiveManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController));
+            _gameFlowController.InitializeSave(_inGameSaveCoordinator);
+
+            bool hasRun = _saveManager.HasSaveFile(InGameSaveCoordinator.SaveKey);
+            InGameSaveData loaded = null;
+            if (hasRun)
+            {
+                if (!_inGameSaveCoordinator.TryReadSaveData(out loaded, out string readError))
+                {
+                    StopStartup(readError);
+                    return;
+                }
+                if (loaded.Flow == null)
+                {
+                    StopStartup("필수 Flow 진행값이 없습니다.");
+                    return;
+                }
+                // 결산 파일을 읽은 직후 판정한다. 다른 파트가 미완성이어도 재지급하지 않는다.
+                if (loaded.Flow.ResumeStep == RunResumeStep.Finished ||
+                    (!string.IsNullOrWhiteSpace(loaded.Flow.RunId) &&
+                     string.Equals(loaded.Flow.RunId, _outGameSaveCoordinator.LastSettledRunId, StringComparison.Ordinal)))
+                {
+                    _gameFlowController.PrepareCompletedRun(loaded.Flow.RunId);
+                    _gameFlowController.BeginRun();
+                    return;
+                }
+            }
+
+            var profile = _outGameSaveCoordinator.CaptureSaveData();
+            if (hasRun && !CanRestoreOutGameEffects(profile, loaded.Flow, out string effectError))
+            {
+                StopStartup(effectError);
+                return;
+            }
+            InitializeOutGameEffects(profile);
+            if (hasRun)
+            {
+                if (!_inGameSaveCoordinator.TryApplySaveData(loaded, out string restoreError))
+                {
+                    StopStartup(restoreError);
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(loaded.Flow.RunId))
+                    _inGameSaveCoordinator.RequireBackupBeforeNextWrite();
+            }
+
+            string saveError;
+            bool saved = hasRun ? _inGameSaveCoordinator.TrySave(out saveError) :
+                _inGameSaveCoordinator.TryCreateSave(out saveError);
+            if (!saved)
+            {
+                StopStartup(saveError);
+                return;
+            }
+            _gameFlowController.BeginRun();
         }
+        catch (OperationCanceledException) when (this == null) { }
+        catch (Exception exception)
+        {
+            StopStartup(exception.Message);
+        }
+    }
 
-        if (!InitializePersistentData()) return;
+    private void StopStartup(string error)
+    {
+        _gameFlowController?.BlockStartup();
+        Debug.LogError("[Save/BootStrap] 진입 중단: " + error, this);
+    }
 
-        _testScript.Initialize(_gameFlowController, _waveController);
+    private bool InitializeManagers()
+    {
         _gameFlowController.Initialize
             (_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController, _shopManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
@@ -95,19 +179,44 @@ public class BootStrap : MonoBehaviour
         if (!_consumableItemManager.IsInitialized)
         {
             Debug.LogError("[BootStrap] 상점에 연결할 소모품 매니저 초기화에 실패했습니다.", this);
-            return;
+            return false;
         }
+
         _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI);
         if (!_shopManager.IsInitialized)
         {
             Debug.LogError("[BootStrap] 상점 매니저 초기화에 실패했습니다.", this);
-            return;
+            return false;
         }
+
+        var settlementBridge = new RunSettlementSaveBridge(_outGameSaveCoordinator,
+            () => _gameFlowController.RunId, _uiStartup.SettlementUI,
+            _gameFlowController.PrepareSettlementViewAsync);
         _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier,
-            _uiStartup.SettlementUI, _persistentSaveCoordinator);
-        _archiveManager.Initialize(_artifactManager,_runtimeUnitManager,_waveController);
+            settlementBridge, settlementBridge);
         _cameraController.Initialize(_buildController,_gameFlowController);
-        
+        _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
+            _runCurrencyManager, _gameFlowController);
+        _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
+        _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
+            _gameFlowController);
+
+        return true;
+    }
+    // 저장용 특성은 런 효과용 선택 목록과 별개다. 파일에서 복원한 특성을 그대로 보존한다.
+    private bool InitializePersistentData()
+    {
+        _persistentCurrencyManager.Initialize();
+        _persistentTraits.Initialize(_persistentCurrencyManager, _outGameSaveCoordinator);
+        _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager);
+        if (_outGameSaveCoordinator.TryLoadOrCreate(out string error))
+            return true;
+        Debug.LogError("[BootStrap] 영구 데이터 초기화 실패: " + error, this);
+        return false;
+    }
+    // UI 부분을 초기화 한다
+    public bool InitializeUI()
+    {
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
@@ -115,52 +224,10 @@ public class BootStrap : MonoBehaviour
                 _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(), _cameraController))
         {
             Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
-            return;
+            return false;
         }
         _uiStartup.UIManager.gameObject.SetActive(true);
-        
-        // Current date KDH 2026-09-29
-        // GameFlow·RunCurrency 초기화 뒤, BeginRun 전에 연결해야 첫 Preparation 이벤트를 받습니다.
-        InitializeOutGameEffects(context, fromOutGame);
-
-        _data.SetOutGameData(context);
-        OutGameStartContext.Pending = null;
-        
-        switch (context.StartMode)
-        {
-            case StartMode.NewGame:
-                _data.SetOutGameData(context);
-                _archiveManager.NewGame();
-                _gameFlowController.NewGame();
-                break;
-
-            case StartMode.Continue:
-                if (!_inGameSaveCoordinator.TryLoad(out string error))
-                {
-                    Debug.LogError(error);
-                    return;
-                }
-
-                _gameFlowController.Continue();
-                break;
-        }
-    }
-
-    // 저장용 특성은 런 효과용 선택 목록과 별개다. 파일에서 복원한 특성을 그대로 보존한다.
-    private bool InitializePersistentData()
-    {
-        _persistentCurrencyManager.Initialize();
-        _persistentTraits.Initialize(_persistentCurrencyManager, _persistentSaveCoordinator);
-        _persistentSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager);
-        if (_persistentSaveCoordinator.TryLoadOrCreate(out string error)) 
-            return true;
-        Debug.LogError("[BootStrap] 영구 데이터 초기화 실패: " + error, this);
-        return false;
-    }
-    public bool InitializeUI(BuildingSlot[] slots)
-    {
-        return _uiStartup != null && _uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
-            _waveController, _buildController, _buildingCoreProgress, slots, _cameraController);
+        return true;
     }
 
     private bool ValidateReferences()
@@ -172,7 +239,8 @@ public class BootStrap : MonoBehaviour
             valid = false;
         }
         if (_persistentCurrencyManager == null || _runSettlementManager == null || _saveManager == null ||
-            _persistentSaveCoordinator == null || _persistentTraits == null)
+            _outGameSaveCoordinator == null || _inGameSaveCoordinator == null || _persistentTraits == null ||
+            _archiveManager == null || _runCurrencyManager == null || _buildController == null || _cameraController == null)
         {
             Debug.LogError("[BootStrap] 정산 매니저·혈석 지갑·SaveManager·영구 저장·특성 데이터 참조를 연결해주세요.", this);
             valid = false;
@@ -216,36 +284,57 @@ public class BootStrap : MonoBehaviour
         return valid;
     }
 
-    // Current date KDH 2026-09-29
-    // 각 Initialize가 null 참조를 직접 경고하므로, 여기서는 오브젝트가 있는지만 확인합니다.
-    // 효과 적용은 각 시스템이 PhaseChanged 이벤트로 처리하므로 Update에서 확인하지 않습니다.
-    private void InitializeOutGameEffects(OutGameStartContext context, bool fromOutGame)
+    // 기존 API는 특성·제단 효과와 시작 지급을 분리하지 못하므로 적용 전에 차단한다.
+    private bool CanRestoreOutGameEffects(PersistentSaveData profile, GameFlowSaveData flow, out string error)
     {
-        // 특성: 첫 Preparation에서 스탯·재화 효과를 적용합니다.
+        var unsupported = new List<string>();
+        if (_traitRunApplier != null && profile.Traits?._levels != null)
+            foreach (var entry in profile.Traits._levels)
+                if (entry != null && entry.Level > 0)
+                {
+                    unsupported.Add("Trait");
+                    break;
+                }
+        if (_altarManager != null && profile.Altar != null && profile.Altar.SelectedAltar != AltarId.None)
+            unsupported.Add("Altar");
+        // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
+        if (_totemRunApplier != null && flow.ResumeStep != RunResumeStep.Preparation && profile.Totem?.Totems != null)
+            foreach (var entry in profile.Totem.Totems)
+                if (entry != null && entry.Level > 0)
+                {
+                    unsupported.Add("Totem");
+                    break;
+                }
+        if (unsupported.Count == 0)
+        {
+            error = null;
+            return true;
+        }
+        error = string.Join(", ", unsupported) + " 이어하기는 효과만 복구하는 API가 필요합니다. " +
+            "복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+        return false;
+    }
+
+    // 신규 런의 효과와 시작 재화는 기존 파트의 첫 Preparation 처리에서 적용한다.
+    private void InitializeOutGameEffects(PersistentSaveData profile)
+    {
+        // 저장된 영구 특성으로 이번 씬의 효과를 다시 구성한다.
         if (_traitRunApplier != null)
         {
-            _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
-                _runCurrencyManager, _gameFlowController);
-            if (fromOutGame)
-            {
-                _traitRunApplier.SetLevels(context.Traits);
-            }
+            _traitRunApplier.SetLevels(_persistentTraits.CaptureLevels());
         }
         // 토템: catalog가 없어도 기본 스탯 효과(TotemBuiltinEffects)는 적용됩니다.
         if (_totemRunApplier != null)
         {
-            _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
-            if (fromOutGame)
-            {
-                _totemRunApplier.SetLevels(context.Totems);
-            }
+            _totemRunApplier.RestoreSaveData(profile.Totem);
         }
-        // 제단: 여기서는 선택만 하고, 적용은 AltarManager가 첫 Preparation에서 합니다.
+        // 제단 선택 복원만 수행하고 효과 적용은 기존 페이즈 처리에 맡긴다.
         if (_altarManager != null)
         {
-            _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
-                _gameFlowController);
-            _altarManager.TrySelectById(context.SelectedAltar);
+            _altarManager.RestoreSaveData(profile.Altar);
+            if (!_altarManager.IsInitialized ||
+                _altarManager.CaptureSaveData().SelectedAltar != profile.Altar.SelectedAltar)
+                throw new InvalidOperationException("제단 초기화 또는 선택 복원에 실패했습니다.");
         }
     }
 }

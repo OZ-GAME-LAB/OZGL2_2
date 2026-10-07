@@ -162,7 +162,7 @@ namespace Game.Core
         /// <summary>
         /// 게임 시작 시 실제 초기화 및 기초세팅 시작
         /// </summary>
-        public void BeginRun() => _controller?.NewGame();
+        public void BeginRun() => _controller?.BeginRun();
 
         public void ProgressStage() => _controller?.RequestProgressStage();
 

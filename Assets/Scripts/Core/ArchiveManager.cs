@@ -74,19 +74,12 @@ namespace Game.Core
             _artifactReader.StackChanged += RefreshArtifacts;
             _waveController.WaveCleared += RefreshWave;
             _unitManager.UnitDied += RefreshUnitDied;
-        }
 
-        public void NewGame()
-        {
             _isRecording = true;
             _runStats = new RunStats();
             _runSummary = null;
         }
 
-        public void Continue()
-        {
-            
-        }
         public void CompleteRun()
         {
             _isRecording = false;
@@ -153,7 +146,7 @@ namespace Game.Core
             stat.MaxWave = data.MaxWave;
             foreach (var artifact in data.Artifacts)
             {
-                _runStats.Artifacts.Add(artifact.Rarity, artifact.Count);
+                stat.Artifacts.Add(artifact.Rarity, artifact.Count);
             }
 
             _runStats = stat;

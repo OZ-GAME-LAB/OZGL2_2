@@ -8,16 +8,20 @@ public class OutGameStartController : MonoBehaviour
     private IAltarSelection _altars;
     private ITraitProgression _traits;
     private ITotemSelection _totems;
+    private OutGameSaveCoordinator _saveCoordinator;
 
     public OutGameStartContext LastStartContext { get; private set; }
 
     private bool _isRunning;
-    public void Initialize(IAltarSelection altars, ITraitProgression traits, ITotemSelection totems)
+    public void Initialize(IAltarSelection altars, ITraitProgression traits, ITotemSelection totems,
+        OutGameSaveCoordinator saveCoordinator = null)
     {
         _altars = altars;
         _traits = traits;
         _totems = totems;
+        _saveCoordinator = saveCoordinator;
         LastStartContext = null;
+        _isRunning = false;
     }
 
     // SO나 UI 참조 대신 ID와 레벨만 복사합니다. 이후 선택 변경은 이 결과에 영향을 주지 않습니다.
@@ -41,16 +45,37 @@ public class OutGameStartController : MonoBehaviour
     {
         if (_isRunning) return;
         _isRunning = true;
-        OutGameStartContext context = CreateStartContext();
-        if (context == null) return;
+        try
+        {
+            OutGameStartContext context = CreateStartContext();
+            if (context == null)
+            {
+                _isRunning = false;
+                return;
+            }
+            if (_saveCoordinator == null || !_saveCoordinator.IsReady)
+            {
+                Debug.LogError("[OutGameController] 시작 설정을 저장할 OutGameSaveCoordinator를 먼저 초기화해주세요.", this);
+                _isRunning = false;
+                return;
+            }
+            if (!_saveCoordinator.TrySave(out string error))
+            {
+                Debug.LogError("[OutGameController] 시작 설정 저장에 실패했습니다. " + error, this);
+                _isRunning = false;
+                return;
+            }
 
-        LastStartContext = context;
-        OutGameStartContext.Pending = context;
-        Debug.Log(BuildStartLog(context), this);
-
-        SceneManager.LoadScene("Test");
+            LastStartContext = context;
+            Debug.Log(BuildStartLog(context), this);
+            SceneManager.LoadScene("Test");
+        }
+        catch (System.Exception exception)
+        {
+            _isRunning = false;
+            Debug.LogError("[OutGameController] 게임 시작에 실패했습니다. " + exception.Message, this);
+        }
     }
-
     private string BuildStartLog(OutGameStartContext context)
     {
         StringBuilder log = new StringBuilder();
