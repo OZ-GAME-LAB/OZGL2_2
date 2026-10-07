@@ -1,25 +1,47 @@
+using System;
 using System.IO;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
 
-
+[Serializable]
 public class InGameSaveData
 {
     public GameFlowSaveData Flow;
+    public RunCurrencySaveData RunCurrency;
+    public ArtifactSaveData Artifact;
+    public ShopSaveData Shop;
+    public ConsumableItemSaveData ConsumableItem;
+    public BuildingSaveData Building;
+    public ArchiveSaveData Archive;
 }
 
-public class InGameSaveCoordinator : MonoBehaviour
+public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
 {
     // 기존 저장 테스트나 실제 영구재화 파일과 구분하는 키입니다.
     public static readonly SaveKey<InGameSaveData> SaveKey =
         new SaveKey<InGameSaveData>("ingame-test");
 
     public bool IsReady { get; private set; }
+    public bool HasSkippedRestore { get; private set; }
+    public bool IsRestoreEnabledForRunCurrency => _restoreRunCurrency;
     public string LastError { get; private set; }
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
 
+    [SerializeField] private bool _restoreRunCurrency = true;
+    [SerializeField] private bool _restoreArtifact = true;
+    [SerializeField] private bool _restoreShop = true;
+    [SerializeField] private bool _restoreConsumableItem = true;
+    [SerializeField] private bool _restoreBuilding = false;
+    [SerializeField] private bool _restoreArchive = true;
+
     private SaveManager _saveManager;
+    private Action _initializeArchive;
+    private bool _archiveInitializationAttempted;
+    private Exception _archiveInitializationFailure;
+    private bool _restoreFailed;
+    private bool _requiresBackupBeforeWrite;
+    private bool _hasBackedUpOriginal;
     
     private ISaveDataProvider<GameFlowSaveData> _flowController;
     private ISaveDataProvider<RunCurrencySaveData> _runCurrency;
@@ -28,13 +50,41 @@ public class InGameSaveCoordinator : MonoBehaviour
     private ISaveDataProvider<ConsumableItemSaveData> _consumableItem;
     private ISaveDataProvider<BuildingSaveData> _building;
     private ISaveDataProvider<ArchiveSaveData> _archive;
-    private ISaveDataProvider<PersistentSaveData> _persistent;
     
     
-    public void Initialize(SaveManager saveManager, ISaveDataProvider<GameFlowSaveData> gameFlowController)
+    public void Initialize(SaveManager saveManager,
+        ISaveDataProvider<GameFlowSaveData> gameFlowController,
+        ISaveDataProvider<RunCurrencySaveData> runCurrency,
+        ISaveDataProvider<ArtifactSaveData> artifact,
+        ISaveDataProvider<ShopSaveData> shop,
+        ISaveDataProvider<ConsumableItemSaveData> consumableItem,
+        ISaveDataProvider<BuildingSaveData> building,
+        ISaveDataProvider<ArchiveSaveData> archive,
+        Action initializeArchive = null)
     {
+        if (saveManager == null || gameFlowController == null || runCurrency == null || artifact == null ||
+            shop == null || consumableItem == null || building == null || archive == null)
+        {
+            Debug.LogError("[InGameSaveCoordinator] 초기화에 필요한 참조가 없습니다. ");
+            LastError = "초기화에 필요한 참조가 없습니다";
+            IsReady = false;
+            return;
+        }
         _saveManager = saveManager;
         _flowController = gameFlowController;
+        _runCurrency = runCurrency;
+        _artifact = artifact;
+        _shop = shop;
+        _consumableItem = consumableItem;
+        _building = building;
+        _archive = archive;
+        _initializeArchive = initializeArchive;
+        _archiveInitializationAttempted = false;
+        _archiveInitializationFailure = null;
+        _restoreFailed = false;
+        _requiresBackupBeforeWrite = false;
+        _hasBackedUpOriginal = false;
+        HasSkippedRestore = false;
         IsReady = false;
         LastError = null;
     }
@@ -44,62 +94,132 @@ public class InGameSaveCoordinator : MonoBehaviour
     {
         if (!CheckReferences(out error)) return false;
         if (File.Exists(SavePath)) return TryLoad(out error);
+        return TryCreateSave(out error);
+    }
 
-        InGameSaveData data = CaptureSaveData();
-        if (!TryWrite(data, out error)) return false;
-        IsReady = true;
-        return true;
+    public bool TryCreateSave(out string error)
+    {
+        IsReady = false;
+        if (!CheckReferences(out error)) return false;
+        if (_restoreFailed) return Fail("복원에 실패한 런을 초기 저장으로 대체할 수 없습니다.", out error);
+        if (_saveManager.HasSaveFile(SaveKey)) return Fail("기존 인게임 저장 파일을 먼저 불러와주세요.", out error);
+        try
+        {
+            if (!TryWrite(CaptureSaveData(), out error)) return false;
+            IsReady = true;
+            return true;
+        }
+        catch (Exception exception) when (!(exception is OperationCanceledException))
+        {
+            return Fail("최초 인게임 저장 생성 실패: " + exception.Message, out error);
+        }
     }
 
     public bool TrySave(out string error)
     {
-        if (!CheckReady(out error)) return false;
-        return TryWrite(CaptureSaveData(), out error);
+        if (!CheckReady(out error))
+        {
+            return false;
+        }
+        try
+        {
+            return TryWrite(CaptureSaveData(), out error);
+        }
+        catch (Exception exception) when (!(exception is OperationCanceledException))
+        {
+            return Fail("인게임 저장 실패: " + exception.Message, out error);
+        }
     }
 
     // 콘텐츠가 만든 데이터를 검증하고 파일에 저장만 합니다. 구매나 상태 변경은 하지 않습니다.
     public bool TrySave(InGameSaveData data, out string error)
     {
-        if (!CheckReady(out error)) return false;
+        if (!CheckReady(out error))
+        {
+            return false;
+        }
         return TryWrite(data, out error);
     }
 
     public bool TryLoad(out string error)
     {
+        if (!TryReadSaveData(out InGameSaveData data, out error)) return false;
+        return TryApplySaveData(data, out error);
+    }
+
+    // 종료된 런은 상태를 복원하지 않고도 식별할 수 있도록 읽기와 적용을 분리합니다.
+    public bool TryReadSaveData(out InGameSaveData data, out string error)
+    {
+        IsReady = false;
+        data = null;
+        if (!CheckReferences(out error)) return false;
+        if (!_saveManager.TryLoad(SaveKey, out data, out error)) return Fail(error, out error);
+        LastError = null;
+        return true;
+    }
+
+    public bool TryApplySaveData(InGameSaveData data, out string error)
+    {
+        IsReady = false;
+        HasSkippedRestore = false;
+        if (!CheckReferences(out error)) return false;
+        _restoreFailed = true;
         try
         {
-            IsReady = false;
-            if (!CheckReferences(out error)) return false;
-            if (!_saveManager.TryLoad(SaveKey, out InGameSaveData data, out error))
-                return Fail(error, out error);
-            if (!TryValidate(data, out error)) return false;
-
-            // 모든 영역을 검증한 뒤 함께 복원합니다. 복원 중에는 구매나 저장을 호출하지 않습니다.
-            Apply(data);
-            
+            if (!TryValidate(data, out error) || !Apply(data, out error)) return false;
+            _restoreFailed = false;
             IsReady = true;
             LastError = null;
             return true;
         }
-        catch (System.ArgumentException exception)
+        catch (Exception exception) when (!(exception is OperationCanceledException))
         {
-            IsReady = false;
-            return Fail($"저장 데이터 복원 실패: {exception.Message}", out error);
+            return Fail("인게임 저장 복원 실패: " + exception.Message, out error);
         }
+    }
+
+    public bool TryDelete(out string error)
+    {
+        if (_saveManager == null) return Fail("SaveManager를 먼저 연결해주세요.", out error);
+        if (!_saveManager.TryDelete(SaveKey, out error)) return Fail(error, out error);
+        IsReady = false;
+        _requiresBackupBeforeWrite = false;
+        _hasBackedUpOriginal = false;
+        LastError = null;
+        return true;
+    }
+
+    public void RequireBackupBeforeNextWrite()
+    {
+        if (!_hasBackedUpOriginal) _requiresBackupBeforeWrite = true;
     }
 
     public InGameSaveData CaptureSaveData()
     {
-        if (!CheckReferences(out string error)) throw new System.InvalidOperationException(error);
+        if (!CheckReferences(out string error)) throw new InvalidOperationException(error);
+        EnsureArchiveInitialized();
         return new InGameSaveData
         {
             Flow = _flowController.CaptureSaveData(),
+            RunCurrency = _runCurrency.CaptureSaveData(),
+            Artifact = _artifact.CaptureSaveData(),
+            Shop = _shop.CaptureSaveData(),
+            ConsumableItem = _consumableItem.CaptureSaveData(),
+            Building = _building.CaptureSaveData(),
+            Archive = _archive.CaptureSaveData()
         };
     }
 
     private bool TryWrite(InGameSaveData data, out string error)
     {
         if (!TryValidate(data, out error)) return false;
+        if (_requiresBackupBeforeWrite)
+        {
+            if (!_saveManager.TryBackup(SaveKey, out string backupPath, out error))
+                return Fail("원본 저장 백업 실패: " + error, out error);
+            _requiresBackupBeforeWrite = false;
+            _hasBackedUpOriginal = backupPath != null;
+        }
         if (!_saveManager.TrySave(SaveKey, data, out error)) return Fail(error, out error);
         LastError = null;
         return true;
@@ -107,22 +227,73 @@ public class InGameSaveCoordinator : MonoBehaviour
 
     private bool TryValidate(InGameSaveData data, out string error)
     {
-        if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
-        error = "s";
+        if (data == null) return Fail("인게임 저장 데이터가 없습니다.", out error);
+        error = null;
         return true;
     }
 
-    private void Apply(InGameSaveData data)
+    private bool Apply(InGameSaveData data, out string error)
     {
-        _flowController.RestoreSaveData(data.Flow);
+        if (!TryRestorePart("Flow", true, _flowController, data.Flow, out error)) return false;
+        if (!TryRestorePart("Building", _restoreBuilding, _building, data.Building, out error)) return false;
+        if (!TryRestorePart("RunCurrency", _restoreRunCurrency, _runCurrency, data.RunCurrency, out error)) return false;
+        if (!TryRestorePart("Artifact", _restoreArtifact, _artifact, data.Artifact, out error)) return false;
+        EnsureArchiveInitialized();
+        // 유물 효과가 슬롯 수에 영향을 주므로 최종 슬롯 상태는 그 뒤에 복원합니다.
+        if (!TryRestorePart("ConsumableItem", _restoreConsumableItem, _consumableItem, data.ConsumableItem, out error)) return false;
+        if (!TryRestorePart("Shop", _restoreShop, _shop, data.Shop, out error)) return false;
+        return TryRestorePart("Archive", _restoreArchive, _archive, data.Archive, out error);
+    }
+
+    private bool TryRestorePart<T>(string name, bool enabled, ISaveDataProvider<T> provider, T data,
+        out string error) where T : class
+    {
+        error = null;
+        if (!enabled)
+        {
+            HasSkippedRestore = true;
+            RequireBackupBeforeNextWrite();
+            Debug.LogWarning("[InGameSaveCoordinator] " + name + " 복원을 생략하고 초기 상태를 사용합니다.", this);
+            return true;
+        }
+        try
+        {
+            provider.RestoreSaveData(data);
+            return true;
+        }
+        catch (Exception exception) when (!(exception is OperationCanceledException))
+        {
+            return Fail(name + " 저장 데이터 복원 실패: " + exception.Message, out error);
+        }
+    }
+
+    private void EnsureArchiveInitialized()
+    {
+        if (_archiveInitializationAttempted)
+        {
+            if (_archiveInitializationFailure != null) throw _archiveInitializationFailure;
+            return;
+        }
+        // 실패한 콜백을 다시 호출하여 이벤트를 중복 구독하지 않습니다.
+        _archiveInitializationAttempted = true;
+        try
+        {
+            _initializeArchive?.Invoke();
+        }
+        catch (Exception exception)
+        {
+            _archiveInitializationFailure = exception;
+            throw;
+        }
     }
 
     private bool CheckReferences(out string error)
     {
         error = null;
-        if (_saveManager == null || _flowController == null)
+        if (_saveManager == null || _flowController == null || _runCurrency == null || _artifact == null ||
+            _shop == null || _consumableItem == null || _building == null || _archive == null)
         {
-            return Fail("SaveManager, 노드 컨트롤러를 먼저 연결해주세요", out error);
+            return Fail("SaveManager와 모든 인게임 저장 Provider를 먼저 연결해주세요.", out error);
         }
         return true;
     }
@@ -130,7 +301,7 @@ public class InGameSaveCoordinator : MonoBehaviour
     private bool CheckReady(out string error)
     {
         if (!CheckReferences(out error)) return false;
-        if (!IsReady) return Fail("영구 데이터를 먼저 불러오거나 최초 데이터를 생성해주세요.", out error);
+        if (!IsReady) return Fail("인게임 데이터를 먼저 불러오거나 최초 데이터를 생성해주세요.", out error);
         return true;
     }
 
@@ -141,17 +312,17 @@ public class InGameSaveCoordinator : MonoBehaviour
         return false;
     }
 
-    [ContextMenu("Persistent Save/Save Traits And Bloodstone")]
+    [ContextMenu("InGame Save/Save")]
     private void SaveFromInspector()
     {
-        if (TrySave(out string error)) Debug.Log("[PersistentSave] 저장 완료: " + SavePath, this);
-        else Debug.LogWarning("[PersistentSave] 저장 실패: " + error, this);
+        if (TrySave(out string error)) Debug.Log("[InGameSave] 저장 완료: " + SavePath, this);
+        else Debug.LogWarning("[InGameSave] 저장 실패: " + error, this);
     }
 
-    [ContextMenu("Persistent Save/Load Traits And Bloodstone")]
+    [ContextMenu("InGame Save/Load")]
     private void LoadFromInspector()
     {
-        if (TryLoad(out string error)) Debug.Log("[PersistentSave] 복원 완료: " + SavePath, this);
-        else Debug.LogWarning("[PersistentSave] 복원 실패: " + error, this);
+        if (TryLoad(out string error)) Debug.Log("[InGameSave] 복원 완료: " + SavePath, this);
+        else Debug.LogWarning("[InGameSave] 복원 실패: " + error, this);
     }
 }

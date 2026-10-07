@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Units;
-using UnityEditor.SceneManagement;
 
 namespace Game.Core
 {
@@ -86,10 +85,16 @@ namespace Game.Core
         
         public void RestoreSaveData(NodeSaveData data)
         {
+            if (data == null || data.nodes == null || data.nodes.Count != WavesPerQuarter ||
+                data.currentQuarter < 1 || data.currentWave < 0 || data.currentWave >= data.nodes.Count)
+                throw new ArgumentException("저장된 분기·웨이브 위치 또는 노드 목록이 올바르지 않습니다.");
             List<Node> nodes = new List<Node>();
 
             foreach (NodeSaveEntry entry in data.nodes)
             {
+                if (entry == null || entry.waveNumber != nodes.Count + 1 ||
+                    !Enum.IsDefined(typeof(PostBattleEventType), entry.postBattleEvent))
+                    throw new ArgumentException("저장된 노드 순서 또는 부착 이벤트가 올바르지 않습니다.");
                 if (!_catalog.TryGetWaveSO(entry.presetId, out WaveSO preset))
                 {
                     throw new InvalidOperationException(

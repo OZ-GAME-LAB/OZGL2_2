@@ -1,5 +1,7 @@
 # 아웃게임 저장·복원 Inspector 테스트
 
+**2026-10-07 정리 완료:** Codex 작성 `OutGameSaveTestData`, `OutGameSaveTestPanel`, `OutGameSaveTestValidation`을 삭제하고 `OutGameTest` 씬의 테스트 패널 컴포넌트만 제거했습니다. 아래는 이전 테스트 구성의 기록입니다. 실제 게임의 저장 구현은 보존했습니다.
+
 팀의 실제 DTO와 매니저가 준비되기 전 `ISaveDataProvider<T>`와 공통 JSON 저장 경로를 검증한다.
 실제 재화·특성·제단 효과를 변경하지 않는다. `test_`로 시작하는 ID는 가상 테스트 데이터다.
 
