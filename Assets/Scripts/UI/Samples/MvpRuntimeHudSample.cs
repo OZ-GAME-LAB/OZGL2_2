@@ -253,7 +253,7 @@ namespace Game.UI.Samples
 
             bool artifactsReady = _artifactManager != null && _effectManager != null;
             if (artifactsReady && !_artifactManager.IsInitialized)
-                _artifactManager.Initialize(_waves, _effectManager);
+                _artifactManager.Initialize(_waves, _effectManager, _currencyManager);
             artifactsReady &= _artifactManager != null && _artifactManager.IsInitialized;
             if (UsesArtifactRewards && artifactsReady)
                 artifactsReady = _artifactRewards.TryInitialize(_artifactManager);

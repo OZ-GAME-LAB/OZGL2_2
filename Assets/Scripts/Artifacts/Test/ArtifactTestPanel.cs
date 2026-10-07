@@ -21,13 +21,13 @@ public class ArtifactTestPanel : MonoBehaviour
     private Vector2 _scroll;
     private CancellationTokenSource _rewardWait;
 
-    public void Initialize(WaveController waveController, EffectManager effectManager)
+    public void Initialize(WaveController waveController, EffectManager effectManager, RunCurrencyManager runCurrencyManager)
     {
         _wave = waveController;
         _effects = effectManager;
         if (_artifacts != null && !_artifacts.IsInitialized)
         {
-            _artifacts.Initialize(_wave, _effects);
+            _artifacts.Initialize(_wave, _effects, runCurrencyManager);
         }
     }
 

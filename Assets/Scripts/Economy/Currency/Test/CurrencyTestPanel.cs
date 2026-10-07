@@ -136,7 +136,7 @@ public class CurrencyTestPanel : MonoBehaviour
             }
             if (_artifactTestPanel != null)
             {
-                _artifactTestPanel.Initialize(_waveController, _effectManager);
+                _artifactTestPanel.Initialize(_waveController, _effectManager, _run);
             }
         }
         Report("Run 시작", _run.IsInitialized);
