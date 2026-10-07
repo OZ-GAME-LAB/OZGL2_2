@@ -72,7 +72,10 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private AltarManager _altarManager;
     #endregion
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
+    public bool IsContinue => _isContinue;
 
+    private bool _isContinue;
+    
     async void Start()
     {
         if (!ValidateReferences()) return;
@@ -192,6 +195,12 @@ public class BootStrap : MonoBehaviour
         _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier,
             settlementBridge, settlementBridge);
         _cameraController.Initialize(_buildController,_gameFlowController);
+        _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
+            _runCurrencyManager, _gameFlowController);
+        _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
+        _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
+            _gameFlowController);
+
         return true;
     }
     // 저장용 특성은 런 효과용 선택 목록과 별개다. 파일에서 복원한 특성을 그대로 보존한다.
@@ -312,21 +321,16 @@ public class BootStrap : MonoBehaviour
         // 저장된 영구 특성으로 이번 씬의 효과를 다시 구성한다.
         if (_traitRunApplier != null)
         {
-            _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
-                _runCurrencyManager, _gameFlowController);
             _traitRunApplier.SetLevels(_persistentTraits.CaptureLevels());
         }
         // 토템: catalog가 없어도 기본 스탯 효과(TotemBuiltinEffects)는 적용됩니다.
         if (_totemRunApplier != null)
         {
-            _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
             _totemRunApplier.RestoreSaveData(profile.Totem);
         }
         // 제단 선택 복원만 수행하고 효과 적용은 기존 페이즈 처리에 맡긴다.
         if (_altarManager != null)
         {
-            _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
-                _gameFlowController);
             _altarManager.RestoreSaveData(profile.Altar);
             if (!_altarManager.IsInitialized ||
                 _altarManager.CaptureSaveData().SelectedAltar != profile.Altar.SelectedAltar)
