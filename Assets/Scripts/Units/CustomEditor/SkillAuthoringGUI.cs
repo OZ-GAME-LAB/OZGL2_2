@@ -224,6 +224,7 @@ namespace Units.Editor
                 if (delivery.intValue == (int)ActiveSkillDeliveryType.Projectile)
                 {
                     Field(action, "_projectileSpeed");
+                    Field(action, "_projectilePrefab");
 
                     var legacy = action.FindPropertyRelative("_isLegacy");
                     var target = action.FindPropertyRelative("_target");

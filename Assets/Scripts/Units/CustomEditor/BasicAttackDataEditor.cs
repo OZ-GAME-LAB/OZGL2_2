@@ -25,6 +25,7 @@ namespace Units.Editor
         private SerializedProperty _areaAngle;
 
         private SerializedProperty _projectileSpeed;
+        private SerializedProperty _projectilePrefab;
 
         private SerializedProperty _attackFXType;
         private SerializedProperty _hitFXType;
@@ -48,6 +49,8 @@ namespace Units.Editor
 
         private void OnEnable()
         {
+            _projectilePrefab = serializedObject.FindProperty("_projectilePrefab");
+
             _basicAttackRange =
                 serializedObject.FindProperty(
                     "_basicAttackRange"
@@ -392,6 +395,8 @@ namespace Units.Editor
                 EditorGUILayout.PropertyField(
                     _projectileSpeed
                 );
+
+                EditorGUILayout.PropertyField(_projectilePrefab);
 
 
                 EditorGUI.indentLevel--;

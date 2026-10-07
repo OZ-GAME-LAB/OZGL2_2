@@ -12,7 +12,11 @@ namespace Units.FX
         [SerializeField] private VFXCatalogSO _catalog;
         [SerializeField] private BasicAttackFXMappingSO _basicAttackMapping;
         public BasicAttackFXMappingSO BasicAttackMapping => _basicAttackMapping;
-        [SerializeField, Min(0)] private int _maxStored = 16;
+        [SerializeField, Min(1)] private int _maxStored = 16;
+        [SerializeField, Min(1), Tooltip("이 세대 수 이상 사용하지 않은 보관 인스턴스를 정리합니다. 프리팹별 1개는 남깁니다.")]
+        private int _unusedGenerationsBeforeRemoval = 2;
+        [SerializeField, Tooltip("일치하는 원본 셰이더만 풀 최초 생성 시 교체합니다. 원본 에셋은 변경하지 않습니다.")]
+        private List<VFXShaderReplacement> _shaderReplacements = new();
         [SerializeField, Min(1)] private int _maxActive = 512;
         private readonly Dictionary<FXHandle, VFXInstance> _active = new();
         private readonly List<FXHandle> _completed = new();
@@ -29,7 +33,8 @@ namespace Units.FX
             if (Instance != null && Instance != this)
             { Debug.LogError("[VFXManager] 활성 매니저가 중복되었습니다.", this); enabled = false; return; }
             Instance = this;
-            if (_pool == null) _pool = new VFXPool(transform, _maxStored);
+            if (_pool == null)
+                _pool = new VFXPool(transform, _maxStored, _unusedGenerationsBeforeRemoval, _shaderReplacements);
         }
 
         // ============================================================
@@ -109,6 +114,12 @@ namespace Units.FX
             if (!_active.TryGetValue(handle, out var instance)) return;
             _active.Remove(handle);
             if (instance != null) _pool.Return(instance);
+        }
+
+        // 전투 시작 1회를 한 세대로 취급한다. 재생 중인 인스턴스는 정리하지 않는다.
+        public void BeginGeneration()
+        {
+            _pool?.BeginGeneration();
         }
 
         public void Clear(bool clearPool = true)

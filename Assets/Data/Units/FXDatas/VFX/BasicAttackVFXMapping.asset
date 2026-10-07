@@ -10,6 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: feedaee5ccaa44be8510051d029d7b33, type: 3}
-  m_Name: BasicAttackFXCatalog
+  m_Name: BasicAttackVFXMapping
   m_EditorClassIdentifier: Assembly-CSharp::Units.FX.BasicAttackFXMappingSO
-  _mappings: []
+  _mappings:
+  - Type: 1
+    Entries:
+    - _key: VFX_Normal_Slash
+      _hook: 0
+      _endPolicy: 2
+      _kind: 0
+      _attachment: 2
+      _followDirection: 0

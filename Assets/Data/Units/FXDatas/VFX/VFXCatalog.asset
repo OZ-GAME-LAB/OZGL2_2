@@ -10,6 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9fff31cdb1724d23bfec0889d7e26ed2, type: 3}
-  m_Name: ActiveVFXCatalog
+  m_Name: VFXCatalog
   m_EditorClassIdentifier: Assembly-CSharp::Units.FX.VFXCatalogSO
-  _entries: []
+  _entries:
+  - _key: VFX_Normal_Slash
+    _prefab: {fileID: 658579276834281116, guid: 6ecca16026f87654b9c2da8ba4e1d682, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1, z: 1}
+    _directionMode: 0
+    _nativeAngle: 0
+    _rotationOffset: 0
+    _spriteFacesRight: 0
+    _maxLifetime: 0.5

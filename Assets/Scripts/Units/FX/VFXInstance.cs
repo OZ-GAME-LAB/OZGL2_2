@@ -17,8 +17,67 @@ namespace Units.FX
         private bool _stopping, _finished;
         private bool _facesRight;
 
+        private readonly System.Collections.Generic.List<Material> _ownedMaterials = new();
+
+        internal long LastUsedGeneration { get; set; }
         internal GameObject Prefab { get; private set; }
         internal SkillFXRequest Request => _playback.Request;
+        // 원본 머티리얼은 공유한 채 두고, 교체가 필요한 슬롯만 런타임 복제본으로 바꾼다.
+        internal void ApplyShaderReplacements(System.Collections.Generic.IReadOnlyList<VFXShaderReplacement> replacements)
+        {
+            if (replacements == null || replacements.Count == 0)
+                return;
+
+            var copies = new System.Collections.Generic.Dictionary<Material, Material>();
+            foreach (var renderer in GetComponentsInChildren<Renderer>(true))
+            {
+                var materials = renderer.sharedMaterials;
+                bool changed = false;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    var original = materials[i];
+                    if (original == null)
+                        continue;
+
+                    if (copies.TryGetValue(original, out var existing))
+                    {
+                        materials[i] = existing;
+                        changed = true;
+                        continue;
+                    }
+
+                    foreach (var replacement in replacements)
+                    {
+                        if (replacement == null || !replacement.Matches(original))
+                            continue;
+
+                        var copy = replacement.CreateMaterial(original);
+                        copies.Add(original, copy);
+                        _ownedMaterials.Add(copy);
+                        materials[i] = copy;
+                        changed = true;
+                        break;
+                    }
+                }
+
+                if (changed)
+                    renderer.sharedMaterials = materials;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            DisposeMaterials();
+        }
+
+        internal void DisposeMaterials()
+        {
+            // 풀 정리·보관 한도 초과·씬 종료 시 생성한 머티리얼도 함께 해제한다.
+            foreach (var material in _ownedMaterials)
+                if (material != null) Destroy(material);
+            _ownedMaterials.Clear();
+        }
+
         internal void Configure(GameObject prefab)
         {
             Prefab = prefab;

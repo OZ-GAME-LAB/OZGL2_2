@@ -491,7 +491,8 @@ namespace Units
                             ? 1
                             : _data.MaxDamageableCount,
                         damageRequest,
-                        flight: CreateFlight()
+                        flight: CreateFlight(),
+                        projectilePrefab: _data.ProjectilePrefab
                     );
 
 

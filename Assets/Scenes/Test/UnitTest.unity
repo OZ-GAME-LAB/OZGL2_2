@@ -485,7 +485,7 @@ MonoBehaviour:
   _allyPassiveModifiers: []
   _enemyPassiveModifiers: []
   _engagementDebugText: {fileID: 226977363}
-  _allyUnitType1: 6
+  _allyUnitType1: 4
   _allyCount1: 5
   _allySpawnPosition1: {fileID: 1840431897}
   _allyRallyPoint1: {x: -10, y: 10}
@@ -836,6 +836,10 @@ MonoBehaviour:
   _catalog: {fileID: 11400000, guid: 5b649048ab0716e4c8a64071f4bb05bb, type: 2}
   _basicAttackMapping: {fileID: 11400000, guid: e98fa4724f24a7c438081be644832d4b, type: 2}
   _maxStored: 16
+  _unusedGenerationsBeforeRemoval: 2
+  _shaderReplacements:
+  - _sourceShaderName: Shader Graphs/M_Flipbook
+    _replacementShader: {fileID: 4800000, guid: 6e6c098a338940b6bfade733f606d1f0, type: 3}
   _maxActive: 512
 --- !u!1 &1289596546
 GameObject:
@@ -1780,6 +1784,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 33f4abdb2523791438a101fd37b8ede0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.UnitStatModifierManager
+  _effectManager: {fileID: 0}
 --- !u!4 &8722780501158709091
 Transform:
   m_ObjectHideFlags: 0
