@@ -31,7 +31,8 @@ public class TraitRunApplier : MonoBehaviour
     private bool _isApplied;
 
     // Current date KDH 2026-09-29
-    // unitStatModifierManager는 SpawnManager가 사용하는 것과 같은 인스턴스여야 스폰 유닛에 반영됩니다.
+    // unitStatModifierManager 인자는 기존 호출부·직접 적용 함수 호환용으로 유지합니다.
+    // 현재 유닛 효과 전달은 EffectManager의 공통 연결에서 담당합니다.
     public void Initialize(
         TraitCatalog catalog,
         EffectManager effectManager,
@@ -43,11 +44,6 @@ public class TraitRunApplier : MonoBehaviour
         {
             Debug.LogError("[OutGame/TraitRunApplier] TraitCatalog, EffectManager, GameFlowController 참조가 필요합니다.", this);
             return;
-        }
-
-        if (unitStatModifierManager == null)
-        {
-            Debug.LogWarning("[OutGame/TraitRunApplier] UnitStatModifierManager 참조가 없습니다. 유닛 스탯 효과를 적용할 수 없습니다.", this);
         }
 
         if (runCurrency == null)
@@ -139,8 +135,8 @@ public class TraitRunApplier : MonoBehaviour
             }
 
             int level = Mathf.Min(entry.Level, trait.MaxLevel);
-            AddCurrencyEffects(trait, level);
-            AddStatModifiers(trait, level);
+            if (!RegisterTraitEffects(trait, level)) continue;
+            // 기존 AddCurrencyEffects / AddStatModifiers는 보존하되 직접 적용 경로는 사용하지 않습니다.
             GrantStartingCurrencies(trait, level);
             _appliedTraits.Add(trait);
         }
@@ -148,7 +144,47 @@ public class TraitRunApplier : MonoBehaviour
         Debug.Log($"[OutGame/TraitRunApplier] 특성 효과를 적용했습니다. 적용 수: {_appliedTraits.Count}", this);
     }
 
-    // 재화 계산기는 EffectManager.CurrencyModifiers를 읽으므로 재화 효과만 EffectManager에 등록합니다.
+    // Tier/Faction을 유지한 스탯과 레벨별 재화 보정을 같은 Source에 한 번에 등록합니다.
+    private bool RegisterTraitEffects(TraitData trait, int level)
+    {
+        if (!_effectManager.TryConvertEffects(trait,
+            new EffectDataGroup { CurrencyEffects = trait.CurrencyEffects }, level, out var currencyEffects))
+        {
+            Debug.LogError($"[OutGame/TraitRunApplier] 특성 재화 효과 변환 실패. ID: {trait.Id}", trait);
+            return false;
+        }
+
+        var allies = new List<AllyStatModifier>();
+        var enemies = new List<EnemyStatModifier>();
+        IReadOnlyList<TraitStatEffect> effects = trait.StatEffects;
+        if (effects != null)
+        {
+            for (int i = 0; i < effects.Count; i++)
+            {
+                TraitStatEffect effect = effects[i];
+                float value = effect.ValuePerLevel * level;
+                if (!effect.IsValidTarget() || float.IsNaN(value) || float.IsInfinity(value))
+                {
+                    Debug.LogError($"[OutGame/TraitRunApplier] 잘못된 스탯 효과를 건너뜁니다. ID: {trait.Id}, Index: {i}", trait);
+                    continue;
+                }
+
+                if (effect.TargetTeam == UnitTeam.Ally)
+                    allies.Add(new AllyStatModifier(trait, effect.ApplyType, effect.AllyClass, effect.AllyType,
+                        effect.StatType, effect.ModifierType, value, effect.AllyTier));
+                else
+                    enemies.Add(new EnemyStatModifier(trait, effect.ApplyType, effect.EnemyClass, effect.EnemyType,
+                        effect.StatType, effect.ModifierType, value, effect.EnemyFaction));
+            }
+        }
+
+        _effectManager.RegisterEffects(trait, new ConvertedEffects(allies, enemies,
+            new List<CurrencyModifier>(currencyEffects.CurrencyModifiers)));
+        return true;
+    }
+
+    // 기존 재화 단독 등록 함수 보존용(현재 호출하지 않음).
+    // 같은 Source의 스탯을 덮어쓰므로 통합 등록 이후 별도로 호출하지 않습니다.
     private bool AddCurrencyEffects(TraitData trait, int level)
     {
         IReadOnlyList<CurrencyEffectData> currencyEffects = trait.CurrencyEffects;
@@ -169,7 +205,7 @@ public class TraitRunApplier : MonoBehaviour
         return true;
     }
 
-    // 스폰 시 GetAllyFinalModifier가 읽는 곳이 UnitStatModifierManager이므로 여기에 직접 넣습니다.
+    // 기존 직접 적용 함수 보존용(현재 호출하지 않음). 현재는 EffectManager에 통합 등록합니다.
     // Tier/Faction 값을 생성자에 넘기지 않으면 default(Tier1)로 들어가므로 반드시 전달합니다.
     private bool AddStatModifiers(TraitData trait, int level)
     {
@@ -252,12 +288,8 @@ public class TraitRunApplier : MonoBehaviour
         for (int i = 0; i < _appliedTraits.Count; i++)
         {
             TraitData trait = _appliedTraits[i];
-            // 재화 효과가 없던 특성은 등록되지 않았으므로 false만 반환하고 넘어갑니다.
+            // 스탯·재화 효과를 함께 해제합니다. 유닛 쪽 해제는 공통 연결에서 담당합니다.
             _effectManager.RemoveEffects(trait);
-            if (_unitStatModifierManager != null)
-            {
-                _unitStatModifierManager.RemoveModifiersBySource(trait);
-            }
         }
 
         _appliedTraits.Clear();

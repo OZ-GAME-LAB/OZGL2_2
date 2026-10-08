@@ -114,7 +114,7 @@ public sealed class ArtifactSkillExcelImport : IDisposable
                 r.Fail("현재 유닛 조건 평가는 NotEqual을 지원하지 않습니다.");
             List<PassiveSkillConditionData>(skill, "_conditions").Add(condition); r.Finish();
         }
-        foreach (var r in Rows(file, "PassiveActions", "SkillPath,Kind,Stat,Modifier,Value,Target,Relation,Radius,MaxTargets,Scaling,RuntimeEffectPath,Delivery,DamageType,ProjectileSpeed"))
+        foreach (var r in Rows(file, "PassiveActions", "SkillPath,Kind,Stat,Modifier,Value,Target,Relation,Radius,MaxTargets,Scaling,RuntimeEffectPath,Delivery,DamageType,ProjectileSpeed", "UseTriggerPosition"))
         {
             var skill = Owner<PassiveSkillData>(r, "SkillPath");
             string kind = r.Required("Kind");
@@ -173,6 +173,12 @@ public sealed class ArtifactSkillExcelImport : IDisposable
     private static PassiveSkillActionData Attack(Row r)
     {
         var action = new PassiveAdditionalAttackActionData();
+        string useTriggerPosition = r.Optional("UseTriggerPosition");
+        if (useTriggerPosition.Length > 0)
+        {
+            if (!bool.TryParse(useTriggerPosition, out bool enabled)) r.Fail("UseTriggerPosition는 True 또는 False입니다.");
+            Set(action, "_useTriggerPosition", enabled);
+        }
         var attack = action.Attack;
         var target = new SkillTargetSettings(SkillTargetSource.Search, SkillTargetRelation.Hostile, false,
             r.Number("Radius", .000001f), r.Integer("MaxTargets", 1), 1f);
@@ -262,11 +268,16 @@ public sealed class ArtifactSkillExcelImport : IDisposable
         if (!type.IsEnum || !System.Enum.GetNames(type).Contains(name)) throw new FormatException(type.Name + ": 잘못된 enum 이름 " + name);
         Set(value, field, System.Enum.Parse(type, name));
     }
-    private static IEnumerable<Row> Rows(string file, string sheet, string header)
+    private static IEnumerable<Row> Rows(string file, string sheet, string header, string optionalColumn = null)
     {
         if (!ExcelSheetReader.TryRead(file, sheet, out var rows, out var error)) throw new FormatException(error);
         string[] columns = header.Split(',');
         if (rows.Count == 0 || rows[0].Number != 1) throw new FormatException(sheet + ": 첫 행에 헤더가 필요합니다.");
+        if (optionalColumn != null && rows[0].Cells.TryGetValue(((char)('A' + columns.Length)).ToString(), out string trailingHeader))
+        {
+            if (trailingHeader != optionalColumn) throw new FormatException(sheet + ": 추가 열은 " + optionalColumn + "이어야 합니다.");
+            columns = columns.Concat(new[] { optionalColumn }).ToArray();
+        }
         for (int i = 0; i < columns.Length; i++)
             if (!rows[0].Cells.TryGetValue(((char)('A' + i)).ToString(), out string name) || name != columns[i])
                 throw new FormatException(sheet + ": 헤더 순서가 필요합니다: " + header);
@@ -287,6 +298,7 @@ public sealed class ArtifactSkillExcelImport : IDisposable
         public FormatException Error(string message) => new(sheet + " " + row.Number + "행: " + message);
         public void Fail(string message) => throw Error(message);
         public string Get(string key) { used.Add(key); return values[key]; }
+        public string Optional(string key) { used.Add(key); return values.TryGetValue(key, out string value) ? value : ""; }
         public string Required(string key) { string v = Get(key); if (v.Length == 0) Fail(key + " 값이 필요합니다."); return v; }
         public float Number(string key, float min, float max = 100000000)
         {

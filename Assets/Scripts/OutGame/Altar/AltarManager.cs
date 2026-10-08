@@ -66,13 +66,6 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
                 this);
         }
 
-        if (unitStatModifierManager == null)
-        {
-            Debug.LogWarning(
-                "[OutGame/AltarManager] UnitStatModifierManager 참조가 없습니다. 유닛 스탯 효과를 실제 유닛에 넣을 수 없습니다.",
-                this);
-        }
-
         if (gameFlow == null)
         {
             Debug.LogWarning(
@@ -82,6 +75,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 
         _effectManager = effectManager;
         _runCurrency = runCurrency;
+        // 기존 직접 적용 함수 호환용으로 보존합니다. 현재 적용은 EffectManager 공통 연결에서 담당합니다.
         _unitStatModifierManager = unitStatModifierManager;
         _gameFlow = gameFlow;
 
@@ -272,7 +266,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         _isApplying = true;
         _instance = instance;
         _effectManager.RegisterEffects(instance, converted);
-        AddUnitModifiers(converted);
+        // AddUnitModifiers는 보존하되 호출하지 않습니다. 공통 연결에서 유닛 효과를 반영합니다.
         ApplyTriggered(AltarTriggerMoment.OnRunStart);
         _isApplying = false;
 
@@ -304,10 +298,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         string altarId = GetAltarId(instance);
         _instance = null;
         _effectManager.RemoveEffects(instance);
-        if (_unitStatModifierManager != null)
-        {
-            _unitStatModifierManager.RemoveModifiersBySource(instance);
-        }
+        // 유닛 효과 해제도 EffectManager 변경을 받는 공통 연결에서 담당합니다.
 
         Cleared?.Invoke();
         Debug.Log($"[OutGame/AltarManager] 제단 효과를 해제했습니다. ID: {altarId}", this);
@@ -469,6 +460,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         return 0;
     }
 
+    // 기존 직접 적용 함수 보존용(현재 호출하지 않음).
     private void AddUnitModifiers(ConvertedEffects converted)
     {
         // EffectManager는 보정치만 보관하므로, 실제 유닛 합산은 공개 API로 직접 넣습니다.
