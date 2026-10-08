@@ -197,7 +197,7 @@ public class BootStrap : MonoBehaviour
         _cameraController.Initialize(_buildController,_gameFlowController);
         _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
             _runCurrencyManager, _gameFlowController);
-        _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
+        _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _effectManager, _gameFlowController);
         _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
             _gameFlowController);
 
