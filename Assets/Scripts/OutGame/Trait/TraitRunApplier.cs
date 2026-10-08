@@ -105,15 +105,38 @@ public class TraitRunApplier : MonoBehaviour
     }
 
     // Current date KDH 2026-09-29
+    // 새 게임은 효과와 시작 재화를 함께 넣습니다.
     private void ApplyAll()
     {
+        TryApplyEffects(true);
+    }
+
+    // Current date KDH 2026-10-08
+    // 이어하기는 시작 재화가 세이브 잔액에 이미 있으므로 효과만 등록합니다.
+    // 여기서 _isApplied를 올려 두면 다음 Preparation이 시작 재화를 다시 넣지 않습니다.
+    public bool TryApplyOngoingEffects()
+    {
+        return TryApplyEffects(false);
+    }
+
+    // 효과 목록은 로드·준비 때 한 번만 순회합니다. Update에서 레벨을 다시 읽지 않습니다.
+    private bool TryApplyEffects(bool grantStartingCurrencies)
+    {
+        if (_isApplied) return true;
+        if (_catalog == null || _effectManager == null)
+        {
+            Debug.LogError("[OutGame/TraitRunApplier] 특성 효과를 적용하려면 초기화가 필요합니다.", this);
+            return false;
+        }
+
         _isApplied = true;
         List<TraitLevelEntry> levels = _hasLevels ? _levels : _testLevels;
         if (levels == null)
         {
-            return;
+            return true;
         }
 
+        bool restored = true;
         for (int i = 0; i < levels.Count; i++)
         {
             TraitLevelEntry entry = levels[i];
@@ -135,13 +158,19 @@ public class TraitRunApplier : MonoBehaviour
             }
 
             int level = Mathf.Min(entry.Level, trait.MaxLevel);
-            if (!RegisterTraitEffects(trait, level)) continue;
+            if (!RegisterTraitEffects(trait, level))
+            {
+                restored = false;
+                continue;
+            }
+
             // 기존 AddCurrencyEffects / AddStatModifiers는 보존하되 직접 적용 경로는 사용하지 않습니다.
-            GrantStartingCurrencies(trait, level);
+            if (grantStartingCurrencies) GrantStartingCurrencies(trait, level);
             _appliedTraits.Add(trait);
         }
 
         Debug.Log($"[OutGame/TraitRunApplier] 특성 효과를 적용했습니다. 적용 수: {_appliedTraits.Count}", this);
+        return restored;
     }
 
     // Tier/Faction을 유지한 스탯과 레벨별 재화 보정을 같은 Source에 한 번에 등록합니다.
