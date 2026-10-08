@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: artifact_071_passive
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 3
+  _tickInterval: 1
+  _conditions:
+  - rid: 1967714782231658644
+  _effectMode: 0
+  _actions:
+  - rid: 1967714782231658645
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 1967714782231658644
+      type: {class: PassiveRuntimeEffectConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _subjectType: 1
+        _conditionType: 1
+        _effectId: 
+        _statusType: 3
+        _shouldExist: 1
+    - rid: 1967714782231658645
+      type: {class: PassiveDamageValueModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _ownerType: 0
+        _modifierType: 1
+        _value: 0.2

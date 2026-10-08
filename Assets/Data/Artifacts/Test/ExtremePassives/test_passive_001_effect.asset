@@ -10,24 +10,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
-  m_Name: "test_passive_001_effect"
-  m_EditorClassIdentifier: "Assembly-CSharp::Units.Effects.EffectData"
+  m_Name: test_passive_001_effect
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
   _skillSchemaVersion: 1
-  _effectId: "test_passive_001_effect"
+  _effectId: test_passive_001_effect
   _alignment: 0
   _durationType: 0
-  _duration: 3
+  _duration: 8
   _stackType: 1
   _maxStack: 1
   _actions:
-    - rid: 1001
+  - rid: 1001
   _categories: []
   references:
     version: 2
     RefIds:
-      - rid: 1001
-        type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
-        data:
-          _statType: 170
-          _modifierType: 1
-          _value: 5
+    - rid: 1001
+      type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
+      data:
+        _statType: 170
+        _modifierType: 1
+        _value: 5

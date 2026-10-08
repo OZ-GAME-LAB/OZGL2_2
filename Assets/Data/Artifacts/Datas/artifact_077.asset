@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5944b9673db241ddb1fb2ad77881c095, type: 3}
+  m_Name: artifact_077
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
+  _id: artifact_077
+  _displayName: "\uC0AC\uB0E5\uAFBC\uC758 \uB300\uAC00"
+  _description: "\uD68D\uB4DD \uC774\uD6C4 \uC0DD\uC131\uB418\uB294 \uAD81\uC218
+    \uD074\uB798\uC2A4: \uC801 \uCC98\uCE58 \uC2DC \uCC98\uCE58 \uC704\uCE58 \uBC18\uACBD
+    4\uC758 \uC801 \uCD5C\uB300 2\uBA85\uC5D0\uAC8C \uACF5\uACA9\uB825 60%\uC758
+    \uBB3C\uB9AC \uD53C\uD574 \uD22C\uC0AC\uCCB4 \uBC1C\uC0AC. \uACF5\uACA9\uB825
+    -15%."
+  _icon: {fileID: 0}
+  _rarity: 3
+  _maxStacks: 1
+  _unitStatEffects:
+  - _targetTeam: 0
+    _applyType: 1
+    _allyClass: 3
+    _allyType: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _statType: 100
+    _modifierType: 1
+    _value: -0.15
+  _currencyEffects: []
+  _consumableSlotEffects: []
+  _passiveSkillEffects:
+  - _passiveSkill: {fileID: 11400000, guid: 195bd4924f7e4372ab4f8b42bc166981, type: 2}
+    _targetTeam: 0
+    _applyType: 1
+    _allyClass: 3
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0
