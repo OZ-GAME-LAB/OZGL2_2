@@ -50,6 +50,9 @@ namespace OZGL.KDH
         [Header("모듈 - 쓰는 기능만 enabled")]
         [SerializeField] private BuildingProductionSettings production = new BuildingProductionSettings();
         [SerializeField] private BuildingSpawnSettings spawn = new BuildingSpawnSettings();
+        // Current date KDH 2026-10-08
+        // 지원 건물이 이번 판 동안 계열 유닛에 주는 보정입니다. 꺼져 있으면 모듈을 붙이지 않습니다.
+        [SerializeField] private BuildingSupportSettings support = new BuildingSupportSettings();
 
         // Current date KDH 2026-09-16
         // 칸 전체 목록이 아니라, 이 건물이 될 수 있는 다음 건물만 적습니다. 비우면 최종 단계입니다.
@@ -73,9 +76,11 @@ namespace OZGL.KDH
         public int BuildLimit => buildLimit;
         public BuildingProductionSettings Production => production;
         public BuildingSpawnSettings Spawn => spawn;
+        public BuildingSupportSettings Support => support;
         public BuildingUpgradeOption[] Upgrades => upgrades;
         public bool HasProduction => production != null && production.enabled;
         public bool HasSpawn => spawn != null && spawn.enabled;
+        public bool HasSupport => support != null && support.enabled;
         public bool HasUpgrades => upgrades != null && upgrades.Length > 0;
         public bool IsCore => buildingType == BuildingType.Core;
         public bool HasWorldVisual => prefab != null || worldSprite != null;
@@ -375,6 +380,18 @@ namespace OZGL.KDH
             if (HasSpawn && spawn.countPerWave > spawn.maxAlive)
             {
                 Debug.LogWarning($"[BuildingData] countPerWave가 maxAlive보다 큽니다. 에셋: {name}", this);
+            }
+
+            // Current date KDH 2026-10-08
+            // 지원 강화는 클래스와 유한한 수치가 있어야 소환 보정치로 들어갑니다.
+            if (HasSupport && support.targetClass == AllyUnitClass.Default)
+            {
+                Debug.LogWarning($"[BuildingData] Support.targetClass가 Default라 강화할 계열이 없습니다. 에셋: {name}", this);
+            }
+
+            if (HasSupport && (float.IsNaN(support.value) || float.IsInfinity(support.value) || support.value == 0f))
+            {
+                Debug.LogWarning($"[BuildingData] Support.value가 0이거나 유한하지 않습니다. 에셋: {name}", this);
             }
 
             WarnUpgrades();

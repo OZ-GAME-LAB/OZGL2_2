@@ -258,13 +258,21 @@ namespace Game.UI
         private bool IsCurrentUpgrade(BuildingData data)
         {
             if (!_slot.IsOccupied || _slot.CurrentBuilding.Data == null) return false;
-            _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            // Current date KDH 2026-10-08
+            // 컨트롤러가 이미 서 있는 지원 T2를 뺀 목록으로 현재 선택인지 확인합니다.
+            if (_controller != null)
+                _controller.CollectAvailableUpgrades(_slot, _candidates);
+            else
+                _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
             return _candidates.Contains(data);
         }
 
         private void PopulateUpgradeCatalog()
         {
-            _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            if (_controller != null)
+                _controller.CollectAvailableUpgrades(_slot, _candidates);
+            else
+                _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
             _items.Clear(); _byId.Clear();
             foreach (var next in _candidates)
             {

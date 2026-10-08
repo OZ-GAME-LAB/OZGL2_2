@@ -451,6 +451,14 @@ namespace OZGL.KDH
                 return false;
             }
 
+            // Current date KDH 2026-10-08
+            // 재화를 차감하기 전에 막습니다. 같은 지원 T2가 이미 있으면 돈만 빠지는 일을 막습니다.
+            if (IsSupportAlreadyBuilt(next))
+            {
+                Debug.LogWarning($"[BuildingBuildController] 같은 지원 건물이 이미 있어 업그레이드할 수 없습니다: {next.DisplayName}", this);
+                return false;
+            }
+
             if (!CanCreateVisual(next))
                 return false;
 
@@ -526,6 +534,11 @@ namespace OZGL.KDH
                 return false;
 
             if (!current.Data.TryGetUpgradeCost(next, GetCurrentCoreLevel(), out BuildingResourceCost[] cost))
+                return false;
+
+            // Current date KDH 2026-10-08
+            // 이미 서 있는 지원 T2는 버튼도 켜지 않습니다. 목록에서 빠진 뒤의 안전망입니다.
+            if (IsSupportAlreadyBuilt(next))
                 return false;
 
             return CanAffordCosts(cost);
@@ -711,6 +724,50 @@ namespace OZGL.KDH
             }
 
             slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            RemoveBuiltSupports(_candidates);
+        }
+
+        // Current date KDH 2026-10-08
+        // 지원 T2는 필드에 같은 buildingId가 있으면 다시 고를 수 없습니다.
+        // Census는 칸이 바뀔 때만 세므로, 여기서 슬롯을 다시 찾지 않습니다.
+        public bool IsSupportAlreadyBuilt(BuildingData data)
+        {
+            if (data == null || data.BuildingType != BuildingType.Support)
+                return false;
+
+            if (_census == null || string.IsNullOrWhiteSpace(data.BuildingId))
+                return false;
+
+            return _census.Has(data.BuildingId);
+        }
+
+        // 호출하는 쪽이 가진 List를 재사용합니다. 업그레이드 메뉴를 열 때마다 new List를 만들지 않습니다.
+        public void CollectAvailableUpgrades(BuildingSlot slot, List<BuildingData> results)
+        {
+            if (results == null)
+            {
+                Debug.LogWarning("[BuildingBuildController] CollectAvailableUpgrades에 results List가 null입니다.", this);
+                return;
+            }
+
+            results.Clear();
+            if (slot == null || slot.CurrentBuilding == null || slot.CurrentBuilding.Data == null)
+                return;
+
+            slot.CurrentBuilding.Data.CollectUpgrades(results, GetCurrentCoreLevel());
+            RemoveBuiltSupports(results);
+        }
+
+        private void RemoveBuiltSupports(List<BuildingData> results)
+        {
+            if (results == null)
+                return;
+
+            for (int i = results.Count - 1; i >= 0; i--)
+            {
+                if (IsSupportAlreadyBuilt(results[i]))
+                    results.RemoveAt(i);
+            }
         }
 
         private int GetCurrentCoreLevel()

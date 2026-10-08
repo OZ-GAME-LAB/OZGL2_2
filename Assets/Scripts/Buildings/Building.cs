@@ -124,6 +124,11 @@ namespace OZGL.KDH
             if (data.HasSpawn && GetComponent<BuildingSpawner>() == null)
                 gameObject.AddComponent<BuildingSpawner>();
 
+            // Current date KDH 2026-10-08
+            // 지원 효과가 켜진 건물에만 모듈을 붙입니다. AddComponent는 건설 때 한 번입니다.
+            if (data.HasSupport && GetComponent<BuildingSupport>() == null)
+                gameObject.AddComponent<BuildingSupport>();
+
             _modules = GetComponents<IBuildingModule>();
         }
 
