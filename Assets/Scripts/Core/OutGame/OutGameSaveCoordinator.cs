@@ -11,7 +11,6 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         new SaveKey<PersistentSaveData>("outgame-test-persistent");
 
     public bool IsReady { get; private set; }
-    public bool HasReadFailure { get; private set; }
     public string LastError { get; private set; }
     public string LastSettledRunId => _lastSettledRunId;
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
@@ -31,17 +30,14 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     private TotemRunSaveData _cachedTotem;
     private AltarRunSaveData _initialAltar;
     private TotemRunSaveData _initialTotem;
-    private TraitSaveData _initialTraits;
-    private PersistentWalletSaveData _initialWallet;
     private string _lastSettledRunId;
+    private string _restoringPart;
     private bool _isInitialized;
     private bool _hasFallbackBackup;
-    private bool _requiresBackupBeforeWrite;
 
     public void Initialize(SaveManager saveManager, OutGameTraitController traits, PersistentCurrencyManager wallet,
         ISaveDataProvider<AltarRunSaveData> altar = null, ISaveDataProvider<TotemRunSaveData> totem = null)
     {
-        HasReadFailure = false;
         if (_isInitialized)
             throw new InvalidOperationException("OutGameSaveCoordinator는 씬에서 한 번만 초기화할 수 있습니다.");
 
@@ -50,8 +46,6 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         _wallet = wallet;
         _altar = altar;
         _totem = totem;
-        _initialTraits = traits != null ? traits.CaptureSaveData() : null;
-        _initialWallet = wallet != null ? wallet.CaptureSaveData() : null;
         _initialAltar = altar != null ? Clone(altar.CaptureSaveData()) : new AltarRunSaveData { SelectedAltar = AltarId.Abundance };
         _initialTotem = totem != null ? Clone(totem.CaptureSaveData()) : new TotemRunSaveData();
         _cachedAltar = Clone(_initialAltar);
@@ -64,7 +58,6 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     // 최초 실행에만 기본 상태를 저장합니다. 손상된 기존 파일은 덮어쓰지 않습니다.
     public bool TryLoadOrCreate(out string error)
     {
-        HasReadFailure = false;
         if (!CheckReferences(out error)) return false;
         if (_saveManager.HasSaveFile(SaveKey)) return TryLoad(out error);
 
@@ -110,97 +103,67 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     public bool TryLoad(out string error)
     {
         IsReady = false;
-        HasReadFailure = false;
         if (!CheckReferences(out error)) return false;
         if (!_saveManager.TryLoad(SaveKey, out PersistentSaveData data, out error))
-        {
-            HasReadFailure = true;
             return Fail(error, out error);
-        }
-        if (data == null)
-        {
-            HasReadFailure = true;
-            return Fail("영구 저장 데이터가 없습니다.", out error);
-        }
+        if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
 
         // 인게임에는 선택 Selector가 없어도 선택 설정과 지급 영수증은 유지합니다.
-        _lastSettledRunId = data.LastSettledRunId;
+        CacheMetadata(data);
         bool legacyAltar = data.Altar == null || data.Altar.SelectedAltar == AltarId.None;
         bool legacyTotem = data.Totem == null;
-        AltarRunSaveData altarData = Clone(data.Altar);
-        TotemRunSaveData totemData = Clone(data.Totem);
         if (!_restoreAltar)
         {
             _cachedAltar = Clone(_initialAltar);
+            LogInitialValue("제단", "복원이 비활성화되어 초기값을 유지합니다.");
         }
         else if (legacyAltar)
         {
-            altarData = new AltarRunSaveData { SelectedAltar = AltarId.Abundance };
+            _cachedAltar = new AltarRunSaveData { SelectedAltar = AltarId.Abundance };
             LogInitialValue("제단", "구버전 선택값이 없어 풍요의 제단을 사용합니다.");
         }
         if (!_restoreTotem)
         {
             _cachedTotem = Clone(_initialTotem);
+            LogInitialValue("토템", "복원이 비활성화되어 초기값을 유지합니다.");
         }
         else if (legacyTotem)
         {
-            totemData = new TotemRunSaveData();
+            _cachedTotem = new TotemRunSaveData();
             LogInitialValue("토템", "구버전 선택값이 없어 0레벨을 사용합니다.");
         }
 
+        if (_restoreTraits && !_traits.TryValidateSaveData(data.Traits, out error))
+            return Fail("특성 저장 데이터 검증 실패: " + error, out error);
+        if (_restoreWallet && !_wallet.TryValidateSaveData(data.Wallet, out error))
+            return Fail("혈석 저장 데이터 검증 실패: " + error, out error);
+        if (!TryValidateSelections(_cachedAltar, _cachedTotem, _restoreAltar, _restoreTotem, out error))
+            return false;
+
         bool needsBackup = !_restoreTraits || !_restoreWallet || !_restoreAltar || !_restoreTotem || legacyAltar || legacyTotem;
-        if (needsBackup) RequireBackupBeforeNextWrite();
+        if (needsBackup && !_hasFallbackBackup)
+        {
+            if (!_saveManager.TryBackup(SaveKey, out _, out error))
+                return Fail("초기값을 사용하기 전 원본 백업에 실패했습니다. " + error, out error);
+            _hasFallbackBackup = true;
+        }
 
-        if (!TryRestorePart("혈석", _restoreWallet,
-                () => _wallet.CaptureSaveData(),
-                () => _wallet.RestoreSaveData(data.Wallet, false),
-                snapshot => _wallet.RestoreSaveData(snapshot, false), out error)) return false;
-        if (!TryRestorePart("특성", _restoreTraits,
-                () => _traits.CaptureSaveData(),
-                () => _traits.RestoreSaveData(data.Traits, false),
-                snapshot => _traits.RestoreSaveData(snapshot, false), out error)) return false;
-        if (!TryRestorePart("제단", _restoreAltar,
-                () => _altar != null ? Clone(_altar.CaptureSaveData()) : Clone(_initialAltar),
-                () =>
-                {
-                    if (!TryValidateSelections(altarData, null, true, false, out string validationError))
-                        throw new ArgumentException(validationError);
-                    RestoreAltar(altarData);
-                }, RestoreAltar, out error)) return false;
-        if (!TryRestorePart("토템", _restoreTotem,
-                () => _totem != null ? Clone(_totem.CaptureSaveData()) : Clone(_initialTotem),
-                () =>
-                {
-                    if (!TryValidateSelections(null, totemData, false, true, out string validationError))
-                        throw new ArgumentException(validationError);
-                    RestoreTotem(totemData);
-                }, RestoreTotem, out error)) return false;
-
-        return FinishRestore(out error);
-    }
-
-    // 파일 전체를 읽지 못한 경우에도 이미 초기화한 기본값으로 조립 테스트를 시작한다.
-    // 여기서는 파일을 쓰지 않고 다음 저장 전에만 원본 백업을 요구한다.
-    public bool TryUseInitialState(out string error)
-    {
-        IsReady = false;
-        if (!CheckReferences(out error)) return false;
-        if (_initialWallet == null || _initialTraits == null || _initialAltar == null || _initialTotem == null)
-            return Fail("초기 영구 데이터 스냅샷이 없습니다.", out error);
-        RequireBackupBeforeNextWrite();
         try
         {
-            _wallet.RestoreSaveData(_initialWallet, false);
-            _traits.RestoreSaveData(_initialTraits, false);
-            RestoreAltar(_initialAltar);
-            RestoreTotem(_initialTotem);
-            // 이미 읽어 둔 정산 영수증은 초기값 복구로 지우지 않는다.
+            Apply(data);
+            // 복원과 알림까지 성공해야 구매 및 저장 요청을 받습니다.
+            IsReady = true;
+            LastError = null;
+            return true;
         }
         catch (Exception exception)
         {
-            return Fail("초기 영구 상태 복구 실패: " + exception.Message, out error);
+            return Fail(_restoringPart + " 복원에 실패했습니다. 저장을 중단합니다. " + exception.Message, out error);
         }
-        return FinishRestore(out error);
+        finally
+        {
+            _restoringPart = null;
+        }
     }
 
     public PersistentSaveData CaptureSaveData()
@@ -228,13 +191,6 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         else if (data.Totem == null) data.Totem = Clone(_cachedTotem);
         if (string.IsNullOrWhiteSpace(data.LastSettledRunId)) data.LastSettledRunId = _lastSettledRunId;
         if (!TryValidate(data, out error)) return false;
-        if (_requiresBackupBeforeWrite && !_hasFallbackBackup)
-        {
-            if (!_saveManager.TryBackup(SaveKey, out string backupPath, out error))
-                return Fail("초기값 저장 전 원본 백업에 실패했습니다. " + error, out error);
-            _hasFallbackBackup = backupPath != null;
-            _requiresBackupBeforeWrite = false;
-        }
         if (!_saveManager.TrySave(SaveKey, data, out error)) return Fail(error, out error);
         CacheMetadata(data);
         LastError = null;
@@ -275,88 +231,29 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         return true;
     }
 
-    private bool TryRestorePart<T>(string name, bool enabled, Func<T> capture, Action apply,
-        Action<T> rollback, out string error) where T : class
+    private void Apply(PersistentSaveData data)
     {
-        error = null;
-        if (!enabled)
-        {
-            RequireBackupBeforeNextWrite();
-            LogInitialValue(name, "복원이 비활성화되어 초기값을 유지합니다.");
-            return true;
-        }
-        T snapshot;
-        try
-        {
-            snapshot = capture();
-            if (snapshot == null) throw new InvalidOperationException("초기 상태 스냅샷이 없습니다.");
-        }
-        catch (Exception exception)
-        {
-            return Fail(name + " 복원 전 스냅샷 생성 실패: " + exception.Message, out error);
-        }
-        try
-        {
-            apply();
-            return true;
-        }
-        catch (Exception exception)
-        {
-            RequireBackupBeforeNextWrite();
-            try
-            {
-                rollback(snapshot);
-            }
-            catch (Exception rollbackException)
-            {
-                return Fail(name + " 복원 실패 후 초기 상태 복구도 실패했습니다. " +
-                    exception.Message + " / " + rollbackException.Message, out error);
-            }
-            Debug.LogError("[OutGameSave] " + name + " 복원 실패: " + exception.Message +
-                " 초기 상태를 유지하고 나머지 복원을 계속합니다.", this);
-            return true;
-        }
-    }
-
-    private void RestoreAltar(AltarRunSaveData data)
-    {
+        _restoringPart = "혈석";
+        if (_restoreWallet) _wallet.RestoreSaveData(data.Wallet, false);
+        else LogInitialValue("혈석", "복원이 비활성화되어 초기값을 유지합니다.");
+        _restoringPart = "특성";
+        if (_restoreTraits) _traits.RestoreSaveData(data.Traits, false);
+        else LogInitialValue("특성", "복원이 비활성화되어 초기값을 유지합니다.");
         if (_altar != null)
         {
-            _altar.RestoreSaveData(Clone(data));
-            AltarRunSaveData current = _altar.CaptureSaveData();
-            if (current == null || current.SelectedAltar != data.SelectedAltar)
-                throw new InvalidOperationException("제단 선택값이 적용되지 않았습니다.");
+            _restoringPart = "제단";
+            if (_restoreAltar) _altar.RestoreSaveData(Clone(_cachedAltar));
         }
-        _cachedAltar = Clone(data);
-    }
-
-    private void RestoreTotem(TotemRunSaveData data)
-    {
-        if (_totem != null) _totem.RestoreSaveData(Clone(data));
-        _cachedTotem = Clone(data);
-    }
-
-    private bool FinishRestore(out string error)
-    {
-        try
+        if (_totem != null)
         {
-            // 모든 상태가 적용된 다음 UI에 한 번씩 알린다.
-            _wallet.NotifyChanged();
-            _traits.NotifyChanged();
+            _restoringPart = "토템";
+            if (_restoreTotem) _totem.RestoreSaveData(Clone(_cachedTotem));
         }
-        catch (Exception exception)
-        {
-            return Fail("영구 상태 변경 알림 실패: " + exception.Message, out error);
-        }
-        IsReady = true;
-        LastError = null;
-        error = null;
-        return true;
-    }
-
-    private void RequireBackupBeforeNextWrite()
-    {
-        if (!_hasFallbackBackup) _requiresBackupBeforeWrite = true;
+        // 모든 상태가 적용된 다음 UI에 알립니다.
+        _restoringPart = "혈석 변경 알림";
+        _wallet.NotifyChanged();
+        _restoringPart = "특성 변경 알림";
+        _traits.NotifyChanged();
     }
 
     private void CacheMetadata(PersistentSaveData data)

@@ -24,7 +24,6 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
 
     public bool IsReady { get; private set; }
     public bool HasSkippedRestore { get; private set; }
-    public bool HasSkippedFlowRestore { get; private set; }
     public bool IsRestoreEnabledForRunCurrency => _restoreRunCurrency;
     public string LastError { get; private set; }
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
@@ -86,7 +85,6 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         _requiresBackupBeforeWrite = false;
         _hasBackedUpOriginal = false;
         HasSkippedRestore = false;
-        HasSkippedFlowRestore = false;
         IsReady = false;
         LastError = null;
     }
@@ -149,29 +147,6 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         return TryApplySaveData(data, out error);
     }
 
-    // 저장 파일을 읽을 수 없으면 이미 준비된 초기 런을 사용합니다. 원본은 다음 저장 전에 백업합니다.
-    public bool TryUseInitialState(out string error)
-    {
-        IsReady = false;
-        if (!CheckReferences(out error)) return false;
-        try
-        {
-            EnsureArchiveInitialized();
-            if (File.Exists(SavePath)) RequireBackupBeforeNextWrite();
-            _restoreFailed = false;
-            HasSkippedRestore = true;
-            HasSkippedFlowRestore = true;
-            IsReady = true;
-            LastError = null;
-            error = null;
-            return true;
-        }
-        catch (Exception exception) when (!(exception is OperationCanceledException))
-        {
-            return Fail("초기 인게임 상태 준비 실패: " + exception.Message, out error);
-        }
-    }
-
     // 종료된 런은 상태를 복원하지 않고도 식별할 수 있도록 읽기와 적용을 분리합니다.
     public bool TryReadSaveData(out InGameSaveData data, out string error)
     {
@@ -187,7 +162,6 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     {
         IsReady = false;
         HasSkippedRestore = false;
-        HasSkippedFlowRestore = false;
         if (!CheckReferences(out error)) return false;
         _restoreFailed = true;
         try
@@ -260,9 +234,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
 
     private bool Apply(InGameSaveData data, out string error)
     {
-        if (!TryRestorePart("Flow", true, _flowController, data.Flow, out error, out bool flowRestored))
-            return false;
-        HasSkippedFlowRestore = !flowRestored;
+        if (!TryRestorePart("Flow", true, _flowController, data.Flow, out error)) return false;
         if (!TryRestorePart("Building", _restoreBuilding, _building, data.Building, out error)) return false;
         if (!TryRestorePart("RunCurrency", _restoreRunCurrency, _runCurrency, data.RunCurrency, out error)) return false;
         if (!TryRestorePart("Artifact", _restoreArtifact, _artifact, data.Artifact, out error)) return false;
@@ -276,14 +248,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     private bool TryRestorePart<T>(string name, bool enabled, ISaveDataProvider<T> provider, T data,
         out string error) where T : class
     {
-        return TryRestorePart(name, enabled, provider, data, out error, out _);
-    }
-
-    private bool TryRestorePart<T>(string name, bool enabled, ISaveDataProvider<T> provider, T data,
-        out string error, out bool restored) where T : class
-    {
         error = null;
-        restored = false;
         if (!enabled)
         {
             HasSkippedRestore = true;
@@ -291,44 +256,14 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
             Debug.LogWarning("[InGameSaveCoordinator] " + name + " 복원을 생략하고 초기 상태를 사용합니다.", this);
             return true;
         }
-
-        T initialState;
-        try
-        {
-            // 앞선 파트가 적용한 효과와 상태를 포함해, 이 파트의 적용 직전 상태를 보관합니다.
-            initialState = provider.CaptureSaveData();
-            if (initialState == null)
-                return Fail(name + " 초기 상태 데이터가 없어 안전하게 복원할 수 없습니다.", out error);
-        }
-        catch (Exception exception) when (!(exception is OperationCanceledException))
-        {
-            return Fail(name + " 초기 상태 보관 실패: " + exception.Message, out error);
-        }
-
         try
         {
             provider.RestoreSaveData(data);
-            restored = true;
             return true;
         }
         catch (Exception exception) when (!(exception is OperationCanceledException))
         {
-            try
-            {
-                // 검증 뒤 일부 상태를 바꾼 Provider도 실패 전 상태로 돌립니다.
-                provider.RestoreSaveData(initialState);
-            }
-            catch (Exception rollbackException) when (!(rollbackException is OperationCanceledException))
-            {
-                return Fail(name + " 저장 데이터 복원 실패: " + exception.Message +
-                    "; 초기 상태 복구도 실패했습니다: " + rollbackException.Message, out error);
-            }
-
-            HasSkippedRestore = true;
-            RequireBackupBeforeNextWrite();
-            Debug.LogError("[InGameSaveCoordinator] " + name + " 저장 데이터 복원 실패: " +
-                exception.Message + ". 해당 파트는 초기 상태를 사용하고 나머지 복원을 계속합니다.", this);
-            return true;
+            return Fail(name + " 저장 데이터 복원 실패: " + exception.Message, out error);
         }
     }
 

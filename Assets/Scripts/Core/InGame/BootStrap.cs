@@ -72,7 +72,9 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private AltarManager _altarManager;
     #endregion
     //각자 대표매니저 1개 만들고 각각 필요한 참조를 말하면 제공
-    public static bool IsContinue;
+    public bool IsContinue => _isContinue;
+
+    private bool _isContinue;
     
     async void Start()
     {
@@ -103,18 +105,18 @@ public class BootStrap : MonoBehaviour
             {
                 if (!_inGameSaveCoordinator.TryReadSaveData(out loaded, out string readError))
                 {
-                    LogSkippedRestore("인게임 저장 파일", readError);
-                    if (!_inGameSaveCoordinator.TryUseInitialState(out string initialError))
-                    {
-                        StopStartup(initialError);
-                        return;
-                    }
-                    loaded = null;
+                    StopStartup(readError);
+                    return;
+                }
+                if (loaded.Flow == null)
+                {
+                    StopStartup("필수 Flow 진행값이 없습니다.");
+                    return;
                 }
                 // 결산 파일을 읽은 직후 판정한다. 다른 파트가 미완성이어도 재지급하지 않는다.
-                if (loaded?.Flow != null && (loaded.Flow.ResumeStep == RunResumeStep.Finished ||
+                if (loaded.Flow.ResumeStep == RunResumeStep.Finished ||
                     (!string.IsNullOrWhiteSpace(loaded.Flow.RunId) &&
-                     string.Equals(loaded.Flow.RunId, _outGameSaveCoordinator.LastSettledRunId, StringComparison.Ordinal))))
+                     string.Equals(loaded.Flow.RunId, _outGameSaveCoordinator.LastSettledRunId, StringComparison.Ordinal)))
                 {
                     _gameFlowController.PrepareCompletedRun(loaded.Flow.RunId);
                     _gameFlowController.BeginRun();
@@ -123,20 +125,22 @@ public class BootStrap : MonoBehaviour
             }
 
             var profile = _outGameSaveCoordinator.CaptureSaveData();
-            if (loaded != null)
+            if (hasRun && !CanRestoreOutGameEffects(profile, loaded.Flow, out string effectError))
+            {
+                StopStartup(effectError);
+                return;
+            }
+            InitializeOutGameEffects(profile);
+            if (hasRun)
             {
                 if (!_inGameSaveCoordinator.TryApplySaveData(loaded, out string restoreError))
                 {
                     StopStartup(restoreError);
                     return;
                 }
-                if (_inGameSaveCoordinator.HasSkippedFlowRestore)
-                    _gameFlowController.ResetRestoreMarker();
-                if (string.IsNullOrWhiteSpace(loaded.Flow?.RunId))
+                if (string.IsNullOrWhiteSpace(loaded.Flow.RunId))
                     _inGameSaveCoordinator.RequireBackupBeforeNextWrite();
             }
-            bool isContinuing = loaded != null && !_inGameSaveCoordinator.HasSkippedFlowRestore;
-            InitializeOutGameEffects(profile, isContinuing, isContinuing ? loaded.Flow : null);
 
             string saveError;
             bool saved = hasRun ? _inGameSaveCoordinator.TrySave(out saveError) :
@@ -207,14 +211,7 @@ public class BootStrap : MonoBehaviour
         _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager);
         if (_outGameSaveCoordinator.TryLoadOrCreate(out string error))
             return true;
-        if (!_outGameSaveCoordinator.HasReadFailure)
-        {
-            Debug.LogError("[BootStrap] 영구 데이터 초기화 실패: " + error, this);
-            return false;
-        }
-        LogSkippedRestore("영구 저장 파일", error);
-        if (_outGameSaveCoordinator.TryUseInitialState(out error)) return true;
-        Debug.LogError("[BootStrap] 초기 영구 상태 준비 실패: " + error, this);
+        Debug.LogError("[BootStrap] 영구 데이터 초기화 실패: " + error, this);
         return false;
     }
     // UI 부분을 초기화 한다
@@ -224,8 +221,7 @@ public class BootStrap : MonoBehaviour
         foreach (var root in gameObject.scene.GetRootGameObjects())
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
         if (!_uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
-                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(),
-                _cameraController, _consumableItemManager))
+                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(), _cameraController))
         {
             Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
             return false;
@@ -288,78 +284,57 @@ public class BootStrap : MonoBehaviour
         return valid;
     }
 
+    // 기존 API는 특성·제단 효과와 시작 지급을 분리하지 못하므로 적용 전에 차단한다.
+    private bool CanRestoreOutGameEffects(PersistentSaveData profile, GameFlowSaveData flow, out string error)
+    {
+        var unsupported = new List<string>();
+        if (_traitRunApplier != null && profile.Traits?._levels != null)
+            foreach (var entry in profile.Traits._levels)
+                if (entry != null && entry.Level > 0)
+                {
+                    unsupported.Add("Trait");
+                    break;
+                }
+        if (_altarManager != null && profile.Altar != null && profile.Altar.SelectedAltar != AltarId.None)
+            unsupported.Add("Altar");
+        // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
+        if (_totemRunApplier != null && flow.ResumeStep != RunResumeStep.Preparation && profile.Totem?.Totems != null)
+            foreach (var entry in profile.Totem.Totems)
+                if (entry != null && entry.Level > 0)
+                {
+                    unsupported.Add("Totem");
+                    break;
+                }
+        if (unsupported.Count == 0)
+        {
+            error = null;
+            return true;
+        }
+        error = string.Join(", ", unsupported) + " 이어하기는 효과만 복구하는 API가 필요합니다. " +
+            "복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+        return false;
+    }
+
     // 신규 런의 효과와 시작 재화는 기존 파트의 첫 Preparation 처리에서 적용한다.
-    private void InitializeOutGameEffects(PersistentSaveData profile, bool isContinuing, GameFlowSaveData flow)
+    private void InitializeOutGameEffects(PersistentSaveData profile)
     {
         // 저장된 영구 특성으로 이번 씬의 효과를 다시 구성한다.
         if (_traitRunApplier != null)
         {
-            RestoreEffectOrUseInitial("Trait", () =>
-            {
-                if (isContinuing && profile.Traits?._levels != null)
-                    foreach (var entry in profile.Traits._levels)
-                        if (entry != null && entry.Level > 0)
-                            throw new NotSupportedException("이어하기에서 효과와 시작 지급을 분리하는 API가 없습니다.");
-                _traitRunApplier.SetLevels(_persistentTraits.CaptureLevels());
-            }, () => _traitRunApplier.SetLevels(null));
+            _traitRunApplier.SetLevels(_persistentTraits.CaptureLevels());
         }
         // 토템: catalog가 없어도 기본 스탯 효과(TotemBuiltinEffects)는 적용됩니다.
         if (_totemRunApplier != null)
         {
-            RestoreEffectOrUseInitial("Totem", () =>
-            {
-                if (profile.Totem?.Totems == null)
-                    throw new InvalidOperationException("토템 저장 목록이 없습니다.");
-                // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
-                if (isContinuing && flow?.ResumeStep != RunResumeStep.Preparation)
-                    foreach (var entry in profile.Totem.Totems)
-                        if (entry != null && entry.Level > 0)
-                            throw new NotSupportedException("현재 재개 단계에서 효과만 복원하는 API가 없습니다.");
-                _totemRunApplier.RestoreSaveData(profile.Totem);
-            }, () => _totemRunApplier.SetLevels(null));
+            _totemRunApplier.RestoreSaveData(profile.Totem);
         }
         // 제단 선택 복원만 수행하고 효과 적용은 기존 페이즈 처리에 맡긴다.
         if (_altarManager != null)
         {
-            RestoreEffectOrUseInitial("Altar", () =>
-            {
-                if (profile.Altar == null)
-                    throw new InvalidOperationException("제단 저장 선택값이 없습니다.");
-                if (isContinuing && profile.Altar.SelectedAltar != AltarId.None)
-                    throw new NotSupportedException("이어하기에서 효과와 시작 지급을 분리하는 API가 없습니다.");
-                _altarManager.RestoreSaveData(profile.Altar);
-                if (!_altarManager.IsInitialized ||
-                    _altarManager.CaptureSaveData().SelectedAltar != profile.Altar.SelectedAltar)
-                    throw new InvalidOperationException("제단 초기화 또는 선택 복원에 실패했습니다.");
-            }, () =>
-            {
-                if (_altarManager.IsApplied && !_altarManager.TryClearApplied())
-                    throw new InvalidOperationException("제단 효과를 해제하지 못했습니다.");
-                if (_altarManager.Selected != null && !_altarManager.TryClearSelection())
-                    throw new InvalidOperationException("제단 선택을 해제하지 못했습니다.");
-            });
+            _altarManager.RestoreSaveData(profile.Altar);
+            if (!_altarManager.IsInitialized ||
+                _altarManager.CaptureSaveData().SelectedAltar != profile.Altar.SelectedAltar)
+                throw new InvalidOperationException("제단 초기화 또는 선택 복원에 실패했습니다.");
         }
-    }
-
-    private void RestoreEffectOrUseInitial(string part, Action restore, Action reset)
-    {
-        try { restore(); }
-        catch (Exception exception) when (!(exception is OperationCanceledException))
-        {
-            try { reset(); }
-            catch (Exception resetException) when (!(resetException is OperationCanceledException))
-            {
-                throw new InvalidOperationException(part + " 복원 실패: " + exception.Message +
-                    "; 초기 상태 복구도 실패했습니다: " + resetException.Message, resetException);
-            }
-            LogSkippedRestore(part, exception.Message);
-            _inGameSaveCoordinator.RequireBackupBeforeNextWrite();
-        }
-    }
-
-    private void LogSkippedRestore(string part, string error)
-    {
-        Debug.LogError("[Save/BootStrap] " + part + " 복원 생략: " + error +
-            " 해당 파트는 초기 상태를 사용하고 나머지 복원과 게임 시작을 계속합니다.", this);
     }
 }
