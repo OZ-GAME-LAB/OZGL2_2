@@ -152,7 +152,12 @@ namespace OZGL.KDH
             if (slot.IsOccupied)
             {
                 if (slot.CurrentBuilding.Data != null)
+                {
                     slot.CurrentBuilding.Data.CollectUpgrades(candidates, GetCurrentCoreLevel());
+                    // Current date KDH 2026-10-08
+                    // 상호작용 업그레이드 목록도 이미 지어진 지원 T2를 빼야 버튼이 남지 않습니다.
+                    RemoveBuiltSupports(candidates);
+                }
             }
             else slot.CollectCandidates(candidates, database, GetCurrentCoreLevel(), _census);
 

@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c369d995ff65118449d895967b96764d, type: 3}
+  m_Name: "B_S_T2_AR\uC9C0\uC6D0\uAC74\uBB3C_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
+  buildingId: "B_S_T2_AR\uC9C0\uC6D0\uAC74\uBB3C"
+  buildingFamilyId: Support
+  displayName: "\uC5F0\uAD6C\uC18C"
+  description: "\uACC4\uC5F4 \uC720\uB2DB\uC758 \uB2A5\uB825\uC744 \uAC15\uD654\uC2DC\uD0A8\uB2E4"
+  buildingType: 3
+  icon: {fileID: 21300000, guid: c130fa9cf5ec423586d2bf6f4d329a3b, type: 3}
+  worldSprite: {fileID: 21300000, guid: c130fa9cf5ec423586d2bf6f4d329a3b, type: 3}
+  prefab: {fileID: 2407311284661884798, guid: bac0f659fe064de09209a8b304fd9994, type: 3}
+  buildCost:
+  - type: 0
+    amount: 9999
+  buildFromEmptySlot: 0
+  requiredCoreLevel: 2
+  requiredFamilyIds: []
+  coreLevel: 0
+  buildLimit: 0
+  production:
+    enabled: 0
+    resourceType: 0
+    amount: 10
+    trigger: 0
+  spawn:
+    enabled: 0
+    unitType: 1
+    countPerWave: 1
+    maxAlive: 3
+  support:
+    enabled: 1
+    targetClass: 3
+    statType: 100
+    modifierType: 1
+    value: 0.2
+  upgrades: []
