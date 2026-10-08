@@ -12,10 +12,10 @@ namespace OZGL.KDH
     {
         public event Action Changed;
 
-        private readonly List<BuildingSlot> _slots = new List<BuildingSlot>(16);
-        private readonly Dictionary<int, OccupancyKey> _known = new Dictionary<int, OccupancyKey>(16);
-        private readonly Dictionary<string, int> _countById = new Dictionary<string, int>(16);
-        private readonly Dictionary<string, int> _countByFamily = new Dictionary<string, int>(16);
+        private readonly List<BuildingSlot> _slots = new List<BuildingSlot>(32);
+        private readonly Dictionary<int, OccupancyKey> _known = new Dictionary<int, OccupancyKey>(32);
+        private readonly Dictionary<string, int> _countById = new Dictionary<string, int>(32);
+        private readonly Dictionary<string, int> _countByFamily = new Dictionary<string, int>(32);
         private readonly Dictionary<BuildingType, int> _countByType = new Dictionary<BuildingType, int>(8);
 
         public int OccupiedCount => _known.Count;
