@@ -222,6 +222,13 @@ namespace Game.Core
             _resumeStep = RunResumeStep.Finished;
             _restoredStep = true;
         }
+
+        // 저장 진행값 대신 초기 진행값을 사용하면 이어하기 표시도 해제한다.
+        public void ResetRestoreMarker()
+        {
+            _restoredStep = false;
+            IsResumingStep = false;
+        }
         //게임을 종료하고 메인으로 이동
         public void QuitRun()
         {

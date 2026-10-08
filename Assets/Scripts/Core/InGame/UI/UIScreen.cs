@@ -11,6 +11,7 @@ namespace Game.UI.InGame
         [SerializeField] private bool _isHud;
         [Header("유저의 조작(ESC입력 등)으로 닫히는지 여부")][SerializeField] private bool _canCloseByUser = true;
         [Header("해당 팝업이 열리면 HUD 입력 제한할지 선택")][SerializeField] private bool _blocksHudInput;
+        [Header("다른 팝업이 열리면 먼저 닫기")][SerializeField] private bool _closeWhenCovered;
         [Header("실제 출력할 UI 화면 프레펩")][SerializeField] private GameObject _root;
         [Header("입력을 받을 캔버스그룹")][SerializeField] private CanvasGroup _inputGroup;
 
@@ -19,6 +20,7 @@ namespace Game.UI.InGame
         public bool IsHud => _isHud;
         public bool CanCloseByUser => _canCloseByUser;
         public bool BlocksHudInput => _blocksHudInput;
+        public bool CloseWhenCovered => _closeWhenCovered;
         public GameObject Root => _root;
         public bool IsVisible => _root != null && _root.activeInHierarchy;
         public event Action<UIScreen, UICloseReason> Closed;
