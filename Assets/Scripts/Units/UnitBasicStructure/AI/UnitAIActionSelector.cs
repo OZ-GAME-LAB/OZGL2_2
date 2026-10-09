@@ -29,7 +29,7 @@ namespace Units
         // ============================================================
 
         public UnitAIActionType SelectAction(
-            UnitAssignment assignment)
+            UnitAssignment assignment, bool approaching = false)
         {
             if (_core == null)
                 return UnitAIActionType.Idle;
@@ -39,6 +39,12 @@ namespace Units
                 return UnitAIActionType.ActiveSkill;
             if (!IsTargetValid(assignment.Target)) return UnitAIActionType.Idle;
             float distance = GetDistanceToTarget(assignment.Target);
+
+            // 접근을 시작했으면 사거리 안쪽까지 이동하여 경계에서의 반복 정지를 막는다.
+            // 공격 판정 자체의 사거리는 변경하지 않는다.
+            if (approaching && _core.CanMove
+                && distance > _core.PreferredCombatRange * 0.9f)
+                return UnitAIActionType.Move;
 
             if (CanUseBasicAttack(
                 distance))

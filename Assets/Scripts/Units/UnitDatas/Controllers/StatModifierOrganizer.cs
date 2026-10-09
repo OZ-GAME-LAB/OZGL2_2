@@ -132,6 +132,18 @@ namespace Units
         }
 
 
+        public void RemoveAllyArtifactModifiers()
+        {
+            _allyContainer.RemoveArtifactModifiers();
+        }
+
+
+        public void RemoveEnemyArtifactModifiers()
+        {
+            _enemyContainer.RemoveArtifactModifiers();
+        }
+
+
         public void RemoveBySource(
             object source)
         {

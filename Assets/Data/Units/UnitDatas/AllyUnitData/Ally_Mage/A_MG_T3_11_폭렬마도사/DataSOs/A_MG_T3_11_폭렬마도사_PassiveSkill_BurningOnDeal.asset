@@ -38,3 +38,13 @@ MonoBehaviour:
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _effectData: {fileID: 11400000, guid: 10fa9e915d220414cb4c46633830cf56, type: 2}
+        _applicationFX:
+        - _key: VFX_OnApply_Debuff
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}

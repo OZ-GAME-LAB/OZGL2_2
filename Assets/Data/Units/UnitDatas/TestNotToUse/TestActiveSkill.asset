@@ -26,6 +26,7 @@ MonoBehaviour:
   _areaAngle: 90
   _effects: []
   _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
   _dashDistance: 3
   _dashSpeed: 10
   _skillFXType: 0
@@ -37,6 +38,24 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
+    - rid: 4617381704218968244
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _applicationFX: []
+        _damageType: 0
+        _damageMultiplier: 1
+    - rid: 4617381704218968245
+      type: {class: SkillStackCondition, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _subject: 0
+        _query:
+          _kind: 0
+          _key: 
+          _statusType: 0
+        _comparison: 3
+        _count: 1
+        _consumeOnApply: 0
+        _consumeCount: 1
     - rid: 4844432359097368589
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -68,12 +87,33 @@ MonoBehaviour:
             _filters: []
             _priorities: []
           _effects: []
-        _conditionalEffects: []
+        _conditionalEffects:
+        - _entryId: 2
+          _timing: 1
+          _subject: 0
+          _frequency: 0
+          _snapshotAreaTarget:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 1
+            _maxTargetCount: 10
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _effects:
+          - rid: 4617381704218968244
+          _order: 1
+          _conditions:
+          - rid: 4617381704218968245
+          _fxEntries: []
         _fxEntries: []
         _delivery: 0
+        _executionDuration: 0
         _area: 0
         _radius: 1
         _angle: 90
         _maxEffectTargets: 1
         _projectileSpeed: 10
+        _projectilePrefab: {fileID: 0}
         _isLegacy: 1

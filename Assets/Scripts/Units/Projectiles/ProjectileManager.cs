@@ -89,7 +89,10 @@ namespace Units
                 return false;
             }
 
-            var prefab = _projectilePrefab != null ? _projectilePrefab : GetFallbackPrefab();
+            // 공격별 전용 프리팹을 우선하고, 미지정이면 기존 공용·기본 투사체를 사용한다.
+            var prefab = request.ProjectilePrefab != null
+                ? request.ProjectilePrefab
+                : _projectilePrefab != null ? _projectilePrefab : GetFallbackPrefab();
 
             var projectile = Instantiate(
                 prefab,

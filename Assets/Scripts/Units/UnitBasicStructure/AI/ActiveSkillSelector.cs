@@ -45,8 +45,7 @@ namespace Units
                 (_core.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally) : _core.Team;
             var candidates = _resolver.ResolveCandidates(new TargetCandidateRequest(_core.transform.position, data.SkillRange, team));
             initial = skill.Selector.SelectTarget(current, candidates);
-            // 새 Action의 Current/Initial은 GroupAI 배정을 출발점으로 사용할 수 있다.
-            if (!data.UsesLegacyTargetSelection && initial == null && CombatTargetUtility.IsValid(current)) initial = current;
+            // 배정 대상도 최상단 사거리의 후보에 포함될 때만 초기 대상으로 사용한다.
             if (!skill.Executor.TryPreview(initial, out targets)) return false;
             return policy.Allows(new SkillConditionContext(_core.CombatTarget, targets.PrimaryTarget, _resolver,
                 isActiveSkill: true, actionIndex: 0, position: targets.Origin));

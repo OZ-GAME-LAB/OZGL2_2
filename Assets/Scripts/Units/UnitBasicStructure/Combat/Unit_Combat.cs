@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
@@ -227,6 +227,7 @@ namespace Units
 
             UpdateTimers();
 
+            _basicAttackExecutor?.Tick(Time.deltaTime);
             _activeSkillExecutor?.Tick(Time.deltaTime);
         }
 
@@ -403,7 +404,7 @@ namespace Units
         public bool TryActiveSkill(ICombatTarget currentTarget)
         { return TrySelectActiveSkill(currentTarget, out var decision) && TryActiveSkill(decision); }
 
-        public bool TryActiveSkill(UnitDecision decision)
+        public bool TryActiveSkill(UnitDecision decision, Action onStarting = null)
         {
             if (!CanUseActiveSkill || decision.Action != UnitAIActionType.ActiveSkill || decision.PhaseVersion != _core.HeroPhaseVersion)
                 return false;
@@ -411,7 +412,12 @@ namespace Units
             if (decision.Target.Target != null && !decision.Target.IsTargetable) return false;
             var runtime = _skills.Find(x => x.Entry.Id == decision.SkillId);
             if (runtime == null || runtime.Cooldown > 0 || runtime.Retry > 0) return false;
-            if (!_activeSelector.Preview(runtime, decision.Target.Target, out var initial, out _, out _)) return false;
+            if (!_activeSelector.Preview(runtime, decision.Target.Target, out var initial, out _, out _))
+            {
+                // 선택 직후 대상/조건이 바뀐 실패도 기존 행동을 유지하며 재시도를 늦춘다.
+                runtime.Retry = 0.25f;
+                return false;
+            }
             _selectedSkill = runtime;
             _activeSkillExecutor = runtime.Executor;
 
@@ -457,6 +463,10 @@ namespace Units
                 StartSkillCooldown();
 
                 started = true;
+
+                // AI는 준비 성공 이후, 실제 Action/동기 완료 이벤트 이전에 전환한다.
+                // 돌진이 시작된 뒤 Move.Exit이 속도를 지우는 순서도 방지한다.
+                onStarting?.Invoke();
 
                 _activeSkillExecutor.Execute(initial, result =>
                 {

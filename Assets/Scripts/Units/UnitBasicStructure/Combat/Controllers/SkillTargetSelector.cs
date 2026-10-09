@@ -324,7 +324,7 @@ namespace Units
             return false;
         }
 
-        private bool IsValidCandidate(ICombatTarget target)
+        internal bool IsValidCandidate(ICombatTarget target)
         {
             if (!CombatTargetUtility.IsValid(target))
                 return false;
@@ -341,7 +341,17 @@ namespace Units
                     return target.Team != _core.Team;
 
                 case SkillTargetRelation.Friendly:
-                    return target.Team == _core.Team;
+                    if (target.Team != _core.Team) return false;
+                    // 초기 선택도 첫 Action의 자신 제외 규칙을 따라야 한다.
+                    // 선택 이후 제외하면 Nearest/LowestHP가 자신에게 고정될 수 있다.
+                    if (!_data.UsesLegacyTargetSelection && _data.Actions.Count > 0)
+                    {
+                        var settings = _data.Actions[0]?.Target;
+                        if (settings != null && settings.Relation == SkillTargetRelation.Friendly
+                            && !settings.IncludeSelf && ReferenceEquals(target, _core.CombatTarget))
+                            return false;
+                    }
+                    return true;
 
                 case SkillTargetRelation.Self:
                     return target.Transform == _core.transform;

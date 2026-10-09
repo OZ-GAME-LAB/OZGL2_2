@@ -38,6 +38,7 @@ namespace Units.Editor
         private SerializedProperty _effects;
 
         private SerializedProperty _projectileSpeed;
+        private SerializedProperty _projectilePrefab;
 
         private SerializedProperty _dashDistance;
 
@@ -77,6 +78,8 @@ namespace Units.Editor
 
         private void OnEnable()
         {
+            _projectilePrefab = serializedObject.FindProperty("_projectilePrefab");
+
             _skillRange = serializedObject.FindProperty("_skillRange");
 
             _skillCooldown = serializedObject.FindProperty("_skillCooldown");
@@ -457,6 +460,8 @@ namespace Units.Editor
                 EditorGUI.indentLevel++;
 
                 EditorGUILayout.PropertyField(_projectileSpeed);
+
+                EditorGUILayout.PropertyField(_projectilePrefab);
 
                 EditorGUI.indentLevel--;
             }
