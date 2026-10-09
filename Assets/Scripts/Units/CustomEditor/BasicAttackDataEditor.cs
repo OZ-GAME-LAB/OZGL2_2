@@ -1,4 +1,4 @@
-﻿using UnityEditor;
+using UnityEditor;
 using Units.Skills;
 
 
@@ -228,6 +228,7 @@ namespace Units.Editor
                 EditorGUILayout.PropertyField(
                     _executionType
                 );
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("_impactTiming"), new UnityEngine.GUIContent("효과 실행 시점"));
 
 
                 EditorGUI.indentLevel--;

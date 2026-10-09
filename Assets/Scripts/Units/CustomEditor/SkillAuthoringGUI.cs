@@ -211,6 +211,7 @@ namespace Units.Editor
 
             Field(action, "_duration");
             Field(action, "_executionDuration");
+            Field(action, "_impactTiming");
 
             Field(action, "_distance");
 

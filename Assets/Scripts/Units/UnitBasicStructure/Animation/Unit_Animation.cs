@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace Units
 {
@@ -150,14 +150,26 @@ namespace Units
         public void PlayAnimation_Buff(float duration = 0f) => PlayTimedAttack(PlayerState.OTHER, duration);
 
         // 클립 길이를 액션 실행 시간에 맞추고, 논리적 완료 전 대기 애니메이션으로 복귀하지 않는다.
-        private void PlayTimedAttack(PlayerState state, float duration)
+        private void PlayTimedAttack(PlayerState state, float duration, int index = 1)
         {
             EndTimedAttack();
-            if (!PlayOneShot(state, 1) || duration <= 0f) return;
+            if (!PlayOneShot(state, index) || duration <= 0f) return;
             _savedAnimatorSpeed = _animator.speed;
-            _animator.speed = _spum.StateAnimationPairs[state.ToString()][1].length / duration;
+            _animator.speed = _spum.StateAnimationPairs[state.ToString()][index].length / duration;
             _timedAttack = true;
             _oneShotUntil = float.PositiveInfinity;
+        }
+
+        // 전투 타이머와 동일한 시간으로 기본 공격 클립을 재생한다.
+        // 클립이 없는 경우에도 0.1초 뒤 정상적인 실행/실패 정리가 가능하다.
+        public float PlayBasicAttackForExecution(float attackSpeed)
+        {
+            float duration = 0.1f;
+            if (_spum != null && _spum.StateAnimationPairs.TryGetValue(PlayerState.ATTACK.ToString(), out var clips)
+                && clips != null && clips.Count > 0 && clips[0] != null)
+                duration = Mathf.Max(0.1f, clips[0].length / Mathf.Max(0.01f, attackSpeed));
+            PlayTimedAttack(PlayerState.ATTACK, duration, 0);
+            return duration;
         }
 
         private void EndTimedAttack()

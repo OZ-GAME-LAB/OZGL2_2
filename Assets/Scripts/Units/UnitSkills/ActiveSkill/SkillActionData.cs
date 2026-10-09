@@ -180,6 +180,12 @@ namespace Units.Skills
         public override bool IsConfigured => base.IsConfigured && _distance > 0f && _speed > 0f && !float.IsInfinity(_distance) && !float.IsInfinity(_speed) && Target.Source != SkillTargetSource.None;
     }
 
+    public enum AnimationImpactTiming
+    {
+        [InspectorName("애니메이션 시작")] AnimationStart = 0,
+        [InspectorName("애니메이션 끝")] AnimationEnd = 1
+    }
+
     [Serializable]
     public sealed class SkillAttackActionData : SkillActionData
     {
@@ -195,6 +201,11 @@ namespace Units.Skills
         private float _executionDuration = 0.3f;
 
         public float ExecutionDuration => _executionDuration;
+
+        [SerializeField, Tooltip("시작은 즉시 효과를 실행하고, 끝은 동기화된 공격 모션 시간이 끝난 후 실행합니다.")]
+        private AnimationImpactTiming _impactTiming;
+        public AnimationImpactTiming ImpactTiming => _impactTiming;
+
 
         [SerializeField]
         private ActiveSkillAreaType _area;

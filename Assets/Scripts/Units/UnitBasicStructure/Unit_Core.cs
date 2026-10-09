@@ -814,6 +814,13 @@ namespace Units
             _animation.PlayAnimation_Move();
         }
 
+        public float PlayBasicAttackForExecution()
+        {
+            return _animation != null
+                ? _animation.PlayBasicAttackForExecution(RuntimeStatus != null ? RuntimeStatus.AttackSpeed : 1f)
+                : 0.1f;
+        }
+
         public void PlayAnimation_Attack()
         {
             if (_animation == null)

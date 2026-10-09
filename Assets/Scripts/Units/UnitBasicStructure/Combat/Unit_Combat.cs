@@ -227,6 +227,7 @@ namespace Units
 
             UpdateTimers();
 
+            _basicAttackExecutor?.Tick(Time.deltaTime);
             _activeSkillExecutor?.Tick(Time.deltaTime);
         }
 

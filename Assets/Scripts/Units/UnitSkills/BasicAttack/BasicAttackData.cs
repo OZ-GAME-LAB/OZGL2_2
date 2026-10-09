@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 
 
@@ -15,6 +15,11 @@ namespace Units.Skills
     )]
     public class BasicAttackData : ScriptableObject
     {
+        [SerializeField, Tooltip("피해/투사체 발사를 공격 애니메이션 시작 또는 끝에 실행합니다.")]
+        private AnimationImpactTiming _impactTiming;
+        public AnimationImpactTiming ImpactTiming => _impactTiming;
+
+
         // ============================================================
         // Basic
         // ============================================================

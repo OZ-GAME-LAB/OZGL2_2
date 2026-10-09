@@ -61,6 +61,7 @@ namespace Units
             // 타격 완료 후에도 액션 동작 시간이 끝날 때까지 다음 액션 진입을 막는다.
             public bool AttackHolding;
             public float AttackRemaining;
+            public SkillAttackActionData PendingAttack;
             public Vector2 Position;
 
             public SkillEffectBatch Batch;
@@ -344,7 +345,9 @@ namespace Units
                         continue;
                     }
 
-                    EmitFX(run, SkillFXHook.OnStart);
+                    // 효과 모션의 시작 FX도 끝 실행 설정이면 실제 타격/발사에 맞춘다.
+                    if (action is not SkillAttackActionData timedAttack || timedAttack.ImpactTiming != AnimationImpactTiming.AnimationEnd)
+                        EmitFX(run, SkillFXHook.OnStart);
 
                     ApplyTiming(run, SkillEffectTiming.OnStart);
 
@@ -412,6 +415,13 @@ namespace Units
                                 _core.PlayAnimation_Buff(duration);
                             else
                                 _core.PlayAnimation_Skill(duration);
+                            if (attack.ImpactTiming == AnimationImpactTiming.AnimationEnd)
+                            {
+                                run.PendingAttack = attack;
+                                run.AttackHolding = true;
+                                run.AttackRemaining = duration;
+                                break;
+                            }
                             bool success = ExecuteAttack(run, attack);
 
                             if (_execution != run)
@@ -489,10 +499,41 @@ namespace Units
             {
                 run.AttackRemaining -= Mathf.Max(0f, deltaTime);
                 if (run.AttackRemaining <= 0f)
-                    CompleteAction(run, ActionCompletionKind.Success);
+                {
+                    if (run.PendingAttack != null) ExecutePendingAttack(run);
+                    else CompleteAction(run, ActionCompletionKind.Success);
+                }
                 return;
             }
             _castController.Tick(deltaTime);
+        }
+
+        private void ExecutePendingAttack(Execution run)
+        {
+            var attack = run.PendingAttack;
+            int index = run.Index;
+            run.PendingAttack = null; // 효과 콜백의 재진입으로 중복 실행하지 않는다.
+            try
+            {
+                if (!OwnerValid(run) || !EnsureTarget(run)) return;
+                if (_execution != run) return;
+                run.Position = _core.transform.position;
+                FaceActionTarget(run);
+                EmitFX(run, SkillFXHook.OnStart);
+                if (_execution != run || run.Index != index) return;
+                if (!OwnerValid(run))
+                { Finish(run, SkillCompletionKind.Interrupted, "Interrupted before delayed impact"); return; }
+                bool success = ExecuteAttack(run, attack);
+                if (_execution != run) return;
+                if (!OwnerValid(run)) Finish(run, SkillCompletionKind.Interrupted, "Interrupted during delayed impact");
+                else if (success) CompleteAction(run, ActionCompletionKind.Success);
+                else FailAction(run, false, "No valid hit or successful projectile");
+            }
+            catch (Exception exception)
+            {
+                if (_execution == run) Finish(run, SkillCompletionKind.Failed, exception.Message);
+                Debug.LogException(exception);
+            }
         }
 
         public void FixedTick(float deltaTime)
@@ -740,6 +781,7 @@ namespace Units
             }
 
             // 실행 시간이 있는 공격도 액션 완료와 동시에 유지 연출을 해제한다.
+            run.PendingAttack = null;
             run.AttackHolding = false;
             run.AttackRemaining = 0f;
             if (run.Owner.MatchesLifetime)
