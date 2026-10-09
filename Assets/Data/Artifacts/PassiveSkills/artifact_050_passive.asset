@@ -16,21 +16,21 @@ MonoBehaviour:
   _triggerType: 1
   _tickInterval: 0.5
   _conditions:
-  - rid: 4617381651116720238
+  - rid: 1967714782231658600
   _effectMode: 1
   _actions:
-  - rid: 4617381651116720239
+  - rid: 1967714782231658601
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4617381651116720238
+    - rid: 1967714782231658600
       type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _subjectType: 0
         _comparisonType: 1
         _healthRatio: 0.5
-    - rid: 4617381651116720239
+    - rid: 1967714782231658601
       type: {class: PassiveStatModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _statType: 100

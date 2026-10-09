@@ -66,13 +66,6 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
                 this);
         }
 
-        if (unitStatModifierManager == null)
-        {
-            Debug.LogWarning(
-                "[OutGame/AltarManager] UnitStatModifierManager 참조가 없습니다. 유닛 스탯 효과를 실제 유닛에 넣을 수 없습니다.",
-                this);
-        }
-
         if (gameFlow == null)
         {
             Debug.LogWarning(
@@ -82,6 +75,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 
         _effectManager = effectManager;
         _runCurrency = runCurrency;
+        // 기존 직접 적용 함수 호환용으로 보존합니다. 현재 적용은 EffectManager 공통 연결에서 담당합니다.
         _unitStatModifierManager = unitStatModifierManager;
         _gameFlow = gameFlow;
 
@@ -216,9 +210,32 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         return true;
     }
 
-    // 선택분을 EffectManager·유닛 보정에 등록하고 OnRunStart 지급을 한 번 실행합니다.
+    // 선택분을 EffectManager에 등록하고 OnRunStart 지급을 한 번 실행합니다.
     public bool TryApplySelected()
     {
+        if (!TryRegisterSelectedEffects(out AltarInstance instance)) return false;
+        // 새 게임의 시작 지급입니다. 이어하기는 TryApplyOngoingEffects만 호출합니다.
+        ApplyTriggered(AltarTriggerMoment.OnRunStart);
+        Applied?.Invoke(instance);
+        Debug.Log($"[OutGame/AltarManager] 제단을 적용했습니다. ID: {_selected.Id}", this);
+        return true;
+    }
+
+    // Current date KDH 2026-10-08
+    // 이어하기는 시작 재화가 세이브 잔액에 이미 있으므로 효과만 등록합니다.
+    // 등록은 로드 때 한 번이고, Update에서 매 프레임 다시 계산하지 않습니다.
+    public bool TryApplyOngoingEffects()
+    {
+        if (!TryRegisterSelectedEffects(out AltarInstance instance)) return false;
+        Applied?.Invoke(instance);
+        Debug.Log($"[OutGame/AltarManager] 제단 효과를 복원했습니다. ID: {_selected.Id}", this);
+        return true;
+    }
+
+    // 효과 변환이 성공한 뒤에만 적용 상태로 바꿉니다. 실패하면 기존 선택을 유지합니다.
+    private bool TryRegisterSelectedEffects(out AltarInstance instance)
+    {
+        instance = null;
         if (!IsInitialized)
         {
             Debug.LogWarning("[OutGame/AltarManager] 초기화 후 제단을 적용할 수 있습니다.", this);
@@ -245,7 +262,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
             return false;
         }
 
-        AltarInstance instance = new AltarInstance(_selected);
+        instance = new AltarInstance(_selected);
         if (instance.Data == null)
         {
             Debug.LogError("[OutGame/AltarManager] 제단 인스턴스에 AltarData가 없습니다.", this);
@@ -268,16 +285,11 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
             return false;
         }
 
-        // 변환이 끝난 뒤에만 보유 상태를 바꿉니다. 실패하면 기존 선택을 유지합니다.
         _isApplying = true;
         _instance = instance;
         _effectManager.RegisterEffects(instance, converted);
-        AddUnitModifiers(converted);
-        ApplyTriggered(AltarTriggerMoment.OnRunStart);
+        // AddUnitModifiers는 보존하되 호출하지 않습니다. 공통 연결에서 유닛 효과를 반영합니다.
         _isApplying = false;
-
-        Applied?.Invoke(instance);
-        Debug.Log($"[OutGame/AltarManager] 제단을 적용했습니다. ID: {_selected.Id}", this);
         return true;
     }
 
@@ -304,10 +316,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         string altarId = GetAltarId(instance);
         _instance = null;
         _effectManager.RemoveEffects(instance);
-        if (_unitStatModifierManager != null)
-        {
-            _unitStatModifierManager.RemoveModifiersBySource(instance);
-        }
+        // 유닛 효과 해제도 EffectManager 변경을 받는 공통 연결에서 담당합니다.
 
         Cleared?.Invoke();
         Debug.Log($"[OutGame/AltarManager] 제단 효과를 해제했습니다. ID: {altarId}", this);
@@ -331,6 +340,9 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         // Reward = 웨이브 승리 후입니다. 패배 경로에는 Reward가 없습니다.
         if (phase == GamePhase.Reward)
         {
+            // Current date KDH 2026-10-08
+            // 보상 화면에서 이어하면 Reward가 다시 옵니다. 이자는 세이브 잔액에 이미 있으므로 건너뜁니다.
+            if (_gameFlow != null && _gameFlow.IsResumingStep) return;
             ApplyTriggered(AltarTriggerMoment.OnWaveCleared);
             return;
         }
@@ -469,6 +481,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         return 0;
     }
 
+    // 기존 직접 적용 함수 보존용(현재 호출하지 않음).
     private void AddUnitModifiers(ConvertedEffects converted)
     {
         // EffectManager는 보정치만 보관하므로, 실제 유닛 합산은 공개 API로 직접 넣습니다.

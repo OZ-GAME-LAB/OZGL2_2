@@ -32,7 +32,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     [SerializeField] private bool _restoreArtifact = true;
     [SerializeField] private bool _restoreShop = true;
     [SerializeField] private bool _restoreConsumableItem = true;
-    [SerializeField] private bool _restoreBuilding = false;
+    [SerializeField] private bool _restoreBuilding = true;
     [SerializeField] private bool _restoreArchive = true;
 
     private SaveManager _saveManager;

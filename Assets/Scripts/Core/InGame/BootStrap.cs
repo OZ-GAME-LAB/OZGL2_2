@@ -125,12 +125,21 @@ public class BootStrap : MonoBehaviour
             }
 
             var profile = _outGameSaveCoordinator.CaptureSaveData();
-            if (hasRun && !CanRestoreOutGameEffects(profile, loaded.Flow, out string effectError))
+            InitializeOutGameEffects(profile);
+            // Current date KDH 2026-10-08
+            // 효과만 복구하는 API가 생기기 전에는 특성·제단·토템 이어하기를 여기서 막았습니다.
+            // if (hasRun && !CanRestoreOutGameEffects(profile, loaded.Flow, out string effectError))
+            // {
+            //     StopStartup(effectError);
+            //     return;
+            // }
+            // 이어하기는 효과만 먼저 올립니다. 실패하면 자동 저장 전에 멈춰 저장 원본을 남깁니다.
+            if (hasRun && !TryRestoreOngoingOutGameEffects(out string effectError))
             {
                 StopStartup(effectError);
                 return;
             }
-            InitializeOutGameEffects(profile);
+            //InitializeOutGameEffects(profile);
             if (hasRun)
             {
                 if (!_inGameSaveCoordinator.TryApplySaveData(loaded, out string restoreError))
@@ -171,7 +180,7 @@ public class BootStrap : MonoBehaviour
             (_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController, _shopManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
-        _artifactManager.Initialize(_waveController, _effectManager, _uiStartup.ArtifactSelectionUI);
+        _artifactManager.Initialize(_waveController, _effectManager, _runCurrencyManager, _uiStartup.ArtifactSelectionUI);
         _uiStartup.InitializeArtifactInventory(_artifactManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
         _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager,
@@ -197,7 +206,7 @@ public class BootStrap : MonoBehaviour
         _cameraController.Initialize(_buildController,_gameFlowController);
         _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
             _runCurrencyManager, _gameFlowController);
-        _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _gameFlowController);
+        _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _effectManager, _gameFlowController);
         _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
             _gameFlowController);
 
@@ -284,35 +293,57 @@ public class BootStrap : MonoBehaviour
         return valid;
     }
 
-    // 기존 API는 특성·제단 효과와 시작 지급을 분리하지 못하므로 적용 전에 차단한다.
-    private bool CanRestoreOutGameEffects(PersistentSaveData profile, GameFlowSaveData flow, out string error)
+    // Current date KDH 2026-10-08
+    // 효과와 시작 지급을 나누기 전 차단입니다. 지금 이어하기는 TryRestoreOngoingOutGameEffects를 사용합니다.
+    // private bool CanRestoreOutGameEffects(PersistentSaveData profile, GameFlowSaveData flow, out string error)
+    // {
+    //     var unsupported = new List<string>();
+    //     if (_traitRunApplier != null && profile.Traits?._levels != null)
+    //         foreach (var entry in profile.Traits._levels)
+    //             if (entry != null && entry.Level > 0)
+    //             {
+    //                 unsupported.Add("Trait");
+    //                 break;
+    //             }
+    //     if (_altarManager != null && profile.Altar != null && profile.Altar.SelectedAltar != AltarId.None)
+    //         unsupported.Add("Altar");
+    //     // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
+    //     if (_totemRunApplier != null && flow.ResumeStep != RunResumeStep.Preparation && profile.Totem?.Totems != null)
+    //         foreach (var entry in profile.Totem.Totems)
+    //             if (entry != null && entry.Level > 0)
+    //             {
+    //                 unsupported.Add("Totem");
+    //                 break;
+    //             }
+    //     if (unsupported.Count == 0)
+    //     {
+    //         error = null;
+    //         return true;
+    //     }
+    //     error = string.Join(", ", unsupported) + " 이어하기는 효과만 복구하는 API가 필요합니다. " +
+    //         "복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+    //     return false;
+    // }
+
+    // Current date KDH 2026-10-08
+    // 시작 재화는 인게임 세이브 잔액에 이미 있습니다. 여기서는 지속 효과만 등록합니다.
+    private bool TryRestoreOngoingOutGameEffects(out string error)
     {
-        var unsupported = new List<string>();
-        if (_traitRunApplier != null && profile.Traits?._levels != null)
-            foreach (var entry in profile.Traits._levels)
-                if (entry != null && entry.Level > 0)
-                {
-                    unsupported.Add("Trait");
-                    break;
-                }
-        if (_altarManager != null && profile.Altar != null && profile.Altar.SelectedAltar != AltarId.None)
-            unsupported.Add("Altar");
-        // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
-        if (_totemRunApplier != null && flow.ResumeStep != RunResumeStep.Preparation && profile.Totem?.Totems != null)
-            foreach (var entry in profile.Totem.Totems)
-                if (entry != null && entry.Level > 0)
-                {
-                    unsupported.Add("Totem");
-                    break;
-                }
-        if (unsupported.Count == 0)
+        if (_traitRunApplier != null && !_traitRunApplier.TryApplyOngoingEffects())
         {
-            error = null;
-            return true;
+            error = "특성 효과를 복원하지 못했습니다. 복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+            return false;
         }
-        error = string.Join(", ", unsupported) + " 이어하기는 효과만 복구하는 API가 필요합니다. " +
-            "복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
-        return false;
+
+        if (_altarManager != null && _altarManager.Selected != null && !_altarManager.TryApplyOngoingEffects())
+        {
+            error = "제단 효과를 복원하지 못했습니다. 복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+            return false;
+        }
+
+        if (_totemRunApplier != null) _totemRunApplier.ApplyOngoingEffects();
+        error = null;
+        return true;
     }
 
     // 신규 런의 효과와 시작 재화는 기존 파트의 첫 Preparation 처리에서 적용한다.
@@ -328,7 +359,7 @@ public class BootStrap : MonoBehaviour
         {
             _totemRunApplier.RestoreSaveData(profile.Totem);
         }
-        // 제단 선택 복원만 수행하고 효과 적용은 기존 페이즈 처리에 맡긴다.
+        // 제단은 선택만 되돌립니다. 새 게임 효과는 첫 Preparation이, 이어하기 효과는 직후 복원이 담당합니다.
         if (_altarManager != null)
         {
             _altarManager.RestoreSaveData(profile.Altar);
