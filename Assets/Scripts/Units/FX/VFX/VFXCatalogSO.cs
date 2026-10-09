@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -14,13 +14,20 @@ namespace Units.FX
         private void OnEnable() => _built = false;
         private void OnValidate() { _built = false; Rebuild(); }
 
+        public IEnumerable<VFXDefinition> GetEntries(FXCatalogCategory category)
+        {
+            foreach (var entry in _entries)
+                if (entry != null && entry.Category == category) yield return entry;
+        }
+
         public void Rebuild()
         {
             _lookup.Clear();
             foreach (var entry in _entries)
             {
-                if (entry == null || string.IsNullOrWhiteSpace(entry.Key) || entry.Prefab == null)
-                { Debug.LogWarning("[VFXCatalog] Key 또는 재생 에셋이 비어 있습니다.", this); continue; }
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Key))
+                { Debug.LogWarning("[VFXCatalog] Key가 비어 있습니다.", this); continue; }
+                if (entry.Prefab == null) continue; // 연결 전 임시 슬롯은 재생하지 않는다.
                 if (!_lookup.TryAdd(entry.Key, entry))
                     Debug.LogWarning($"[VFXCatalog] 중복 Key: {entry.Key}", this);
             }

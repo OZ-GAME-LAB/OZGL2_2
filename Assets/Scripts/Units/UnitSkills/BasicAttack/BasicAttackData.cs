@@ -1,4 +1,5 @@
-using UnityEngine;
+﻿using UnityEngine;
+using System.Collections.Generic;
 
 
 
@@ -94,12 +95,18 @@ namespace Units.Skills
         // ============================================================
 
         [Header("FX")]
-
         [SerializeField]
+        private List<SkillFXEntry> _fxEntries = new();
+
+        public IReadOnlyList<SkillFXEntry> FXEntries => _fxEntries;
+
+        // 기존 에셋 이전용 값. 실행 경로는 FXEntries만 사용한다.
+        [SerializeField, HideInInspector]
         private BasicAttackFXType _attackFXType =
             BasicAttackFXType.None;
 
-        [SerializeField]
+        // 기존 에셋 이전용 값. 실행 경로는 FXEntries만 사용한다.
+        [SerializeField, HideInInspector]
         private BasicAttackFXType _hitFXType =
             BasicAttackFXType.None;
 

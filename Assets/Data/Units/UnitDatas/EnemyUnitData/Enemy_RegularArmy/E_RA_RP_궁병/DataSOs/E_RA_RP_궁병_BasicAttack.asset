@@ -24,3 +24,18 @@ MonoBehaviour:
   _projectileSpeed: 10
   _attackFXType: 0
   _hitFXType: 0
+  _fxEntries:
+  - _key: VFX_OnHit_Arrow
+    _hook: 1
+    _operation: 5
+    _endPolicy: 2
+    _kind: 0
+    _attachment: 2
+    _followDirection: 1
+  - _key: SFX_OnHit_Arrow
+    _hook: 1
+    _operation: 5
+    _endPolicy: 2
+    _kind: 1
+    _attachment: 2
+    _followDirection: 1

@@ -18,12 +18,12 @@ MonoBehaviour:
   _conditions: []
   _effectMode: 0
   _actions:
-  - rid: 1967714737147871470
+  - rid: 4617381651116720254
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 1967714737147871470
+    - rid: 4617381651116720254
       type: {class: PassiveAdditionalAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _attack:
@@ -56,7 +56,7 @@ MonoBehaviour:
               _filters: []
               _priorities: []
             _effects:
-            - rid: 1967714737147871471
+            - rid: 4617381651116720255
           _conditionalEffects: []
           _fxEntries: []
           _delivery: 0
@@ -65,9 +65,10 @@ MonoBehaviour:
           _angle: 90
           _maxEffectTargets: 1
           _projectileSpeed: 10
+          _projectilePrefab: {fileID: 0}
           _isLegacy: 0
         _useTriggerPosition: 0
-    - rid: 1967714737147871471
+    - rid: 4617381651116720255
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _damageType: 0

@@ -184,6 +184,7 @@ namespace Units
             );
 
             Flight.Configure(SkillEffectRequest.Value.Batch, skillEffectRequest.Metadata);
+            Flight.SetFXRadius(impactType == ProjectileImpactType.Single ? 0f : AreaRadius);
 
             AttackerLifetimeVersion = attacker != null ? attacker.LifetimeVersion : 0;
         }

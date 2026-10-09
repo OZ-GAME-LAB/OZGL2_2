@@ -16,8 +16,36 @@ MonoBehaviour:
   - Type: 1
     Entries:
     - _key: VFX_Normal_Slash
-      _hook: 0
+      _hook: 1
+      _operation: 5
       _endPolicy: 2
       _kind: 0
       _attachment: 2
-      _followDirection: 0
+      _followDirection: 1
+  - Type: 2
+    Entries:
+    - _key: VFX_Normal_Pierce
+      _hook: 1
+      _operation: 5
+      _endPolicy: 2
+      _kind: 0
+      _attachment: 2
+      _followDirection: 1
+  - Type: 3
+    Entries:
+    - _key: VFX_Normal_Projectile
+      _hook: 8
+      _operation: 3
+      _endPolicy: 3
+      _kind: 0
+      _attachment: 3
+      _followDirection: 1
+  - Type: 4
+    Entries:
+    - _key: VFX_Normal_Explosion
+      _hook: 1
+      _operation: 5
+      _endPolicy: 2
+      _kind: 0
+      _attachment: 2
+      _followDirection: 1

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Units.Skills;
 using Units.Effects;
@@ -58,6 +58,9 @@ namespace Units
 
             public bool Waiting, Moved, HitsObserved, Entered, DashStarted;
 
+            // 타격 완료 후에도 액션 동작 시간이 끝날 때까지 다음 액션 진입을 막는다.
+            public bool AttackHolding;
+            public float AttackRemaining;
             public Vector2 Position;
 
             public SkillEffectBatch Batch;
@@ -402,12 +405,13 @@ namespace Units
                             break;
 
                         case SkillAttackActionData attack:
+                            float duration = Mathf.Max(0.1f, attack.ExecutionDuration / Mathf.Max(0.01f, _core.RuntimeStatus.AttackSpeed));
                             // Self 대상 지원 액션은 자가 버프, 나머지는 스킬 공격으로 표시한다.
                             if (attack.Target.Source == SkillTargetSource.Self
                                 || attack.Target.Relation == SkillTargetRelation.Self)
-                                _core.PlayAnimation_Buff();
+                                _core.PlayAnimation_Buff(duration);
                             else
-                                _core.PlayAnimation_Skill();
+                                _core.PlayAnimation_Skill(duration);
                             bool success = ExecuteAttack(run, attack);
 
                             if (_execution != run)
@@ -421,7 +425,14 @@ namespace Units
                                 );
 
                             else if (success)
-                                CompleteAction(run, ActionCompletionKind.Success);
+                            {
+                                if (duration > 0f)
+                                {
+                                    run.AttackHolding = true;
+                                    run.AttackRemaining = duration;
+                                }
+                                else CompleteAction(run, ActionCompletionKind.Success);
+                            }
 
                             else
                                 FailAction(
@@ -473,6 +484,14 @@ namespace Units
             if (!ValidateExecution(run))
                 return;
 
+            // 새 액션에 같은 프레임의 deltaTime을 다시 적용하지 않는다.
+            if (run.AttackHolding)
+            {
+                run.AttackRemaining -= Mathf.Max(0f, deltaTime);
+                if (run.AttackRemaining <= 0f)
+                    CompleteAction(run, ActionCompletionKind.Success);
+                return;
+            }
             _castController.Tick(deltaTime);
         }
 
@@ -507,7 +526,8 @@ namespace Units
                 return false;
             }
 
-            return EnsureTarget(run);
+            // 이미 타격한 대상의 사망은 남은 공격 동작을 취소하지 않는다.
+            return run.AttackHolding || EnsureTarget(run);
         }
 
         private void CompleteDelayed(
@@ -719,7 +739,9 @@ namespace Units
                     return;
             }
 
-            // Cast/Dash의 유지 연출만 종료한다. 즉시 완료된 공격 클립은 계속 재생한다.
+            // 실행 시간이 있는 공격도 액션 완료와 동시에 유지 연출을 해제한다.
+            run.AttackHolding = false;
+            run.AttackRemaining = 0f;
             if (run.Owner.MatchesLifetime)
                 _core.StopAnimation_SkillMotion();
 
@@ -923,19 +945,31 @@ namespace Units
             {
                 var center = action.Area == ActiveSkillAreaType.TargetCircle ? (Vector2)primary.Target.Transform.position : origin;
 
-                foreach (var target in _targetResolver.ResolveHitTargets(new TargetHitRequest(center, direction, action.Radius, action.Angle, action.MaxEffectTargets, action.Area == ActiveSkillAreaType.SelfCone ? HitAreaType.Cone : HitAreaType.Circle, GetTargetTeam(action.Target.Relation), action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null)))
+                bool AllowsEffectTarget(ICombatTarget target)
                 {
-                    if (action.Target.Relation == SkillTargetRelation.Self && !ReferenceEquals(target, run.Owner.Target))
-                        continue;
-
-                    if (action.Target.Relation == SkillTargetRelation.Friendly && !action.Target.IncludeSelf && ReferenceEquals(target, run.Owner.Target))
-                        continue;
-
-                    targets.Add(new CombatTargetSnapshot(target));
+                    if (action.Target.Relation == SkillTargetRelation.Hostile)
+                        return run.Engagement.HostileFilter == null || run.Engagement.HostileFilter(target);
+                    bool self = ReferenceEquals(target, run.Owner.Target);
+                    return action.Target.Relation == SkillTargetRelation.Self
+                        ? self : action.Target.IncludeSelf || !self;
                 }
+
+                // 인원 제한 전에 제외해야 자신이 효과 슬롯을 소비하지 않는다.
+                foreach (var target in _targetResolver.ResolveHitTargets(new TargetHitRequest(
+                    center, direction, action.Radius, action.Angle, action.MaxEffectTargets,
+                    action.Area == ActiveSkillAreaType.SelfCone ? HitAreaType.Cone : HitAreaType.Circle,
+                    GetTargetTeam(action.Target.Relation), AllowsEffectTarget)))
+                    targets.Add(new CombatTargetSnapshot(target));
 
                 run.Position = center;
             }
+
+            // 즉시 피해형도 실제 공격 중심에서 폭발을 한 번 재생한다.
+            // 대상별 OnHit과 분리하고, 투사체 경로는 위에서 반환하므로 중복하지 않는다.
+            EmitFX(run, SkillFXHook.Collision, primary, run.Position, direction);
+
+            if (_execution != run || !OwnerValid(run))
+                return false;
 
             var impact = NewImpact(run);
 
@@ -1123,7 +1157,9 @@ namespace Units
             foreach (var entry in run.Actions[run.Index].FXEntries)
                 if (entry != null && entry.Hook == hook)
                     DispatchFX(new SkillFXRequest(entry, run.Metadata, position ?? origin,
-                        direction: aim, target: target, facingDirection: _core.FacingDirection));
+                        direction: aim, target: target, facingDirection: _core.FacingDirection,
+                        attackRadius: run.Actions[run.Index] is SkillAttackActionData attack
+                            ? (attack.Area == ActiveSkillAreaType.Single ? attack.Target.Range : attack.Radius) : 0f));
         }
 
         private void DispatchFX(SkillFXRequest request)

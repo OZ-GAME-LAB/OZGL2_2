@@ -34,6 +34,16 @@ MonoBehaviour:
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _effectData: {fileID: 11400000, guid: ee7cff4db385cf44eb38bf06b8ca88c9, type: 2}
+        _applicationFX:
+        - _key: VFX_OnApply_Heal
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
     - rid: 4844432381217865731
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -50,3 +60,13 @@ MonoBehaviour:
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _effectData: {fileID: 11400000, guid: 1fdadc3ac28e2e046895a49fc6a7fe2e, type: 2}
+        _applicationFX:
+        - _key: VFX_OnApply_Debuff
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}

@@ -43,6 +43,8 @@ namespace Units.FX
             _age += delta;
             if (!_playback.Tick())
             {
+                if (Request.Entry.EndPolicy == SkillFXEndPolicy.ClearImmediately)
+                    return true;
                 if (Request.Entry.EndPolicy == SkillFXEndPolicy.Independent) _playback.Detach();
                 else Stop();
             }

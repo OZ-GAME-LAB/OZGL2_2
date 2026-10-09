@@ -40,6 +40,7 @@ MonoBehaviour:
     - rid: 4844432381217865729
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _executionDuration: 0
         _target:
           _source: 6
           _relation: 0
@@ -71,7 +72,43 @@ MonoBehaviour:
           _effects:
           - rid: 4844432381217865730
         _conditionalEffects: []
-        _fxEntries: []
+        _fxEntries:
+        - _key: VFX_Ally_ActiveAttack_Circle
+          _hook: 0
+          _operation: 4
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 0
+          _followDirection: 0
+          _scaleMode: 2
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: SFX_Ally_ActiveAttack_Circle
+          _hook: 0
+          _operation: 4
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 0
+          _followDirection: 0
+          _scaleMode: 2
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: VFX_Ally_ActiveOnHit_Melee
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: SFX_Ally_ActiveOnHit_Melee
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
         _area: 2
         _radius: 4

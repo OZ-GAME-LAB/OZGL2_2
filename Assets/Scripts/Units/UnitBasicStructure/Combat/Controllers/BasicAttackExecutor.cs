@@ -118,9 +118,7 @@ namespace Units
                 var root = CombatEventMetadata.Create(_core.CombatTarget);
                 _fxMetadata = CombatEventMetadata.Create(_core.CombatTarget, root, executionId: root.EventId, actionIndex: 0);
                 _fxDirection = (Vector2)target.Transform.position - (Vector2)_core.transform.position;
-                var mapping = _core.GetComponent<Units.FX.UnitFXBridge>()?.BasicAttackMapping
-                    ?? Units.FX.VFXManager.Instance?.BasicAttackMapping;
-                _fxEntries = mapping != null ? mapping.Capture(_data.AttackFXType, _data.HitFXType) : Array.Empty<SkillFXEntry>();
+                _fxEntries = SkillDefinitionCopy.Copy(new List<SkillFXEntry>(_data.FXEntries)).ToArray();
                 fxStarted = true;
                 EmitFX(SkillFXHook.OnStart, _core.transform.position, new CombatTargetSnapshot(target));
                 if (_data.ExecutionType == BasicAttackExecutionType.Direct)

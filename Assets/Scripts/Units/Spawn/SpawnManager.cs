@@ -70,7 +70,7 @@ namespace Units
         private Vector2 _rallySectorSize =
             new Vector2(
                 5f,
-                10f
+                5f
             );
 
         [SerializeField]

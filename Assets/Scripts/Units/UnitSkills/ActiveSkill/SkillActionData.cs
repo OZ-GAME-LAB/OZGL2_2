@@ -154,7 +154,7 @@ namespace Units.Skills
 
         public float Distance => _distance;
 
-        public float Speed => _speed;
+        public float Speed => Mathf.Min(_speed, 20f);
 
         // ============================================================
         // Constructor
@@ -190,6 +190,11 @@ namespace Units.Skills
 
         [SerializeField]
         private ActiveSkillDeliveryType _delivery;
+
+        [SerializeField, Min(0f), Tooltip("공격 시작부터 다음 액션까지의 기준 시간(초). 공격 속도 보정 후에도 실제 행동 시간은 최소 0.1초입니다.")]
+        private float _executionDuration = 0.3f;
+
+        public float ExecutionDuration => _executionDuration;
 
         [SerializeField]
         private ActiveSkillAreaType _area;
@@ -251,6 +256,7 @@ namespace Units.Skills
 
         internal SkillAttackActionData(ActiveSkillData legacy)
         {
+            _executionDuration = 0f;
             _delivery = legacy.DeliveryType;
 
             _area = legacy.AreaType;
@@ -274,7 +280,7 @@ namespace Units.Skills
         // Properties
         // ============================================================
 
-        public override bool IsConfigured => base.IsConfigured && _maxEffectTargets > 0 && (_delivery == ActiveSkillDeliveryType.Direct || (_delivery == ActiveSkillDeliveryType.Projectile && _projectileSpeed > 0f && !float.IsInfinity(_projectileSpeed))) && Target.Source != SkillTargetSource.None;
+        public override bool IsConfigured => base.IsConfigured && _executionDuration >= 0f && !float.IsInfinity(_executionDuration) && _maxEffectTargets > 0 && (_delivery == ActiveSkillDeliveryType.Direct || (_delivery == ActiveSkillDeliveryType.Projectile && _projectileSpeed > 0f && !float.IsInfinity(_projectileSpeed))) && Target.Source != SkillTargetSource.None;
     }
 
     public static class SkillActionPlan

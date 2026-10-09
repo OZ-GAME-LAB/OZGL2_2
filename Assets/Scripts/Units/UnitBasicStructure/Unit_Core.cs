@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Units.Effects;
 using Units.Skills;
@@ -39,7 +39,8 @@ namespace Units
             SelectedSkillDecision = decision;
             return found;
         }
-        public bool TryActiveSkill(UnitDecision decision) => _combat != null && _combat.TryActiveSkill(decision);
+        public bool TryActiveSkill(UnitDecision decision, Action onStarting = null)
+            => _combat != null && _combat.TryActiveSkill(decision, onStarting);
 
 
         [SerializeField]
@@ -435,6 +436,11 @@ namespace Units
             _movement.MoveTo(targetPosition);
         }
 
+        public void UpdateMovementDestination(Vector2 targetPosition)
+        {
+            _movement?.UpdateDestination(targetPosition);
+        }
+
         public void StopMovement()
         {
             if (_movement == null)
@@ -760,12 +766,12 @@ namespace Units
             _animation.PlayAnimation_Cast();
         }
 
-        public void PlayAnimation_Buff()
+        public void PlayAnimation_Buff(float duration = 0f)
         {
             if (_animation == null)
                 return;
 
-            _animation.PlayAnimation_Buff();
+            _animation.PlayAnimation_Buff(duration);
         }
 
         public void PlayAnimation_Victory()
@@ -816,12 +822,12 @@ namespace Units
             _animation.PlayAnimation_Attack();
         }
 
-        public void PlayAnimation_Skill()
+        public void PlayAnimation_Skill(float duration = 0f)
         {
             if (_animation == null)
                 return;
 
-            _animation.PlayAnimation_Skill();
+            _animation.PlayAnimation_Skill(duration);
         }
 
         public void PlayAnimation_Hit()

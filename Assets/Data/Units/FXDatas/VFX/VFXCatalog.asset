@@ -13,12 +13,615 @@ MonoBehaviour:
   m_Name: VFXCatalog
   m_EditorClassIdentifier: Assembly-CSharp::Units.FX.VFXCatalogSO
   _entries:
-  - _key: VFX_Normal_Slash
-    _prefab: {fileID: 658579276834281116, guid: 6ecca16026f87654b9c2da8ba4e1d682, type: 3}
+  - _operation: 5
+    _category: 1
+    _key: VFX_Ally_Slash_BasicAttack
+    _prefab: {fileID: 6913297746009204716, guid: 46222642a46ab60479bf5c7f024ccbc5, type: 3}
     _offset: {x: 0, y: 0}
-    _scale: {x: 1, y: 1, z: 1}
+    _scale: {x: 0.6, y: 0.6}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 1
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 1
+    _key: VFX_Enemy_Slash_BasicAttack
+    _prefab: {fileID: 5267198685792777811, guid: bba0e5717d664454db0686e92ab95156, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.6, y: 0.6}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 1
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 1
+    _key: VFX_Ally_Pierce_BasicAttack
+    _prefab: {fileID: 2090392003819258702, guid: 369a54b4d488579438864192213013f7, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.6, y: 0.6}
+    _rotationOffset: -45
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 1
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 1
+    _key: VFX_Enemy_Pierce_BasicAttack
+    _prefab: {fileID: 5985919691680972548, guid: 9f6132e534ccad746b515781f040c26b, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.6, y: 0.6}
+    _rotationOffset: -90
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 1
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 2
+    _key: VFX_Projectile_Arrow
+    _prefab: {fileID: 0}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 2
+    _key: VFX_Projectile_Fire
+    _prefab: {fileID: 4748681987041982144, guid: fc85e20c3a1229842b9e8d3f610316bf, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 2
+    _key: VFX_Projectile_Ice
+    _prefab: {fileID: 4748681987041982144, guid: efec1dd6db1a8dd4e9f0d3df77cd655f, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 2
+    _key: VFX_Projectile_Electric
+    _prefab: {fileID: 4748681987041982144, guid: 3b5f466633dd2e2428325ec52f462325, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 3
+    _key: VFX_OnHit_Arrow
+    _prefab: {fileID: 4748681987041982144, guid: 534e62d9c5d62a24090ab2a1f1376349, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
     _directionMode: 0
     _nativeAngle: 0
-    _rotationOffset: 0
-    _spriteFacesRight: 0
+    _spriteFacesRight: 1
     _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 3
+    _key: VFX_OnHit_Fire
+    _prefab: {fileID: 4748681987041982144, guid: 76b4391231a2ff24eba10be108d13923, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 3
+    _key: VFX_OnHit_Ice
+    _prefab: {fileID: 4748681987041982144, guid: 3027b7b617dbb2c439172f4cb28b1866, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 3
+    _key: VFX_OnHit_Electric
+    _prefab: {fileID: 4748681987041982144, guid: 99a403afe93111940878a5fae7fcda58, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 5
+    _key: VFX_ActiveProjectile_Arrow
+    _prefab: {fileID: 4748681987041982144, guid: 1e09730f2d7a89643878c89a12abfe0b, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1.5, y: 1.5}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 5
+    _key: VFX_ActiveProjectile_Fire
+    _prefab: {fileID: 4748681987041982144, guid: 5623c0a9e27c84749907d738fb5108bb, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1.5, y: 1.5}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 5
+    _key: VFX_ActiveProjectile_Ice
+    _prefab: {fileID: 4748681987041982144, guid: efec1dd6db1a8dd4e9f0d3df77cd655f, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 3
+    _category: 5
+    _key: VFX_ActiveProjectile_Electric
+    _prefab: {fileID: 4748681987041982144, guid: 3b5f466633dd2e2428325ec52f462325, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 6
+    _category: 6
+    _key: VFX_ActiveExplosion_Arrow
+    _prefab: {fileID: 0}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 6
+    _category: 6
+    _key: VFX_ActiveExplosion_Fire
+    _prefab: {fileID: 4748681987041982144, guid: 777499209afb7f842bf6d678ad6cc6fc, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 6
+    _category: 6
+    _key: VFX_ActiveExplosion_Ice
+    _prefab: {fileID: 4748681987041982144, guid: 34a940ebbf7dd54438c68003b3d7eb08, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 6
+    _category: 6
+    _key: VFX_ActiveExplosion_Electric
+    _prefab: {fileID: 4748681987041982144, guid: 552008db49cd98143bf3702415b0ab50, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 4
+    _key: VFX_ActiveOnHit_Arrow
+    _prefab: {fileID: 6104271077723484671, guid: 8241ec4e54fc0c84dab732a0876a3807, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.5, y: 0.5}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 4
+    _key: VFX_ActiveOnHit_Fire
+    _prefab: {fileID: 4748681987041982144, guid: 49f8bc9fbaacee144a7de203076ea7db, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 4
+    _key: VFX_ActiveOnHit_Ice
+    _prefab: {fileID: 4748681987041982144, guid: bfc9027c0c512794ba07c0f42e5d3266, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 4
+    _key: VFX_ActiveOnHit_Electric
+    _prefab: {fileID: 4748681987041982144, guid: 0f7ea8a1d0a56154c886573c1eb9d0ff, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 2, y: 2}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 0
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 9
+    _key: VFX_Dash_OnHit
+    _prefab: {fileID: 4748681987041982144, guid: e1897611225fc93438027d0966aa78a5, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 7
+    _key: VFX_Ally_ActiveAttack_Circle
+    _prefab: {fileID: 6792073445626459971, guid: 85f3e3eeb46cd754092b6561cfdb822d, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.3, y: 0.3}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 7
+    _key: VFX_Ally_ActiveAttack_Cone
+    _prefab: {fileID: 8057750970601848588, guid: 66eab71ca9dad18479d9ef95a07e6fff, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.3, y: 0.3}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 7
+    _key: VFX_Ally_ActiveAttack_Single
+    _prefab: {fileID: 8218691985371785984, guid: 840ec224a199d2b4aae6e67dc01d782b, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.2, y: 0.2}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 1
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 8
+    _key: VFX_Ally_ActiveOnHit_Melee
+    _prefab: {fileID: 658579276834281116, guid: 6ecca16026f87654b9c2da8ba4e1d682, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.5, y: 0.5}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 7
+    _key: VFX_Enemy_ActiveAttack_Circle
+    _prefab: {fileID: 6792073445626459971, guid: 1f3d957ef18646a4480da0cb49e00a36, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.3, y: 0.3}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 7
+    _key: VFX_Enemy_ActiveAttack_Cone
+    _prefab: {fileID: 8057750970601848588, guid: 9f5a3ba2da667354b8f0da3d17b985b2, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.3, y: 0.3}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 4
+    _category: 7
+    _key: VFX_Enemy_ActiveAttack_Single
+    _prefab: {fileID: 2186613312934156935, guid: 6a4577d2498f2d44889d31ea31df57ca, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.2, y: 0.2}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 1
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 8
+    _key: VFX_Enemy_ActiveOnHit_Melee
+    _prefab: {fileID: 3240696161500089197, guid: 6cb28a5ca740d5640a93a2371581e0bd, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 0.5, y: 0.5}
+    _rotationOffset: 0
+    _directionMode: 2
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 10
+    _key: VFX_OnApply_Heal
+    _prefab: {fileID: 4748681987041982144, guid: e6cbb321dea99c441ac46e8e93200364, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 10
+    _key: VFX_OnApply_Buff
+    _prefab: {fileID: 4748681987041982144, guid: 3f831964f388b5249923521438e71be9, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1
+  - _operation: 5
+    _category: 10
+    _key: VFX_OnApply_Debuff
+    _prefab: {fileID: 4748681987041982144, guid: 8fb54bd58b5bc3d41bfcda73a9084852, type: 3}
+    _offset: {x: 0, y: 0}
+    _scale: {x: 1, y: 1}
+    _rotationOffset: 0
+    _directionMode: 0
+    _nativeAngle: 0
+    _spriteFacesRight: 1
+    _maxLifetime: 0.5
+    _sortingOrderOffset: 1
+    _particleStartMode: 0
+    _immediateEmitCount: 1
+    _particleScalingMode: 1
+    _particleSimulationMode: 1
+    _referenceRadius: 1

@@ -27,8 +27,7 @@ namespace Units.Editor
         private SerializedProperty _projectileSpeed;
         private SerializedProperty _projectilePrefab;
 
-        private SerializedProperty _attackFXType;
-        private SerializedProperty _hitFXType;
+
 
 
         // ============================================================
@@ -106,15 +105,7 @@ namespace Units.Editor
                 );
 
 
-            _attackFXType =
-                serializedObject.FindProperty(
-                    "_attackFXType"
-                );
 
-            _hitFXType =
-                serializedObject.FindProperty(
-                    "_hitFXType"
-                );
         }
 
 
@@ -432,13 +423,7 @@ namespace Units.Editor
                 EditorGUI.indentLevel++;
 
 
-                EditorGUILayout.PropertyField(
-                    _attackFXType
-                );
-
-                EditorGUILayout.PropertyField(
-                    _hitFXType
-                );
+                SkillAuthoringGUI.Draw(serializedObject.FindProperty("_fxEntries"));
 
 
                 EditorGUI.indentLevel--;

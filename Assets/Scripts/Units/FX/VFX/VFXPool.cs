@@ -15,21 +15,18 @@ namespace Units.FX
         private readonly Transform _inactiveRoot;
         private readonly int _limit;
         private readonly int _unusedGenerationsBeforeRemoval;
-        private readonly IReadOnlyList<VFXShaderReplacement> _shaderReplacements;
+        private readonly VFXMaterialCache _materials;
         private long _generation;
 
-        internal VFXPool(Transform root, int limit, int unusedGenerationsBeforeRemoval = 2,
+        internal VFXPool(Transform activeRoot, Transform inactiveRoot, int limit,
+            int unusedGenerationsBeforeRemoval = 2,
             IReadOnlyList<VFXShaderReplacement> shaderReplacements = null)
         {
-            _root = root;
-            // 기존 씬의 0 설정도 최소 보관 1개 정책으로 처리한다.
+            _root = activeRoot;
+            _inactiveRoot = inactiveRoot;
             _limit = Mathf.Max(1, limit);
             _unusedGenerationsBeforeRemoval = Mathf.Max(1, unusedGenerationsBeforeRemoval);
-            _shaderReplacements = shaderReplacements;
-            var inactive = new GameObject("Stored VFX");
-            inactive.transform.SetParent(root, false);
-            inactive.SetActive(false);
-            _inactiveRoot = inactive.transform;
+            _materials = new VFXMaterialCache(shaderReplacements);
         }
 
         // ============================================================
@@ -57,7 +54,7 @@ namespace Units.FX
             var instance = go.GetComponent<VFXInstance>() ?? go.AddComponent<VFXInstance>();
             instance.Configure(prefab);
             // 최초 생성에서만 교체한다. 풀 재대여 시 머티리얼을 다시 만들지 않는다.
-            instance.ApplyShaderReplacements(_shaderReplacements);
+            _materials.Apply(instance.gameObject);
             instance.LastUsedGeneration = _generation;
             go.transform.SetParent(_root, false);
             return instance;
@@ -121,12 +118,12 @@ namespace Units.FX
                     if (item != null) DestroyInstance(item);
             _stored.Clear();
             _generation = 0;
+            _materials.Clear();
         }
 
         private static void DestroyInstance(VFXInstance instance)
         {
-            // 한 번도 활성화되지 않은 오브젝트는 OnDestroy가 생략될 수 있어 소유 자원을 먼저 해제한다.
-            instance.DisposeMaterials();
+            // 공유 머티리얼은 개별 인스턴스가 아닌 풀 전체 정리 시 해제한다.
             Object.Destroy(instance.gameObject);
         }
     }
