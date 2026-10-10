@@ -136,7 +136,13 @@ public class BootStrap : MonoBehaviour
                     _inGameSaveCoordinator.RequireBackupBeforeNextWrite();
             }
             bool isContinuing = loaded != null && !_inGameSaveCoordinator.HasSkippedFlowRestore;
-            InitializeOutGameEffects(profile, isContinuing, isContinuing ? loaded.Flow : null);
+            InitializeOutGameEffects(profile);
+            // dev의 효과 전용 API로 이어하기를 복원하고 시작 재화는 다시 지급하지 않습니다.
+            if (isContinuing && !TryRestoreOngoingOutGameEffects(out string effectError))
+            {
+                StopStartup(effectError);
+                return;
+            }
 
             string saveError;
             bool saved = hasRun ? _inGameSaveCoordinator.TrySave(out saveError) :
@@ -288,72 +294,79 @@ public class BootStrap : MonoBehaviour
         return valid;
     }
 
+    // Current date KDH 2026-10-08
+    // 효과와 시작 지급을 나누기 전 차단입니다. 지금 이어하기는 TryRestoreOngoingOutGameEffects를 사용합니다.
+    // private bool CanRestoreOutGameEffects(PersistentSaveData profile, GameFlowSaveData flow, out string error)
+    // {
+    //     var unsupported = new List<string>();
+    //     if (_traitRunApplier != null && profile.Traits?._levels != null)
+    //         foreach (var entry in profile.Traits._levels)
+    //             if (entry != null && entry.Level > 0)
+    //             {
+    //                 unsupported.Add("Trait");
+    //                 break;
+    //             }
+    //     if (_altarManager != null && profile.Altar != null && profile.Altar.SelectedAltar != AltarId.None)
+    //         unsupported.Add("Altar");
+    //     // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
+    //     if (_totemRunApplier != null && flow.ResumeStep != RunResumeStep.Preparation && profile.Totem?.Totems != null)
+    //         foreach (var entry in profile.Totem.Totems)
+    //             if (entry != null && entry.Level > 0)
+    //             {
+    //                 unsupported.Add("Totem");
+    //                 break;
+    //             }
+    //     if (unsupported.Count == 0)
+    //     {
+    //         error = null;
+    //         return true;
+    //     }
+    //     error = string.Join(", ", unsupported) + " 이어하기는 효과만 복구하는 API가 필요합니다. " +
+    //         "복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+    //     return false;
+    // }
+
+    // Current date KDH 2026-10-08
+    // 시작 재화는 인게임 세이브 잔액에 이미 있습니다. 여기서는 지속 효과만 등록합니다.
+    private bool TryRestoreOngoingOutGameEffects(out string error)
+    {
+        if (_traitRunApplier != null && !_traitRunApplier.TryApplyOngoingEffects())
+        {
+            error = "특성 효과를 복원하지 못했습니다. 복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+            return false;
+        }
+
+        if (_altarManager != null && _altarManager.Selected != null && !_altarManager.TryApplyOngoingEffects())
+        {
+            error = "제단 효과를 복원하지 못했습니다. 복원·자동 저장·BeginRun을 실행하지 않고 저장 원본을 보존합니다.";
+            return false;
+        }
+
+        if (_totemRunApplier != null) _totemRunApplier.ApplyOngoingEffects();
+        error = null;
+        return true;
+    }
+
     // 신규 런의 효과와 시작 재화는 기존 파트의 첫 Preparation 처리에서 적용한다.
-    private void InitializeOutGameEffects(PersistentSaveData profile, bool isContinuing, GameFlowSaveData flow)
+    private void InitializeOutGameEffects(PersistentSaveData profile)
     {
         // 저장된 영구 특성으로 이번 씬의 효과를 다시 구성한다.
         if (_traitRunApplier != null)
         {
-            RestoreEffectOrUseInitial("Trait", () =>
-            {
-                if (isContinuing && profile.Traits?._levels != null)
-                    foreach (var entry in profile.Traits._levels)
-                        if (entry != null && entry.Level > 0)
-                            throw new NotSupportedException("이어하기에서 효과와 시작 지급을 분리하는 API가 없습니다.");
-                _traitRunApplier.SetLevels(_persistentTraits.CaptureLevels());
-            }, () => _traitRunApplier.SetLevels(null));
+            _traitRunApplier.SetLevels(_persistentTraits.CaptureLevels());
         }
         // 토템: catalog가 없어도 기본 스탯 효과(TotemBuiltinEffects)는 적용됩니다.
         if (_totemRunApplier != null)
         {
-            RestoreEffectOrUseInitial("Totem", () =>
-            {
-                if (profile.Totem?.Totems == null)
-                    throw new InvalidOperationException("토템 저장 목록이 없습니다.");
-                // 토템은 첫 Preparation에서 지급 없이 효과를 구성할 수 있다.
-                if (isContinuing && flow?.ResumeStep != RunResumeStep.Preparation)
-                    foreach (var entry in profile.Totem.Totems)
-                        if (entry != null && entry.Level > 0)
-                            throw new NotSupportedException("현재 재개 단계에서 효과만 복원하는 API가 없습니다.");
-                _totemRunApplier.RestoreSaveData(profile.Totem);
-            }, () => _totemRunApplier.SetLevels(null));
+            _totemRunApplier.RestoreSaveData(profile.Totem);
         }
-        // 제단 선택 복원만 수행하고 효과 적용은 기존 페이즈 처리에 맡긴다.
+        // 제단은 선택만 되돌립니다. 새 게임 효과는 첫 Preparation이, 이어하기 효과는 직후 복원이 담당합니다.
         if (_altarManager != null)
         {
-            RestoreEffectOrUseInitial("Altar", () =>
-            {
-                if (profile.Altar == null)
-                    throw new InvalidOperationException("제단 저장 선택값이 없습니다.");
-                if (isContinuing && profile.Altar.SelectedAltar != AltarId.None)
-                    throw new NotSupportedException("이어하기에서 효과와 시작 지급을 분리하는 API가 없습니다.");
-                _altarManager.RestoreSaveData(profile.Altar);
-                if (!_altarManager.IsInitialized ||
-                    _altarManager.CaptureSaveData().SelectedAltar != profile.Altar.SelectedAltar)
-                    throw new InvalidOperationException("제단 초기화 또는 선택 복원에 실패했습니다.");
-            }, () =>
-            {
-                if (_altarManager.IsApplied && !_altarManager.TryClearApplied())
-                    throw new InvalidOperationException("제단 효과를 해제하지 못했습니다.");
-                if (_altarManager.Selected != null && !_altarManager.TryClearSelection())
-                    throw new InvalidOperationException("제단 선택을 해제하지 못했습니다.");
-            });
-        }
-    }
-
-    private void RestoreEffectOrUseInitial(string part, Action restore, Action reset)
-    {
-        try { restore(); }
-        catch (Exception exception) when (!(exception is OperationCanceledException))
-        {
-            try { reset(); }
-            catch (Exception resetException) when (!(resetException is OperationCanceledException))
-            {
-                throw new InvalidOperationException(part + " 복원 실패: " + exception.Message +
-                    "; 초기 상태 복구도 실패했습니다: " + resetException.Message, resetException);
-            }
-            LogSkippedRestore(part, exception.Message);
-            _inGameSaveCoordinator.RequireBackupBeforeNextWrite();
+            _altarManager.RestoreSaveData(profile.Altar);
+            if (!_altarManager.IsInitialized ||
+                _altarManager.CaptureSaveData().SelectedAltar != profile.Altar.SelectedAltar)
+                throw new InvalidOperationException("제단 초기화 또는 선택 복원에 실패했습니다.");
         }
     }
 

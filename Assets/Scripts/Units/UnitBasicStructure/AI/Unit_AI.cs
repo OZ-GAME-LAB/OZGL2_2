@@ -62,6 +62,9 @@ namespace Units
 
         private float _nextTargetReevaluationTime;
 
+        private float _nextAssignmentRetryTime;
+        private const float AssignmentRetryInterval = 0.5f;
+
 
         // ============================================================
         // Properties
@@ -243,6 +246,20 @@ namespace Units
         public void SetUnitAssignment(
             UnitAssignment assignment)
         {
+            // 같은 대상의 위치 재평가는 이동을 정지/재진입시키지 않는다.
+            if (_isRunning && !_currentActionEnded && !_movementCompleted
+                && IsCurrentAction(UnitAIActionType.Move) && _currentAssignment.HasValue
+                && ReferenceEquals(_currentAssignment.Value.Target, assignment.Target))
+            {
+                bool destinationChanged = Vector2.Distance(
+                    _currentAssignment.Value.PreferredPosition, assignment.PreferredPosition) > 0.01f;
+                _currentAssignment = assignment;
+                if (destinationChanged && !_core.IsCombatBusy)
+                    _core.UpdateMovementDestination(assignment.PreferredPosition);
+                EvaluateAction();
+                return;
+            }
+
             _currentAssignment =
                 assignment;
 
@@ -311,7 +328,7 @@ namespace Units
 
             if (_core.IsCombatBusy) return;
             if (_core.TrySelectActiveSkill(CurrentTarget, out _))
-            { _currentActionEnded = true; ChangeAction(UnitAIActionType.ActiveSkill); return; }
+            { ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!ValidateCurrentAssignment()) return;
 
 
@@ -347,7 +364,7 @@ namespace Units
         {
             if (_core == null || !_isRunning || _core.IsCombatBusy) return;
             if (_isRunning && _core.TrySelectActiveSkill(CurrentTarget, out _))
-            { _currentActionEnded = true; ChangeAction(UnitAIActionType.ActiveSkill); return; }
+            { ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!HasAssignment)
             {
                 ChangeAction(
@@ -373,7 +390,7 @@ namespace Units
 
             UnitAIActionType nextAction =
                 _actionSelector.SelectAction(
-                    assignment
+                    assignment, approaching: IsCurrentAction(UnitAIActionType.Move) && !_movementCompleted && !_currentActionEnded
                 );
 
 
@@ -401,8 +418,16 @@ namespace Units
         // ============================================================
 
         private void ChangeAction(
-            UnitAIActionType actionType)
+            UnitAIActionType actionType, bool skillPrepared = false)
         {
+            // 승인 실패는 행동 전환이 아니다. Move.Exit/Stop 전에 실행 준비를 마친다.
+            if (actionType == UnitAIActionType.ActiveSkill && !skillPrepared)
+            {
+                _core.TryActiveSkill(_core.SelectedSkillDecision,
+                    () => ChangeAction(UnitAIActionType.ActiveSkill, skillPrepared: true));
+                return;
+            }
+
             if (!_actions.TryGetValue(
                 actionType,
                 out IUnitAIAction nextAction))
@@ -544,7 +569,11 @@ namespace Units
         private bool ValidateCurrentAssignment()
         {
             if (!HasAssignment)
-                return true;
+            {
+                if (Time.time >= _nextAssignmentRetryTime)
+                    RequestFullAssignment();
+                return false;
+            }
 
 
             UnitAssignment assignment =
@@ -582,6 +611,8 @@ namespace Units
 
         private void RequestFullAssignment()
         {
+            // 요청은 동기적으로 실패할 수 있다. 다음 Think에서 무제한 재귀/재시도하지 않는다.
+            _nextAssignmentRetryTime = Time.time + AssignmentRetryInterval;
             ClearUnitAssignment();
 
             _core.RequestFullAssignment();
@@ -603,8 +634,8 @@ namespace Units
                 false;
 
 
-            _core.StopMovement();
-
+            ClearUnitAssignment();
+            _nextAssignmentRetryTime = Time.time + AssignmentRetryInterval;
             _core.RequestPositionAssignment();
         }
 
@@ -653,6 +684,8 @@ namespace Units
 
             _isRunning =
                 true;
+
+            _nextAssignmentRetryTime = 0f;
 
             _nextThinkTime =
                 0f;

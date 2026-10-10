@@ -39,6 +39,8 @@ Transform:
   - {fileID: 9030570934318424791}
   - {fileID: 3476539269708912935}
   - {fileID: 7948164099943996460}
+  - {fileID: 4941673863942684845}
+  - {fileID: 4282941764697702797}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &839057062849347674
@@ -85,6 +87,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 33f4abdb2523791438a101fd37b8ede0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.UnitStatModifierManager
+  _effectManager: {fileID: 0}
 --- !u!1 &1032084354787506254
 GameObject:
   m_ObjectHideFlags: 0
@@ -491,6 +494,68 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 925022ec959afe34d9f080ecc9d3193b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.HealResolver
+--- !u!1 &4507377533327193903
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4941673863942684845}
+  - component: {fileID: 3253172189058891290}
+  m_Layer: 0
+  m_Name: VFXManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4941673863942684845
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4507377533327193903}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5421153721552506957}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3253172189058891290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4507377533327193903}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aca3a4f3bc7e4919954469fec4813eb5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Units.FX.VFXManager
+  _catalog: {fileID: 11400000, guid: 5b649048ab0716e4c8a64071f4bb05bb, type: 2}
+  _basicAttackMapping: {fileID: 11400000, guid: e98fa4724f24a7c438081be644832d4b, type: 2}
+  _activeRoot: {fileID: 0}
+  _inactiveRoot: {fileID: 0}
+  _maxStored: 16
+  _unusedGenerationsBeforeRemoval: 2
+  _shaderReplacements:
+  - _sourceShaderName: Shader Graphs/M_Flipbook
+    _replacementShader: {fileID: 4800000, guid: 6e6c098a338940b6bfade733f606d1f0, type: 3}
+  - _sourceShaderName: Vefects/SH_Vefects_BIRP_Unlit_Flipbook_Pixel_01
+    _replacementShader: {fileID: 4800000, guid: 248af0c3e6a245dc8a563741dd63d860, type: 3}
+  - _sourceShaderName: Vefects/SH_Vefects_BIRP_Unlit_Flipbook_Pixel_Advanced_01
+    _replacementShader: {fileID: 4800000, guid: 5e901e79775543b7ab28fff23df3e3e0, type: 3}
+  - _sourceShaderName: Vefects/SH_Vefects_BIRP_Unlit_Flipbook_Pixel_Color_01
+    _replacementShader: {fileID: 4800000, guid: 8dd5a7c7b47344528667a9f203e39e90, type: 3}
+  - _sourceShaderName: Vefects/SH_Vefects_BIRP_Unlit_Flipbook_Pixel_Color_Advanced_01
+    _replacementShader: {fileID: 4800000, guid: f89619b261674d09b8624cf50029cc93, type: 3}
+  _maxActive: 512
 --- !u!1 &5201438548541252366
 GameObject:
   m_ObjectHideFlags: 0
@@ -584,6 +649,53 @@ Transform:
   m_Children: []
   m_Father: {fileID: 6664268405185740916}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &6065055276088881699
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4282941764697702797}
+  - component: {fileID: 4748115203289948267}
+  m_Layer: 0
+  m_Name: SFXManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4282941764697702797
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6065055276088881699}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5421153721552506957}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4748115203289948267
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6065055276088881699}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 219be8aa9ad14a359305b62624df5339, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Units.FX.SFXManager
+  _catalog: {fileID: 11400000, guid: fbb172202b5c768418f141e557405860, type: 2}
+  _maxStored: 32
+  _maxActive: 64
 --- !u!1 &6158351459864469375
 GameObject:
   m_ObjectHideFlags: 0

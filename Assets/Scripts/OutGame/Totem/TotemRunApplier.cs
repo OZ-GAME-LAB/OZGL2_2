@@ -120,6 +120,15 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         }
     }
 
+    // Current date KDH 2026-10-08
+    // 이어하기는 상점·이벤트에서도 효과가 필요하므로 Preparation을 기다리지 않습니다.
+    // 토템 적용은 재화를 넣지 않고, 이미 적용됐으면 목록을 다시 돌지 않습니다.
+    public void ApplyOngoingEffects()
+    {
+        if (_isApplied) return;
+        ApplyAll();
+    }
+
     // OutGameStartContext.Totems를 그대로 넘기면 됩니다. BeginRun 전에 호출해야 이번 Run에 반영됩니다.
     public void SetLevels(IReadOnlyList<TotemLevelEntry> levels)
     {
@@ -161,8 +170,8 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     }
 
     // Current date KDH 2026-10-02
-    // 레벨만 되돌립니다. 스탯은 이후 첫 Preparation의 ApplyAll이 넣습니다.
-    // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    // 레벨만 되돌립니다. 새 게임 스탯은 첫 Preparation의 ApplyAll이 넣습니다.
+    // 이어하기는 그 전에 ApplyOngoingEffects를 호출합니다.
     public void RestoreSaveData(TotemRunSaveData data)
     {
         if (data == null)

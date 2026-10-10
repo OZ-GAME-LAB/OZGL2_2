@@ -32,6 +32,8 @@ namespace Units
 
         public float ProjectileSpeed { get; }
 
+        public Projectile_Controller ProjectilePrefab { get; }
+
         public ProjectileImpactType ImpactType { get; }
 
         public float AreaRadius { get; }
@@ -67,7 +69,8 @@ namespace Units
             int maxImpactTargetCount,
             DamageRequest damageRequest,
             Predicate<ICombatTarget> targetFilter = null,
-            ProjectileFlightState flight = null)
+            ProjectileFlightState flight = null,
+            Projectile_Controller projectilePrefab = null)
         {
             SourceSnapshot = new CombatSourceSnapshot(attacker);
 
@@ -82,6 +85,8 @@ namespace Units
             Origin = origin;
 
             ProjectileSpeed = projectileSpeed;
+
+            ProjectilePrefab = projectilePrefab;
 
             ImpactType = impactType;
 
@@ -123,7 +128,8 @@ namespace Units
             int maxImpactTargetCount,
             SkillEffectRequest skillEffectRequest,
             Predicate<ICombatTarget> targetFilter = null,
-            ProjectileFlightState flight = null)
+            ProjectileFlightState flight = null,
+            Projectile_Controller projectilePrefab = null)
         {
             SourceSnapshot = new CombatSourceSnapshot(attacker);
 
@@ -138,6 +144,8 @@ namespace Units
             Origin = origin;
 
             ProjectileSpeed = projectileSpeed;
+
+            ProjectilePrefab = projectilePrefab;
 
             ImpactType = impactType;
 
@@ -176,6 +184,7 @@ namespace Units
             );
 
             Flight.Configure(SkillEffectRequest.Value.Batch, skillEffectRequest.Metadata);
+            Flight.SetFXRadius(impactType == ProjectileImpactType.Single ? 0f : AreaRadius);
 
             AttackerLifetimeVersion = attacker != null ? attacker.LifetimeVersion : 0;
         }

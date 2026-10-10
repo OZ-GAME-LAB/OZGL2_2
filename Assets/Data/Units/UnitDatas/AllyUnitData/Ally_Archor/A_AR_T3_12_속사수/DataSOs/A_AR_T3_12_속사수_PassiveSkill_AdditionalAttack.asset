@@ -63,15 +63,18 @@ MonoBehaviour:
           _conditionalEffects: []
           _fxEntries: []
           _delivery: 1
+          _executionDuration: 0.3
           _area: 0
           _radius: 1
           _angle: 90
           _maxEffectTargets: 1
           _projectileSpeed: 10
+          _projectilePrefab: {fileID: 7783028690776527434, guid: b0fc075a24c608d48b120abbd91c94bc, type: 3}
           _isLegacy: 0
         _useTriggerPosition: 0
     - rid: 4844432426836164619
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
         _damageMultiplier: 1

@@ -27,7 +27,7 @@ namespace Units
         private float _arrivalDistance = 0.15f;
 
         [SerializeField]
-        private float _stuckDistanceThreshold = 0.3f;
+        private float _stuckDistanceThreshold = 0.2f;
 
         [SerializeField]
         private float _stuckTimeLimit = 1f;
@@ -283,6 +283,24 @@ namespace Units
             ResetMovementState();
         }
 
+
+        /// <summary>추적 목적지만 갱신하고 속도, 회피 방향과 정체 감시는 유지한다.</summary>
+        public void UpdateDestination(Vector2 targetPosition)
+        {
+            if (_rigidbody == null || !CanMove) return;
+            if (!_isMoving)
+            {
+                MoveTo(targetPosition);
+                return;
+            }
+
+            // 목적지가 움직인 거리는 유닛 자신의 전진/후퇴로 계산하지 않는다.
+            // 진행 시간을 초기화하면 움직이는 대상을 쫓다 막힌 상태를 영원히 감지하지 못한다.
+            float previousDistance = Vector2.Distance(_rigidbody.position, _targetPosition);
+            float nextDistance = Vector2.Distance(_rigidbody.position, targetPosition);
+            _moveBestDistance += nextDistance - previousDistance;
+            _targetPosition = targetPosition;
+        }
 
         public void Stop()
         {

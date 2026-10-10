@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -38,6 +38,10 @@ namespace Units
         private Vector2 _advanceDirection;
 
         private Vector2 _stepStartPosition;
+
+        private const float ProgressCheckInterval = 1.5f;
+        private float _nextProgressCheckTime;
+        private readonly Dictionary<Unit_Gateway, Vector2> _progressPositions = new();
 
 
         // =========================
@@ -107,6 +111,8 @@ namespace Units
 
             _isAdvancing =
                 true;
+            _progressPositions.Clear();
+            _nextProgressCheckTime = Time.time + ProgressCheckInterval;
 
 
             MoveNextStep();
@@ -130,6 +136,8 @@ namespace Units
                 return;
             }
 
+
+            RecoverStoppedMembers();
 
             Vector2 currentCenter =
                 CalculateCenterPosition();
@@ -167,6 +175,7 @@ namespace Units
 
             _isAdvancing =
                 false;
+            _progressPositions.Clear();
 
 
             for (int i = 0;
@@ -257,6 +266,7 @@ namespace Units
                 unit.MoveTo(
                     destination
                 );
+                _progressPositions[unit] = currentPosition;
             }
         }
 
@@ -264,6 +274,28 @@ namespace Units
         // =========================
         // Reference Validation
         // =========================
+
+        // 전진 중에는 개별 전투 AI가 일시정지되므로 이동 실패 복구를 그룹이 담당한다.
+        // 움직이고 있는 구성원은 건드리지 않고 정체된 구성원만 현재 적 방향으로 재요청한다.
+        private void RecoverStoppedMembers()
+        {
+            if (Time.time < _nextProgressCheckTime) return;
+            _nextProgressCheckTime = Time.time + ProgressCheckInterval;
+            for (int i = 0; i < _members.Count; i++)
+            {
+                var unit = _members[i];
+                if (unit == null || unit.Transform == null) continue;
+                Vector2 position = unit.Transform.position;
+                if (!_progressPositions.TryGetValue(unit, out var previous)
+                    || Vector2.Distance(position, previous) < 0.1f)
+                {
+                    Vector2 direction = _advanceReference.CenterPosition - position;
+                    if (direction.sqrMagnitude > Mathf.Epsilon)
+                        unit.MoveTo(position + direction.normalized * _advanceDistance);
+                }
+                _progressPositions[unit] = position;
+            }
+        }
 
         private bool IsAdvanceReferenceValid()
         {

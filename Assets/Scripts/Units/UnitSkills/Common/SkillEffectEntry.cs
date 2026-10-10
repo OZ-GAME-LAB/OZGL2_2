@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Units.Effects;
@@ -218,10 +218,21 @@ namespace Units.Skills
     }
     public enum SkillFXEndPolicy
     {
-        Stop,
-        KeepActive,
-        Independent
+        StopEmission = 0,
+        // 기존 저장 값 1은 유지한다. 신규 설정에서는 사용하지 않는다.
+        KeepActive = 1,
+        Independent = 2,
+        ClearImmediately = 3
     }
+    // Legacy는 기존 완료·중단 Hook의 호환성을 보존하기 위한 고급 설정이다.
+    public enum SkillFXOperation
+    {
+        Legacy = 0, Cast = 1, Dash = 2, ProjectileFlight = 3,
+        Action = 4, Hit = 5, Collision = 6, Fire = 7, Expire = 8
+    }
+
+    public enum SkillFXScaleMode { Catalog, Multiplier, AttackRadius }
+
     [Serializable]
     public sealed class SkillFXEntry
     {
@@ -235,6 +246,9 @@ namespace Units.Skills
 
         [SerializeField]
         private SkillFXHook _hook;
+
+        [SerializeField]
+        private SkillFXOperation _operation;
 
         [SerializeField]
         private SkillFXEndPolicy _endPolicy;
@@ -252,26 +266,69 @@ namespace Units.Skills
         [SerializeField, Tooltip("위치 추적과 별도로 대상의 방향 변화를 반영합니다.")]
         private bool _followDirection;
 
+        [SerializeField] private SkillFXScaleMode _scaleMode;
+        [SerializeField] private Vector2 _scaleMultiplier = Vector2.one;
+        public SkillFXScaleMode ScaleMode => _scaleMode;
+        public Vector2 ScaleMultiplier => _scaleMultiplier;
+
+        public Vector2 ResolveScale(float attackRadius, float referenceRadius)
+        {
+            // 피격/비행은 스킬과 무관한 공유 크기를 유지한다.
+            if (Hook == SkillFXHook.OnHit || Hook == SkillFXHook.Flight
+                || _scaleMode == SkillFXScaleMode.Catalog) return Vector2.one;
+            float ratio = _scaleMode == SkillFXScaleMode.AttackRadius && attackRadius > 0f
+                ? attackRadius / Mathf.Max(0.01f, referenceRadius) : 1f;
+            return new Vector2(Mathf.Max(0.01f, _scaleMultiplier.x), Mathf.Max(0.01f, _scaleMultiplier.y)) * ratio;
+        }
+
         public FXKind Kind => _kind;
         public FXAttachment Attachment => _attachment;
         public bool FollowDirection => _followDirection;
 
-        public SkillFXEntry() { }
+        public SkillFXEntry() { ApplyDefaults(SkillFXOperation.Action); }
+
+        public SkillFXOperation Operation => _operation;
+
+        // 명시적으로 동작을 선택할 때만 초기화한다. 개별 수정값은 재생 중 덮어쓰지 않는다.
+        public void ApplyDefaults(SkillFXOperation operation)
+        {
+            _operation = operation;
+            _attachment = operation == SkillFXOperation.ProjectileFlight ? FXAttachment.Projectile
+                : operation == SkillFXOperation.Hit ? FXAttachment.Target
+                : operation == SkillFXOperation.Cast || operation == SkillFXOperation.Dash ? FXAttachment.Owner
+                : FXAttachment.World;
+            _followDirection = operation == SkillFXOperation.ProjectileFlight || operation == SkillFXOperation.Dash
+                || operation == SkillFXOperation.Hit;
+            _endPolicy = operation == SkillFXOperation.ProjectileFlight ? SkillFXEndPolicy.ClearImmediately
+                : operation == SkillFXOperation.Cast || operation == SkillFXOperation.Dash ? SkillFXEndPolicy.StopEmission
+                : SkillFXEndPolicy.Independent;
+        }
 
         public SkillFXEntry(string key, SkillFXHook hook, SkillFXEndPolicy endPolicy = SkillFXEndPolicy.Independent,
-            FXKind kind = FXKind.VFX, FXAttachment attachment = FXAttachment.World, bool followDirection = false)
+            FXKind kind = FXKind.VFX, FXAttachment? attachment = null, bool? followDirection = null)
         {
             _key = key;
             _hook = hook;
             _endPolicy = endPolicy;
             _kind = kind;
-            _attachment = attachment;
-            _followDirection = followDirection;
+            _attachment = attachment ?? (hook == SkillFXHook.OnHit ? FXAttachment.Target : FXAttachment.World);
+            _followDirection = followDirection ?? hook == SkillFXHook.OnHit;
         }
 
         public string Key => _key;
 
-        public SkillFXHook Hook => _hook;
+        public SkillFXHook Hook => _operation switch
+        {
+            SkillFXOperation.Cast => SkillFXHook.Cast,
+            SkillFXOperation.Dash => SkillFXHook.Dash,
+            SkillFXOperation.ProjectileFlight => SkillFXHook.Flight,
+            SkillFXOperation.Action => SkillFXHook.OnStart,
+            SkillFXOperation.Hit => SkillFXHook.OnHit,
+            SkillFXOperation.Collision => SkillFXHook.Collision,
+            SkillFXOperation.Fire => SkillFXHook.Fire,
+            SkillFXOperation.Expire => SkillFXHook.Expire,
+            _ => _hook
+        };
 
         public SkillFXEndPolicy EndPolicy => _endPolicy;
     }
@@ -295,9 +352,10 @@ namespace Units.Skills
         public CombatTargetSnapshot Target { get; }
         public Transform FollowTarget { get; }
         public FXCleanupReason CleanupReason { get; }
+        public float AttackRadius { get; }
 
         public SkillFXRequest AsCleanup(FXCleanupReason reason = FXCleanupReason.ActionEnded)
-            => new SkillFXRequest(Entry, Metadata, Position, true, Direction, Target, FollowTarget, Scope, reason, FacingDirection);
+            => new SkillFXRequest(Entry, Metadata, Position, true, Direction, Target, FollowTarget, Scope, reason, FacingDirection, AttackRadius);
 
         // ============================================================
         // Constructor
@@ -313,9 +371,11 @@ namespace Units.Skills
             Transform followTarget = null,
             FXScope? scope = null,
             FXCleanupReason cleanupReason = FXCleanupReason.ActionEnded,
-            Vector2 facingDirection = default)
+            Vector2 facingDirection = default,
+            float attackRadius = 0f)
         {
             Entry = entry;
+            AttackRadius = Mathf.Max(0f, attackRadius);
 
             Metadata = metadata;
 

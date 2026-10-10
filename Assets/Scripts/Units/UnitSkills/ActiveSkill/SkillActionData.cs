@@ -154,7 +154,7 @@ namespace Units.Skills
 
         public float Distance => _distance;
 
-        public float Speed => _speed;
+        public float Speed => Mathf.Min(_speed, 20f);
 
         // ============================================================
         // Constructor
@@ -180,6 +180,12 @@ namespace Units.Skills
         public override bool IsConfigured => base.IsConfigured && _distance > 0f && _speed > 0f && !float.IsInfinity(_distance) && !float.IsInfinity(_speed) && Target.Source != SkillTargetSource.None;
     }
 
+    public enum AnimationImpactTiming
+    {
+        [InspectorName("애니메이션 시작")] AnimationStart = 0,
+        [InspectorName("애니메이션 끝")] AnimationEnd = 1
+    }
+
     [Serializable]
     public sealed class SkillAttackActionData : SkillActionData
     {
@@ -190,6 +196,16 @@ namespace Units.Skills
 
         [SerializeField]
         private ActiveSkillDeliveryType _delivery;
+
+        [SerializeField, Min(0f), Tooltip("공격 시작부터 다음 액션까지의 기준 시간(초). 공격 속도 보정 후에도 실제 행동 시간은 최소 0.1초입니다.")]
+        private float _executionDuration = 0.3f;
+
+        public float ExecutionDuration => _executionDuration;
+
+        [SerializeField, Tooltip("시작은 즉시 효과를 실행하고, 끝은 동기화된 공격 모션 시간이 끝난 후 실행합니다.")]
+        private AnimationImpactTiming _impactTiming;
+        public AnimationImpactTiming ImpactTiming => _impactTiming;
+
 
         [SerializeField]
         private ActiveSkillAreaType _area;
@@ -206,6 +222,10 @@ namespace Units.Skills
         [SerializeField, Min(0f)]
         private float _projectileSpeed = 10f;
 
+        // 비워두면 ProjectileManager의 공용 투사체를 사용한다.
+        [SerializeField, Tooltip("이 공격 전용 투사체 프리팹. 루트의 Projectile_Controller를 지정합니다.")]
+        private Projectile_Controller _projectilePrefab;
+
         // ============================================================
         // Properties
         // ============================================================
@@ -219,6 +239,8 @@ namespace Units.Skills
         public float Angle => _angle;
 
         public int MaxEffectTargets => _maxEffectTargets;
+
+        public Projectile_Controller ProjectilePrefab => _projectilePrefab;
 
         public float ProjectileSpeed => _projectileSpeed;
 
@@ -245,6 +267,7 @@ namespace Units.Skills
 
         internal SkillAttackActionData(ActiveSkillData legacy)
         {
+            _executionDuration = 0f;
             _delivery = legacy.DeliveryType;
 
             _area = legacy.AreaType;
@@ -257,6 +280,8 @@ namespace Units.Skills
 
             _projectileSpeed = legacy.ProjectileSpeed;
 
+            _projectilePrefab = legacy.ProjectilePrefab;
+
             _isLegacy = true;
 
             AddLegacyEffects(legacy.Effects);
@@ -266,7 +291,7 @@ namespace Units.Skills
         // Properties
         // ============================================================
 
-        public override bool IsConfigured => base.IsConfigured && _maxEffectTargets > 0 && (_delivery == ActiveSkillDeliveryType.Direct || (_delivery == ActiveSkillDeliveryType.Projectile && _projectileSpeed > 0f && !float.IsInfinity(_projectileSpeed))) && Target.Source != SkillTargetSource.None;
+        public override bool IsConfigured => base.IsConfigured && _executionDuration >= 0f && !float.IsInfinity(_executionDuration) && _maxEffectTargets > 0 && (_delivery == ActiveSkillDeliveryType.Direct || (_delivery == ActiveSkillDeliveryType.Projectile && _projectileSpeed > 0f && !float.IsInfinity(_projectileSpeed))) && Target.Source != SkillTargetSource.None;
     }
 
     public static class SkillActionPlan

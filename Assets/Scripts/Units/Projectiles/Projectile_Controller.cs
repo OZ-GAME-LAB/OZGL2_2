@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 namespace Units
@@ -60,6 +60,9 @@ namespace Units
             Vector2 offset = (Vector2)request.Target.Transform.position - request.Origin;
 
             _direction = offset.sqrMagnitude > 0f ? offset.normalized : Vector2.right;
+
+            // 프리팹의 +X 방향을 발사 방향에 맞추고, 비행 FX를 연결하기 전에 회전을 확정한다.
+            transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(_direction.y, _direction.x) * Mathf.Rad2Deg);
 
             _isFlying = true;
 
