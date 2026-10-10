@@ -1000,6 +1000,17 @@ MonoBehaviour:
   _gameFlowController: {fileID: 0}
   _buildController: {fileID: 0}
   _focusTarget: {fileID: 1712598976}
+--- !u!114 &816352329 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4160709902362798911, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+  m_PrefabInstance: {fileID: 1150398547}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9cd63a622b9d4849a5f54a1f6712dfe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemActionButton
 --- !u!1 &888529014
 GameObject:
   m_ObjectHideFlags: 0
@@ -1274,6 +1285,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4699429969222987375, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4719435597006020467, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+      propertyPath: m_SizeDelta.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5145535021911383695, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
@@ -1947,6 +1962,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1644761147}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1889107714 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3214277193597728744, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+  m_PrefabInstance: {fileID: 1150398547}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d76d60d320e02944ac2bb3c378f12c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemView
 --- !u!1 &1943876166
 GameObject:
   m_ObjectHideFlags: 0
@@ -2209,6 +2235,14 @@ PrefabInstance:
       propertyPath: _runDecisionUI
       value: 
       objectReference: {fileID: 1532280162}
+    - target: {fileID: 8763287373462392912, guid: 3eb9d8e3798860d4fb422927880dff26, type: 3}
+      propertyPath: _consumableItemView
+      value: 
+      objectReference: {fileID: 1889107714}
+    - target: {fileID: 8763287373462392912, guid: 3eb9d8e3798860d4fb422927880dff26, type: 3}
+      propertyPath: _consumableUsePopup
+      value: 
+      objectReference: {fileID: 816352329}
     - target: {fileID: 8763287373462392912, guid: 3eb9d8e3798860d4fb422927880dff26, type: 3}
       propertyPath: _artifactSelectionUI
       value: 
