@@ -9,6 +9,9 @@ namespace Units.Skills
     )]
     public class ActiveSkillData : ScriptableObject
     {
+        [SerializeField] private SkillDisplayData _display = new();
+        public SkillDisplayData Display => _display;
+
         // ============================================================
         // Basic
         // ============================================================

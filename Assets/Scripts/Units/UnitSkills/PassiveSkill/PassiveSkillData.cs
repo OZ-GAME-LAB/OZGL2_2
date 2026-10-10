@@ -11,6 +11,9 @@ namespace Units.Skills
     )]
     public class PassiveSkillData : ScriptableObject
     {
+        [SerializeField] private SkillDisplayData _display = new();
+        public SkillDisplayData Display => _display;
+
 
         [SerializeField, HideInInspector]
         private int _skillSchemaVersion;
