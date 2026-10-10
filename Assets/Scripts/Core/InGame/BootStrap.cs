@@ -263,7 +263,7 @@ public class BootStrap : MonoBehaviour
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
         if (!_uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
                 _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(),
-                _cameraController, _consumableItemManager))
+                _cameraController, _consumableItemManager, _spawnManager))
         {
             Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
             return false;

@@ -2,6 +2,7 @@ using Game.Cameras;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
+using Units;
 
 namespace Game.UI.InGame
 {
@@ -40,7 +41,7 @@ namespace Game.UI.InGame
         // 비활성 UI 루트도 연결한다. 게임 시작과 루트 활성화는 Bootstrap이 담당한다.
         public bool Initialize(RunCurrencyManager wallet, GameFlowController flow, WaveController waves,
             BuildingBuildController controller, BuildingCoreProgress core, BuildingSlot[] slots,
-            InGameCameraController cameraController, ConsumableItemManager consumableItems)
+            InGameCameraController cameraController, ConsumableItemManager consumableItems, ISpawnManager spawnManager = null)
         {
             IsReady = false;
             if (_uiManager == null || _hudView == null || _hudPresenter == null ||
@@ -56,7 +57,7 @@ namespace Game.UI.InGame
             _hudPresenter.Initialize(_hudView, wallet, flow, waves);
             _consumableItemView.Initialize(consumableItems, consumableItems, consumableItems, _consumableUsePopup);
             flow.InitializeUI(_continueUI, _runDecisionUI);
-            _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI);
+            _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI, spawnManager);
             if (!_buildingUIConnection.IsReady) return false;
             IsReady = true;
             _uiManager.ShowHud();
