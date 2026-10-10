@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
@@ -19,21 +18,23 @@ public class InGameSaveData
 public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
 {
     // 기존 저장 테스트나 실제 영구재화 파일과 구분하는 키입니다.
+    // 특성·토템·제단은 아웃게임에서 복원하므로 해당 데이터를 함께 저장하던 구버전 파일과 구분합니다.
     public static readonly SaveKey<InGameSaveData> SaveKey =
-        new SaveKey<InGameSaveData>("ingame-test");
+        new SaveKey<InGameSaveData>("ingame-test", version: 4);
 
     public bool IsReady { get; private set; }
-    public bool HasSkippedRestore { get; private set; }
-    public bool IsRestoreEnabledForRunCurrency => _restoreRunCurrency;
     public string LastError { get; private set; }
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
 
-    [SerializeField] private bool _restoreRunCurrency = true;
-    [SerializeField] private bool _restoreArtifact = true;
-    [SerializeField] private bool _restoreShop = true;
-    [SerializeField] private bool _restoreConsumableItem = true;
-    [SerializeField] private bool _restoreBuilding = true;
-    [SerializeField] private bool _restoreArchive = true;
+    // 병합 보존: dev의 파트별 복원 선택 옵션입니다. 현재는 일부 파트만 초기 상태로
+    // 진행하지 않고 복원 실패 시 진입을 중단하므로 선택 옵션을 사용하지 않습니다.
+    // dev에서 활성화한 Building 복원은 아래 Apply에서 항상 실행합니다.
+    // [SerializeField] private bool _restoreRunCurrency = true;
+    // [SerializeField] private bool _restoreArtifact = true;
+    // [SerializeField] private bool _restoreShop = true;
+    // [SerializeField] private bool _restoreConsumableItem = true;
+    // [SerializeField] private bool _restoreBuilding = true;
+    // [SerializeField] private bool _restoreArchive = true;
 
     private SaveManager _saveManager;
     private Action _initializeArchive;
@@ -52,6 +53,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     private ISaveDataProvider<ArchiveSaveData> _archive;
     
     
+    // 10.9 / 문규성 / 아웃게임에서 복원하는 특성·토템·제단 연결을 제거하고 인게임 저장 Provider만 받도록 정리했습니다.
     public void Initialize(SaveManager saveManager,
         ISaveDataProvider<GameFlowSaveData> gameFlowController,
         ISaveDataProvider<RunCurrencySaveData> runCurrency,
@@ -84,7 +86,6 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         _restoreFailed = false;
         _requiresBackupBeforeWrite = false;
         _hasBackedUpOriginal = false;
-        HasSkippedRestore = false;
         IsReady = false;
         LastError = null;
     }
@@ -93,7 +94,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     public bool TryLoadOrCreate(out string error)
     {
         if (!CheckReferences(out error)) return false;
-        if (File.Exists(SavePath)) return TryLoad(out error);
+        if (_saveManager.HasSaveFile(SaveKey)) return TryLoad(out error);
         return TryCreateSave(out error);
     }
 
@@ -161,12 +162,12 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     public bool TryApplySaveData(InGameSaveData data, out string error)
     {
         IsReady = false;
-        HasSkippedRestore = false;
         if (!CheckReferences(out error)) return false;
         _restoreFailed = true;
         try
         {
-            if (!TryValidate(data, out error) || !Apply(data, out error)) return false;
+            if (!TryValidate(data, out error)) return false;
+            Apply(data);
             _restoreFailed = false;
             IsReady = true;
             LastError = null;
@@ -194,6 +195,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         if (!_hasBackedUpOriginal) _requiresBackupBeforeWrite = true;
     }
 
+    // 10.9 / 문규성 / 아웃게임에 보관하는 특성·토템·제단은 중복 저장하지 않고 이번 런의 진행 상태만 수집합니다.
     public InGameSaveData CaptureSaveData()
     {
         if (!CheckReferences(out string error)) throw new InvalidOperationException(error);
@@ -232,39 +234,18 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         return true;
     }
 
-    private bool Apply(InGameSaveData data, out string error)
+    // 10.9 / 문규성 / 아웃게임에서 먼저 등록한 효과는 유지하고 기존 순서대로 인게임 상태만 복원합니다.
+    private void Apply(InGameSaveData data)
     {
-        if (!TryRestorePart("Flow", true, _flowController, data.Flow, out error)) return false;
-        if (!TryRestorePart("Building", _restoreBuilding, _building, data.Building, out error)) return false;
-        if (!TryRestorePart("RunCurrency", _restoreRunCurrency, _runCurrency, data.RunCurrency, out error)) return false;
-        if (!TryRestorePart("Artifact", _restoreArtifact, _artifact, data.Artifact, out error)) return false;
+        _flowController.RestoreSaveData(data.Flow);
+        _building.RestoreSaveData(data.Building);
+        _runCurrency.RestoreSaveData(data.RunCurrency);
+        _artifact.RestoreSaveData(data.Artifact);
         EnsureArchiveInitialized();
         // 유물 효과가 슬롯 수에 영향을 주므로 최종 슬롯 상태는 그 뒤에 복원합니다.
-        if (!TryRestorePart("ConsumableItem", _restoreConsumableItem, _consumableItem, data.ConsumableItem, out error)) return false;
-        if (!TryRestorePart("Shop", _restoreShop, _shop, data.Shop, out error)) return false;
-        return TryRestorePart("Archive", _restoreArchive, _archive, data.Archive, out error);
-    }
-
-    private bool TryRestorePart<T>(string name, bool enabled, ISaveDataProvider<T> provider, T data,
-        out string error) where T : class
-    {
-        error = null;
-        if (!enabled)
-        {
-            HasSkippedRestore = true;
-            RequireBackupBeforeNextWrite();
-            Debug.LogWarning("[InGameSaveCoordinator] " + name + " 복원을 생략하고 초기 상태를 사용합니다.", this);
-            return true;
-        }
-        try
-        {
-            provider.RestoreSaveData(data);
-            return true;
-        }
-        catch (Exception exception) when (!(exception is OperationCanceledException))
-        {
-            return Fail(name + " 저장 데이터 복원 실패: " + exception.Message, out error);
-        }
+        _consumableItem.RestoreSaveData(data.ConsumableItem);
+        _shop.RestoreSaveData(data.Shop);
+        _archive.RestoreSaveData(data.Archive);
     }
 
     private void EnsureArchiveInitialized()
@@ -287,6 +268,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         }
     }
 
+    // 10.9 / 문규성 / 인게임 코디네이터가 직접 저장하고 복원하는 Provider만 연결 여부를 확인하도록 정리했습니다.
     private bool CheckReferences(out string error)
     {
         error = null;

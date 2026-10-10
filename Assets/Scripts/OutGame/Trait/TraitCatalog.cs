@@ -10,7 +10,7 @@ using UnityEngine;
 public class TraitCatalog : ScriptableObject
 {
     public IReadOnlyList<TraitData> Traits => _registeredTraits;
-
+    
     [SerializeField] private List<TraitData> _traits = new List<TraitData>();
 
     private readonly Dictionary<TraitId, TraitData> _traitById = new Dictionary<TraitId, TraitData>();

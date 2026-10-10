@@ -33,6 +33,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
     private AltarData _selected;
     private AltarInstance _instance;
     private bool _isApplying;
+    private bool _startEffectApplied;
 
     // 참조는 한 번만 캐시합니다. 이후 PhaseChanged에서 Find를 다시 하지 않습니다.
     public void Initialize(
@@ -75,7 +76,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 
         _effectManager = effectManager;
         _runCurrency = runCurrency;
-        // 기존 직접 적용 함수 호환용으로 보존합니다. 현재 적용은 EffectManager 공통 연결에서 담당합니다.
+        // 공통 스폰 수집은 ArtifactInstance만 읽으므로 제단 스탯은 직접 전달합니다.
         _unitStatModifierManager = unitStatModifierManager;
         _gameFlow = gameFlow;
 
@@ -153,33 +154,60 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 
     // Current date KDH 2026-10-02
     // 저장 시점에만 객체를 만듭니다. Update에서는 호출하지 않습니다.
-    // 파일에는 AltarId만 담습니다. 에셋 참조는 다음 실행에서 복원되지 않습니다.
+    // 파일에는 선택 ID와 시작 효과 처리 여부를 담습니다. 에셋 참조는 저장하지 않습니다.
+    // 10.9 / 문규성 / 제단정보와 시작 효과 처리 여부를 함께 저장하도록 변경
     public AltarRunSaveData CaptureSaveData()
     {
         return new AltarRunSaveData
         {
-            SelectedAltar = _selected != null ? _selected.Id : AltarId.None
+            SelectedAltar = _selected != null ? _selected.Id : AltarId.None,
+            isApplied = _startEffectApplied
         };
     }
 
     // Current date KDH 2026-10-02
-    // ID로 카탈로그의 AltarData를 다시 고릅니다. 인게임은 Selected로 그 에셋을 읽습니다.
+    // ID로 카탈로그의 AltarData와 지속 효과를 복원합니다. 시작 지급은 저장된 처리 여부를 따릅니다.
     // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    // 10.9 / 문규성 / bool 오버로드를 제거하고 저장 데이터의 isApplied로 단발성 효과 지급을 처리
+    // 기존 효과를 해제한 뒤 선택과 지속 효과를 복원하고 아직 처리하지 않은 시작 효과만 지급
     public void RestoreSaveData(AltarRunSaveData data)
     {
         if (data == null)
         {
-            Debug.LogError("[OutGame/AltarManager] 복원할 제단 저장 데이터가 없습니다.", this);
-            return;
+            throw new ArgumentNullException(nameof(data));
         }
+
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("제단 저장 데이터를 복원하려면 초기화가 필요합니다.");
+        }
+
+        if (IsApplied && !TryClearApplied())
+        {
+            throw new InvalidOperationException("기존 제단 효과를 해제하지 못했습니다.");
+        }
+
+        _startEffectApplied = data.isApplied;
 
         if (data.SelectedAltar == AltarId.None)
         {
-            TryClearSelection();
+            if (!TryClearSelection())
+            {
+                throw new InvalidOperationException("제단 선택을 복원하지 못했습니다.");
+            }
             return;
         }
+        if (!TrySelectById(data.SelectedAltar))
+        {
+            throw new InvalidOperationException($"저장된 제단을 선택하지 못했습니다. ID: {data.SelectedAltar}");
+        }
 
-        TrySelectById(data.SelectedAltar);
+        if (!TryApplySelected())
+        {
+            throw new InvalidOperationException($"제단 지속 효과를 복원하지 못했습니다. ID: {data.SelectedAltar}");
+        }
+
+        ApplyStartEffect(); //단발성 효과를 적용
     }
 
     public bool TryClearSelection()
@@ -210,12 +238,14 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         return true;
     }
 
-    // 선택분을 EffectManager에 등록하고 OnRunStart 지급을 한 번 실행합니다.
+    // 선택한 제단의 지속 효과를 EffectManager와 유닛 스탯 매니저에 등록합니다.
+    // 10.9 / 문규성 / 지속효과 적용은 유지하고 시작 재화 지급을 ApplyStartEffect로 분리
+    // Applied 이벤트는 지속 효과 등록을 마친 뒤 발생
     public bool TryApplySelected()
     {
         if (!TryRegisterSelectedEffects(out AltarInstance instance)) return false;
-        // 새 게임의 시작 지급입니다. 이어하기는 TryApplyOngoingEffects만 호출합니다.
-        ApplyTriggered(AltarTriggerMoment.OnRunStart);
+        // 시작 지급은 저장된 처리 여부를 확인하는 ApplyStartEffect로 일원화해 중복을 막습니다.
+        // ApplyTriggered(AltarTriggerMoment.OnRunStart);
         Applied?.Invoke(instance);
         Debug.Log($"[OutGame/AltarManager] 제단을 적용했습니다. ID: {_selected.Id}", this);
         return true;
@@ -224,6 +254,8 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
     // Current date KDH 2026-10-08
     // 이어하기는 시작 재화가 세이브 잔액에 이미 있으므로 효과만 등록합니다.
     // 등록은 로드 때 한 번이고, Update에서 매 프레임 다시 계산하지 않습니다.
+    // RestoreSaveData가 지속 효과를 즉시 복원하므로 별도 복원 경로는 주석으로 보존합니다.
+    /*
     public bool TryApplyOngoingEffects()
     {
         if (!TryRegisterSelectedEffects(out AltarInstance instance)) return false;
@@ -231,6 +263,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         Debug.Log($"[OutGame/AltarManager] 제단 효과를 복원했습니다. ID: {_selected.Id}", this);
         return true;
     }
+    */
 
     // 효과 변환이 성공한 뒤에만 적용 상태로 바꿉니다. 실패하면 기존 선택을 유지합니다.
     private bool TryRegisterSelectedEffects(out AltarInstance instance)
@@ -285,12 +318,39 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
             return false;
         }
 
+        bool hasUnitModifiers = (converted.AllyModifiers != null && converted.AllyModifiers.Count > 0)
+            || (converted.EnemyModifiers != null && converted.EnemyModifiers.Count > 0);
+        if (hasUnitModifiers && _unitStatModifierManager == null)
+        {
+            Debug.LogError("[OutGame/AltarManager] UnitStatModifierManager가 없어 제단 스탯을 적용할 수 없습니다.", this);
+            return false;
+        }
+
         _isApplying = true;
         _instance = instance;
-        _effectManager.RegisterEffects(instance, converted);
-        // AddUnitModifiers는 보존하되 호출하지 않습니다. 공통 연결에서 유닛 효과를 반영합니다.
-        _isApplying = false;
+        try
+        {
+            _effectManager.RegisterEffects(instance, converted);
+            AddUnitModifiers(converted);
+        }
+        finally
+        {
+            _isApplying = false;
+        }
         return true;
+    }
+
+    // 10.9 / 문규성 / 등록된 제단의 시작 효과를 아직 처리하지 않았을 때만 지급하는 메서드
+    // 기존 트리거 지급 메서드를 재사용하고 이번판의 시작 효과 처리 여부를 갱신
+    private void ApplyStartEffect()
+    {
+        if (!IsApplied || _startEffectApplied)
+        {
+            return;
+        }
+
+        ApplyTriggered(AltarTriggerMoment.OnRunStart);
+        _startEffectApplied = true;
     }
 
     // Run 종료·리셋 시 호출합니다. 선택은 남겨 다음 판에서 다시 적용할 수 있습니다.
@@ -316,13 +376,18 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         string altarId = GetAltarId(instance);
         _instance = null;
         _effectManager.RemoveEffects(instance);
-        // 유닛 효과 해제도 EffectManager 변경을 받는 공통 연결에서 담당합니다.
+        if (_unitStatModifierManager != null)
+        {
+            _unitStatModifierManager.RemoveModifiersBySource(instance);
+        }
 
         Cleared?.Invoke();
         Debug.Log($"[OutGame/AltarManager] 제단 효과를 해제했습니다. ID: {altarId}", this);
         return true;
     }
 
+    // 10.9 / 문규성 / Preparation에서 지속 효과 등록과 시작 지급을 각각 처리하고, 런 종료 시 시작 지급 상태를 초기화하도록 변경했습니다.
+    // Reward 재개 중에는 기존 IsResumingStep 확인으로 웨이브 효과를 다시 지급하지 않습니다.
     private void HandlePhaseChanged(GamePhase phase)
     {
         // Current date KDH 2026-09-29
@@ -334,6 +399,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
             {
                 TryApplySelected();
             }
+            ApplyStartEffect();
             return;
         }
 
@@ -351,6 +417,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         if (phase == GamePhase.None || phase == GamePhase.Finished)
         {
             TryClearApplied();
+            _startEffectApplied = false;
         }
     }
 
@@ -481,7 +548,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
         return 0;
     }
 
-    // 기존 직접 적용 함수 보존용(현재 호출하지 않음).
+    // 공통 스폰 수집은 ArtifactInstance만 읽으므로 제단 스탯은 직접 전달합니다.
     private void AddUnitModifiers(ConvertedEffects converted)
     {
         // EffectManager는 보정치만 보관하므로, 실제 유닛 합산은 공개 API로 직접 넣습니다.
@@ -561,4 +628,6 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 public class AltarRunSaveData
 {
     public AltarId SelectedAltar;
+    // 이번 게임에서 시작 효과 처리를 마쳤는지 저장
+    public bool isApplied;
 }

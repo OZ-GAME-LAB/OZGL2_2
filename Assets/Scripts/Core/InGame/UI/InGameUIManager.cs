@@ -101,6 +101,9 @@ namespace Game.UI.InGame
         {
             if (_closingPopups || !TryGetScreen(id, out UIScreen screen) || screen.IsHud) return false;
             if (_openedPopups.Contains(screen)) return true;
+            UIScreen top = TopPopup;
+            if (top != null && top.CloseWhenCovered && !ClosePopup(top.Id, UICloseReason.Replaced))
+                return false;
             _openedPopups.Add(screen);
             screen.transform.SetAsLastSibling();
             screen.Display();

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -65,6 +65,8 @@ namespace Units.Editor
             serializedObject.Update();
 
             SkillInspectorUI.Header("패시브 스킬", "발동 조건 → 적용 방식 → 실행 효과");
+
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_display"), new GUIContent("UI 표시 정보"), true);
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {

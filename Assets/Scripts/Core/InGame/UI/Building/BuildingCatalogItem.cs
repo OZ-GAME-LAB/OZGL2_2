@@ -1,4 +1,6 @@
 using System;
+using OZGL.KDH;
+using UnityEngine;
 
 namespace Game.UI
 {
@@ -10,10 +12,14 @@ namespace Game.UI
         public string Summary { get; }
         public int? GoldCost { get; }
         public int? GemCost { get; }
+        public BuildingType Category { get; }
+        public Sprite Icon { get; }
+        public BuildingActionOffer Offer { get; }
         public BuildingCatalogItem(string id, string name, string summary, int? goldCost)
             : this(id, name, summary, goldCost, goldCost.HasValue ? 0 : (int?)null) { }
 
-        public BuildingCatalogItem(string id, string name, string summary, int? goldCost, int? gemCost)
+        public BuildingCatalogItem(string id, string name, string summary, int? goldCost, int? gemCost,
+            BuildingType category = BuildingType.Barracks, Sprite icon = null, BuildingActionOffer offer = null)
         {
             if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Catalog ID and name are required.");
@@ -26,6 +32,9 @@ namespace Game.UI
             Summary = summary ?? "";
             GoldCost = goldCost;
             GemCost = gemCost;
+            Category = category;
+            Icon = icon;
+            Offer = offer;
         }
     }
 

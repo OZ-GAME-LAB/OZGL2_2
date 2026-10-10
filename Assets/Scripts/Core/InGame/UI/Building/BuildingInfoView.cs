@@ -1,14 +1,15 @@
 using System;
 using TMPro;
+using Units.UnitDatas;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
-    /// <summary>선택된 건물의 표시만 담당한다. 선택 판정/재화/건설 규칙은 외부 소유다.</summary>
+    /// <summary>현재 건물, 업그레이드 비교, 상세 팝업에서 공통으로 사용하는 정보 표시.</summary>
     public sealed class BuildingInfoView : MonoBehaviour
     {
+        public event Action<UnitData> UnitSelected;
         public UIScreen Popup => _playerPopup;
         public string SelectionId { get; private set; }
         public bool HasSelection => SelectionId != null;
@@ -19,50 +20,56 @@ namespace Game.UI.InGame
         [SerializeField] private TMP_Text _nameText;
         [SerializeField] private TMP_Text _categoryText;
         [SerializeField] private TMP_Text _levelText;
-        [SerializeField] private Image _icon;
+        [SerializeField] private UnityEngine.UI.Image _icon;
         [SerializeField] private GameObject _iconPlaceholder;
 
         [Header("Scrollable Information")]
-        [SerializeField] private ScrollRect _detailsScroll;
+        [SerializeField] private UnityEngine.UI.ScrollRect _detailsScroll;
         [SerializeField] private TMP_Text _descriptionText;
         [SerializeField] private TMP_Text _productionText;
         [SerializeField] private TMP_Text _effectText;
+        [SerializeField] private TMP_Text _costText;
+        [SerializeField] private UnityEngine.UI.Button _unitButton;
+        [SerializeField] private TMP_Text _unitText;
+        [SerializeField] private bool _resetScrollOnSelection = true;
 
-        [Header("Display Copy")]
-        [SerializeField] private string _levelFormat = "레벨 {0}";
         [SerializeField] private string _missingDescription = "설명이 아직 없습니다.";
-        [SerializeField] private string _productionFormat = "생산 유닛\n{0}";
-        [SerializeField] private string _effectFormat = "건물 효과\n{0}";
-
         [SerializeField] private UIScreen _playerPopup;
+        private UnitData _unit;
+        private string _buildingId;
+
+        private void Awake()
+        {
+            _unitButton.onClick.AddListener(() => UnitSelected?.Invoke(_unit));
+        }
 
         public void ShowBuildingInfo(BuildingInfoData data)
         {
-            if (data == null) throw new ArgumentNullException(nameof(data));
-            // 표시 문자열을 먼저 준비해 형식 오류가 나도 선택이 일부만 바뀌지 않게 한다.
-            var level = string.Format(_levelFormat, data.Level);
-            var production = string.IsNullOrWhiteSpace(data.ProductionSummary)
-                ? string.Empty : string.Format(_productionFormat, data.ProductionSummary);
-            var effect = string.IsNullOrWhiteSpace(data.EffectSummary)
-                ? string.Empty : string.Format(_effectFormat, data.EffectSummary);
-            var selectionChanged = SelectionId != data.SelectionId;
-
+            bool selectionChanged = SelectionId != data.SelectionId || _buildingId != data.BuildingId;
             SelectionId = data.SelectionId;
+            _buildingId = data.BuildingId;
             _nameText.text = data.DisplayName;
             _categoryText.text = data.CategoryLabel;
-            _levelText.text = level;
+            // 일반 건물 데이터에는 레벨이 없으므로 임의의 레벨을 표시하지 않는다.
+            _levelText.gameObject.SetActive(false);
             _descriptionText.text = string.IsNullOrWhiteSpace(data.Description)
                 ? _missingDescription : data.Description;
-            _productionText.text = production;
-            _productionText.gameObject.SetActive(production.Length > 0);
-            _effectText.text = effect;
-            _effectText.gameObject.SetActive(effect.Length > 0);
+            _productionText.text = data.ProductionSummary;
+            _productionText.gameObject.SetActive(!string.IsNullOrWhiteSpace(data.ProductionSummary));
+            _effectText.text = data.EffectSummary;
+            _effectText.gameObject.SetActive(!string.IsNullOrWhiteSpace(data.EffectSummary));
+            _costText.text = data.CostSummary;
+            _costText.gameObject.SetActive(!string.IsNullOrWhiteSpace(data.CostSummary));
+            _unit = data.Unit;
+            _unitButton.gameObject.SetActive(_unit != null);
+            _unitText.text = _unit != null ? _unit.UnitName + "  정보 보기" : string.Empty;
             _icon.sprite = data.Icon;
             _icon.gameObject.SetActive(data.Icon != null);
             _iconPlaceholder.SetActive(data.Icon == null);
             _emptyState.SetActive(false);
             _contentPanel.SetActive(true);
-            if (selectionChanged)
+
+            if (selectionChanged && _resetScrollOnSelection)
             {
                 _detailsScroll.StopMovement();
                 _detailsScroll.verticalNormalizedPosition = 1f;
@@ -71,31 +78,18 @@ namespace Game.UI.InGame
 
         public void HideBuildingInfo()
         {
-            ClearDisplay();
-        }
-
-        private void ClearDisplay()
-        {
             SelectionId = null;
+            _buildingId = null;
+            _unit = null;
             _detailsScroll.StopMovement();
             _detailsScroll.verticalNormalizedPosition = 1f;
-            _nameText.text = string.Empty;
-            _categoryText.text = string.Empty;
-            _levelText.text = string.Empty;
-            _descriptionText.text = string.Empty;
-            _productionText.text = string.Empty;
-            _effectText.text = string.Empty;
-            _productionText.gameObject.SetActive(false);
-            _effectText.gameObject.SetActive(false);
-            _icon.sprite = null;
-            _icon.gameObject.SetActive(false);
-            _iconPlaceholder.SetActive(true);
+
             if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
                 EventSystem.current.currentSelectedGameObject.transform.IsChildOf(_contentPanel.transform))
                 EventSystem.current.SetSelectedGameObject(null);
-            _contentPanel.SetActive(false);
-            _emptyState.SetActive(_playerPopup == null);
-        }
 
+            _contentPanel.SetActive(false);
+            _emptyState.SetActive(true);
+        }
     }
 }
