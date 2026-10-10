@@ -3831,6 +3831,10 @@ PrefabInstance:
       propertyPath: _artifactInventoryView
       value: 
       objectReference: {fileID: 1988025358}
+    - target: {fileID: 7834731325221564867, guid: 3eb9d8e3798860d4fb422927880dff26, type: 3}
+      propertyPath: _outGameSaveCoordinator
+      value: 
+      objectReference: {fileID: 7968771019946275036}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3846,3 +3850,14 @@ SceneRoots:
   - {fileID: 1644761147}
   - {fileID: 796016852}
   - {fileID: 1150398547}
+--- !u!114 &7968771019946275036 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7356614912341857810, guid: 3eb9d8e3798860d4fb422927880dff26, type: 3}
+  m_PrefabInstance: {fileID: 7968771019946275035}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c89d73aa1c21dda43b2c7655017378ee, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OutGameSaveCoordinator

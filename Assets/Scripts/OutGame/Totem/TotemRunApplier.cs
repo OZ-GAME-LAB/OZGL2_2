@@ -55,6 +55,7 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
 
     // unitStatModifierManager는 SpawnManager가 사용하는 것과 같은 인스턴스여야 스폰 유닛에 반영됩니다.
     // catalog가 없어도 격노·취약 기본 스탯은 적용됩니다. 혈석 퍼센트는 TotemData가 있어야 계산됩니다.
+    // 10.9 / 문규성 / 외부 레벨이 없으면 테스트 레벨을 SetLevels로 복사해 저장에도 같은 목록을 사용하도록 변경했습니다.
     public void Initialize(
         TotemEffectCatalog catalog,
         UnitStatModifierManager unitStatModifierManager,
@@ -92,6 +93,10 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         _unitStatModifierManager = unitStatModifierManager;
         _effectManager = effectManager;
         _gameFlow = gameFlow;
+        if (!_hasLevels)
+        {
+            SetLevels(_testLevels);
+        }
         _gameFlow.PhaseChanged += HandlePhaseChanged;
         BuildActiveTotems();
     }
@@ -123,11 +128,14 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     // Current date KDH 2026-10-08
     // 이어하기는 상점·이벤트에서도 효과가 필요하므로 Preparation을 기다리지 않습니다.
     // 토템 적용은 재화를 넣지 않고, 이미 적용됐으면 목록을 다시 돌지 않습니다.
+    // RestoreSaveData가 즉시 ApplyAll을 실행하므로 별도 복원 경로는 주석으로 보존합니다.
+    /*
     public void ApplyOngoingEffects()
     {
         if (_isApplied) return;
         ApplyAll();
     }
+    */
 
     // OutGameStartContext.Totems를 그대로 넘기면 됩니다. BeginRun 전에 호출해야 이번 Run에 반영됩니다.
     public void SetLevels(IReadOnlyList<TotemLevelEntry> levels)
@@ -170,17 +178,46 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     }
 
     // Current date KDH 2026-10-02
-    // 레벨만 되돌립니다. 새 게임 스탯은 첫 Preparation의 ApplyAll이 넣습니다.
-    // 이어하기는 그 전에 ApplyOngoingEffects를 호출합니다.
+    // 레벨과 지속 효과를 즉시 되돌립니다. Preparation 이외의 단계에서도 이어갈 수 있습니다.
+    // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    // 10.9 / 문규성 / 저장된 레벨로 교체한 뒤 기존 효과를 해제하고 ApplyAll로 즉시 다시 적용하도록 변경했습니다.
+    // 준비 단계가 아닌 곳에서 이어가도 토템효과를 복원합니다.
     public void RestoreSaveData(TotemRunSaveData data)
     {
         if (data == null)
         {
-            Debug.LogError("[OutGame/TotemRunApplier] 복원할 토템 저장 데이터가 없습니다.", this);
-            return;
+            throw new ArgumentNullException(nameof(data));
+        }
+
+        if (_gameFlow == null)
+        {
+            throw new InvalidOperationException("토템 저장 데이터를 복원하려면 초기화가 필요합니다.");
+        }
+
+        // 복원은 필요한 전달 대상이 없으면 실패로 알립니다. 카탈로그 없는 기본 스탯 경로는 유지합니다.
+        if (data.Totems != null)
+        {
+            foreach (TotemLevelEntry entry in data.Totems)
+            {
+                if (entry == null || entry.Id == TotemId.None || entry.Level <= 0) continue;
+                if (entry.Id == TotemId.GoldReduction && _effectManager == null)
+                {
+                    throw new InvalidOperationException("EffectManager가 없어 궁핍 효과를 복원하지 못했습니다.");
+                }
+
+                IReadOnlyList<TotemStatEffect> effects = _catalog != null
+                    ? _catalog.GetStatEffects(entry.Id)
+                    : TotemBuiltinEffects.Get(entry.Id);
+                if (effects != null && effects.Count > 0 && _unitStatModifierManager == null)
+                {
+                    throw new InvalidOperationException($"UnitStatModifierManager가 없어 토템 스탯을 복원하지 못했습니다. ID: {entry.Id}");
+                }
+            }
         }
 
         SetLevels(data.Totems);
+        ClearAll();
+        ApplyAll();
     }
 
     // 정산으로 받은 혈석에 이번 Run 퍼센트를 곱한 추가분입니다. 10혈석의 10%는 1입니다.
@@ -290,9 +327,13 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         return true;
     }
 
+    // 10.9 / 문규성 / 복원 직후 이미 적용한 효과는 다시 등록하지 않고, 기존 적용을 마친 뒤 완료 상태를 기록하도록 변경했습니다.
     private void ApplyAll()
     {
-        _isApplied = true;
+        if (_isApplied)
+        {
+            return;
+        }
         _bonusGranted = false;
         _rewardBonusPercent = 0;
 
@@ -341,6 +382,7 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
             AddGoldReduction(entry.Id, totem, level);
         }
 
+        _isApplied = true;
         Debug.Log(
             $"[OutGame/TotemRunApplier] 토템을 적용했습니다. 스탯 적용 수: {appliedStatCount}, 혈석 보너스: {_rewardBonusPercent}%",
             this);
