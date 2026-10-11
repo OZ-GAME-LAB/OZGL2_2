@@ -54,6 +54,10 @@ namespace Units
 
         public event Action<Unit_Gateway> RallyCompleted;
 
+        public event Action<float, float> HpChanged;
+
+        public event Action<float, float> ShieldChanged;
+
 
         // ============================================================
         // Properties
@@ -82,6 +86,8 @@ namespace Units
         public float CurrentHp => _core != null ? _core.CurrentHp : 0f;
 
         public float CurrentShield => _core != null ? _core.CurrentShield : 0f;
+
+        public float MaxHp => _core?.RuntimeStatus?.MaxHp ?? 0f;
 
 
         // ============================================================
@@ -333,6 +339,27 @@ namespace Units
         internal void NotifyDeath()
         {
             Died?.Invoke(this);
+        }
+
+        public void NotifyHpChanged(
+            float previousHp,
+            float currentHp)
+        {
+            HpChanged?.Invoke(
+                previousHp,
+                currentHp
+            );
+        }
+
+
+        public void NotifyShieldChanged(
+            float previousShield,
+            float currentShield)
+        {
+            ShieldChanged?.Invoke(
+                previousShield,
+                currentShield
+            );
         }
 
 

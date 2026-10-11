@@ -99,7 +99,37 @@ namespace Units
         // Spawn Wave
         // ============================================================
 
-        internal async UniTask<bool> SpawnWaveAsync(
+        private readonly BossSpawner _bossSpawner = new BossSpawner();
+        private readonly List<Unit_GroupAI> _spawnedGroups = new List<Unit_GroupAI>();
+
+        internal async UniTask<bool> SpawnWaveAsync(int cost, SpawnContext context,
+            CancellationToken cancellationToken)
+        {
+            _spawnedGroups.Clear();
+            bool succeeded = false;
+            try
+            {
+                succeeded = await SpawnWaveCoreAsync(cost, context, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                return succeeded;
+            }
+            finally
+            {
+                if (!succeeded || cancellationToken.IsCancellationRequested)
+                {
+                    foreach (var group in _spawnedGroups)
+                    {
+                        if (group == null) continue;
+                        _runtimeUnitManager.UnregisterGroup(group);
+                        DestroyGroup(group);
+                    }
+                    _rallyGridAllocator.Clear();
+                }
+                _spawnedGroups.Clear();
+            }
+        }
+
+        private async UniTask<bool> SpawnWaveCoreAsync(
             int cost,
             SpawnContext context,
             CancellationToken cancellationToken)
@@ -115,12 +145,22 @@ namespace Units
             cancellationToken.ThrowIfCancellationRequested();
 
 
-            List<EnemyGroupSpawnData>
-                groupSpawnDataList =
-                    BuildGroupSpawnData(
-                        cost,
-                        context
-                    );
+            // Validate all bosses before any objects are created. Preserve duplicates.
+            var bossPlan = _bossSpawner.BuildPlan(context.BossIDs, _spawnEntries);
+            var groupSpawnDataList = new List<EnemyGroupSpawnData>();
+            foreach (var boss in bossPlan)
+                groupSpawnDataList.Add(new EnemyGroupSpawnData(boss, 1));
+            if (cost > 0 && context.MonsterIDs != null && context.MonsterIDs.Count > 0)
+                groupSpawnDataList.AddRange(BuildGroupSpawnData(cost, context));
+
+            var zones = new List<RallyZone>();
+            var bosses = new List<bool>();
+            foreach (var group in groupSpawnDataList)
+            {
+                var entry = _spawnEntries[group.UnitType];
+                zones.Add(entry.RallyZone);
+                bosses.Add(entry.Rank == EnemyRank.Boss);
+            }
 
 
             if (groupSpawnDataList.Count == 0)
@@ -145,8 +185,7 @@ namespace Units
             // 전열부터 후열 방향으로 Sector를 준비한다.
             // ========================================================
 
-            if (!_rallyGridAllocator.PrepareCenteredAllocation(
-                groupSpawnDataList.Count))
+            if (!_rallyGridAllocator.PreparePreferredAllocation(zones, bosses))
             {
                 Debug.LogError(
                     "[EnemyWaveSpawner] " +
@@ -216,7 +255,7 @@ namespace Units
 
                     UniTask<Unit_GroupAI>
                         spawnTask =
-                            SpawnGroupAsync(
+                            SpawnGroupSafelyAsync(
                                 groupSpawnData.UnitType,
                                 groupSpawnData.Count,
                                 spawnPoint.position,
@@ -239,6 +278,8 @@ namespace Units
                         batchTasks
                     );
 
+
+                cancellationToken.ThrowIfCancellationRequested();
 
                 for (int i = 0;
                      i < spawnedGroups.Length;
@@ -360,6 +401,9 @@ namespace Units
                     continue;
                 }
 
+
+                // Bosses must only come from the explicit boss request list.
+                if (entry.Rank == EnemyRank.Boss) continue;
 
                 EnemyUnitClass unitClass =
                     entry.UnitClass;
@@ -717,6 +761,19 @@ namespace Units
         // ============================================================
         // Group
         // ============================================================
+
+        private async UniTask<Unit_GroupAI> SpawnGroupSafelyAsync(EnemyUnitType type,
+            int count, Vector2 position, CancellationToken token)
+        {
+            try
+            {
+                var group = await SpawnGroupAsync(type, count, position, token);
+                if (group != null) _spawnedGroups.Add(group);
+                return group;
+            }
+            catch (OperationCanceledException) { SpawnFailed = true; return null; }
+            catch (Exception error) { Debug.LogException(error); SpawnFailed = true; return null; }
+        }
 
         private async UniTask<Unit_GroupAI>
             SpawnGroupAsync(
@@ -1367,28 +1424,13 @@ namespace Units
             }
 
 
-            if (cost <= 0)
+            bool hasBosses = context.BossIDs != null && context.BossIDs.Count > 0;
+            bool hasNormals = cost > 0 && context.MonsterIDs != null && context.MonsterIDs.Count > 0;
+            if (cost < 0 || (!hasBosses && !hasNormals))
             {
-                Debug.LogWarning(
-                    $"[EnemyWaveSpawner] " +
-                    $"잘못된 Spawn Cost : {cost}"
-                );
-
+                Debug.LogWarning("[EnemyWaveSpawner] 스폰할 일반 적 또는 보스가 없습니다.");
                 return false;
             }
-
-
-            if (context.MonsterIDs == null ||
-                context.MonsterIDs.Count == 0)
-            {
-                Debug.LogWarning(
-                    "[EnemyWaveSpawner] " +
-                    "Spawn 가능한 MonsterID가 없습니다."
-                );
-
-                return false;
-            }
-
 
             return true;
         }
@@ -1405,6 +1447,7 @@ namespace Units
                 return;
 
 
+            _runtimeUnitManager.UnregisterGroup(group);
             IReadOnlyList<Unit_Gateway> members =
                 group.Members;
 

@@ -310,6 +310,9 @@ namespace Units.Editor
                 if (consume.boolValue)
                 {
                     EditorGUILayout.PropertyField(condition.FindPropertyRelative("_consumeCount"), new GUIContent("소비 개수"));
+                    if (condition.FindPropertyRelative("_subject").intValue == (int)SkillConditionSubject.Owner)
+                        EditorGUILayout.PropertyField(entry.FindPropertyRelative("_consumeOncePerExecution"),
+                            new GUIContent("실행당 중첩 한 번 소비", "첫 소비 성공 후 같은 효과의 다른 명중 대상은 추가 소비 없이 강화됩니다."));
                     EditorGUILayout.LabelField("위 조건의 대상과 조회 기준을 그대로 사용합니다. 소비할 중첩이 부족하면 효과를 적용하지 않습니다.", EditorStyles.wordWrappedMiniLabel);
                 }
             }, () => AddItem(conditions), "조건", conditions.arraySize > 0);

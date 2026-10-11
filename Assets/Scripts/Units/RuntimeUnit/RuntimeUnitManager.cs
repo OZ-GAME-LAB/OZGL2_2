@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Units
 {
-    public class RuntimeUnitManager : MonoBehaviour, IRuntimeUnitManager
+    public class RuntimeUnitManager : MonoBehaviour, IRuntimeUnitManager, IBossRuntimeUnitManager
     {
         // =========================
         // Runtime States
@@ -14,6 +14,53 @@ namespace Units
         [Header("Engagement Expansion")]
         [SerializeField]
         private EngagementExpansionPolicy _engagementExpansionPolicy = new EngagementExpansionPolicy();
+
+        private readonly List<Unit_Gateway> _bossUnits = new();
+        private bool _hadBosses;
+        private bool _bossRemovedWithoutDeath;
+        private bool _allBossesDefeated;
+        private bool _clearingRuntime;
+        private System.Threading.CancellationTokenSource _preparationLifetime = new();
+        internal System.Threading.CancellationToken PreparationToken => _preparationLifetime.Token;
+        public IReadOnlyList<Unit_Gateway> BossUnits => _bossUnits.AsReadOnly();
+        public int BossUnitCount => _bossUnits.Count;
+        public event Action<Unit_Gateway> BossSpawned;
+        public event Action<Unit_Gateway> BossDied;
+        public event Action<Unit_Gateway> BossRemoved;
+        public event Action AllBossesDefeated;
+
+        internal void BeginEnemySpawnCycle()
+        {
+            if (_enemyUnits.Count != 0 || _enemyGroups.Count != 0)
+                throw new InvalidOperationException("기존 적을 정리한 뒤 새 스폰을 요청해야 합니다.");
+            _isEnemySpawnCompleted = false;
+            _hadBosses = false;
+            _bossRemovedWithoutDeath = false;
+            _allBossesDefeated = false;
+        }
+
+        private void TrackBoss(Unit_Gateway unit)
+        {
+            if (unit?.RuntimeStatus?.UnitData == null || !unit.RuntimeStatus.UnitData.IsBoss ||
+                _bossUnits.Contains(unit)) return;
+            _bossUnits.Add(unit);
+            _hadBosses = true;
+            BossSpawned?.Invoke(unit);
+        }
+
+        private void TryNotifyAllBossesDefeated()
+        {
+            if (_clearingRuntime || !_isEnemySpawnCompleted || !_hadBosses ||
+                _bossRemovedWithoutDeath || _allBossesDefeated || _bossUnits.Count != 0) return;
+            _allBossesDefeated = true;
+            AllBossesDefeated?.Invoke();
+        }
+
+        private void OnDestroy()
+        {
+            _preparationLifetime.Cancel();
+            _preparationLifetime.Dispose();
+        }
 
         private bool _battleStarted;
 
@@ -183,17 +230,15 @@ namespace Units
             }
 
 
-            SubscribeUnitEvents(
-                unit
-            );
-
-
+            SubscribeUnitEvents(unit);
+            TrackBoss(unit);
             return true;
         }
 
 
-        public bool UnregisterUnit(
-            Unit_Gateway unit)
+        public bool UnregisterUnit(Unit_Gateway unit) => RemoveUnit(unit, false);
+
+        private bool RemoveUnit(Unit_Gateway unit, bool died)
         {
             if (unit == null)
                 return false;
@@ -206,11 +251,14 @@ namespace Units
             }
 
 
-            UnsubscribeUnitEvents(
-                unit
-            );
-
-
+            UnsubscribeUnitEvents(unit);
+            if (_bossUnits.Remove(unit))
+            {
+                if (!died) _bossRemovedWithoutDeath = true;
+                if (died) BossDied?.Invoke(unit);
+                BossRemoved?.Invoke(unit);
+                if (died) TryNotifyAllBossesDefeated();
+            }
             return true;
         }
 
@@ -240,6 +288,7 @@ namespace Units
 
 
             _pendingPreparationGroupCount++;
+            foreach (var member in group.Members) TrackBoss(member);
 
 
             Debug.Log(
@@ -414,8 +463,7 @@ namespace Units
         private void HandleUnitDied(
             Unit_Gateway unit)
         {
-            if (!UnregisterUnit(
-                unit))
+            if (!RemoveUnit(unit, true))
             {
                 return;
             }
@@ -656,6 +704,7 @@ namespace Units
                 true;
 
 
+            TryNotifyAllBossesDefeated();
             TryCompletePreparation();
         }
 
@@ -682,7 +731,7 @@ namespace Units
 
         private void TryCompletePreparation()
         {
-            if (!_isAllySpawnCompleted)
+            if (_clearingRuntime || !_isAllySpawnCompleted)
                 return;
 
 
@@ -934,6 +983,10 @@ namespace Units
 
         public void ClearRuntime()
         {
+            _clearingRuntime = true;
+            _preparationLifetime.Cancel();
+            _preparationLifetime.Dispose();
+            _preparationLifetime = new System.Threading.CancellationTokenSource();
             // 투사체 종료 통지가 끝난 뒤 독립 연출까지 정리한다.
             ProjectileManager.Instance?.Clear();
 
@@ -983,6 +1036,11 @@ namespace Units
                 0;
 
 
+            _bossUnits.Clear();
+            _hadBosses = false;
+            _bossRemovedWithoutDeath = false;
+            _allBossesDefeated = false;
+            _clearingRuntime = false;
             ResetGroupIds();
             // 전투 사이에는 보관 풀을 유지하고, 오래 미사용한 인스턴스만 다음 세대에 정리한다.
             Units.FX.VFXManager.Instance?.Clear(false);

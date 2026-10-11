@@ -320,7 +320,9 @@ namespace Units
                 new EnemySpawnEntry(
                     unitData.GetEnemyFaction(),
                     unitData.GetEnemyClass(),
-                    prefab
+                    prefab,
+                    unitData.RallyZone,
+                    unitData.EnemyRank
                 )
             );
         }
