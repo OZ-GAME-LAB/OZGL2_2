@@ -97,7 +97,7 @@ namespace Game.UI.Samples
             }
             var rewardLabel = _rewardButton.GetComponentInChildren<TMP_Text>(true);
             if (rewardLabel != null) rewardLabel.text = UsesArtifactRewards ? "승리 보상 다시 열기" : "웨이브 보상 지급";
-            _flow.NewGame();
+            _flow.BeginRun();
             _statusText.text = "실제 재화·코어 연결 / 전투 판정은 테스트 입력 · 승리 유물 연동: " + UsesArtifactRewards;
         }
 

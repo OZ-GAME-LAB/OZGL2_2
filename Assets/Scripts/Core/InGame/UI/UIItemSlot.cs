@@ -12,7 +12,7 @@ namespace Game.UI.InGame
         [SerializeField] private Image _icon;
         [SerializeField] private TMP_Text _title;
         [SerializeField] private TMP_Text _value;
-        [SerializeField] private GameObject _selection;
+        [SerializeField] private GameObject _selection; //클릭시 열리는 팝업창
         private Action _onClick;
 
         private void OnEnable() { if (_button != null) _button.onClick.AddListener(HandleClick); }
@@ -26,8 +26,22 @@ namespace Game.UI.InGame
             if (_selection != null) _selection.SetActive(selected);
             if (_button != null) _button.interactable = interactable;
         }
-        public void Unbind() { _onClick = null; }
 
+        public void Unbind()
+        {
+            _onClick = null;
+        }
+
+        /// <summary>비어있는 슬롯 제작
+        public void EmptySlot()
+        {
+            _onClick = null;
+            if (_icon != null) _icon.sprite = null;
+            if (_title != null) _title.text = string.Empty;
+            if (_value != null) _value.text = string.Empty;
+            if (_selection != null) _selection.SetActive(false);
+            if (_button != null) _button.interactable = false;
+        }
         private void HandleClick()
         {
             if (_button != null && _button.IsInteractable()) 

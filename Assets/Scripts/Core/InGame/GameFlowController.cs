@@ -177,8 +177,6 @@ namespace Game.Core
         }
         
         // 기존 버튼/샘플의 연결은 유지하되 준비된 런을 다시 초기화하지 않는다.
-        public void NewGame() => BeginRun();
-        public void Continue() => BeginRun();
         public void BeginRun() => BeginRunAsync().Forget();
 
         public async UniTask BeginRunAsync()
@@ -222,6 +220,7 @@ namespace Game.Core
             _resumeStep = RunResumeStep.Finished;
             _restoredStep = true;
         }
+
         //게임을 종료하고 메인으로 이동
         public void QuitRun()
         {
@@ -240,14 +239,18 @@ namespace Game.Core
         //저장된 값 불러와서 다시 쓸 수 있게 복원
         public void RestoreSaveData(GameFlowSaveData data)
         {
-            if (data == null || !Enum.IsDefined(typeof(RunResumeStep), data.ResumeStep))
+            if (data == null)
+            {
                 throw new ArgumentException("게임 진행 저장값이 올바르지 않습니다.");
+            }
             _nodeController.RestoreSaveData(data.Node);
             if ((data.ResumeStep == RunResumeStep.Event && CurrentNode.PostBattleEvent != PostBattleEventType.Event &&
                  CurrentNode.PostBattleEvent != PostBattleEventType.Curse) ||
                 (data.ResumeStep == RunResumeStep.Store && CurrentNode.PostBattleEvent != PostBattleEventType.Shop) ||
                 (data.ResumeStep == RunResumeStep.QuarterDecision && (!IsLastNode || !data.HasClearedMainGame)))
+            {
                 throw new ArgumentException("저장된 재개 단계와 현재 노드가 일치하지 않습니다.");
+            }
             _resumeStep = data.ResumeStep;
             HasClearedMainGame = data.HasClearedMainGame;
             if (!string.IsNullOrWhiteSpace(data.RunId)) RunId = data.RunId;
@@ -294,7 +297,8 @@ namespace Game.Core
             return !_isTransitioning && _curPhase == GamePhase.Battle;
         }
 
-        // 전투 시작 및 결과 처리
+        // 전투준비 페이즈를 담당.
+        // 실제 유닛 실행까지만 요청하고 실제 전투페이즈는 TryStartWave 메서드에서 실행
         public async UniTask<bool> TrySpawnUnits()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
@@ -307,10 +311,9 @@ namespace Game.Core
             {
                 await SaveCheckpointAsync(token);
                 ChangePhase(GamePhase.BattlePreparing);
+                // 건물은 BattlePreparing 알림으로 아군을 생성한다.
                 if (token.IsCancellationRequested) return false;
                 _cameraController.ShowBase();
-                // 건물은 BattlePreparing 알림으로 아군을 생성한다.
-                // 아군·적 생성과 배치가 끝나면 RuntimeUnitManager의 준비 완료 알림으로 전투에 진입한다.
 
                 _cameraController.ShowBattleField();
                 // 리셋은 진행만 취소하고 적 생성은 완료까지 기다린다. 파괴 시에는 생성도 취소한다.
@@ -328,6 +331,8 @@ namespace Game.Core
             }
         }
 
+        // 아군·적 생성과 배치가 끝나면 RuntimeUnitManager의 준비 완료 알림으로 실행된다
+        // RuntimeUnitManager.PreparationCompleted 이벤트 발행 -> WaveManager.HandleMonsterSpawnCompleted -> TryStartWave
         public void TryStartWave()
         {
             ChangePhase(GamePhase.Battle);
@@ -421,6 +426,7 @@ namespace Game.Core
             IsResumingStep = false;
         }
 
+        /// <summary> 정규 스토리 분기(5분기) 클리어 후 계속 진행할지 결정하는 메서드</summary>
         private async UniTask<RunDecision> ChooseQuarterDecisionAsync(CancellationToken token)
         {
             _resumeStep = RunResumeStep.QuarterDecision;
@@ -447,13 +453,14 @@ namespace Game.Core
         }
 
         /// <summary>
-        /// 돌발 이벤트 완료까지만 담당하고 이후 진행은 승리 처리 경로에서 결정한다.
+        /// 전투 클리어 후 발생하는 이벤트 담당메서드
         /// </summary>
         private async UniTask ProcessEventAsync(Node completedNode, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
+            //이벤트 없으면 바로 진행
             if (completedNode.PostBattleEvent == PostBattleEventType.None) return;
-
+            //상점 이벤트면 
             if (completedNode.PostBattleEvent == PostBattleEventType.Shop)
             {
                 if (_shopFlow == null)
@@ -461,9 +468,11 @@ namespace Game.Core
                 PrepareShopCheckpoint();
                 _resumeStep = RunResumeStep.Store;
                 ChangePhase(GamePhase.Store);
+                //상점 진입 전에 세이브 한번 하기
                 await SaveCheckpointAsync(token);
                 IsResumingStep = false;
                 token.ThrowIfCancellationRequested();
+                
                 await _shopFlow.OpenShopAsync(token);
                 token.ThrowIfCancellationRequested();
                 return;
@@ -490,7 +499,7 @@ namespace Game.Core
             token.ThrowIfCancellationRequested();
         }
 
-        // 기존 상점 API로 후보를 먼저 확정해 UI 표시 전 체크포인트에 포함한다.
+        // 상점 진입 전 상점에 등장하는 물품 후보를 미리 만들어놓아서 저장 후 불러오기에도 상점 물품이 바뀌지 않게 관리
         private void PrepareShopCheckpoint()
         {
             if (_shopFlow is ShopManager shop)
@@ -505,7 +514,7 @@ namespace Game.Core
                 throw new InvalidOperationException("저장할 상점 후보를 준비할 수 있는 ShopManager를 연결해주세요.");
         }
 
-        // 분기·노드 진행
+        // 새 분기를 시작하기 위한 노드를 생성
         private bool StartQuarter(int quarter)
         {
             if (!_nodeController.TryStartQuarter(quarter, _twoEliteChance, out string error))
@@ -518,6 +527,7 @@ namespace Game.Core
             return true;
         }
 
+        //노드(웨이브) 진행
         private void AdvanceNode()
         {
             if (_nodeController.MoveNext()) NotifyNodeChanged();
@@ -575,6 +585,7 @@ namespace Game.Core
             _settlementViewPrepared = true;
         }
 
+        //중요 체크포인트(웨이브 클리어, 건물 건설, 이벤트 조우 등...) 발생 시 자동으로 저장
         private async UniTask SaveCheckpointAsync(CancellationToken token)
         {
             // 저장기를 연결하지 않은 기존 독립 테스트/샘플은 파일을 만들지 않는다.
@@ -589,6 +600,7 @@ namespace Game.Core
             token.ThrowIfCancellationRequested();
         }
 
+        // 진행하고 있던 판이 완료되었을 때 기존 저장소를 지운다.
         private async UniTask LeaveCompletedRunAsync(CancellationToken token)
         {
             if (_checkpointWriter != null)

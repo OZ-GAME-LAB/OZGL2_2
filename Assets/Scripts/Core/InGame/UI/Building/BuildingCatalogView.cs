@@ -1,123 +1,112 @@
 using System;
 using System.Collections.Generic;
+using OZGL.KDH;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
-    /// <summary>건설 후보를 공용 슬롯에 표시하고, 선택한 후보의 ID만 전달한다.</summary>
+    /// <summary>카테고리별 건설 목록을 표시하고 건설 클릭과 정보 클릭을 구분한다.</summary>
     [DisallowMultipleComponent]
     public sealed class BuildingCatalogView : MonoBehaviour
     {
         public event Action<string> ItemSelected;
+        public event Action<string> InfoRequested;
         public UIScreen Popup => _popup;
-        public int PageIndex => _page;
         public int ItemCount => _items.Count;
 
-        [Serializable]
-        private sealed class Card
-        {
-            public UIItemSlot Slot;
-            public TMP_Text Summary;
-        }
-
         [SerializeField] private UIScreen _popup;
-        [SerializeField] private Card[] _cards = Array.Empty<Card>();
-        [SerializeField] private Button _previous;
-        [SerializeField] private Button _next;
-        [SerializeField] private TMP_Text _pageText;
+        [SerializeField] private BuildingCardView _cardTemplate;
+        [SerializeField] private RectTransform _content;
+        [SerializeField] private UnityEngine.UI.ScrollRect _scroll;
+        [SerializeField] private UnityEngine.UI.Button[] _tabs;
         [SerializeField] private TMP_Text _emptyText;
 
         private readonly List<BuildingCatalogItem> _items = new List<BuildingCatalogItem>();
-        private int _page;
-
-        private void OnEnable()
+        private readonly List<BuildingCardView> _cards = new List<BuildingCardView>();
+        private readonly BuildingType[] _categories =
         {
-            if (_previous != null) _previous.onClick.AddListener(HandlePrevious);
-            if (_next != null) _next.onClick.AddListener(HandleNext);
-            Refresh();
-        }
+            BuildingType.Barracks, BuildingType.Producer, BuildingType.Support
+        };
+        private readonly float[] _scrollPositions = { 1f, 1f, 1f };
+        private int _tabIndex;
 
-        private void OnDisable()
+        private void Awake()
         {
-            if (_previous != null) _previous.onClick.RemoveListener(HandlePrevious);
-            if (_next != null) _next.onClick.RemoveListener(HandleNext);
-            foreach (var card in _cards)
-                if (card != null && card.Slot != null) card.Slot.Unbind();
+            _cardTemplate.gameObject.SetActive(false);
+            for (int i = 0; i < _tabs.Length; i++)
+            {
+                int tabIndex = i;
+                _tabs[i].onClick.AddListener(() => SelectTab(tabIndex));
+            }
         }
 
         public void SetItems(IReadOnlyList<BuildingCatalogItem> items, bool preservePage = false)
         {
-            if (items == null) throw new ArgumentNullException(nameof(items));
-            var ids = new HashSet<string>();
-            foreach (var item in items)
-                if (item == null || !ids.Add(item.Id))
-                    throw new ArgumentException("Catalog candidates need unique IDs.", nameof(items));
-
             _items.Clear();
             for (int i = 0; i < items.Count; i++) _items.Add(items[i]);
-            _page = preservePage ? Mathf.Clamp(_page, 0, Mathf.Max(0, (_items.Count - 1) / Mathf.Max(1, _cards.Length))) : 0;
+
+            if (preservePage)
+            {
+                _scrollPositions[_tabIndex] = _scroll.verticalNormalizedPosition;
+            }
+            else
+            {
+                _tabIndex = 0;
+                for (int i = 0; i < _scrollPositions.Length; i++) _scrollPositions[i] = 1f;
+            }
+
             Refresh();
         }
 
-        private void HandlePrevious()
+        private void SelectTab(int tabIndex)
         {
-            if (_page <= 0) return;
-            _page--;
+            _scrollPositions[_tabIndex] = _scroll.verticalNormalizedPosition;
+            _tabIndex = tabIndex;
             Refresh();
-        }
-
-        private void HandleNext()
-        {
-            if ((_page + 1) * _cards.Length >= _items.Count) return;
-            _page++;
-            Refresh();
-        }
-
-        private void Select(string itemId)
-        {
-            if (!isActiveAndEnabled || !_popup.IsVisible) return;
-            // 다음 화면을 여는 Presenter가 전환한다. 여기서 먼저 닫으면 취소로 처리될 수 있다.
-            ItemSelected?.Invoke(itemId);
         }
 
         private void Refresh()
         {
-            int pageSize = _cards.Length;
-            if (pageSize == 0 || _previous == null || _next == null ||
-                _pageText == null || _emptyText == null) return;
-
-            for (int i = 0; i < pageSize; i++)
+            int visibleCount = 0;
+            foreach (var item in _items)
             {
-                var card = _cards[i];
-                if (card == null || card.Slot == null) continue;
-                int index = _page * pageSize + i;
-                bool visible = index < _items.Count;
-                card.Slot.gameObject.SetActive(visible);
-                if (!visible)
-                {
-                    card.Slot.Unbind();
-                    continue;
-                }
+                if (item.Category != _categories[_tabIndex]) continue;
 
-                var item = _items[index];
-                string price = item.GoldCost.HasValue
-                    ? BuildingCurrencyText.Format(item.GoldCost.Value, item.GemCost.Value)
-                    : "가격 미정";
-                card.Summary.text = item.Summary;
-                card.Slot.Bind(null, item.Name, price, false, true, () => Select(item.Id));
+                if (visibleCount == _cards.Count)
+                    _cards.Add(Instantiate(_cardTemplate, _content));
+
+                var card = _cards[visibleCount];
+                bool canBuild = item.Offer != null && item.Offer.CanExecute;
+                card.Bind(item, false, canBuild, Select, ShowInfo);
+                card.gameObject.SetActive(true);
+                visibleCount++;
             }
 
-            _emptyText.gameObject.SetActive(_items.Count == 0);
-            bool paging = _items.Count > pageSize;
-            _previous.gameObject.SetActive(paging);
-            _next.gameObject.SetActive(paging);
-            _pageText.gameObject.SetActive(paging);
-            _previous.interactable = _page > 0;
-            _next.interactable = (_page + 1) * pageSize < _items.Count;
-            int pageCount = Mathf.Max(1, (_items.Count + pageSize - 1) / pageSize);
-            _pageText.text = (_page + 1) + " / " + pageCount;
+            for (int i = visibleCount; i < _cards.Count; i++)
+            {
+                _cards[i].Unbind();
+                _cards[i].gameObject.SetActive(false);
+            }
+
+            for (int i = 0; i < _tabs.Length; i++) _tabs[i].interactable = i != _tabIndex;
+            _emptyText.text = "건설 가능한 건물이 없습니다.";
+            _emptyText.gameObject.SetActive(visibleCount == 0);
+
+            // 카드 수가 바뀐 뒤 높이를 먼저 갱신해야 이전 탭의 스크롤 위치가 섞이지 않는다.
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(_content);
+            _scroll.StopMovement();
+            _scroll.verticalNormalizedPosition = _scrollPositions[_tabIndex];
+        }
+
+        private void Select(string itemId)
+        {
+            if (isActiveAndEnabled && _popup.IsVisible) ItemSelected?.Invoke(itemId);
+        }
+
+        private void ShowInfo(string itemId)
+        {
+            if (isActiveAndEnabled && _popup.IsVisible) InfoRequested?.Invoke(itemId);
         }
     }
 }
