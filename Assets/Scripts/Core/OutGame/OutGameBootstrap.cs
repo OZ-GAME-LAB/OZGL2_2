@@ -10,11 +10,12 @@ public class OutGameBootstrap : MonoBehaviour
     [SerializeField] private OutGameTotemController totemController;
     [SerializeField] private OutGameStartController startController;
     [SerializeField] private SaveManager _saveManager;
-    [SerializeField] private PersistentSaveCoordinator _persistentSaveCoordinator;
+    [SerializeField] private OutGameSaveCoordinator _persistentSaveCoordinator;
     [FormerlySerializedAs("_uiBinding")]
     [SerializeField] private OutGameUIController _uiController;
 
     public bool IsInitialized { get; private set; }
+    private bool _initializationStarted;
 
     private void Start()
     {
@@ -24,8 +25,15 @@ public class OutGameBootstrap : MonoBehaviour
     // 판 설정은 초기화하고, 특성과 혈석은 저장된 상태로 복원합니다.
     public bool Initialize()
     {
+        if (IsInitialized) return true;
+        if (_initializationStarted)
+        {
+            Debug.LogError("[OutGameBootstrap] 실패한 초기화를 다시 호출할 수 없습니다. 씬을 다시 열어주세요.", this);
+            return false;
+        }
         IsInitialized = false;
         if (!ValidateReferences()) return false;
+        _initializationStarted = true;
 
         _uiController.Shutdown();
         _wallet.Initialize();
@@ -40,14 +48,14 @@ public class OutGameBootstrap : MonoBehaviour
             return false;
         }
 
-        _persistentSaveCoordinator.Initialize(_saveManager, traitController, _wallet);
+        _persistentSaveCoordinator.Initialize(_saveManager, traitController, _wallet, altarController, totemController);
         if (!_persistentSaveCoordinator.TryLoadOrCreate(out string error))
         {
             Debug.LogError("[OutGameBootstrap] 영구 데이터 초기화 실패: " + error, this);
             return false;
         }
 
-        startController.Initialize(altarController, traitController, totemController);
+        startController.Initialize(altarController, traitController, totemController, _persistentSaveCoordinator);
         _uiController.Initialize(altarController, traitController, totemController, _wallet, startController);
         IsInitialized = true;
         return true;
@@ -59,7 +67,7 @@ public class OutGameBootstrap : MonoBehaviour
             totemController == null || startController == null || _uiController == null ||
             _saveManager == null || _persistentSaveCoordinator == null)
         {
-            Debug.LogError("[OutGameBootstrap] Inspector의 지갑, Selector 3개, Controller, UI Controller, SaveManager, PersistentSaveCoordinator를 연결해주세요.", this);
+            Debug.LogError("[OutGameBootstrap] Inspector의 지갑, Selector 3개, Controller, UI Controller, SaveManager, OutGameSaveCoordinator를 연결해주세요.", this);
             return false;
         }
 

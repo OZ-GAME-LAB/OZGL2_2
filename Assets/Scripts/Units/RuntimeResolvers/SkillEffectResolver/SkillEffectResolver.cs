@@ -80,7 +80,19 @@ namespace Units.Skills
                         continue;
                     }
 
-                    results.Add(ResolveEffect(request, effects[i]));
+                    var result = ResolveEffect(request, effects[i]);
+                    results.Add(result);
+                    if (result.WasApplied && effects[i].ApplicationFX != null)
+                        foreach (var fx in effects[i].ApplicationFX)
+                            if (fx != null)
+                            {
+                                var playback = new SkillFXRequest(fx, request.Metadata, result.Target.Position,
+                                    target: result.Target);
+                                Units.FX.UnitFXBridge.Dispatch(playback);
+                                // 효과 요청은 별도 실행 수명이 없으므로 종료를 함께 전달한다.
+                                // 독립 재생은 대상에서 분리되어 자체 수명까지 유지한다.
+                                Units.FX.UnitFXBridge.Dispatch(playback.AsCleanup());
+                            }
                 }
             }
 

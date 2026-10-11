@@ -185,10 +185,6 @@ PrefabInstance:
       propertyPath: _persistentSaveCoordinator
       value: 
       objectReference: {fileID: 7356614912341857810}
-    - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
-      propertyPath: _buildingShortcuts.Array.size
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8248911123056721564, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
       propertyPath: TestCanvas
       value: 
@@ -289,7 +285,6 @@ MonoBehaviour:
   _shopView: {fileID: 0}
   _buildingUI: {fileID: 0}
   _buildingUIConnection: {fileID: 6600772222949329545}
-  _buildingShortcuts: []
 --- !u!1001 &4606525673056401832
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -541,7 +536,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c89d73aa1c21dda43b2c7655017378ee, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PersistentSaveCoordinator
+  m_EditorClassIdentifier: Assembly-CSharp::OutGameSaveCoordinator
 --- !u!1001 &6906411473244202100
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -638,18 +633,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: UnitSystem
       objectReference: {fileID: 0}
-    - target: {fileID: 3226164567534235992, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -8
-      objectReference: {fileID: 0}
-    - target: {fileID: 3638060669485205825, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 3638060669485205825, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 2
-      objectReference: {fileID: 0}
     - target: {fileID: 5421153721552506957, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
       propertyPath: m_LocalPosition.x
       value: -4.12227
@@ -689,30 +672,6 @@ PrefabInstance:
     - target: {fileID: 5421153721552506957, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6059216695445244944, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 7480073423502478011, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 7480073423502478011, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 7
-      objectReference: {fileID: 0}
-    - target: {fileID: 8342881250874902347, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 8907409741024235908, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 40
-      objectReference: {fileID: 0}
-    - target: {fileID: 8907409741024235908, guid: 90a6c8aff9795194ba4d9f802818fd79, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -3
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

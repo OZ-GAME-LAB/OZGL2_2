@@ -2,12 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Game.Core;
 using UnityEngine;
 
 // 상점 품목을 보관하고 재화·아티팩트·소모성 아이템 매니저에 거래 요청
 public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, ISaveDataProvider<ShopSaveData>
 {
-    public bool IsInitialized => _selector != null && _artifactManager != null &&
+    public bool IsInitialized => _gameFlowController != null && _selector != null && _artifactManager != null &&
         _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized &&
         (!HasConsumableSales || (_consumables != null && _consumables.IsInitialized));
     public bool HasStock { get; private set; }
@@ -19,6 +20,8 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
     [SerializeField] private ShopTable _shopTable;
 
     private ArtifactManager _artifactManager;
+    private GameFlowController _gameFlowController;
+    private int _stockQuarter;
     private RunCurrencyManager _runCurrencyManager;
     private ShopArtifactSelector _selector;
     private ConsumableItemManager _consumables;
@@ -36,17 +39,17 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
 
     // 판매에 사용하는 매니저 초기화 후 호출. 소모성 판매 설정이 있으면 소모성 매니저도 필요
     public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager,
-        ConsumableItemManager consumableItemManager = null, IShopUI shopUI = null)
+        GameFlowController gameFlowController, ConsumableItemManager consumableItemManager = null, IShopUI shopUI = null)
     {
         if (_isTrading || IsInitialized)
         {
             return;
         }
 
-        if (_shopTable == null || artifactManager == null || !artifactManager.IsInitialized ||
+        if (gameFlowController == null || _shopTable == null || artifactManager == null || !artifactManager.IsInitialized ||
             artifactManager.ArtifactCatalog == null || runCurrencyManager == null || !runCurrencyManager.IsInitialized)
         {
-            Debug.LogError("[Shop/ShopManager] ShopTable 및 초기화된 아티팩트·Run 재화 매니저 연결 필요", this);
+            Debug.LogError("[Shop/ShopManager] GameFlowController, ShopTable 및 초기화된 아티팩트·Run 재화 매니저 연결 필요", this);
             return;
         }
 
@@ -58,6 +61,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         }
 
         _artifactManager = artifactManager;
+        _gameFlowController = gameFlowController;
         _consumables = consumableItemManager;
         _consumableSelector = new ShopConsumableSelector(
             _consumables != null ? _consumables.Catalog : null, _shopTable);
@@ -68,6 +72,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         _exchangeSlots.Clear();
         _consumableSlots.Clear();
         HasStock = false;
+        _stockQuarter = 0;
     }
 
     // 게임 플로우에서 호출 : 상점 UI를 열고 나가기 버튼을 누를 때까지 대기.
@@ -82,7 +87,13 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             throw new InvalidOperationException("초기화 및 거래 처리 완료 후 상점을 열어주세요.");
         }
 
-        if (!HasStock && !TryGenerateStock())
+        int currentQuarter = _gameFlowController.CurrentQuarter;
+        if (currentQuarter < 1)
+            throw new InvalidOperationException("분기 시작 후 상점을 열어주세요.");
+
+        // 분기 정보가 없는 이전 저장 데이터는 첫 진입 분기에 귀속시켜 기존 구매 상태를 유지합니다.
+        if (HasStock && _stockQuarter == 0) _stockQuarter = currentQuarter;
+        if ((!HasStock || _stockQuarter != currentQuarter) && !TryGenerateStock())
         {
             throw new InvalidOperationException("상점 품목 생성에 실패했습니다.");
         }
@@ -113,6 +124,8 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         {
             return false;
         }
+        int currentQuarter = _gameFlowController.CurrentQuarter;
+        if (currentQuarter < 1) return false;
 
         // 한쪽 추첨이 실패하면 기존 상점 목록 유지
         if (!_selector.TryCreatePurchaseSlots(out List<ShopArtifactSlot> purchases) ||
@@ -127,9 +140,10 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         _exchangeSlots = exchanges;
         _consumableSlots = consumables;
         HasStock = true;
+        _stockQuarter = currentQuarter;
         _isTrading = true;
-        ShopChanged?.Invoke();
-        _isTrading = false;
+        try { ShopChanged?.Invoke(); }
+        finally { _isTrading = false; }
         return true;
     }
 
@@ -289,7 +303,9 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         _consumables = null;
         _artifactManager = null;
         _runCurrencyManager = null;
+        _gameFlowController = null;
         HasStock = false;
+        _stockQuarter = 0;
         _isTrading = true;
         ShopChanged?.Invoke();
         _isTrading = false;
@@ -299,7 +315,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
     public ShopSaveData CaptureSaveData()
     {
         if (!IsInitialized || _isTrading) throw new InvalidOperationException("상점 초기화 및 거래 완료 후 저장하세요.");
-        var data = new ShopSaveData { HasStock = HasStock };
+        var data = new ShopSaveData { HasStock = HasStock, StockQuarter = _stockQuarter };
         foreach (var slot in _purchaseSlots)
             data.Artifacts.Add(new ShopPurchaseSaveEntry { ItemId = slot.Artifact.Id, Currency = slot.Currency, Price = slot.Price, Purchased = slot.IsPurchased });
         foreach (var slot in _consumableSlots)
@@ -314,6 +330,8 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         if (!IsInitialized || _isTrading) throw new InvalidOperationException("상점 초기화 및 거래 완료 후 복원하세요.");
         if (data == null || data.Artifacts == null || data.Consumables == null || data.Exchanges == null)
             throw new ArgumentException("상점 저장 데이터가 없습니다.");
+        if (data.StockQuarter < 0 || (!data.HasStock && data.StockQuarter != 0))
+            throw new ArgumentException("저장된 상점 분기 정보를 확인하세요.");
         if (!data.HasStock && (data.Artifacts.Count != 0 || data.Consumables.Count != 0 || data.Exchanges.Count != 0))
             throw new ArgumentException("미생성 상점에 저장 상품이 있습니다.");
         var artifacts = new List<ShopArtifactSlot>();
@@ -356,6 +374,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             _consumableSlots = consumables;
             _exchangeSlots = exchanges;
             HasStock = data.HasStock;
+            _stockQuarter = data.StockQuarter;
             ShopChanged?.Invoke();
         }
         finally { _isTrading = false; }

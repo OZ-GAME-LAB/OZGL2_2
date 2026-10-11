@@ -53,7 +53,8 @@ namespace Units
                 type == ProjectileImpactType.Single ? 1 : action.MaxEffectTargets,
                 pending,
                 filter,
-                flight
+                flight,
+                action.ProjectilePrefab
             );
 
             bool fired = ProjectileManager.GetOrCreate().Fire(request);

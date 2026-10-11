@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Units.Effects;
 using UnityEngine;
@@ -69,6 +69,9 @@ namespace Units.Skills
         private readonly List<SkillFXRequest> _conditionalFX = new();
 
         private bool _conditionalFXClosed;
+        internal Units.FX.FXScope? FXScope { get; set; }
+        internal Transform FXFollowTarget { get; set; }
+        internal Vector2 FXDirection { get; set; }
 
         // 조건이 성립한 요청만 기록한다. 정리 콜백 재진입 전에 소유권을 먼저 해제한다.
         internal void RequestConditionalFX(SkillFXRequest request)
@@ -93,7 +96,7 @@ namespace Units.Skills
             _conditionalFX.Clear();
 
             foreach (var request in pending)
-                FXRequested?.Invoke(new SkillFXRequest(request.Entry, request.Metadata, request.Position, true));
+                FXRequested?.Invoke(request.AsCleanup(FXScope.HasValue ? Units.FX.FXCleanupReason.ScopeEnded : Units.FX.FXCleanupReason.ActionEnded));
         }
 
         // ============================================================
@@ -173,7 +176,8 @@ namespace Units.Skills
 
             PreviousResult = source.PreviousResult;
 
-            FXRequested = source.FXRequested;
+            // 발사자의 컴포넌트 구독이 해제되어도 비행 중인 연출은 독립적으로 전달한다.
+            FXRequested = Units.FX.UnitFXBridge.Dispatch;
 
             HostileFilter = source.HostileFilter;
 
@@ -351,7 +355,9 @@ namespace Units.Skills
 
                     foreach (var fx in extra.FXEntries)
                         if (fx != null)
-                            batch.RequestConditionalFX(new SkillFXRequest(fx, metadata, context.Position));
+                            batch.RequestConditionalFX(new SkillFXRequest(fx, metadata, context.Position,
+                                direction: batch.FXScope.HasValue ? batch.FXDirection : context.Target.Position - context.Owner.Position,
+                                target: context.Target, followTarget: batch.FXFollowTarget, scope: batch.FXScope));
                 }
 
                 // 소비 통지도 반응을 일으킬 수 있으므로 적용 직전에 재검사한다.

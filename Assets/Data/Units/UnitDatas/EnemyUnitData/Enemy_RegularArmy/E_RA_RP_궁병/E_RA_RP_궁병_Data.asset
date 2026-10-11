@@ -1,0 +1,81 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "E_RA_RP_\uAD81\uBCD1_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "E_RA_RP_\uAD81\uBCD1"
+  _unitName: "\uAD81\uBCD1"
+  _team: 1
+  _allyIdentity:
+    _unitClass: 0
+    _unitTier: 0
+    _unitType: 0
+  _enemyIdentity:
+    _unitClass: 4
+    _unitFaction: 1
+    _unitType: 25
+  _stats:
+  - _statType: 0
+    _value: 700
+  - _statType: 10
+    _value: 0
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 25
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.1
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 5
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 
+  _basicAttackData: {fileID: 11400000, guid: 2f405a7c15390db4faf26804de0e345f, type: 2}
+  _activeSkills:
+  - _id: OneShot_RA
+    _skill: {fileID: 11400000, guid: 2a69a772c275bb646b2f380bc09cc090, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: c2ffd14d965034740a2f8334310fdd78, type: 2}
+  - {fileID: 11400000, guid: ec4213d7e0e606d41a78564065e6484c, type: 2}
+  references:
+    version: 2
+    RefIds: []

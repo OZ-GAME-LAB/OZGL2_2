@@ -35,6 +35,14 @@ namespace Game.UI.Editor
         [SerializeField] private string _search = "";
         [SerializeField] private int _category;
         [SerializeField] private int _selected;
+        [SerializeField] private SceneAsset _sourceScene;
+        [SerializeField] private int _unitFilter;
+        [SerializeField] private bool _showPaths;
+        [SerializeField] private bool _showSceneTools;
+        private readonly HashSet<string> _expandedRelated = new HashSet<string>();
+        private readonly Dictionary<string, string> _unitLabels = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> _unitBuckets = new Dictionary<string, string>();
+        private string[] _unitFilters = { "전체" };
         private Workspace _workspace;
         private Vector2 _navigationScroll, _detailScroll;
         private static readonly string[] Categories = { "전체", "유닛", "건물", "웨이브", "재화", "아티팩트", "상점" };
@@ -83,15 +91,15 @@ namespace Game.UI.Editor
         private void OnGUI()
         {
             EditorGUILayout.LabelField("게임 밸런스 작업 공간", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("복사본에서 수치 수정 → 저장 → 테스트 씬에서 플레이 → 선택한 데이터만 원본 반영. ID·참조·목록 구조는 잠겨 있습니다.", MessageType.Info);
-            EditorGUILayout.HelpBox("적 총 생성 수는 현재 팀 코드에서 10으로 고정되어 이 도구로 변경하지 않습니다. 플레이 중 실시간 수정은 지원하지 않습니다.", MessageType.None);
+            EditorGUILayout.HelpBox("씬 설정 없이 유닛·건물·보상·아티팩트 데이터를 조정합니다. 데이터 불러오기 → 수치 수정 → 검증 → 확정값 반영. ID·참조·목록 구조는 보호됩니다.", MessageType.Info);
+            EditorGUILayout.HelpBox("건설·업그레이드 비용과 보상부터 정한 뒤 유닛·스킬·유물을 조정하세요. 기본 공격 수치만으로 실제 DPS를 판정하지 않습니다. 플레이 중 수정은 지원하지 않습니다.", MessageType.None);
             using (new EditorGUI.DisabledScope(Busy))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("새 작업용 복사본 만들기")) Run(() =>
+                    if (GUILayout.Button("프로젝트 밸런스 데이터 불러오기")) Run(() =>
                     {
-                        if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                        if (_workspace != null) SaveWorkingAssets();
                         _manifestPath = CreateWorkspace();
                         EditorPrefs.SetString(PreferenceKey, _manifestPath);
                         LoadWorkspace();
@@ -114,82 +122,185 @@ namespace Game.UI.Editor
                             var issues = Validate(_workspace);
                             EditorUtility.DisplayDialog("밸런스 검증", issues.Count == 0 ? "구조·수치·참조 검사 통과 (게임 밸런스 적정성은 플레이 테스트 필요)" : string.Join("\n", issues.Take(20)), "확인");
                         });
-                        if (GUILayout.Button("테스트 씬 열기")) Run(() =>
-                        {
-                            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
-                            SaveWorkingAssets();
-                            EditorSceneManager.OpenScene(_workspace.scene);
-                        });
                     }
                 }
+                _showSceneTools = EditorGUILayout.Foldout(_showSceneTools, "선택 기능: 별도 플레이 테스트", true);
+                if (_showSceneTools) DrawSceneTools();
                 if (_workspace == null) return;
-                EditorGUILayout.LabelField(_workspace.scene, EditorStyles.miniLabel);
-                int category = GUILayout.Toolbar(_category, Categories);
-                if (category != _category)
-                {
-                    _category = category;
-                    _selected = _workspace.entries.FindIndex(e => !string.IsNullOrEmpty(e.group) && (_category == 0 || e.group == Categories[_category]));
-                }
+                using (new EditorGUI.DisabledScope(_selected < 0 || _selected >= _workspace.entries.Count || !IsVisible(_workspace.entries[_selected])))
+                    if (GUILayout.Button("선택 항목 적용 — 실제 게임 데이터에 저장", GUILayout.Height(32)))
+                        ConfirmAndPublish(_workspace.entries[_selected]);
+                EditorGUILayout.LabelField("프로젝트 데이터 편집 / 수정값은 확인 후 실제 데이터에 반영", EditorStyles.miniLabel);
                 _search = EditorGUILayout.TextField("검색", _search);
+                _showPaths = EditorGUILayout.Toggle("고급 정보 (파일 경로)", _showPaths);
+                if (_category == 0 || Categories[_category] == "유닛")
+                    _unitFilter = EditorGUILayout.Popup("유닛 팀 / 티어 / 팩션", _unitFilter, _unitFilters);
+                var visible = Enumerable.Range(0, _workspace.entries.Count).Where(i => IsVisible(_workspace.entries[i])).ToList();
+                if (!visible.Contains(_selected)) _selected = visible.Count == 0 ? -1 : visible[0];
+                EditorGUILayout.LabelField("표시 데이터: " + visible.Count, EditorStyles.miniLabel);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     using (var scroll = new EditorGUILayout.ScrollViewScope(_navigationScroll, GUILayout.Width(300)))
                     {
                         _navigationScroll = scroll.scrollPosition;
-                        for (int i = 0; i < _workspace.entries.Count; i++)
+                        EditorGUILayout.LabelField("분류", EditorStyles.boldLabel);
+                        for (int category = 0; category < Categories.Length; category++)
+                        {
+                            if (!GUILayout.Toggle(_category == category, Categories[category], "Button") || _category == category) continue;
+                            _category = category;
+                            _unitFilter = 0;
+                            _selected = -1;
+                            _detailScroll = Vector2.zero;
+                            Repaint();
+                        }
+                        EditorGUILayout.Space(12);
+                        EditorGUILayout.LabelField("조정할 항목", EditorStyles.boldLabel);
+                        foreach (int i in visible)
                         {
                             var item = _workspace.entries[i];
-                            if (string.IsNullOrEmpty(item.group) || (_category > 0 && item.group != Categories[_category])) continue;
-                            if (item.source.IndexOf(_search, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                            if (GUILayout.Toggle(_selected == i, (item.connected ? "● " : "○ ") + Path.GetFileNameWithoutExtension(item.source), "Button")) _selected = i;
+                            string label = _unitLabels.TryGetValue(item.source, out string unitLabel) ? unitLabel : Path.GetFileNameWithoutExtension(item.source);
+                            var style = new GUIStyle(EditorStyles.miniButton) { wordWrap = true, alignment = TextAnchor.MiddleLeft };
+                            if (GUILayout.Toggle(_selected == i, new GUIContent(label, item.source), style) && _selected != i)
+                            {
+                                _selected = i;
+                                _detailScroll = Vector2.zero;
+                            }
                         }
                     }
                     using (var scroll = new EditorGUILayout.ScrollViewScope(_detailScroll))
                     {
                         _detailScroll = scroll.scrollPosition;
                         if (_selected >= 0 && _selected < _workspace.entries.Count) DrawEntry(_workspace.entries[_selected]);
-                        DrawStartingCurrency();
+                        else EditorGUILayout.HelpBox("왼쪽에서 조정할 항목을 선택하세요. 검색 결과가 없다면 검색어나 유닛 필터를 해제하세요.", MessageType.Info);
+                        if (_category == 0 || Categories[_category] == "재화") DrawStartingCurrency();
                     }
                 }
             }
         }
 
-        private void DrawEntry(Entry entry)
+        private void DrawSceneTools()
+        {
+            EditorGUILayout.HelpBox("밸런스 데이터 편집에는 씬이 필요하지 않습니다. 복사본으로 플레이까지 확인하려는 경우에만 별도의 테스트 작업 공간을 만드세요. 현재 작업의 수정값을 자동 이전하지 않습니다.", MessageType.Info);
+            _sourceScene = (SceneAsset)EditorGUILayout.ObjectField("테스트할 씬 (선택)", _sourceScene, typeof(SceneAsset), false);
+            using (new EditorGUI.DisabledScope(_sourceScene == null))
+                if (GUILayout.Button("선택한 씬으로 별도 테스트 작업 공간 생성")) Run(() =>
+                {
+                    if (_workspace != null) SaveWorkingAssets();
+                    if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                    _manifestPath = CreateWorkspace(AssetDatabase.GetAssetPath(_sourceScene));
+                    EditorPrefs.SetString(PreferenceKey, _manifestPath);
+                    LoadWorkspace();
+                });
+            using (new EditorGUI.DisabledScope(_workspace == null || string.IsNullOrEmpty(_workspace.scene)))
+                if (GUILayout.Button("작업 공간의 테스트 씬 열기")) Run(() =>
+                {
+                    if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                    SaveWorkingAssets();
+                    EditorSceneManager.OpenScene(_workspace.scene);
+                });
+        }
+
+        private bool IsVisible(Entry entry)
+        {
+            if (string.IsNullOrEmpty(entry.group) || (_category > 0 && entry.group != Categories[_category])) return false;
+            string text = entry.source + " " + (_unitLabels.TryGetValue(entry.source, out string label) ? label : "");
+            if (text.IndexOf(_search ?? "", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if ((_category == 0 || Categories[_category] == "유닛") && _unitFilter > 0)
+                return _unitBuckets.TryGetValue(entry.source, out string bucket) && bucket == _unitFilters[_unitFilter];
+            return true;
+        }
+
+        public static string UnitBucket(Units.UnitDatas.UnitData unit)
+        {
+            return unit.Team.ToString() == "Ally" ? "아군 / " + unit.GetAllyTier() : "적군 / " + unit.GetEnemyFaction();
+        }
+
+        private void DrawRelatedData(Entry entry)
+        {
+            if (entry.type != "UnitData" && entry.type != "BuildingData") return;
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("함께 조정할 연결 설정", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("펼치면 이 화면에서 연결된 복사본도 편집할 수 있습니다. 공유된 스킬의 수치는 연결된 다른 유닛에도 영향을 줍니다. 원본 반영은 각 항목에서 별도로 확인합니다.", MessageType.Info);
+            var dependencies = new HashSet<string>(AssetDatabase.GetDependencies(entry.working, true));
+            foreach (var related in _workspace.entries.Where(e => e.working != entry.working && dependencies.Contains(e.working) && !string.IsNullOrEmpty(e.group)))
+            {
+                bool expanded = EditorGUILayout.Foldout(_expandedRelated.Contains(related.working), related.group + " / " + Path.GetFileNameWithoutExtension(related.source), true);
+                if (expanded) _expandedRelated.Add(related.working); else _expandedRelated.Remove(related.working);
+                if (expanded)
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) DrawEntry(related, false);
+            }
+        }
+
+        private void DrawEntry(Entry entry, bool includeRelated = true)
         {
             if (string.IsNullOrEmpty(entry.group)) return;
             EditorGUILayout.LabelField(entry.group + " / " + Path.GetFileNameWithoutExtension(entry.source), EditorStyles.boldLabel);
-            EditorGUILayout.SelectableLabel(entry.source, GUILayout.Height(34));
-            EditorGUILayout.HelpBox(entry.connected ? "● 테스트 씬 의존성에 포함된 데이터" : "○ 현재 테스트 씬에 연결되지 않은 데이터: 수정해도 해당 씬에 자동 추가되지 않습니다.", MessageType.Info);
+            if (_showPaths) EditorGUILayout.SelectableLabel(entry.source, GUILayout.Height(34));
+            EditorGUILayout.HelpBox(GroupHelp(entry.group), MessageType.None);
+            if (!string.IsNullOrEmpty(_workspace.scene) && _showSceneTools)
+                EditorGUILayout.HelpBox(entry.connected ? "선택한 테스트 씬에서 사용하는 데이터" : "선택한 테스트 씬에 연결되지 않은 데이터 (편집 가능)", MessageType.Info);
             var working = AssetDatabase.LoadAssetAtPath<ScriptableObject>(entry.working);
             var source = AssetDatabase.LoadAssetAtPath<ScriptableObject>(entry.source);
             if (working == null || source == null) { EditorGUILayout.HelpBox("원본 또는 복사본을 찾을 수 없습니다.", MessageType.Error); return; }
             var serialized = new SerializedObject(working);
             var original = new SerializedObject(source);
+            if (_unitLabels.TryGetValue(entry.source, out string identity)) EditorGUILayout.LabelField(identity, EditorStyles.wordWrappedLabel);
+            EditorGUILayout.LabelField("조정 항목                              작업값 / 원본값", EditorStyles.miniLabel);
             foreach (string path in NumericPaths(working))
             {
                 var property = serialized.FindProperty(path);
                 string label = Describe(serialized, property);
-                EditorGUILayout.LabelField(new GUIContent(label, path), EditorStyles.wordWrappedLabel);
-                EditorGUILayout.PropertyField(property, GUIContent.none);
                 var old = original.FindProperty(path);
-                if (old != null) EditorGUILayout.LabelField("원본: " + Number(old), EditorStyles.miniLabel);
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                {
+                    EditorGUILayout.LabelField(new GUIContent(label, path), EditorStyles.wordWrappedLabel);
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        EditorGUILayout.PropertyField(property, GUIContent.none);
+                        if (old != null) GUILayout.Label("원본 " + Number(old), GUILayout.Width(110));
+                    }
+                }
             }
             if (serialized.ApplyModifiedProperties()) Repaint();
-            if (GUILayout.Button("선택 데이터 변경 내역 확인 / 원본 반영")) Run(() =>
+            if (GUILayout.Button("이 항목 적용 — 실제 게임 데이터에 저장", GUILayout.Height(28))) ConfirmAndPublish(entry);
+            if (includeRelated) DrawRelatedData(entry);
+        }
+
+        private void ConfirmAndPublish(Entry entry)
+        {
+            Run(() =>
             {
                 var changes = GetChanges(entry);
                 if (changes.Count == 0) { EditorUtility.DisplayDialog("원본 반영", "변경된 수치가 없습니다.", "확인"); return; }
                 string description = entry.source + "\n\n" + string.Join("\n", changes) + "\n\n팀 공유 원본을 변경합니다. 팀원과 합의한 값만 반영하세요. 씬·프리팹·ID는 반영하지 않습니다.";
                 if (!EditorUtility.DisplayDialog("선택 데이터만 원본 반영", description, "원본 반영", "취소")) return;
                 Publish(entry);
+                var working = AssetDatabase.LoadAssetAtPath<Object>(entry.working);
+                if (working != null) AssetDatabase.SaveAssetIfDirty(working);
                 WriteManifest(_manifestPath, _workspace);
+                EditorUtility.DisplayDialog("적용 완료", Path.GetFileNameWithoutExtension(entry.source) + "의 수정값을 실제 게임 데이터에 저장했습니다.\n\n해당 원본 데이터를 사용하는 게임을 다시 실행해 확인하세요.\n연결된 스킬 등 다른 항목의 수정값은 각각 적용해야 합니다. 작업용 테스트 씬은 복사본을 사용합니다.", "확인");
+                Repaint();
             });
+        }
+
+        private static string GroupHelp(string group)
+        {
+            switch (group)
+            {
+                case "건물": return "건설 비용과 업그레이드 비용을 먼저 정하세요. 생산 수를 늘리면 한 웨이브의 아군 전체 전투력이 함께 증가합니다. 연결된 유닛 설정은 아래에서 펼칠 수 있습니다.";
+                case "재화": return "분기별 획득 골드가 건설·업그레이드를 얼마나 허용하는지 확인하세요. 시작 재화는 작업용 테스트 씬을 연 상태에서 아래에 표시됩니다.";
+                case "유닛": return "체력·방어·공격뿐 아니라 스킬 주기, 광역 대상 수, 패시브와 유물까지 함께 테스트하세요. 기본 공격 수치만으로 실제 DPS를 판단하지 않습니다.";
+                case "아티팩트": return "등급별 효과와 최대 중첩을 확인하세요. 일반 4~5개와 신화 1개 등 실제 획득 조합의 누적 성장을 다음 분기 난이도와 함께 비교하세요. 이 도구가 성장 목표를 자동 산출하지는 않습니다.";
+                case "웨이브": return "병종 가중치는 고정 생성 수가 아닌 상대 등장 비중입니다. 분기에서 얻은 골드·유물로 성장한 아군을 기준으로 실제 전투를 확인하세요.";
+                case "상점": return "구매 가격·판매 가격·등장 가중치를 조정합니다. 최소 구매가가 최대 구매가보다 크지 않은지 확인하세요.";
+                default: return "작업용 복사본의 수치를 조정합니다. 저장과 실제 데이터 반영은 별개입니다.";
+            }
         }
 
         private void DrawStartingCurrency()
         {
             var scene = SceneManager.GetActiveScene();
-            if (scene.path != _workspace.scene) return;
+            if (string.IsNullOrEmpty(_workspace.scene) || scene.path != _workspace.scene) return;
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("테스트 씬 시작 재화 (원본 반영 대상 아님)", EditorStyles.boldLabel);
             foreach (var wallet in scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<RunCurrencyManager>(true)))
@@ -217,9 +328,21 @@ namespace Game.UI.Editor
             if (!string.IsNullOrEmpty(_manifestPath) && IsWorkspacePath(_manifestPath) && File.Exists(_manifestPath))
             {
                 var candidate = JsonUtility.FromJson<Workspace>(File.ReadAllText(_manifestPath));
-                if (candidate != null && IsWorkspacePath(candidate.scene) && candidate.entries.All(e => IsWorkspacePath(e.working) && IsSourcePath(e.source)))
+                if (candidate != null && (string.IsNullOrEmpty(candidate.scene) || IsWorkspacePath(candidate.scene)) && candidate.entries != null && candidate.entries.All(e => IsWorkspacePath(e.working) && IsSourcePath(e.source)))
                 {
                     _workspace = candidate;
+                    _unitLabels.Clear(); _unitBuckets.Clear();
+                    foreach (var entry in candidate.entries.Where(e => e.type == "UnitData"))
+                    {
+                        var unit = AssetDatabase.LoadAssetAtPath<Units.UnitDatas.UnitData>(entry.working);
+                        if (unit == null) continue;
+                        string bucket = UnitBucket(unit);
+                        string type = unit.Team.ToString() == "Ally" ? unit.GetAllyType().ToString() : unit.GetEnemyType().ToString();
+                        _unitBuckets[entry.source] = bucket;
+                        _unitLabels[entry.source] = bucket + " / " + unit.UnitName + " / " + type;
+                    }
+                    _unitFilters = new[] { "전체" }.Concat(_unitBuckets.Values.Distinct().OrderBy(v => v)).ToArray();
+                    _unitFilter = 0;
                     if (_selected < 0 || _selected >= candidate.entries.Count || string.IsNullOrEmpty(candidate.entries[_selected].group)) _selected = candidate.entries.FindIndex(e => !string.IsNullOrEmpty(e.group));
                 }
             }
@@ -243,21 +366,26 @@ namespace Game.UI.Editor
         public static bool IsWorkspacePath(string path) => !string.IsNullOrEmpty(path) && path.StartsWith(Root + "/", StringComparison.Ordinal) && !path.Contains("..") && !path.Contains('\\');
         private static bool IsSourcePath(string path) => !string.IsNullOrEmpty(path) && path.StartsWith("Assets/", StringComparison.Ordinal) && !path.StartsWith("Assets/BalanceWorkspace/", StringComparison.Ordinal) && !path.Contains("..") && !path.Contains('\\');
 
-        public static string CreateWorkspace()
+        public static string CreateWorkspace() => CreateWorkspace(null);
+
+        public static string CreateWorkspace(string sourceScene)
         {
-            try { return CreateWorkspaceCore(); }
+            try { return CreateWorkspaceCore(sourceScene); }
             finally { EditorUtility.ClearProgressBar(); }
         }
 
-        private static string CreateWorkspaceCore()
+        private static string CreateWorkspaceCore(string sourceScene)
         {
             if (Busy) throw new InvalidOperationException("플레이/컴파일 종료 후 생성하세요.");
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(SourceScene) == null) throw new FileNotFoundException(SourceScene);
-            var connected = new HashSet<string>(AssetDatabase.GetDependencies(SourceScene, true));
+            bool withScene = !string.IsNullOrEmpty(sourceScene);
+            if (withScene && !IsSourcePath(sourceScene)) throw new InvalidOperationException("Assets 내부의 원본 씬을 선택하세요. 작업용 복사본을 다시 복사할 수 없습니다.");
+            if (withScene && AssetDatabase.LoadAssetAtPath<SceneAsset>(sourceScene) == null) throw new FileNotFoundException(sourceScene);
+            var connected = withScene ? new HashSet<string>(AssetDatabase.GetDependencies(sourceScene, true)) : new HashSet<string>();
             var candidates = AssetDatabase.FindAssets("t:ScriptableObject", new[] { "Assets" }).Select(AssetDatabase.GUIDToAssetPath)
                 .Where(IsSourcePath).Where(p => !string.IsNullOrEmpty(Group(AssetDatabase.LoadAssetAtPath<ScriptableObject>(p)?.GetType().Name))).ToArray();
-            var paths = AssetDatabase.GetDependencies(candidates.Concat(new[] { SourceScene }).ToArray(), true)
-                .Where(IsSourcePath).Where(p => p == SourceScene || p.EndsWith(".prefab", StringComparison.Ordinal) || IsFirstPartyData(p)).Distinct().OrderBy(p => p).ToArray();
+            var roots = withScene ? candidates.Concat(new[] { sourceScene }).ToArray() : candidates;
+            var paths = AssetDatabase.GetDependencies(roots, true)
+                .Where(IsSourcePath).Where(p => (withScene && (p == sourceScene || p.EndsWith(".prefab", StringComparison.Ordinal))) || IsFirstPartyData(p)).Distinct().OrderBy(p => p).ToArray();
             // Preflight all inputs before writing anything. Only text-serialized copies are rewritten;
             // GUID substitution preserves file IDs, prefab inheritance and nested references exactly.
             foreach (string path in paths)
@@ -280,7 +408,7 @@ namespace Game.UI.Editor
                 guidMap.Add(guid, AssetDatabase.AssetPathToGUID(working));
                 var data = AssetDatabase.LoadAssetAtPath<ScriptableObject>(source);
                 workspace.entries.Add(new Entry { source = source, working = working, hash = Hash(source), type = data?.GetType().Name, group = Group(data?.GetType().Name), connected = connected.Contains(source) });
-                if (source == SourceScene) workspace.scene = working;
+                if (source == sourceScene) workspace.scene = working;
             }
             foreach (var entry in workspace.entries)
             {
@@ -309,7 +437,7 @@ namespace Game.UI.Editor
         {
             switch (type)
             {
-                case "UnitData": case "BasicAttackData": case "ActiveSkillData": return "유닛";
+                case "UnitData": case "BasicAttackData": case "ActiveSkillData": case "PassiveSkillData": return "유닛";
                 case "BuildingData": return "건물";
                 case "WaveSO": return "웨이브";
                 case "WaveRewardTable": return "재화";
@@ -334,6 +462,7 @@ namespace Game.UI.Editor
             switch (type)
             {
                 case "UnitData": return normalized == "_stats[]._value";
+                case "PassiveSkillData": return normalized == "_tickInterval" || normalized == "_conditionCheckInterval";
                 case "BuildingData": return new[] { "buildCost[].amount", "production.amount", "spawn.countPerWave", "spawn.maxAlive", "requiredCoreLevel", "upgrades[].requiredCoreLevel", "upgrades[].cost[].amount" }.Contains(normalized);
                 case "WaveSO": return normalized.StartsWith("Weights.", StringComparison.Ordinal);
                 case "WaveRewardTable": return normalized == "_quarters[]._waves[]._rewards[]._amount";
@@ -363,7 +492,30 @@ namespace Game.UI.Editor
                 var stat = owner.FindProperty(path.Replace("._value", "._statType"));
                 if (stat != null && stat.enumValueIndex >= 0 && stat.enumValueIndex < stat.enumDisplayNames.Length) return Korean(stat.enumNames[stat.enumValueIndex]);
             }
-            string parent = path.Contains(".") ? path.Substring(0, path.LastIndexOf('.')).Replace(".Array.data", "") + " / " : "";
+            string parent = "";
+            if (path.Contains("."))
+            {
+                string parentPath = path.Substring(0, path.LastIndexOf('.'));
+                string readable = Regex.Replace(parentPath, @"\.Array\.data\[(\d+)\]", m => " (" + (int.Parse(m.Groups[1].Value) + 1) + ")");
+                parent = string.Join(" / ", readable.Split('.').Select(part =>
+                {
+                    int suffix = part.IndexOf(" (", StringComparison.Ordinal);
+                    return suffix < 0 ? Korean(part) : Korean(part.Substring(0, suffix)) + part.Substring(suffix);
+                })) + " / ";
+                var context = owner.FindProperty(parentPath);
+                if (context != null)
+                {
+                    foreach (string field in new[] { "_statType", "_rarity", "_operation", "_currency", "currency" })
+                    {
+                        var sibling = context.FindPropertyRelative(field);
+                        if (sibling == null) continue;
+                        if (sibling.propertyType == SerializedPropertyType.Enum && sibling.enumValueIndex >= 0 && sibling.enumValueIndex < sibling.enumNames.Length)
+                            parent += Korean(sibling.enumNames[sibling.enumValueIndex]) + " / ";
+                        else if (sibling.propertyType == SerializedPropertyType.ObjectReference && sibling.objectReferenceValue != null)
+                            parent += sibling.objectReferenceValue.name + " / ";
+                    }
+                }
+            }
             return parent + Korean(property.name);
         }
 
@@ -372,6 +524,20 @@ namespace Game.UI.Editor
             switch (name.TrimStart('_'))
             {
                 case "MaxHp": return "최대 체력";
+                case "buildCost": return "건설 비용";
+                case "upgrades": return "업그레이드";
+                case "cost": return "비용";
+                case "production": return "자원 생산";
+                case "spawn": return "유닛 생산";
+                case "unitStatEffects": return "유닛 능력치 효과";
+                case "currencyEffects": return "재화 효과";
+                case "consumableSlotEffects": return "소모품 슬롯 효과";
+                case "raritySettings": return "등급별 설정";
+                case "Weights": return "병종 등장 비중";
+                case "Common": return "일반";
+                case "Rare": return "희귀";
+                case "Legendary": return "전설";
+                case "Mythic": return "신화";
                 case "AttackPower": return "공격력";
                 case "Defense": return "방어력";
                 case "MoveSpeed": return "이동 속도";
@@ -384,6 +550,8 @@ namespace Game.UI.Editor
                 case "basicAttackRange": case "skillRange": return "사거리";
                 case "basicAttackDelay": return "일반 공격 지연";
                 case "skillCooldown": return "스킬 재사용 시간";
+                case "tickInterval": return "패시브 주기 (초 / 주기형 트리거에서 사용)";
+                case "conditionCheckInterval": return "패시브 조건 검사 간격 (초)";
                 case "castTime": return "시전 시간";
                 case "maxTargetCount": return "최대 대상 수";
                 case "maxDamageableCount": case "maxEffectTargetCount": return "최대 효과 대상 수";
@@ -468,7 +636,7 @@ namespace Game.UI.Editor
         public static List<string> Validate(Workspace workspace)
         {
             var issues = new List<string>();
-            if (workspace == null || !IsWorkspacePath(workspace.scene)) { issues.Add("작업 공간이 유효하지 않습니다."); return issues; }
+            if (workspace == null || workspace.entries == null || (!string.IsNullOrEmpty(workspace.scene) && !IsWorkspacePath(workspace.scene))) { issues.Add("작업 공간이 유효하지 않습니다."); return issues; }
             var originals = new HashSet<string>(workspace.entries.Select(e => AssetDatabase.AssetPathToGUID(e.source)));
             foreach (var entry in workspace.entries)
             {
@@ -488,6 +656,8 @@ namespace Game.UI.Editor
                         if (double.IsNaN(value) || double.IsInfinity(value) || (!signedEffect && value < 0)) issues.Add(data.name + ": 수치 범위 오류 " + path);
                     }
                     if (data is ArtifactRewardTable rewards && !rewards.IsValid) issues.Add(data.name + ": 유물 후보/가중치 오류");
+                    if (entry.type == "PassiveSkillData" && (serialized.FindProperty("_tickInterval").floatValue < 0.1f || serialized.FindProperty("_conditionCheckInterval").floatValue < 0.05f))
+                        issues.Add(data.name + ": 패시브 주기는 0.1초, 조건 검사 간격은 0.05초 이상이어야 합니다.");
                     if (data is ArtifactData artifact && artifact.MaxStacks < 1) issues.Add(data.name + ": 최대 중첩은 1 이상이어야 합니다.");
                     if (data is Units.UnitDatas.UnitData unit)
                         foreach (var stat in unit.Stats)

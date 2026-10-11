@@ -6,6 +6,8 @@ public class ShopSaveData
 {
     // 상점 상품 추첨을 완료했는지 나타냅니다. 상품이 없어도 true이면 재추첨하지 않습니다.
     public bool HasStock;
+    // 후보 생성 분기. 0은 미생성 또는 분기 정보가 없는 이전 저장 데이터입니다.
+    public int StockQuarter;
     // 판매 아티팩트 목록입니다. 인덱스가 상품 슬롯 번호이며 구매한 상품도 포함합니다.
     public List<ShopPurchaseSaveEntry> Artifacts = new();
     // 판매 소모성 아이템 목록입니다. 인덱스가 상품 슬롯 번호이며 구매한 상품도 포함합니다.

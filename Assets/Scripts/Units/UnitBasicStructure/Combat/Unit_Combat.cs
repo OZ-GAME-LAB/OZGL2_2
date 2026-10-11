@@ -45,6 +45,18 @@ namespace Units
         // Executor
         // ============================================================
 
+        public event Action<SkillFXRequest> FXRequested;
+
+        private void DispatchFX(SkillFXRequest request)
+        {
+            if (FXRequested == null) return;
+            foreach (Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
+            {
+                try { listener(request); }
+                catch (Exception exception) { Debug.LogException(exception); }
+            }
+        }
+
         private BasicAttackExecutor _basicAttackExecutor;
 
         private ActiveSkillExecutor _activeSkillExecutor;
@@ -215,6 +227,7 @@ namespace Units
 
             UpdateTimers();
 
+            _basicAttackExecutor?.Tick(Time.deltaTime);
             _activeSkillExecutor?.Tick(Time.deltaTime);
         }
 
@@ -268,6 +281,8 @@ namespace Units
         private void InitializeCombatModules()
         {
             _targetResolver = new TargetResolver();
+            if (_basicAttackExecutor != null) _basicAttackExecutor.FXRequested -= DispatchFX;
+            foreach (var skill in _skills) skill.Executor.FXRequested -= DispatchFX;
             _skills.Clear();
             _selectedSkill = null;
             var ids = new HashSet<string>();
@@ -276,7 +291,9 @@ namespace Units
                 if (entry == null || entry.Skill == null) continue;
                 if (string.IsNullOrWhiteSpace(entry.Id) || !ids.Add(entry.Id))
                 { Debug.LogError("[Unit_Combat] 스킬 ID가 없거나 중복되었습니다.", this); continue; }
-                _skills.Add(new RuntimeActiveSkill(_core, entry, _targetResolver));
+                var runtime = new RuntimeActiveSkill(_core, entry, _targetResolver);
+                runtime.Executor.FXRequested += DispatchFX;
+                _skills.Add(runtime);
             }
             _activeSelector = new ActiveSkillSelector(_core, _targetResolver);
 
@@ -287,6 +304,7 @@ namespace Units
                 _basicAttackData,
                 _targetResolver
             ) : null;
+            if (_basicAttackExecutor != null) _basicAttackExecutor.FXRequested += DispatchFX;
 
             _activeSkillExecutor = null;
         }
@@ -386,7 +404,7 @@ namespace Units
         public bool TryActiveSkill(ICombatTarget currentTarget)
         { return TrySelectActiveSkill(currentTarget, out var decision) && TryActiveSkill(decision); }
 
-        public bool TryActiveSkill(UnitDecision decision)
+        public bool TryActiveSkill(UnitDecision decision, Action onStarting = null)
         {
             if (!CanUseActiveSkill || decision.Action != UnitAIActionType.ActiveSkill || decision.PhaseVersion != _core.HeroPhaseVersion)
                 return false;
@@ -394,7 +412,12 @@ namespace Units
             if (decision.Target.Target != null && !decision.Target.IsTargetable) return false;
             var runtime = _skills.Find(x => x.Entry.Id == decision.SkillId);
             if (runtime == null || runtime.Cooldown > 0 || runtime.Retry > 0) return false;
-            if (!_activeSelector.Preview(runtime, decision.Target.Target, out var initial, out _, out _)) return false;
+            if (!_activeSelector.Preview(runtime, decision.Target.Target, out var initial, out _, out _))
+            {
+                // 선택 직후 대상/조건이 바뀐 실패도 기존 행동을 유지하며 재시도를 늦춘다.
+                runtime.Retry = 0.25f;
+                return false;
+            }
             _selectedSkill = runtime;
             _activeSkillExecutor = runtime.Executor;
 
@@ -440,6 +463,10 @@ namespace Units
                 StartSkillCooldown();
 
                 started = true;
+
+                // AI는 준비 성공 이후, 실제 Action/동기 완료 이벤트 이전에 전환한다.
+                // 돌진이 시작된 뒤 Move.Exit이 속도를 지우는 순서도 방지한다.
+                onStarting?.Invoke();
 
                 _activeSkillExecutor.Execute(initial, result =>
                 {

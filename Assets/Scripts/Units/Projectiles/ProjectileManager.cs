@@ -89,7 +89,10 @@ namespace Units
                 return false;
             }
 
-            var prefab = _projectilePrefab != null ? _projectilePrefab : GetFallbackPrefab();
+            // 공격별 전용 프리팹을 우선하고, 미지정이면 기존 공용·기본 투사체를 사용한다.
+            var prefab = request.ProjectilePrefab != null
+                ? request.ProjectilePrefab
+                : _projectilePrefab != null ? _projectilePrefab : GetFallbackPrefab();
 
             var projectile = Instantiate(
                 prefab,
@@ -114,6 +117,17 @@ namespace Units
         // ============================================================
         // Projectile Return
         // ============================================================
+
+        // 전투 초기화에서는 먼저 비행을 종료하여 지연 명중과 부착 FX가 남지 않게 한다.
+        public void Clear()
+        {
+            foreach (var projectile in GetComponentsInChildren<Projectile_Controller>(true))
+            {
+                if (projectile == _fallbackPrefab) continue;
+                projectile.gameObject.SetActive(false);
+                Destroy(projectile.gameObject);
+            }
+        }
 
         public void Release(Projectile_Controller projectile)
         {

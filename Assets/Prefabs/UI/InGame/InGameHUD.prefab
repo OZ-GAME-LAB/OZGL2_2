@@ -328,7 +328,9 @@ MonoBehaviour:
   _goldText: {fileID: 6244198778109744145}
   _waveText: {fileID: 4340488837521494989}
   _phaseText: {fileID: 3622753303593654919}
+  _changeViewText: {fileID: 0}
   _waveStartButton: {fileID: 5567631557168596815}
+  _changeViewButton: {fileID: 0}
 --- !u!114 &4748922542669062634
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2124,7 +2126,6 @@ GameObject:
   - component: {fileID: 4315537876398169958}
   - component: {fileID: 3027025451838478741}
   - component: {fileID: 7734496859787759113}
-  - component: {fileID: 1081974221646031638}
   m_Layer: 0
   m_Name: Build
   m_TagString: Untagged
@@ -2234,22 +2235,6 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &1081974221646031638
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7636412134767272844}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 19b1348c7ff88174f8bee93c5d0c5edb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.BuildingShortcut
-  _button: {fileID: 7734496859787759113}
-  _label: {fileID: 0}
-  _emptyIcon: {fileID: 0}
-  _selectFirstEmptySlot: 1
 --- !u!1 &8170081858266927756
 GameObject:
   m_ObjectHideFlags: 0

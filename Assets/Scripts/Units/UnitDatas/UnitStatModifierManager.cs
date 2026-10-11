@@ -9,6 +9,14 @@ namespace Units
     public class UnitStatModifierManager : MonoBehaviour, IUnitStatModifierRegister
     {
         // ============================================================
+        // References
+        // ============================================================
+
+        [SerializeField]
+        private EffectManager _effectManager;
+
+
+        // ============================================================
         // Data
         // ============================================================
 
@@ -127,6 +135,74 @@ namespace Units
 
 
         // ============================================================
+        // Spawn Artifact Methods
+        // ============================================================
+
+        // 진영별 스폰 시작 시 한 번 호출하여 이전 아티펙트분만 최신화한다.
+        public bool RefreshAllyArtifactEffects()
+        {
+            Initialize();
+
+            if (!TryResolveEffectManager())
+                return false;
+
+            // 제거 전에 현재 목록을 확보한다. 현재 보유하지 않은 출처도 아래에서 정리한다.
+            var statModifiers = new List<AllyStatModifier>();
+            var passiveModifiers = new List<AllyPassiveSkillModifier>();
+
+            foreach (AllyStatModifier modifier in _effectManager.AllyModifiers)
+            {
+                if (modifier.Source is ArtifactInstance)
+                    statModifiers.Add(modifier);
+            }
+
+            foreach (AllyPassiveSkillModifier modifier in _effectManager.AllyPassiveSkillModifiers)
+            {
+                if (modifier.Source is ArtifactInstance)
+                    passiveModifiers.Add(modifier);
+            }
+
+            _organizer.RemoveAllyArtifactModifiers();
+            _passiveController.RemoveAllyArtifactPassiveSkills();
+            _organizer.AddAllyModifiers(statModifiers);
+            _passiveController.AddAllyPassiveSkills(passiveModifiers);
+            return true;
+        }
+
+
+        // 진영별 스폰 시작 시 한 번 호출하여 이전 아티펙트분만 최신화한다.
+        public bool RefreshEnemyArtifactEffects()
+        {
+            Initialize();
+
+            if (!TryResolveEffectManager())
+                return false;
+
+            // 제거 전에 현재 목록을 확보한다. 현재 보유하지 않은 출처도 아래에서 정리한다.
+            var statModifiers = new List<EnemyStatModifier>();
+            var passiveModifiers = new List<EnemyPassiveSkillModifier>();
+
+            foreach (EnemyStatModifier modifier in _effectManager.EnemyModifiers)
+            {
+                if (modifier.Source is ArtifactInstance)
+                    statModifiers.Add(modifier);
+            }
+
+            foreach (EnemyPassiveSkillModifier modifier in _effectManager.EnemyPassiveSkillModifiers)
+            {
+                if (modifier.Source is ArtifactInstance)
+                    passiveModifiers.Add(modifier);
+            }
+
+            _organizer.RemoveEnemyArtifactModifiers();
+            _passiveController.RemoveEnemyArtifactPassiveSkills();
+            _organizer.AddEnemyModifiers(statModifiers);
+            _passiveController.AddEnemyPassiveSkills(passiveModifiers);
+            return true;
+        }
+
+
+        // ============================================================
         // Spawn Passive Methods
         // ============================================================
 
@@ -237,6 +313,30 @@ namespace Units
         // ============================================================
         // Private Methods
         // ============================================================
+
+        private bool TryResolveEffectManager()
+        {
+            // 기존 씬도 동작하도록 같은 씬의 참조를 최초 사용 시 찾고 재사용한다.
+            if (_effectManager == null)
+            {
+                foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+                {
+                    _effectManager = root.GetComponentInChildren<EffectManager>(true);
+                    if (_effectManager != null)
+                        break;
+                }
+            }
+
+            if (_effectManager != null)
+                return true;
+
+            Debug.LogError(
+                "[UnitStatModifierManager] EffectManager가 없어 아티펙트 효과를 최신화하지 못했습니다.",
+                this
+            );
+            return false;
+        }
+
 
         private void Initialize()
         {

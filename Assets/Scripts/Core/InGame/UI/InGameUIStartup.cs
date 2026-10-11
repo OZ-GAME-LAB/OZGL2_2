@@ -1,6 +1,8 @@
+using Game.Cameras;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
+using Units;
 
 namespace Game.UI.InGame
 {
@@ -16,9 +18,11 @@ namespace Game.UI.InGame
         [SerializeField] private RunDecisionView _runDecisionUI;
         [SerializeField] private SettlementView _settlementUI;
         [SerializeField] private ShopView _shopView;
+        [SerializeField] private ArtifactInventoryPopupView _artifactInventoryView;
+        [SerializeField] private ConsumableItemView _consumableItemView;
+        [SerializeField] private ConsumableItemActionButton _consumableUsePopup;
         [SerializeField] private BuildingUIPresenter _buildingUI;
         [SerializeField] private BuildingUIConnection _buildingUIConnection;
-        [SerializeField] private BuildingShortcut[] _buildingShortcuts;
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
@@ -28,24 +32,32 @@ namespace Game.UI.InGame
         public IShopUI ShopUI => _shopView;
         public bool IsReady { get; private set; }
 
+        public void InitializeArtifactInventory(IArtifactReader artifactReader)
+        {
+            if (_artifactInventoryView != null)
+                _artifactInventoryView.Initialize(artifactReader);
+        }
+
         // 비활성 UI 루트도 연결한다. 게임 시작과 루트 활성화는 Bootstrap이 담당한다.
         public bool Initialize(RunCurrencyManager wallet, GameFlowController flow, WaveController waves,
-            BuildingBuildController controller, BuildingCoreProgress core, BuildingSlot[] slots)
+            BuildingBuildController controller, BuildingCoreProgress core, BuildingSlot[] slots,
+            InGameCameraController cameraController, ConsumableItemManager consumableItems, ISpawnManager spawnManager = null)
         {
             IsReady = false;
             if (_uiManager == null || _hudView == null || _hudPresenter == null ||
                 _artifactSelectionUI == null || _continueUI == null || _runDecisionUI == null ||
-                _settlementUI == null || _shopView == null || _buildingUI == null || _buildingUIConnection == null)
+                _settlementUI == null || _shopView == null || _buildingUI == null || _buildingUIConnection == null || consumableItems == null)
             {
                 Debug.LogError("[InGameUIStartup] UI 연결 참조를 확인해주세요.", this);
                 return false;
             }
             if (!_uiManager.InitializeScreens()) return false;
             _shopView.Initialize(wallet);
-            _hudView.Initialize();
+            _hudView.Initialize(cameraController);
             _hudPresenter.Initialize(_hudView, wallet, flow, waves);
+            _consumableItemView.Initialize(consumableItems, consumableItems, consumableItems, _consumableUsePopup);
             flow.InitializeUI(_continueUI, _runDecisionUI);
-            _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI, _buildingShortcuts);
+            _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI, spawnManager);
             if (!_buildingUIConnection.IsReady) return false;
             IsReady = true;
             _uiManager.ShowHud();

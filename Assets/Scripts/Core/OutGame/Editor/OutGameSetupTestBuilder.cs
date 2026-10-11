@@ -64,7 +64,7 @@ public static class OutGameSetupTestBuilder
         systems.transform.SetParent(root.transform, false);
         PersistentCurrencyManager wallet = systems.AddComponent<PersistentCurrencyManager>();
         SaveManager saveManager = systems.AddComponent<SaveManager>();
-        PersistentSaveCoordinator persistentSaveCoordinator = systems.AddComponent<PersistentSaveCoordinator>();
+        OutGameSaveCoordinator persistentSaveCoordinator = systems.AddComponent<OutGameSaveCoordinator>();
         OutGameAltarController altar = systems.AddComponent<OutGameAltarController>();
         OutGameTraitController trait = systems.AddComponent<OutGameTraitController>();
         OutGameTotemController totem = systems.AddComponent<OutGameTotemController>();

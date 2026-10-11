@@ -164,6 +164,20 @@ namespace Units
         }
 
 
+        // 해당 진영의 아티펙트 패시브만 제거한다. 반대 진영과 다른 출처는 유지한다.
+        public void RemoveAllyArtifactPassiveSkills()
+        {
+            _allyModifiers.RemoveAll(modifier => modifier.Source is ArtifactInstance);
+        }
+
+
+        // 해당 진영의 아티펙트 패시브만 제거한다. 반대 진영과 다른 출처는 유지한다.
+        public void RemoveEnemyArtifactPassiveSkills()
+        {
+            _enemyModifiers.RemoveAll(modifier => modifier.Source is ArtifactInstance);
+        }
+
+
         public void RemoveBySource(object source)
         {
             _allyModifiers.RemoveAll(modifier => Equals(modifier.Source, source));

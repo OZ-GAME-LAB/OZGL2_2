@@ -761,6 +761,9 @@ namespace Units
             }
 
 
+            // 전투 시작 중복 방어를 통과한 뒤에만 VFX 보관 세대를 진행한다.
+            Units.FX.VFXManager.Instance?.BeginGeneration();
+
             _battleStarted =
                 true;
 
@@ -931,6 +934,9 @@ namespace Units
 
         public void ClearRuntime()
         {
+            // 투사체 종료 통지가 끝난 뒤 독립 연출까지 정리한다.
+            ProjectileManager.Instance?.Clear();
+
             ClearGroups(
                 _allyGroups
             );
@@ -948,6 +954,12 @@ namespace Units
                 _enemyUnits
             );
 
+
+            // 사망 통지 후 Runtime 목록에서 빠진 연출 중 유닛도 회수한다.
+            foreach (var member in FindObjectsByType<UnitPoolMember>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (member.IsLeased && member.RuntimeManager == this)
+                    member.GetComponent<Unit_Core>()?.ReturnToPool();
 
             _engagements.Clear();
 
@@ -972,6 +984,9 @@ namespace Units
 
 
             ResetGroupIds();
+            // 전투 사이에는 보관 풀을 유지하고, 오래 미사용한 인스턴스만 다음 세대에 정리한다.
+            Units.FX.VFXManager.Instance?.Clear(false);
+            Units.FX.SFXManager.Instance?.Clear();
         }
 
 
@@ -1030,9 +1045,7 @@ namespace Units
                     continue;
 
 
-                group.RemoveMember(
-                    unit
-                );
+                unit.Core.ReturnToPool();
             }
         }
 
@@ -1064,9 +1077,7 @@ namespace Units
                 );
 
 
-                Destroy(
-                    unit.gameObject
-                );
+                unit.Core.ReturnToPool();
             }
         }
     }

@@ -10,6 +10,12 @@ public interface ISaveDataProvider<T> where T : class
     void RestoreSaveData(T data);
 }
 
+public interface IRunCheckpointWriter
+{
+    bool TrySave(out string error);
+    bool TryDelete(out string error);
+}
+
 public class SaveManager : MonoBehaviour
 {
     private string _directory;
@@ -18,6 +24,10 @@ public class SaveManager : MonoBehaviour
     public string DirectoryPath => string.IsNullOrWhiteSpace(_directory)
         ? Path.Combine(Application.persistentDataPath, "Saves") : _directory;
 
+    public bool HasSaveFile<T>(SaveKey<T> key) where T : class
+    {
+        return File.Exists(GetFilePath(key));
+    }
     // 테스트에서는 실제 플레이어 저장소와 분리된 디렉터리를 주입합니다.
     public void ConfigureDirectory(string absoluteDirectory)
     {
@@ -31,6 +41,49 @@ public class SaveManager : MonoBehaviour
     {
         if (key == null) throw new ArgumentNullException(nameof(key));
         return Path.Combine(DirectoryPath, key.Id + ".json");
+    }
+
+    // 복원을 생략한 영역이 있는 파일은 첫 덮어쓰기 전에 원본 그대로 보관합니다.
+    public bool TryBackup<T>(SaveKey<T> key, out string backupPath, out string error) where T : class
+    {
+        backupPath = null;
+        error = null;
+        try
+        {
+            string path = GetFilePath(key);
+            if (!File.Exists(path)) return true;
+
+            string timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmssfff");
+            string destination = path + "." + timestamp + "." + Guid.NewGuid().ToString("N") + ".bak";
+            File.Copy(path, destination, false);
+            backupPath = destination;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return false;
+        }
+    }
+
+    // 이미 삭제된 런도 성공으로 처리합니다.
+    public bool TryDelete<T>(SaveKey<T> key, out string error) where T : class
+    {
+        error = null;
+        try
+        {
+            File.Delete(GetFilePath(key));
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return true;
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            return false;
+        }
     }
 
     // true는 임시 메모리 갱신이 아니라 JSON 파일 교체까지 성공했다는 뜻입니다.

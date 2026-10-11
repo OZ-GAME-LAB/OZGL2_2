@@ -14,11 +14,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.BasicAttackData
   _basicAttackRange: 2
   _basicAttackDelay: 1
+  _damageType: 0
   _executionType: 0
   _areaType: 0
   _maxTargetCount: 1
+  _maxDamageableCount: 1
   _areaRadius: 1
   _areaAngle: 90
   _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
+  _fxEntries:
+  - _key: VFX_Ally_Slash_BasicAttack
+    _hook: 1
+    _operation: 5
+    _endPolicy: 2
+    _kind: 0
+    _attachment: 2
+    _followDirection: 1
+  - _key: SFX_Ally_Slash_BasicAttack
+    _hook: 1
+    _operation: 5
+    _endPolicy: 2
+    _kind: 1
+    _attachment: 2
+    _followDirection: 1
   _attackFXType: 0
-  _hitFXType: 0
+  _hitFXType: 2

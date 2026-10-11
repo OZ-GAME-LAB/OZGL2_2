@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>토템 선택 레벨과 테스트용 누적 보너스를 관리합니다.</summary>
-public class OutGameTotemController : MonoBehaviour, ITotemSelection
+public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataProvider<TotemRunSaveData>
 {
     [SerializeField] private List<TotemData> _totemDatas = new List<TotemData>();
 
@@ -82,6 +82,57 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection
             result.Add(new TotemLevelEntry { Id = _levels[i].Id, Level = _levels[i].Level });
         }
         return result;
+    }
+
+    // 레벨 0을 포함한 전체 선택 상태를 복사합니다.
+    public TotemRunSaveData CaptureSaveData()
+    {
+        if (_data.Count == 0)
+            throw new InvalidOperationException("토템 목록 초기화 후 저장하세요.");
+
+        return new TotemRunSaveData
+        {
+            Totems = CaptureLevels()
+        };
+    }
+
+    public void RestoreSaveData(TotemRunSaveData data)
+    {
+        if (_data.Count == 0)
+            throw new InvalidOperationException("토템 목록 초기화 후 복원하세요.");
+        if (data == null)
+            throw new ArgumentNullException(nameof(data));
+        if (data.Totems == null)
+            throw new ArgumentException("토템 저장 목록이 없습니다.", nameof(data));
+
+        // 모두 검증한 뒤 적용합니다. 저장에 없는 신규 토템은 레벨 0으로 둡니다.
+        int[] restoredLevels = new int[_levels.Count];
+        var seen = new HashSet<TotemId>();
+        foreach (TotemLevelEntry entry in data.Totems)
+        {
+            if (entry == null || entry.Id == TotemId.None || !seen.Add(entry.Id))
+                throw new ArgumentException("토템 저장 항목의 ID와 중복을 확인하세요.", nameof(data));
+
+            int index = FindIndex(entry.Id);
+            if (index < 0)
+                throw new ArgumentException("저장된 토템을 목록에서 찾을 수 없습니다.", nameof(data));
+
+            TotemData totem = _data[index];
+            int maxLevel = totem.SelectionMode == TotemSelectionMode.Toggle ? 1 : totem.MaxLevel;
+            if (entry.Level < 0 || entry.Level > maxLevel)
+                throw new ArgumentException("저장된 토템 레벨이 허용 범위를 벗어났습니다.", nameof(data));
+
+            restoredLevels[index] = entry.Level;
+        }
+
+        bool changed = false;
+        for (int i = 0; i < _levels.Count; i++)
+        {
+            if (_levels[i].Level != restoredLevels[i]) changed = true;
+            _levels[i].Level = restoredLevels[i];
+        }
+
+        if (changed) Changed?.Invoke();
     }
 
     private int FindIndex(TotemId id)

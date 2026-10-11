@@ -4,6 +4,7 @@ using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
@@ -14,8 +15,9 @@ namespace Game.UI.InGame
         [SerializeField] private TMP_Text _goldText;
         [SerializeField] private ShopItemCardView[] _artifactCards;
         [SerializeField] private ShopItemCardView[] _consumableCards;
+        [SerializeField] private ArtifactPopupView _artifactPopup;
         [SerializeField] private TMP_Text _feedbackText;
-        [SerializeField] private UnityEngine.UI.Button _leaveButton;
+        [SerializeField] private Button _leaveButton;
 
         public bool IsPending => _pending != null;
 
@@ -37,7 +39,7 @@ namespace Game.UI.InGame
             if (shop == null || !shop.IsInitialized || _wallet == null || !isActiveAndEnabled ||
                 _screen == null || _screen.Manager == null || _goldText == null ||
                 _artifactCards == null || _consumableCards == null ||
-                _feedbackText == null || _leaveButton == null)
+                _feedbackText == null || _leaveButton == null || _artifactPopup == null)
                 throw new InvalidOperationException("상점 UI와 시스템 참조를 먼저 연결해주세요.");
 
             var completion = new UniTaskCompletionSource();
@@ -108,14 +110,11 @@ namespace Game.UI.InGame
                 }
                 // 현재 상점의 슬롯을 그대로 전달해야 ShopManager의 거래 검증을 통과한다.
                 ShopArtifactSlot slot = _shop.PurchaseSlots[i];
-                ArtifactData item = slot.Artifact;
-                _artifactCards[i].ShowItem(
-                    item.Icon, 
-                    item.DisplayName, 
-                    item.Description,
+                _artifactCards[i].Bind(
+                    slot.Artifact,
                     FormatPrice(slot.Currency, slot.Price), 
                     slot.IsPurchased, 
-                    () => PurchaseArtifact(slot));
+                    () => PurchaseArtifact(slot), OpenArtifact);
             }
             for (int i = 0; i < _consumableCards.Length; i++)
             {
@@ -151,6 +150,15 @@ namespace Game.UI.InGame
             _isBuying = true;
             try { ShowPurchaseResult(_shop.TryPurchaseConsumable(slot)); }
             finally { _isBuying = false; Refresh(); }
+        }
+
+        private void OpenArtifact(ArtifactData artifact, Vector2 screenPosition)
+        {
+            if (!isActiveAndEnabled || !IsPending || _pending.Task.Status != UniTaskStatus.Pending ||
+                _isBuying || artifact == null || _artifactPopup == null || _screen == null ||
+                !_screen.IsVisible || _screen.Manager == null || _screen.Manager.TopPopup != _screen) return;
+            if (!_artifactPopup.Open(artifact, screenPosition))
+                _feedbackText.text = "유물 정보를 열지 못했습니다.";
         }
         /// <summary> 현재 상태가 구매할 수 있는 상태인지, 구매할 재화가 있는지 확인</summary>
         private bool CanPurchase(CurrencyType currency, int price)

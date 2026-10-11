@@ -32,6 +32,8 @@ namespace Units
 
         public bool IsFlying => _isFlying;
 
+        public Vector2 FlightDirection => _direction;
+
 
         // ============================================================
         // Initialize
@@ -59,8 +61,12 @@ namespace Units
 
             _direction = offset.sqrMagnitude > 0f ? offset.normalized : Vector2.right;
 
+            // 프리팹의 +X 방향을 발사 방향에 맞추고, 비행 FX를 연결하기 전에 회전을 확정한다.
+            transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(_direction.y, _direction.x) * Mathf.Rad2Deg);
+
             _isFlying = true;
 
+            _request.Flight?.BindFX(transform, _direction);
             _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Flight, transform.position);
         }
 
@@ -174,7 +180,7 @@ namespace Units
 
             try
             {
-                _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Collision, position);
+                _request.Flight?.NotifyFX(Units.Skills.SkillFXHook.Collision, position, new CombatTargetSnapshot(target));
 
                 if (_request.Flight == null || _request.Flight.Ended)
                     return;

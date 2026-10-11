@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 
 
@@ -14,6 +15,11 @@ namespace Units.Skills
     )]
     public class BasicAttackData : ScriptableObject
     {
+        [SerializeField, Tooltip("피해/투사체 발사를 공격 애니메이션 시작 또는 끝에 실행합니다.")]
+        private AnimationImpactTiming _impactTiming;
+        public AnimationImpactTiming ImpactTiming => _impactTiming;
+
+
         // ============================================================
         // Basic
         // ============================================================
@@ -84,18 +90,28 @@ namespace Units.Skills
         [SerializeField]
         private float _projectileSpeed = 10f;
 
+        // 비워두면 ProjectileManager의 공용 투사체를 사용한다.
+        [SerializeField, Tooltip("이 공격 전용 투사체 프리팹. 루트의 Projectile_Controller를 지정합니다.")]
+        private Projectile_Controller _projectilePrefab;
+
 
         // ============================================================
         // FX
         // ============================================================
 
         [Header("FX")]
-
         [SerializeField]
+        private List<SkillFXEntry> _fxEntries = new();
+
+        public IReadOnlyList<SkillFXEntry> FXEntries => _fxEntries;
+
+        // 기존 에셋 이전용 값. 실행 경로는 FXEntries만 사용한다.
+        [SerializeField, HideInInspector]
         private BasicAttackFXType _attackFXType =
             BasicAttackFXType.None;
 
-        [SerializeField]
+        // 기존 에셋 이전용 값. 실행 경로는 FXEntries만 사용한다.
+        [SerializeField, HideInInspector]
         private BasicAttackFXType _hitFXType =
             BasicAttackFXType.None;
 
@@ -133,6 +149,8 @@ namespace Units.Skills
 
         public float AreaAngle =>
             _areaAngle;
+
+        public Projectile_Controller ProjectilePrefab => _projectilePrefab;
 
         public float ProjectileSpeed =>
             _projectileSpeed;

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 
 
@@ -249,11 +249,14 @@ namespace Units.Skills
 
             bool applied = false;
 
-            void FX(SkillFXHook hook, bool cleanup = false)
+            void FX(SkillFXHook hook, bool cleanup = false, CombatTargetSnapshot target = default)
             {
                 foreach (var entry in action.FXEntries)
                     if (entry != null && (cleanup || entry.Hook == hook))
-                        _fxRequested?.Invoke(new SkillFXRequest(entry, metadata, origin, cleanup));
+                        _fxRequested?.Invoke(new SkillFXRequest(entry, metadata,
+                            hook == SkillFXHook.OnHit && target.ObjectId != 0 ? target.Position : origin, cleanup,
+                            target.ObjectId != 0 ? target.Position - origin : direction,
+                            target.ObjectId != 0 ? target : selected.PrimaryTarget));
             }
 
             void Timing(SkillEffectTiming timing)
@@ -311,7 +314,7 @@ namespace Units.Skills
                                 );
 
                                 if (fired)
-                                    FX(SkillFXHook.Fire);
+                                    FX(SkillFXHook.Fire, target: target);
                             }
                             catch
                             {
@@ -363,7 +366,7 @@ namespace Units.Skills
                         foreach (var result in SkillAttackDelivery.Hit(batch, new SkillConditionContext(context.Owner, target, _targetResolver, metadata, position: origin)))
                             applied |= result.WasApplied;
 
-                        FX(SkillFXHook.OnHit);
+                        FX(SkillFXHook.OnHit, target: target);
                     }
 
                     Timing(SkillEffectTiming.OnComplete);

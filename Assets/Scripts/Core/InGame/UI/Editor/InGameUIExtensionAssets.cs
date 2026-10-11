@@ -69,7 +69,7 @@ namespace Game.UI.InGame.Editor
                 screenData.FindProperty("_canCloseByUser").boolValue = true;
                 screenData.FindProperty("_blocksHudInput").boolValue = false;
                 screenData.ApplyModifiedPropertiesWithoutUndo();
-                var detail = root.AddComponent<DetailPopupView>();
+                var detail = root.AddComponent<TextPopupView>();
                 Set(detail, "_title", title);
                 Set(detail, "_subtitle", subtitle);
                 Set(detail, "_description", description);

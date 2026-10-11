@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "E_CR_RP_\uC9D1\uD589\uAD00_PassiveSkill_AdditionalAttack"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _skillSchemaVersion: 1
+  _triggerType: 3
+  _tickInterval: 0.25
+  _conditions:
+  - rid: 4617381582868316297
+  _effectMode: 0
+  _actions:
+  - rid: 4617381582868316298
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381582868316297
+      type: {class: PassiveDistanceConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _minimumDistance: 6
+    - rid: 4617381582868316298
+      type: {class: PassiveAdditionalAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _attack:
+          _target:
+            _source: 2
+            _relation: 0
+            _includeSelf: 0
+            _range: 3
+            _maxTargetCount: 1
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _targetLostPolicy: 0
+          _failurePolicy: 0
+          _origin: 0
+          _conditions: []
+          _baseEffects:
+          - _entryId: 1
+            _timing: 1
+            _subject: 0
+            _frequency: 0
+            _snapshotAreaTarget:
+              _source: 6
+              _relation: 0
+              _includeSelf: 0
+              _range: 1
+              _maxTargetCount: 10
+              _clusterRadius: 1
+              _filters: []
+              _priorities: []
+            _effects:
+            - rid: 4617381582868316299
+          _conditionalEffects: []
+          _fxEntries: []
+          _delivery: 1
+          _area: 0
+          _radius: 1
+          _angle: 90
+          _maxEffectTargets: 1
+          _projectileSpeed: 10
+          _isLegacy: 0
+        _useTriggerPosition: 0
+    - rid: 4617381582868316299
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _damageType: 0
+        _damageMultiplier: 1

@@ -89,6 +89,10 @@ namespace Units.Editor
                 else
                     EditorGUILayout.PropertyField(property.FindPropertyRelative("_key"), new GUIContent("효과 ID"));
             }
+            else if (property.FindPropertyRelative("_hook") != null && property.FindPropertyRelative("_endPolicy") != null)
+            {
+                EditorGUILayout.PropertyField(property, true);
+            }
             else if (property.FindPropertyRelative("_baseEffects") != null)
                 DrawAction(property);
             else if (property.FindPropertyRelative("_entryId") != null)
@@ -120,6 +124,7 @@ namespace Units.Editor
                 "_baseEffects" => new SkillEffectEntry(),
                 "_conditionalEffects" => new SkillConditionalEffectEntry(),
                 "_fxEntries" => new SkillFXEntry(),
+                "_applicationFX" => new SkillFXEntry(string.Empty, SkillFXHook.OnHit),
                 "_filters" => new SkillTargetNumericFilter(default, default, 0f),
                 "_priorities" => new SkillTargetPriority(default),
                 "_categories" => "",
@@ -130,6 +135,27 @@ namespace Units.Editor
             else if (list.name == "_maintainedEffects") SkillInspectorUI.Add(list, null);
         }
         // Action의 동작과 효과 정의를 분리해 현재 동작에 필요한 설정만 보여 준다.
+        private static void ValidateActionFX(SerializedProperty action)
+        {
+            var entries = action.FindPropertyRelative("_fxEntries");
+            bool cast = action.managedReferenceValue is SkillCastActionData;
+            bool dash = action.managedReferenceValue is SkillDashActionData;
+            bool attackAction = action.managedReferenceValue is SkillAttackActionData;
+            bool projectile = action.managedReferenceValue is SkillAttackActionData attack
+                && attack.Delivery == ActiveSkillDeliveryType.Projectile;
+            for (int i = 0; i < entries.arraySize; i++)
+            {
+                var operation = (SkillFXOperation)entries.GetArrayElementAtIndex(i).FindPropertyRelative("_operation").intValue;
+                bool invalid = operation == SkillFXOperation.Cast && !cast
+                    || operation == SkillFXOperation.Dash && !dash
+                    || operation == SkillFXOperation.Collision && !attackAction
+                    || (operation == SkillFXOperation.ProjectileFlight
+                        || operation == SkillFXOperation.Expire) && !projectile;
+                if (invalid)
+                    EditorGUILayout.HelpBox($"FX {i + 1}: {operation} 동작은 현재 액션에서 발생하지 않습니다.", MessageType.Warning);
+            }
+        }
+
         private static void DrawAction(SerializedProperty action)
         {
             int tab = SkillInspectorUI.Tabs(action, "동작 / 대상", "효과", "고급 / FX");
@@ -178,11 +204,14 @@ namespace Units.Editor
                 EditorGUILayout.LabelField("공통 조건은 효과 적용만 제한합니다.", EditorStyles.wordWrappedMiniLabel);
 
                 Field(action, "_fxEntries");
+                ValidateActionFX(action);
 
                 return;
             }
 
             Field(action, "_duration");
+            Field(action, "_executionDuration");
+            Field(action, "_impactTiming");
 
             Field(action, "_distance");
 
@@ -211,6 +240,7 @@ namespace Units.Editor
                 if (delivery.intValue == (int)ActiveSkillDeliveryType.Projectile)
                 {
                     Field(action, "_projectileSpeed");
+                    Field(action, "_projectilePrefab");
 
                     var legacy = action.FindPropertyRelative("_isLegacy");
                     var target = action.FindPropertyRelative("_target");
@@ -398,3 +428,4 @@ namespace Units.Editor
     }
 }
 #endif
+

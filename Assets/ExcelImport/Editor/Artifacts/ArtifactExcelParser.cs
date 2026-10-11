@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Units;
 
-// 네 시트를 모두 검사한 후 가져오기 데이터 반환
+// 기본 시트와 선택적인 패시브 시트를 검사한 후 가져오기 데이터 반환
 public static class ArtifactExcelParser
 {
     public class Data
@@ -16,6 +16,16 @@ public static class ArtifactExcelParser
         public List<Effect> UnitEffects = new List<Effect>();
         public List<Effect> CurrencyEffects = new List<Effect>();
         public List<int> ConsumableSlotEffects = new List<int>();
+        // 시트가 없으면 기존 Inspector 설정을 유지하고, 있으면 해당 목록으로 교체합니다.
+        public List<PassiveEffect> PassiveEffects;
+    }
+
+    public class PassiveEffect
+    {
+        public string SkillPath;
+        public int Row;
+        // Team, ApplyType, AllyClass, AllyType, AllyTier, EnemyClass, EnemyType, EnemyFaction
+        public int[] Types;
     }
 
     public class Effect
@@ -53,9 +63,68 @@ public static class ArtifactExcelParser
             byId.Add(id, item);
         }
         if (!ReadEffects(path, true, byId, out error) || !ReadEffects(path, false, byId, out error) ||
-            !ReadConsumableSlotEffects(path, byId, out error))
+            !ReadConsumableSlotEffects(path, byId, out error) || !ReadPassiveEffects(path, byId, out error))
         {
             return false;
+        }
+        return true;
+    }
+
+    private static bool ReadPassiveEffects(string path, Dictionary<string, Data> byId, out string error)
+    {
+        const string sheet = "PassiveSkillEffects";
+        string[] headers = { "ArtifactId", "PassiveSkillPath", "TargetTeam", "ApplyType", "AllyClass", "AllyType",
+            "AllyTier", "EnemyClass", "EnemyType", "EnemyFaction" };
+        if (!Read(path, sheet, headers, out var rows, out error))
+        {
+            if (error != sheet + " 시트가 없습니다.") return false;
+            error = "";
+            return true;
+        }
+        foreach (var owner in byId.Values) owner.PassiveEffects = new List<PassiveEffect>();
+        Type[] types = { typeof(UnitTeam), typeof(UnitModifierApplyType), typeof(AllyUnitClass), typeof(AllyUnitType),
+            typeof(AllyUnitTier), typeof(EnemyUnitClass), typeof(EnemyUnitType), typeof(EnemyUnitFaction) };
+        for (int r = 1; r < rows.Count; r++)
+        {
+            var row = rows[r];
+            if (!byId.TryGetValue(Cell(row, 0), out var owner))
+            {
+                error = $"{sheet}!A{row.Number}: Artifacts 시트에 없는 ID입니다.";
+                return false;
+            }
+            string skillPath = Cell(row, 1).Replace('\\', '/');
+            if (!skillPath.StartsWith("Assets/", StringComparison.Ordinal) ||
+                !skillPath.EndsWith(".asset", StringComparison.OrdinalIgnoreCase) || skillPath.Contains(".."))
+            {
+                error = $"{sheet}!B{row.Number}: Assets/로 시작하는 패시브 S.O 경로를 입력하세요.";
+                return false;
+            }
+            var effect = new PassiveEffect { SkillPath = skillPath, Row = row.Number, Types = new int[types.Length] };
+            for (int i = 0; i < types.Length; i++)
+            {
+                bool ally = effect.Types[0] == (int)UnitTeam.Ally;
+                var apply = (UnitModifierApplyType)effect.Types[1];
+                bool required = i < 2 ||
+                    (i == (ally ? 2 : 5) && apply == UnitModifierApplyType.Class) ||
+                    (i == (ally ? 3 : 6) && apply == UnitModifierApplyType.Type) ||
+                    (ally && i == 4 && apply == UnitModifierApplyType.Tier) ||
+                    (!ally && i == 7 && apply == UnitModifierApplyType.Faction);
+                string value = Cell(row, i + 2);
+                if (!required && value.Length == 0) continue;
+                if (!TryEnum(types[i], value, out effect.Types[i]))
+                {
+                    error = $"{sheet} {row.Number}행 {headers[i + 2]}: enum 이름을 확인하세요.";
+                    return false;
+                }
+            }
+            var mode = (UnitModifierApplyType)effect.Types[1];
+            if ((effect.Types[0] == (int)UnitTeam.Ally && mode == UnitModifierApplyType.Faction) ||
+                (effect.Types[0] == (int)UnitTeam.Enemy && mode == UnitModifierApplyType.Tier))
+            {
+                error = $"{sheet} {row.Number}행: 아군은 Tier, 적군은 Faction을 사용하세요.";
+                return false;
+            }
+            owner.PassiveEffects.Add(effect);
         }
         return true;
     }

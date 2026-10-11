@@ -1,4 +1,4 @@
-// 저장소에서 저장 및 불러오는 인터페이스
+// 전체 사본에는 선택 설정과 마지막 정산 Run ID도 포함해 저장 중에 보존합니다.
 public interface IPersistentSaveWriter
 {
     bool IsReady { get; }

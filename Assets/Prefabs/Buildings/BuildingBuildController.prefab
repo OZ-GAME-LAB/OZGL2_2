@@ -46,12 +46,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5fc1848a0b787048b7573c8170b5220, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingBuildController
-  database: {fileID: 11400000, guid: ca81b6ab7625cac4cb786c0b9d9f501a, type: 2}
+  database: {fileID: 11400000, guid: 1ab363048cbc4cfb9dcf125dfeb24e4e, type: 2}
   worldCamera: {fileID: 0}
   slotMask:
     serializedVersion: 2
     m_Bits: 4294967295
   refundRate: 0.7
+  fallbackBuildLimit: 0
 --- !u!114 &2813086061672694063
 MonoBehaviour:
   m_ObjectHideFlags: 0

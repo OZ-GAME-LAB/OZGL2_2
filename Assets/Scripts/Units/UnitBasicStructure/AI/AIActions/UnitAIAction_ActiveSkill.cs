@@ -9,9 +9,10 @@ namespace Units
         public void Enter(UnitAssignment? assignment)
         {
             _started = false;
-            if (_core == null || !_core.CanUseActiveSkill) return;
+            if (_core == null || !_core.IsCombatBusy) return;
             _core.StopMovement();
-            _started = _core.TryActiveSkill(_core.SelectedSkillDecision);
+            // Unit_AI가 전투 준비를 승인받은 뒤 이 행동에 진입한다.
+            _started = true;
         }
         public UnitAIActionType? Evaluate(UnitAssignment? assignment)
             => !_started || !_core.IsCombatBusy ? UnitAIActionType.Idle : (UnitAIActionType?)null;

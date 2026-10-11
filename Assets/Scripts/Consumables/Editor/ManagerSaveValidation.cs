@@ -51,7 +51,7 @@ public static class ManagerSaveValidation
             Set(artifact, "_consumableSlotEffects", new List<ConsumableSlotEffectData> { (ConsumableSlotEffectData)slotEffect });
             var catalog = Asset<ArtifactCatalog>(); Set(catalog, "_artifacts", new List<ArtifactData> { artifact }); Call(catalog, "OnValidate");
             var artifacts = root.AddComponent<ArtifactManager>(); Set(artifacts, "_artifactCatalog", catalog); Set(artifacts, "_rewardTable", Asset<ArtifactRewardTable>());
-            artifacts.Initialize(root.AddComponent<WaveController>(), effects);
+            artifacts.Initialize(root.AddComponent<WaveController>(), effects, money);
             var artifactData = new ArtifactSaveData {
                 Owned = new List<ArtifactSaveEntry> { new() { ArtifactId = artifact.Id, StackCount = 2 } },
                 HasRewardCandidates = true, RewardQuarter = 1, RewardWave = 1, CandidateIds = new List<string> { artifact.Id }
@@ -86,9 +86,9 @@ public static class ManagerSaveValidation
             Reject(() => items.RestoreSaveData(badItems), "미등록 아이템 거부");
             Equal(overflow, items.CaptureSaveData(), "아이템 실패 시 기존 상태 유지");
 
-            var shop = root.AddComponent<ShopManager>(); Set(shop, "_shopTable", Asset<ShopTable>()); shop.Initialize(artifacts, money, items);
+            var shop = root.AddComponent<ShopManager>(); Set(shop, "_shopTable", Asset<ShopTable>()); shop.Initialize(artifacts, money, root.AddComponent<GameFlowController>(), items);
             var shopData = new ShopSaveData {
-                HasStock = true,
+                HasStock = true, StockQuarter = 2,
                 Artifacts = new List<ShopPurchaseSaveEntry> { new() { ItemId = artifact.Id, Currency = CurrencyType.Gold, Price = 91, Purchased = true } },
                 Consumables = new List<ShopPurchaseSaveEntry> { new() { ItemId = item.Id, Currency = CurrencyType.Gem, Price = 4, Purchased = false } },
                 Exchanges = new List<ShopExchangeSaveEntry> { new() { ArtifactId = artifact.Id, Exchanged = true } }
@@ -100,6 +100,12 @@ public static class ManagerSaveValidation
             var badShop = Clone(shopData); badShop.Consumables[0].Price = -1;
             Reject(() => shop.RestoreSaveData(badShop), "음수 상품 가격 거부");
             Equal(shopData, shop.CaptureSaveData(), "상점 실패 시 기존 상태 유지");
+            var badQuarter = Clone(shopData); badQuarter.StockQuarter = -1;
+            Reject(() => shop.RestoreSaveData(badQuarter), "음수 상점 분기 거부");
+            Equal(shopData, shop.CaptureSaveData(), "분기 검증 실패 시 기존 상태 유지");
+            var legacyShop = Clone(shopData); legacyShop.StockQuarter = 0;
+            shop.RestoreSaveData(legacyShop);
+            Equal(legacyShop, shop.CaptureSaveData(), "분기 정보 없는 이전 상점 저장 호환");
             shop.RestoreSaveData(new ShopSaveData { HasStock = true });
             Check(shop.HasStock && shop.PurchaseSlots.Count == 0, "매진/빈 생성 상점을 미생성으로 바꾸지 않음");
             shop.RestoreSaveData(new ShopSaveData());

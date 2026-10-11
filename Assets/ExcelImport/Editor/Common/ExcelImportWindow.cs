@@ -55,7 +55,8 @@ public class ExcelImportWindow : EditorWindow
                 }
                 else if (entry.Type == ExcelImportType.Artifacts)
                 {
-                    EditorGUILayout.LabelField("시트", "Artifacts / UnitStatEffects / CurrencyEffects / ConsumableSlotEffects");
+                    EditorGUILayout.LabelField("시트", "Artifacts / UnitStatEffects / CurrencyEffects / ConsumableSlotEffects / PassiveSkillEffects");
+                    EditorGUILayout.HelpBox("PassiveSkillEffects에서 아티팩트와 패시브를 연결합니다. PassiveSkills / PassiveConditions / PassiveActions 및 RuntimeEffects / RuntimeActions로 패시브와 지속 효과 S.O를 생성·갱신합니다. 기존 경로는 GUID를 유지합니다. 새 5개 시트가 모두 없으면 기존 S.O를 그대로 참조합니다. 입력 방법은 엑셀 SkillSheetGuide를 확인하세요.", MessageType.Info);
                     EditorGUILayout.HelpBox("ConsumableSlotEffects: ArtifactId / AdditionalSlots. 양수는 증가, 음수는 감소. 해당 ID의 행이 없으면 슬롯 효과를 제거합니다.", MessageType.Info);
                     entry.OutputFolder = EditorGUILayout.TextField("신규 S.O 폴더", entry.OutputFolder);
                     EditorGUILayout.HelpBox("대상에는 ArtifactCatalog를 연결하세요. 동일 ID는 갱신하고 신규 ID는 생성 후 카탈로그에 등록합니다. 아이콘과 엑셀에 없는 아티팩트는 유지합니다.", MessageType.Info);

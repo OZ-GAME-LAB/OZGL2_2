@@ -473,7 +473,7 @@ namespace Units
             _deathBodies.Clear();
         }
 
-        // 사망 애니메이션을 2초 동안 표시한 뒤 비활성화한다.
+        // 사망 연출이 끝난 현재 수명만 비활성화하고 풀에 반환한다.
         private IEnumerator DisableAfterDeath()
         {
             int generation = _lifeGeneration;
@@ -483,7 +483,10 @@ namespace Units
             if (generation != _lifeGeneration)
                 yield break;
 
-            gameObject.SetActive(false);
+            if (_core != null)
+                _core.ReturnToPool();
+            else
+                gameObject.SetActive(false);
         }
 
 

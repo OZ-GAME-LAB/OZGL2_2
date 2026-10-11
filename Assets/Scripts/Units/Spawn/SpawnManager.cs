@@ -16,6 +16,13 @@ namespace Units
         // ============================================================
 
         [SerializeField]
+        private UnitPoolManager _unitPoolManager;
+
+        private long _allySpawnGeneration;
+        private bool _allySpawnFailed;
+        private bool _enemySpawning;
+
+        [SerializeField]
         private RuntimeUnitManager _runtimeUnitManager;
 
         [SerializeField]
@@ -63,7 +70,7 @@ namespace Units
         private Vector2 _rallySectorSize =
             new Vector2(
                 5f,
-                10f
+                5f
             );
 
         [SerializeField]
@@ -178,6 +185,13 @@ namespace Units
                 return;
 
 
+            if (_unitPoolManager == null)
+            {
+                var poolObject = new GameObject("UnitPoolManager");
+                poolObject.transform.SetParent(transform, false);
+                _unitPoolManager = poolObject.AddComponent<UnitPoolManager>();
+            }
+
             InitializePrefabMapper();
             InitializeRallyGridAllocators();
             InitializeSpawners();
@@ -232,6 +246,7 @@ namespace Units
             _allyGroupSpawner =
                 new AllyGroupSpawner(
                     _runtimeUnitManager,
+                    _unitPoolManager,
                     _unitStatModifierManager,
                     _allySpawnEntries,
                     _groupPrefab,
@@ -243,6 +258,7 @@ namespace Units
             _enemyWaveSpawner =
                 new EnemyWaveSpawner(
                     _runtimeUnitManager,
+                    _unitPoolManager,
                     _unitStatModifierManager,
                     _enemySpawnEntries,
                     _groupPrefab,
@@ -347,6 +363,13 @@ namespace Units
 
             if (_activeAllySpawnCount == 0)
             {
+                // 첫 요청에서만 아군 아티펙트 스탯·패시브를 최신화한다.
+                // 참조가 없는 독립 테스트 씬은 기존 등록을 보존한 채 스폰한다.
+                _unitStatModifierManager.RefreshAllyArtifactEffects();
+
+                _allySpawnGeneration = _unitPoolManager.BeginSpawn(UnitTeam.Ally);
+                _allySpawnFailed = false;
+                _allyGroupSpawner.ResetSpawnResult();
                 _allyRallyGridAllocator.Clear();
             }
 
@@ -371,13 +394,24 @@ namespace Units
         {
             try
             {
-                await _allyGroupSpawner.SpawnGroupAsync(
+                // 같은 프레임의 건물 요청을 먼저 모아 빈 요청·즉시 실패도 한 묶음으로 처리한다.
+                // 다음 프레임까지 카운트를 유지하여 최신화와 완료 알림의 중복을 방지한다.
+                await UniTask.NextFrame(cancellationToken: this.GetCancellationTokenOnDestroy());
+
+                var group = await _allyGroupSpawner.SpawnGroupAsync(
                     unitType,
                     spawnPosition,
                     count,
                     rallyPoint,
                     this.GetCancellationTokenOnDestroy()
                 );
+                if (group == null)
+                    _allySpawnFailed = true;
+            }
+            catch
+            {
+                _allySpawnFailed = true;
+                throw;
             }
             finally
             {
@@ -385,14 +419,20 @@ namespace Units
 
                 if (_activeAllySpawnCount == 0)
                 {
-                    Debug.Log(
-                        "[SpawnManager] " +
-                        "모든 Ally Spawn 완료."
-                    );
+                    bool succeeded = !_allySpawnFailed && !_allyGroupSpawner.SpawnFailed;
+                    if (_unitPoolManager != null)
+                        _unitPoolManager.EndSpawn(UnitTeam.Ally, _allySpawnGeneration, succeeded);
+                    if (succeeded)
+                    {
+                        Debug.Log(
+                            "[SpawnManager] " +
+                            "모든 Ally Spawn 완료."
+                        );
 
-                    _runtimeUnitManager.NotifyAllySpawnCompleted();
+                        _runtimeUnitManager.NotifyAllySpawnCompleted();
 
-                    AllySpawnCompleted?.Invoke();
+                        AllySpawnCompleted?.Invoke();
+                    }
                 }
             }
         }
@@ -432,28 +472,39 @@ namespace Units
             // Sector 객체 자체는 유지된다.
             // ========================================================
 
-            _enemyRallyGridAllocator.Clear();
+            if (_enemySpawning)
+                throw new InvalidOperationException("[SpawnManager] 적 스폰이 이미 진행 중입니다.");
 
+            // 적 웨이브 시작 시 적 아티펙트 스탯·패시브만 한 번 최신화한다.
+            _unitStatModifierManager.RefreshEnemyArtifactEffects();
 
-            await _enemyWaveSpawner.SpawnWaveAsync(
-                cost,
-                context,
-                cancellationToken
-            );
+            long generation = _unitPoolManager.BeginSpawn(UnitTeam.Enemy);
+            _enemySpawning = true;
+            bool succeeded = false;
+            try
+            {
+                _enemyRallyGridAllocator.Clear();
+                _enemyWaveSpawner.ResetSpawnResult();
+                succeeded = await _enemyWaveSpawner.SpawnWaveAsync(cost, context, cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch
+            {
+                succeeded = false;
+                throw;
+            }
+            finally
+            {
+                _enemySpawning = false;
+                if (_unitPoolManager != null)
+                    _unitPoolManager.EndSpawn(UnitTeam.Enemy, generation, succeeded);
+            }
 
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-
-            Debug.Log(
-                "[SpawnManager] " +
-                "모든 Enemy Spawn 완료."
-            );
-
-
-            _runtimeUnitManager.NotifyEnemySpawnCompleted();
-
-            EnemySpawnCompleted?.Invoke();
+            if (succeeded)
+            {
+                _runtimeUnitManager.NotifyEnemySpawnCompleted();
+                EnemySpawnCompleted?.Invoke();
+            }
         }
 
 

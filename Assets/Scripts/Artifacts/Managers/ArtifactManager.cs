@@ -34,6 +34,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
 
     [SerializeField] private ArtifactCatalog _artifactCatalog;
     [SerializeField] private ArtifactRewardTable _rewardTable;
+    private RunCurrencyManager _runCurrencyManager;
 
     private ArtifactInventory _inventory;
     private WaveController _waveController;
@@ -56,7 +57,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     // 10.2(문규성) : 인자 추가중 오류가 많이 발생해서 일단 null 허용으로 만들어놓았습니다.
     // 나중에 테스트시 문제가 생길 소지가 있어서 = null지우고 ArtifactRewardPresenter상속받거나 테스트용 인터페이스 구현체 만들어서 연결이 필요합니다. 
     // 웨이브와 공통 효과 매니저를 주입받아 새로운 Run의 보유 목록을 준비
-    public void Initialize(WaveController waveController, EffectManager effectManager, IArtifactSelectionUI artifactSelectionUI = null)
+    public void Initialize(WaveController waveController, EffectManager effectManager,
+        RunCurrencyManager runCurrencyManager, IArtifactSelectionUI artifactSelectionUI = null)
     {
         if (IsInitialized)
         {
@@ -88,12 +90,19 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return;
         }
         
+        if (runCurrencyManager == null)
+        {
+            Debug.LogError("[Artifacts/ArtifactManager] RunCurrencyManager 참조가 없습니다.", this);
+            return;
+        }
+
         if (artifactSelectionUI == null)
         {
             Debug.LogError("[Artifacts/ArtifactManager] ArtifactSelectionUI 참조가 없습니다.", this);
             return;
         }
         _effectManager = effectManager;
+        _runCurrencyManager = runCurrencyManager;
         _selectionUI = artifactSelectionUI;
         _waveController = waveController;
         _inventory = new ArtifactInventory(_artifactCatalog);
@@ -133,6 +142,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return false;
         }
 
+        // Bootstrap에서는 재화 초기화 전에 참조를 주입하므로 실제 사용 시 준비 상태를 확인합니다.
+        if (_runCurrencyManager == null || !_runCurrencyManager.IsInitialized)
+        {
+            Debug.LogError("[Artifacts/ArtifactManager] 초기화된 RunCurrencyManager가 필요합니다.", this);
+            return false;
+        }
+
         PrepareRewardPosition();
         IReadOnlyList<ArtifactData> candidates = _testCandidates ?? (_hasRewardCandidates ? _selectionCandidates : null);
         _testCandidates = null;
@@ -144,13 +160,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         // 지급 직후 취소된 요청은 재지급 없이 완료
         if (_rewardApplied)
         {
-            return true;
+            return TryCompleteWaveCurrencyReward();
         }
         if (candidates.Count == 0)
         {
             _hasRewardCandidates = true;
             _rewardApplied = true;
-            return true;
+            return TryCompleteWaveCurrencyReward();
         }
 
         _selectionCandidates = new List<ArtifactData>(candidates);
@@ -178,7 +194,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             }
 
             waitToken.ThrowIfCancellationRequested();
-            return true;
+            // SelectAsync의 UI 닫기와 아티팩트 획득 성공 이후에 재화를 지급합니다.
+            return TryCompleteWaveCurrencyReward();
         }
         //SelectAsync에서 취소나 예외 발생시에 _selectionWait를 정리해 다음 요청을 막지 않도록 하기 위한 조치입니다. 
         finally
@@ -207,6 +224,16 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         waitToken.ThrowIfCancellationRequested();
         return !canceled;
         */
+    }
+
+    private bool TryCompleteWaveCurrencyReward()
+    {
+        // 이전 저장에서 이미 지급했거나, 지급 후 재진입한 경우는 성공으로 종료합니다.
+        if (_runCurrencyManager.TryGetAppliedWaveReward(
+            _waveController.CurQuarter, _waveController.CurWave, out _, out _)) return true;
+        if (_runCurrencyManager.TryApplyWaveReward()) return true;
+        Debug.LogError("[Artifacts/ArtifactManager] 아티팩트 선택 후 웨이브 재화 지급에 실패했습니다.", this);
+        return false;
     }
 
     // 테스트 진입점만 별도 제공. 준비된 후보를 전달한 뒤 실제 게임과 같은 함수 실행

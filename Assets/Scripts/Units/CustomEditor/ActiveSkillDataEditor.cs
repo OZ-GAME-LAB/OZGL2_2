@@ -38,6 +38,7 @@ namespace Units.Editor
         private SerializedProperty _effects;
 
         private SerializedProperty _projectileSpeed;
+        private SerializedProperty _projectilePrefab;
 
         private SerializedProperty _dashDistance;
 
@@ -77,6 +78,8 @@ namespace Units.Editor
 
         private void OnEnable()
         {
+            _projectilePrefab = serializedObject.FindProperty("_projectilePrefab");
+
             _skillRange = serializedObject.FindProperty("_skillRange");
 
             _skillCooldown = serializedObject.FindProperty("_skillCooldown");
@@ -127,6 +130,8 @@ namespace Units.Editor
 
             SkillInspectorUI.Header("액티브 스킬", actions.arraySize > 0
                 ? actions.arraySize + "개 동작을 순서대로 실행" : "레거시 단일 스킬 설정");
+
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_display"), new GUIContent("UI 표시 정보"), true);
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
@@ -457,6 +462,8 @@ namespace Units.Editor
                 EditorGUI.indentLevel++;
 
                 EditorGUILayout.PropertyField(_projectileSpeed);
+
+                EditorGUILayout.PropertyField(_projectilePrefab);
 
                 EditorGUI.indentLevel--;
             }

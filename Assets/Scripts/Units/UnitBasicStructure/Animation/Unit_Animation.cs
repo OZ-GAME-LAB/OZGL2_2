@@ -39,6 +39,8 @@ namespace Units
         private bool _victory;
         private int _skillMotion; // 0: 없음, 1: 캐스팅, 2: 돌진
         private float _oneShotUntil;
+        private bool _timedAttack;
+        private float _savedAnimatorSpeed;
 
         // ============================================================
         // Initialize
@@ -46,6 +48,7 @@ namespace Units
 
         public void Initialize(Unit_Core core)
         {
+            EndTimedAttack();
             // 풀 재사용 시 이전 수명의 사망/기절/피격 제한을 해제한다.
             _dead = false;
             _stunned = false;
@@ -143,8 +146,39 @@ namespace Units
         public void PlayAnimation_Dash() => StartSkillMotion(2);
         public void PlayAnimation_Cast() => StartSkillMotion(1);
         public void PlayAnimation_Attack() => PlayOneShot(PlayerState.ATTACK, 0);
-        public void PlayAnimation_Skill() => PlayOneShot(PlayerState.ATTACK, 1);
-        public void PlayAnimation_Buff() => PlayOneShot(PlayerState.OTHER, 1);
+        public void PlayAnimation_Skill(float duration = 0f) => PlayTimedAttack(PlayerState.ATTACK, duration);
+        public void PlayAnimation_Buff(float duration = 0f) => PlayTimedAttack(PlayerState.OTHER, duration);
+
+        // 클립 길이를 액션 실행 시간에 맞추고, 논리적 완료 전 대기 애니메이션으로 복귀하지 않는다.
+        private void PlayTimedAttack(PlayerState state, float duration, int index = 1)
+        {
+            EndTimedAttack();
+            if (!PlayOneShot(state, index) || duration <= 0f) return;
+            _savedAnimatorSpeed = _animator.speed;
+            _animator.speed = _spum.StateAnimationPairs[state.ToString()][index].length / duration;
+            _timedAttack = true;
+            _oneShotUntil = float.PositiveInfinity;
+        }
+
+        // 전투 타이머와 동일한 시간으로 기본 공격 클립을 재생한다.
+        // 클립이 없는 경우에도 0.1초 뒤 정상적인 실행/실패 정리가 가능하다.
+        public float PlayBasicAttackForExecution(float attackSpeed)
+        {
+            float duration = 0.1f;
+            if (_spum != null && _spum.StateAnimationPairs.TryGetValue(PlayerState.ATTACK.ToString(), out var clips)
+                && clips != null && clips.Count > 0 && clips[0] != null)
+                duration = Mathf.Max(0.1f, clips[0].length / Mathf.Max(0.01f, attackSpeed));
+            PlayTimedAttack(PlayerState.ATTACK, duration, 0);
+            return duration;
+        }
+
+        private void EndTimedAttack()
+        {
+            if (!_timedAttack) return;
+            if (_animator != null) _animator.speed = _savedAnimatorSpeed;
+            _timedAttack = false;
+            _oneShotUntil = 0f;
+        }
 
         public void PlayAnimation_Victory()
         {
@@ -167,6 +201,9 @@ namespace Units
 
         public void StopAnimation_SkillMotion()
         {
+            bool timed = _timedAttack;
+            EndTimedAttack();
+            if (timed) RefreshContinuousAnimation();
             if (_skillMotion == 0)
                 return;
             _skillMotion = 0;
@@ -204,7 +241,7 @@ namespace Units
         /// <summary>실제 피격 재생 요청이 전달되었을 때만 쿨타임을 소비한다.</summary>
         public bool TryPlayAnimation_Hit()
         {
-            if (!_hitAnimationEnabled || Time.time < _nextHitTime)
+            if (_timedAttack || !_hitAnimationEnabled || Time.time < _nextHitTime)
                 return false;
 
             if (!PlayOneShot(PlayerState.DAMAGED, 0))
@@ -220,6 +257,7 @@ namespace Units
                 return;
             _oneShotUntil = 0f;
             _skillMotion = 0;
+            EndTimedAttack();
             Play(PlayerState.DEBUFF, 0, true);
             _stunned = true;
         }
@@ -239,6 +277,7 @@ namespace Units
             if (_dead)
                 return;
 
+            EndTimedAttack();
             Play(PlayerState.DEATH, 0);
             // 사망 클립이 없어도 이후 일반 행동은 차단한다.
             _dead = true;

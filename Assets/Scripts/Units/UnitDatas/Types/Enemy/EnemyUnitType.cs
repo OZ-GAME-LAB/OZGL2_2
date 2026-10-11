@@ -21,9 +21,9 @@ namespace Units
         // RegularArmy 21~40
         RA_TK_방패병 = 21,
         RA_BR_중장보병 = 22,
-        RA_BR_기병 = 23,
+        RA_BR_창병 = 23,
         RA_AS_순찰대 = 24,
-        RA_RP_장궁병 = 25,
+        RA_RP_궁병 = 25,
         RA_RM_수습마법사 = 26,
         RA_SP_의무병 = 27,
 
@@ -33,7 +33,7 @@ namespace Units
         EA_BR_근위대 = 42,
         EA_BR_팔랑크스 = 43,
         EA_AS_어쌔신 = 44,
-        EA_RP_총사 = 45,
+        EA_RP_장궁병 = 45,
         EA_RM_원소마도사 = 46,
         EA_SP_사제 = 47,
 
@@ -42,8 +42,8 @@ namespace Units
         CR_TK_성기사 = 61,
         CR_BR_이단심판관 = 62,
         CR_AS_발키리 = 63,
-        CR_RP_집행자 = 64,
-        CR_RM_천사 = 65,
+        CR_RP_집행관 = 64,
+        CR_RM_대행자 = 65,
         CR_SP_클래릭 = 66
     }
 }
