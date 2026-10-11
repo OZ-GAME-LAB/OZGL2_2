@@ -15,28 +15,20 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     public string LastSettledRunId => _lastSettledRunId;
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
 
-    // 아직 복원을 지원하지 않는 영역은 호출 전에 제외해 초기화된 값을 유지합니다.
-    [SerializeField] private bool _restoreTraits = true;
-    [SerializeField] private bool _restoreWallet = true;
-    [SerializeField] private bool _restoreAltar = true;
-    [SerializeField] private bool _restoreTotem = true;
-
     private SaveManager _saveManager;
     private OutGameTraitController _traits;
     private PersistentCurrencyManager _wallet;
     private ISaveDataProvider<AltarRunSaveData> _altar;
     private ISaveDataProvider<TotemRunSaveData> _totem;
-    private AltarRunSaveData _cachedAltar;
-    private TotemRunSaveData _cachedTotem;
-    private AltarRunSaveData _initialAltar;
-    private TotemRunSaveData _initialTotem;
+    private ISaveDataProvider<TraitRunSaveData> _traitRun;
     private string _lastSettledRunId;
-    private string _restoringPart;
     private bool _isInitialized;
-    private bool _hasFallbackBackup;
 
+    // 10.9 / 문규성 / 두 씬에서 제단과 토템 Provider를 모두 연결하고, 인게임에서는 런 특성 Provider도 연결하도록 변경했습니다.
+    // 아웃게임은 선택 Controller를, 인게임은 기존 런 매니저를 전달해 별도 선택 캐시 없이 같은 저장 데이터를 사용합니다.
     public void Initialize(SaveManager saveManager, OutGameTraitController traits, PersistentCurrencyManager wallet,
-        ISaveDataProvider<AltarRunSaveData> altar = null, ISaveDataProvider<TotemRunSaveData> totem = null)
+        ISaveDataProvider<AltarRunSaveData> altar, ISaveDataProvider<TotemRunSaveData> totem,
+        ISaveDataProvider<TraitRunSaveData> traitRun = null)
     {
         if (_isInitialized)
             throw new InvalidOperationException("OutGameSaveCoordinator는 씬에서 한 번만 초기화할 수 있습니다.");
@@ -46,10 +38,7 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         _wallet = wallet;
         _altar = altar;
         _totem = totem;
-        _initialAltar = altar != null ? Clone(altar.CaptureSaveData()) : new AltarRunSaveData { SelectedAltar = AltarId.Abundance };
-        _initialTotem = totem != null ? Clone(totem.CaptureSaveData()) : new TotemRunSaveData();
-        _cachedAltar = Clone(_initialAltar);
-        _cachedTotem = Clone(_initialTotem);
+        _traitRun = traitRun;
         _isInitialized = true;
         IsReady = false;
         LastError = null;
@@ -100,99 +89,75 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         }
     }
 
+    // 10.9 / 문규성 / 기본 불러오기는 시작 지급을 생략하도록 명시적인 이어하기 인수를 전달합니다.
+    // Inspector에서 다시 불러와도 시작 재화를 다시 지급하지 않습니다. 신규 런은 bool 인수에 false를 전달합니다.
     public bool TryLoad(out string error)
+    {
+        return TryLoad(true, out error);
+    }
+
+    // 10.9 / 문규성 / 신규 런인지 이어하기인지 전달받아 아웃게임 복원과 런 효과 적용을 한 번에 처리하도록 변경했습니다.
+    // 시작 지급 여부는 입력 저장 데이터를 변경하지 않고 각 런 Provider에 전달합니다.
+    public bool TryLoad(bool isContinue, out string error)
     {
         IsReady = false;
         if (!CheckReferences(out error)) return false;
         if (!_saveManager.TryLoad(SaveKey, out PersistentSaveData data, out error))
             return Fail(error, out error);
-        if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
-
-        // 인게임에는 선택 Selector가 없어도 선택 설정과 지급 영수증은 유지합니다.
-        CacheMetadata(data);
-        bool legacyAltar = data.Altar == null || data.Altar.SelectedAltar == AltarId.None;
-        bool legacyTotem = data.Totem == null;
-        if (!_restoreAltar)
-        {
-            _cachedAltar = Clone(_initialAltar);
-            LogInitialValue("제단", "복원이 비활성화되어 초기값을 유지합니다.");
-        }
-        else if (legacyAltar)
-        {
-            _cachedAltar = new AltarRunSaveData { SelectedAltar = AltarId.Abundance };
-            LogInitialValue("제단", "구버전 선택값이 없어 풍요의 제단을 사용합니다.");
-        }
-        if (!_restoreTotem)
-        {
-            _cachedTotem = Clone(_initialTotem);
-            LogInitialValue("토템", "복원이 비활성화되어 초기값을 유지합니다.");
-        }
-        else if (legacyTotem)
-        {
-            _cachedTotem = new TotemRunSaveData();
-            LogInitialValue("토템", "구버전 선택값이 없어 0레벨을 사용합니다.");
-        }
-
-        if (_restoreTraits && !_traits.TryValidateSaveData(data.Traits, out error))
-            return Fail("특성 저장 데이터 검증 실패: " + error, out error);
-        if (_restoreWallet && !_wallet.TryValidateSaveData(data.Wallet, out error))
-            return Fail("혈석 저장 데이터 검증 실패: " + error, out error);
-        if (!TryValidateSelections(_cachedAltar, _cachedTotem, _restoreAltar, _restoreTotem, out error))
-            return false;
-
-        bool needsBackup = !_restoreTraits || !_restoreWallet || !_restoreAltar || !_restoreTotem || legacyAltar || legacyTotem;
-        if (needsBackup && !_hasFallbackBackup)
-        {
-            if (!_saveManager.TryBackup(SaveKey, out _, out error))
-                return Fail("초기값을 사용하기 전 원본 백업에 실패했습니다. " + error, out error);
-            _hasFallbackBackup = true;
-        }
+        if (!TryValidate(data, out error)) return false;
 
         try
         {
-            Apply(data);
-            // 복원과 알림까지 성공해야 구매 및 저장 요청을 받습니다.
+            Apply(data, isContinue);
+            _lastSettledRunId = data.LastSettledRunId;
             IsReady = true;
             LastError = null;
+            error = null;
             return true;
         }
         catch (Exception exception)
         {
-            return Fail(_restoringPart + " 복원에 실패했습니다. 저장을 중단합니다. " + exception.Message, out error);
-        }
-        finally
-        {
-            _restoringPart = null;
+            return Fail("영구 저장 데이터 복원 실패: " + exception.Message, out error);
         }
     }
 
+    // 10.9 / 문규성 / 연결된 Provider의 현재 사본으로 전체 저장 데이터를 모으고 선택 캐시 사용을 제거했습니다.
+    // 영구 파일에는 제단 선택만 유지하므로 런의 시작 지급 상태는 항상 false로 저장합니다.
     public PersistentSaveData CaptureSaveData()
     {
         if (!CheckReferences(out string error)) throw new InvalidOperationException(error);
+        AltarRunSaveData altar = _altar.CaptureSaveData();
+        altar.isApplied = false;
         return new PersistentSaveData
         {
             Traits = _traits.CaptureSaveData(),
             Wallet = _wallet.CaptureSaveData(),
-            Altar = _altar != null ? Clone(_altar.CaptureSaveData()) : Clone(_cachedAltar),
-            Totem = _totem != null ? Clone(_totem.CaptureSaveData()) : Clone(_cachedTotem),
+            Altar = altar,
+            Totem = _totem.CaptureSaveData(),
             LastSettledRunId = _lastSettledRunId
         };
     }
 
+    // 10.9 / 문규성 / 완성된 전체 저장 데이터만 받고, 누락된 선택을 캐시에서 보충하던 처리를 제거했습니다.
+    // 저장용 루트와 제단 사본을 만들어 시작 지급 상태를 false로 저장하며 호출자가 전달한 데이터는 변경하지 않습니다.
     private bool TryWrite(PersistentSaveData data, out string error)
     {
-        if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
-        // 부분 데이터로 저장을 요청해도 이미 확정된 선택과 영수증을 지우지 않습니다.
-        if (!_restoreAltar)
-            data.Altar = _altar != null ? Clone(_altar.CaptureSaveData()) : Clone(_cachedAltar);
-        else if (data.Altar == null) data.Altar = Clone(_cachedAltar);
-        if (!_restoreTotem)
-            data.Totem = _totem != null ? Clone(_totem.CaptureSaveData()) : Clone(_cachedTotem);
-        else if (data.Totem == null) data.Totem = Clone(_cachedTotem);
-        if (string.IsNullOrWhiteSpace(data.LastSettledRunId)) data.LastSettledRunId = _lastSettledRunId;
         if (!TryValidate(data, out error)) return false;
-        if (!_saveManager.TrySave(SaveKey, data, out error)) return Fail(error, out error);
-        CacheMetadata(data);
+        PersistentSaveData saveData = new PersistentSaveData
+        {
+            Traits = data.Traits,
+            Wallet = data.Wallet,
+            Altar = new AltarRunSaveData
+            {
+                SelectedAltar = data.Altar.SelectedAltar,
+                isApplied = false
+            },
+            Totem = data.Totem,
+            LastSettledRunId = string.IsNullOrWhiteSpace(data.LastSettledRunId)
+                ? _lastSettledRunId : data.LastSettledRunId
+        };
+        if (!_saveManager.TrySave(SaveKey, saveData, out error)) return Fail(error, out error);
+        _lastSettledRunId = saveData.LastSettledRunId;
         LastError = null;
         return true;
     }
@@ -202,96 +167,62 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
         if (!_traits.TryValidateSaveData(data.Traits, out error)) return Fail("특성 저장 데이터 검증 실패: " + error, out error);
         if (!_wallet.TryValidateSaveData(data.Wallet, out error)) return Fail("혈석 저장 데이터 검증 실패: " + error, out error);
-        return TryValidateSelections(data.Altar, data.Totem, true, true, out error);
+        return TryValidateSelections(data.Altar, data.Totem, out error);
     }
 
-    private bool TryValidateSelections(AltarRunSaveData altar, TotemRunSaveData totem,
-        bool validateAltar, bool validateTotem, out string error)
+    private bool TryValidateSelections(AltarRunSaveData altar, TotemRunSaveData totem, out string error)
     {
-        if (validateAltar && (altar == null || altar.SelectedAltar == AltarId.None ||
-            !Enum.IsDefined(typeof(AltarId), altar.SelectedAltar)))
+        if (altar == null || altar.SelectedAltar == AltarId.None ||
+            !Enum.IsDefined(typeof(AltarId), altar.SelectedAltar))
             return Fail("제단 저장 데이터의 ID가 올바르지 않습니다.", out error);
 
-        if (validateTotem)
-        {
-            if (totem == null || totem.Totems == null)
-                return Fail("토템 저장 데이터의 목록이 없습니다.", out error);
+        if (totem == null || totem.Totems == null)
+            return Fail("토템 저장 데이터의 목록이 없습니다.", out error);
 
-            HashSet<TotemId> seen = new HashSet<TotemId>();
-            for (int i = 0; i < totem.Totems.Count; i++)
-            {
-                TotemLevelEntry entry = totem.Totems[i];
-                if (entry == null || entry.Id == TotemId.None || !Enum.IsDefined(typeof(TotemId), entry.Id) ||
-                    entry.Level < 0 || !seen.Add(entry.Id))
-                    return Fail("토템 저장 항목의 ID, 레벨과 중복을 확인하세요. Index: " + i, out error);
-            }
+        HashSet<TotemId> seen = new HashSet<TotemId>();
+        for (int i = 0; i < totem.Totems.Count; i++)
+        {
+            TotemLevelEntry entry = totem.Totems[i];
+            if (entry == null || entry.Id == TotemId.None || !Enum.IsDefined(typeof(TotemId), entry.Id) ||
+                entry.Level < 0 || !seen.Add(entry.Id))
+                return Fail("토템 저장 항목의 ID, 레벨과 중복을 확인하세요. Index: " + i, out error);
         }
 
         error = null;
         return true;
     }
 
-    private void Apply(PersistentSaveData data)
+    // 10.9 / 문규성 / 영구 지갑과 특성을 복원한 뒤 특성, 토템, 제단 순서로 기존 런 Provider를 호출하도록 변경했습니다.
+    // 특성과 제단의 시작 지급은 isContinue로 판단하며, 영구 저장 데이터의 지급 플래그는 변경하지 않습니다.
+    private void Apply(PersistentSaveData data, bool isContinue)
     {
-        _restoringPart = "혈석";
-        if (_restoreWallet) _wallet.RestoreSaveData(data.Wallet, false);
-        else LogInitialValue("혈석", "복원이 비활성화되어 초기값을 유지합니다.");
-        _restoringPart = "특성";
-        if (_restoreTraits) _traits.RestoreSaveData(data.Traits, false);
-        else LogInitialValue("특성", "복원이 비활성화되어 초기값을 유지합니다.");
-        if (_altar != null)
+        _wallet.RestoreSaveData(data.Wallet, false);
+        _traits.RestoreSaveData(data.Traits, false);
+        if (_traitRun != null)
         {
-            _restoringPart = "제단";
-            if (_restoreAltar) _altar.RestoreSaveData(Clone(_cachedAltar));
+            _traitRun.RestoreSaveData(new TraitRunSaveData
+            {
+                Levels = data.Traits._levels,
+                IsApplied = isContinue
+            });
         }
-        if (_totem != null)
+        _totem.RestoreSaveData(data.Totem);
+        _altar.RestoreSaveData(new AltarRunSaveData
         {
-            _restoringPart = "토템";
-            if (_restoreTotem) _totem.RestoreSaveData(Clone(_cachedTotem));
-        }
-        // 모든 상태가 적용된 다음 UI에 알립니다.
-        _restoringPart = "혈석 변경 알림";
+            SelectedAltar = data.Altar.SelectedAltar,
+            isApplied = isContinue
+        });
+
+        // 모든 상태가 적용된 다음 UI에 한 번씩 알립니다.
         _wallet.NotifyChanged();
-        _restoringPart = "특성 변경 알림";
         _traits.NotifyChanged();
     }
 
-    private void CacheMetadata(PersistentSaveData data)
-    {
-        _cachedAltar = Clone(data.Altar);
-        _cachedTotem = Clone(data.Totem);
-        _lastSettledRunId = data.LastSettledRunId;
-    }
-
-    private static AltarRunSaveData Clone(AltarRunSaveData data)
-    {
-        return data == null ? null : new AltarRunSaveData { SelectedAltar = data.SelectedAltar };
-    }
-
-    private static TotemRunSaveData Clone(TotemRunSaveData data)
-    {
-        if (data == null) return null;
-        TotemRunSaveData copy = new TotemRunSaveData
-        {
-            Totems = data.Totems == null ? null : new List<TotemLevelEntry>()
-        };
-        if (data.Totems != null)
-        {
-            foreach (TotemLevelEntry entry in data.Totems)
-                copy.Totems.Add(entry == null ? null : new TotemLevelEntry { Id = entry.Id, Level = entry.Level });
-        }
-        return copy;
-    }
-
-    private void LogInitialValue(string part, string reason)
-    {
-        Debug.LogWarning("[OutGameSave] " + part + ": " + reason, this);
-    }
-
+    // 10.9 / 문규성 / 선택 캐시 대신 실제 Provider를 사용하므로 제단과 토템 연결도 기존 참조 확인에 포함했습니다.
     private bool CheckReferences(out string error)
     {
-        if (_saveManager == null || _traits == null || _wallet == null)
-            return Fail("SaveManager, 특성 Selector, 혈석 지갑을 먼저 연결해주세요.", out error);
+        if (_saveManager == null || _traits == null || _wallet == null || _altar == null || _totem == null)
+            return Fail("SaveManager, 특성 Selector, 혈석 지갑, 제단과 토템 Provider를 먼저 연결해주세요.", out error);
         if (!_traits.IsInitialized || !_wallet.IsInitialized)
             return Fail("특성 Selector와 혈석 지갑을 먼저 초기화해주세요.", out error);
         error = null;
