@@ -96,6 +96,7 @@ namespace Game.Core
         private IContinueUI _continueUI;
         private IRunDecisionUI _decisionUI;
         private IShopFlow _shopFlow;
+        private IEventFlow _eventFlow;
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
         private IRunCheckpointWriter _checkpointWriter;
@@ -134,6 +135,7 @@ namespace Game.Core
             _cameraController = cameraController;
             _shopFlow = shopFlow;
             _nodeController = new NodeController(waveController.WaveCatalog);
+            
             ClearToken();
             ResetDecisionState();
             _isTransitioning = false;
@@ -146,6 +148,7 @@ namespace Game.Core
             _startupBlocked = false;
             _settlementViewPrepared = false;
             IsResumingStep = false;
+            
             if (!_nodeController.TryStartQuarter(1, _twoEliteChance, out string error))
                 throw new InvalidOperationException("기본 런 준비 실패: " + error);
         }
@@ -153,6 +156,11 @@ namespace Game.Core
         public void InitializeSave(IRunCheckpointWriter checkpointWriter)
         {
             _checkpointWriter = checkpointWriter ?? throw new ArgumentNullException(nameof(checkpointWriter));
+        }
+
+        public void InitializeEventFlow(IEventFlow eventFlow)
+        {
+            _eventFlow = eventFlow ?? throw new ArgumentNullException(nameof(eventFlow));
         }
 
         public void BlockStartup()
@@ -164,8 +172,10 @@ namespace Game.Core
         /// <summary>호출하고 결과를 기다리는 UI 계약을 연결한다. 게임 데이터는 Flow가 전달한다.</summary>
         public void InitializeUI(IContinueUI continueUI, IRunDecisionUI decisionUI)
         {
-            if (continueUI == null) throw new ArgumentNullException(nameof(continueUI));
-            if (decisionUI == null) throw new ArgumentNullException(nameof(decisionUI));
+            if (continueUI == null) 
+                throw new ArgumentNullException(nameof(continueUI));
+            if (decisionUI == null) 
+                throw new ArgumentNullException(nameof(decisionUI));
             _continueUI = continueUI;
             _decisionUI = decisionUI;
         }
@@ -478,6 +488,20 @@ namespace Game.Core
                 return;
             }
 
+            if (completedNode.PostBattleEvent == PostBattleEventType.Event)
+            {
+                if (_eventFlow == null)
+                    throw new InvalidOperationException("이벤트 진행 계약을 먼저 연결해주세요.");
+                _resumeStep = RunResumeStep.Event;
+                ChangePhase(GamePhase.Event);
+                // 사건 준비와 체크포인트 저장은 이벤트 시스템이 맡는다.
+                await _eventFlow.OpenEventAsync(token);
+                token.ThrowIfCancellationRequested();
+                IsResumingStep = false;
+                return;
+            }
+
+            // 저주는 기존 임시 안내/테스트 대기 경로를 유지한다.
             _resumeStep = RunResumeStep.Event;
             GamePhase phase = GamePhase.Event;
             if (_continueUI != null)

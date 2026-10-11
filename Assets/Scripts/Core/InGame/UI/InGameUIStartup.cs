@@ -14,6 +14,7 @@ namespace Game.UI.InGame
         [SerializeField] private GameHudView _hudView;
         [SerializeField] private HudPresenter _hudPresenter;
         [SerializeField] private ArtifactRewardPresenter _artifactSelectionUI;
+        [SerializeField] private EventPopupView _eventUI;
         [SerializeField] private ContinueView _continueUI;
         [SerializeField] private RunDecisionView _runDecisionUI;
         [SerializeField] private SettlementView _settlementUI;
@@ -26,6 +27,7 @@ namespace Game.UI.InGame
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
+        public IEventUI EventUI => _eventUI;
         public IContinueUI ContinueUI => _continueUI;
         public IRunDecisionUI RunDecisionUI => _runDecisionUI;
         public IRunSettlementUI SettlementUI => _settlementUI;
@@ -45,7 +47,7 @@ namespace Game.UI.InGame
         {
             IsReady = false;
             if (_uiManager == null || _hudView == null || _hudPresenter == null ||
-                _artifactSelectionUI == null || _continueUI == null || _runDecisionUI == null ||
+                _artifactSelectionUI == null || _eventUI == null || _continueUI == null || _runDecisionUI == null ||
                 _settlementUI == null || _shopView == null || _buildingUI == null || _buildingUIConnection == null || consumableItems == null)
             {
                 Debug.LogError("[InGameUIStartup] UI 연결 참조를 확인해주세요.", this);

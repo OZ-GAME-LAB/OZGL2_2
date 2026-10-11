@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d4af5fe790f9f9439c52d2c8a00778c, type: 3}
+  m_Name: GoldWager
+  m_EditorClassIdentifier: Assembly-CSharp::EventData
+  _id: 20003
+  _title: "\uC6B4\uBA85\uC758 \uB0B4\uAE30"
+  _image: {fileID: 0}
+  _description: "\uC791\uC740 \uD0C1\uC790 \uC704\uC5D0\uC11C \uB3D9\uC804\uC774
+    \uBC18\uC9DD\uC785\uB2C8\uB2E4.\n\uC5BC\uB9C8\uB97C \uAC78\uC9C0\uB294 \uB2F9\uC2E0\uC758
+    \uC120\uD0DD\uC785\uB2C8\uB2E4."
+  _choices:
+  - _title: "\uC791\uC740 \uB0B4\uAE30\uB97C \uD55C\uB2E4"
+    _description: "<color=#EF8888>50\uACE8\uB4DC \uC18C\uBAA8</color>\n<color=#E7CC72>50%:
+      100\uACE8\uB4DC / 50%: 50\uACE8\uB4DC \uD68D\uB4DD</color>"
+    _conditions: []
+    _cost:
+      _gold: 50
+      _artifacts: []
+    _action: {fileID: 11400000, guid: 3f0bcaea60f90804f81c57ff445102d6, type: 2}
+  - _title: "\uD070 \uB0B4\uAE30\uB97C \uD55C\uB2E4"
+    _description: "<color=#EF8888>200\uACE8\uB4DC \uC18C\uBAA8</color>\n<color=#E7CC72>30%:
+      500\uACE8\uB4DC / 40%: 170\uACE8\uB4DC / 30%: 100\uACE8\uB4DC \uD68D\uB4DD</color>"
+    _conditions: []
+    _cost:
+      _gold: 200
+      _artifacts: []
+    _action: {fileID: 11400000, guid: 70b0e2d8a7324b74f975a8bf3b675b10, type: 2}
+  - _title: "\uB5A0\uB098\uAE30"
+    _description: "\uC544\uBB34\uAC83\uB3C4 \uC18C\uBAA8\uD558\uC9C0 \uC54A\uACE0
+      \uB5A0\uB0A9\uB2C8\uB2E4."
+    _conditions: []
+    _cost:
+      _gold: 0
+      _artifacts: []
+    _action: {fileID: 11400000, guid: cce7ebca04ec2d641b55fd0126565d9f, type: 2}
