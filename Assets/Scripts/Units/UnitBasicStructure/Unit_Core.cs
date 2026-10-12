@@ -56,6 +56,13 @@ namespace Units
         // Properties
         // ============================================================
 
+        [SerializeField, Min(0f)]
+        [Tooltip("로컬 전투 몸 반지름. 월드 반지름에는 루트의 XY 스케일이 반영됩니다. Collider와 크기를 맞춰주세요.")]
+        private float _bodyRadius = CombatRangeUtility.StandardBodyRadius;
+
+        public float BodyRadius => Mathf.Max(0f, _bodyRadius)
+            * Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y));
+
         public UnitTeam Team => _team;
 
         public Vector2 FacingDirection => _facingDirection;

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 
 
@@ -219,7 +219,7 @@ namespace Units.Skills
 
             var settings = action.Target;
 
-            var selected = _targetResolver.ResolveSkillTargets(new SkillTargetRequest(context.Owner, settings, origin, direction, initialTarget: context.TargetSnapshot, currentTarget: context.TargetSnapshot, triggerTarget: context.TargetSnapshot));
+            var selected = _targetResolver.ResolveSkillTargets(new SkillTargetRequest(context.Owner, settings, origin, direction, initialTarget: context.TargetSnapshot, currentTarget: context.TargetSnapshot, triggerTarget: context.TargetSnapshot, useBodyRange: !data.UseTriggerPosition));
 
             if (!selected.Success)
                 return false;

@@ -107,7 +107,7 @@ namespace Units
 
             float preferredRange =
                 CalculatePreferredRange(
-                    unit
+                    unit, target
                 );
 
 
@@ -133,59 +133,15 @@ namespace Units
         // Preferred Range
         // =========================
 
-        private float CalculatePreferredRange(
-            Unit_Gateway unit)
+        private float CalculatePreferredRange(Unit_Gateway unit, ICombatTarget target)
+            => CombatRangeUtility.PreferredCenterDistance(unit, target, unit.PreferredCombatRange);
+
+        private bool IsCurrentPositionValid(Unit_Gateway unit, ICombatTarget target)
         {
-            float combatRange =
-                Mathf.Max(
-                    0f,
-                    unit.PreferredCombatRange
-                );
-
-
-            return combatRange
-                * PreferredRangeRatio;
+            float distance = Vector2.Distance(unit.transform.position, target.Transform.position);
+            return distance >= unit.BodyRadius + target.BodyRadius - 0.01f
+                && distance <= CalculatePreferredRange(unit, target);
         }
-
-
-        // =========================
-        // Current Position
-        // =========================
-
-        private bool IsCurrentPositionValid(
-            Unit_Gateway unit,
-            ICombatTarget target)
-        {
-            float combatRange =
-                Mathf.Max(
-                    0f,
-                    unit.PreferredCombatRange * PreferredRangeRatio
-                );
-
-
-            Vector2 unitPosition =
-                unit.transform.position;
-
-            Vector2 targetPosition =
-                target.Transform.position;
-
-
-            float sqrDistance =
-                (
-                    targetPosition
-                    - unitPosition
-                ).sqrMagnitude;
-
-
-            float combatRangeSqr =
-                combatRange
-                * combatRange;
-
-
-            return sqrDistance
-                <= combatRangeSqr;
-        }
-
 
         // =========================
         // Position Selection
@@ -318,9 +274,7 @@ namespace Units
             Unit_Gateway requester,
             Vector2 position)
         {
-            float checkRadiusSqr =
-                PositionCheckRadius
-                * PositionCheckRadius;
+
 
 
             foreach (
@@ -352,8 +306,9 @@ namespace Units
                     ).sqrMagnitude;
 
 
-                if (sqrDistance
-                    < checkRadiusSqr)
+                float spacing = Mathf.Max(requester.BodyRadius + pair.Key.BodyRadius,
+                    PositionCheckRadius + CombatRangeUtility.Correction(requester, pair.Key));
+                if (sqrDistance < spacing * spacing)
                 {
                     return false;
                 }

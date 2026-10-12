@@ -43,7 +43,9 @@ namespace Units
             // 접근을 시작했으면 사거리 안쪽까지 이동하여 경계에서의 반복 정지를 막는다.
             // 공격 판정 자체의 사거리는 변경하지 않는다.
             if (approaching && _core.CanMove
-                && distance > _core.PreferredCombatRange * 0.9f)
+                && Vector2.Distance(_core.transform.position, assignment.Target.Transform.position)
+                    > CombatRangeUtility.PreferredCenterDistance(_core.CombatTarget,
+                        assignment.Target, _core.PreferredCombatRange) + 0.001f)
                 return UnitAIActionType.Move;
 
             if (CanUseBasicAttack(
@@ -119,10 +121,7 @@ namespace Units
                 target.Transform.position;
 
 
-            return Vector2.Distance(
-                unitPosition,
-                targetPosition
-            );
+            return CombatRangeUtility.Distance(_core.CombatTarget, target);
         }
 
 

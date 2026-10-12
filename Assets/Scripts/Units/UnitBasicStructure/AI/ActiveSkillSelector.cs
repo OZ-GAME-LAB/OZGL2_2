@@ -43,7 +43,7 @@ namespace Units
             var data = skill.Entry.Skill;
             UnitTeam team = data.TargetSide == SkillTargetRelation.Hostile ?
                 (_core.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally) : _core.Team;
-            var candidates = _resolver.ResolveCandidates(new TargetCandidateRequest(_core.transform.position, data.SkillRange, team));
+            var candidates = _resolver.ResolveCandidates(new TargetCandidateRequest(_core.transform.position, data.SkillRange, team, sourceBodyRadius: _core.BodyRadius));
             initial = skill.Selector.SelectTarget(current, candidates);
             // 배정 대상도 최상단 사거리의 후보에 포함될 때만 초기 대상으로 사용한다.
             if (!skill.Executor.TryPreview(initial, out targets)) return false;

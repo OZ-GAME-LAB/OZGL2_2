@@ -71,6 +71,8 @@ namespace Units
 
         public Unit_GroupAI GroupAI => _groupAI;
 
+        public float BodyRadius => _core != null ? _core.BodyRadius : CombatRangeUtility.StandardBodyRadius;
+
         public Transform Transform => transform;
 
         public Vector2 FacingDirection => _core != null ? _core.FacingDirection : Vector2.left;

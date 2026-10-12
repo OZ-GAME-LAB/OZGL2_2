@@ -40,6 +40,25 @@ namespace Units.Editor
             return open;
         }
 
+        // ============================================================
+        // UI Display
+        // ============================================================
+
+        public static void DisplaySection(SerializedProperty display)
+        {
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                if (Foldout(display, "UI 표시 정보", true))
+                {
+                    EditorGUILayout.PropertyField(display.FindPropertyRelative("_name"), new GUIContent("표시 이름"));
+                    EditorGUILayout.PropertyField(display.FindPropertyRelative("_icon"), new GUIContent("아이콘"));
+                    EditorGUILayout.PropertyField(display.FindPropertyRelative("_description"), new GUIContent("설명"));
+                }
+            }
+
+            EditorGUILayout.Space(6);
+        }
+
         public static int Tabs(SerializedProperty property, params string[] titles)
         {
             string key = Key(property.serializedObject, property.propertyPath + ":tab");

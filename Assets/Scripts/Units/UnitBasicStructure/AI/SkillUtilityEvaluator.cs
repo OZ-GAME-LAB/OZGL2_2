@@ -30,7 +30,7 @@ namespace Units
                     (Vector2)current.Target.Transform.position : predictedPosition;
                 Vector2 direction = initialSnapshot.IsTargetable ? (Vector2)initial.Transform.position - origin : _core.FacingDirection;
                 var selected = _resolver.ResolveSkillTargets(new SkillTargetRequest(_core.CombatTarget, action.Target,
-                    origin, direction, initialTarget: initialSnapshot, currentTarget: current, previousTarget: previous));
+                    origin, direction, initialTarget: initialSnapshot, currentTarget: current, previousTarget: previous, useBodyRange: action.Origin == SkillAreaOrigin.Owner));
                 if (!selected.Success) break;
                 var context = new SkillConditionContext(_core.CombatTarget, selected.PrimaryTarget, _resolver,
                     isActiveSkill: true, actionIndex: index, position: origin);
@@ -70,7 +70,8 @@ namespace Units
                 previous = selected.PrimaryTarget; current = selected.PrimaryTarget;
                 if (action is SkillDashActionData dash && selected.PrimaryTarget.IsTargetable)
                     predictedPosition = DashController.PredictEndPosition(predictedPosition,
-                        selected.PrimaryTarget.Target.Transform.position, dash.Distance, dash.Speed);
+                        selected.PrimaryTarget.Target.Transform.position, dash.Distance, dash.Speed,
+                        CombatRangeUtility.Correction(_core.BodyRadius, selected.PrimaryTarget.BodyRadius));
             }
             return Mathf.Max(0, score);
         }

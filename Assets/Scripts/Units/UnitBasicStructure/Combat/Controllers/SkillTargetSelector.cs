@@ -101,7 +101,8 @@ namespace Units
                     float value = GetMetric(
                         target,
                         request.Origin,
-                        filter.Metric
+                        filter.Metric,
+                        request.UseBodyRange ? request.Owner.BodyRadius : (float?)null
                     );
 
                     float expected = filter.Value;
@@ -172,7 +173,8 @@ namespace Units
                             values[i] = GetMetric(
                                 target,
                                 request.Origin,
-                                SkillTargetMetric.Distance
+                                SkillTargetMetric.Distance,
+                                request.UseBodyRange ? request.Owner.BodyRadius : (float?)null
                             );
 
                             break;
@@ -181,7 +183,8 @@ namespace Units
                             values[i] = -GetMetric(
                                 target,
                                 request.Origin,
-                                SkillTargetMetric.Distance
+                                SkillTargetMetric.Distance,
+                                request.UseBodyRange ? request.Owner.BodyRadius : (float?)null
                             );
 
                             break;
@@ -248,7 +251,7 @@ namespace Units
         private static float GetMetric(
             ICombatTarget target,
             Vector2 origin,
-            SkillTargetMetric metric)
+            SkillTargetMetric metric, float? sourceBodyRadius = null)
         {
             float maxHp = target.RuntimeStatus != null ? target.RuntimeStatus.MaxHp : 0f;
 
@@ -256,7 +259,9 @@ namespace Units
 
             return metric switch
             {
-                SkillTargetMetric.Distance => Vector2.Distance(origin, target.Transform.position),
+                SkillTargetMetric.Distance => sourceBodyRadius.HasValue
+                    ? CombatRangeUtility.Distance(origin, sourceBodyRadius.Value, target)
+                    : Vector2.Distance(origin, target.Transform.position),
                 SkillTargetMetric.CurrentHp => target.CurrentHp,
                 SkillTargetMetric.HpRatio => ratio,
                 SkillTargetMetric.MissingHpRatio => 1f - ratio,
@@ -399,7 +404,8 @@ namespace Units
                     continue;
                 }
 
-                float distanceSqr = ((Vector2)candidate.Transform.position - origin).sqrMagnitude;
+                float distance = CombatRangeUtility.Distance(origin, _core.BodyRadius, candidate);
+                float distanceSqr = distance * distance;
 
                 if (distanceSqr >= selectedDistanceSqr)
                     continue;
@@ -429,7 +435,8 @@ namespace Units
                     continue;
                 }
 
-                float distanceSqr = ((Vector2)candidate.Transform.position - origin).sqrMagnitude;
+                float distance = CombatRangeUtility.Distance(origin, _core.BodyRadius, candidate);
+                float distanceSqr = distance * distance;
 
                 if (distanceSqr <= selectedDistanceSqr)
                     continue;
