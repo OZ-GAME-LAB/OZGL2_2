@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 2650370216710282267}
   - component: {fileID: 936689470157237555}
   - component: {fileID: 8248911123056721564}
+  - component: {fileID: 4368029838820995545}
   m_Layer: 0
   m_Name: CoreSystem
   m_TagString: Untagged
@@ -50,16 +51,27 @@ MonoBehaviour:
   _testScript: {fileID: 0}
   _gameFlowController: {fileID: 2650370216710282267}
   _waveController: {fileID: 936689470157237555}
+  _archiveManager: {fileID: 0}
   _artifactManager: {fileID: 0}
   _effectManager: {fileID: 0}
   _spawnManager: {fileID: 0}
   _runtimeUnitManager: {fileID: 0}
   _runCurrencyManager: {fileID: 0}
+  _shopManager: {fileID: 0}
+  _eventManager: {fileID: 0}
+  _consumableItemManager: {fileID: 0}
+  _runSettlementManager: {fileID: 0}
+  _persistentCurrencyManager: {fileID: 0}
   _cameraController: {fileID: 0}
   _buildController: {fileID: 0}
   _buildingCoreProgress: {fileID: 0}
   _buildingCensus: {fileID: 0}
   _inGameSaveCoordinator: {fileID: 0}
+  _outGameSaveCoordinator: {fileID: 0}
+  _saveManager: {fileID: 0}
+  _uiStartup: {fileID: 0}
+  _archiveController: {fileID: 4368029838820995545}
+  _persistentTraits: {fileID: 0}
   _unitStatModifierManager: {fileID: 0}
   _traitRunApplier: {fileID: 0}
   _traitCatalog: {fileID: 11400000, guid: 4bc0d96a911c202439d4bf32d79730a1, type: 2}
@@ -108,3 +120,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TestPanelManager
   TestCanvas: {fileID: 0}
+--- !u!114 &4368029838820995545
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9210137385767385224}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f337c7853b01094686c31fffa69d034, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Archive.ArchiveController
