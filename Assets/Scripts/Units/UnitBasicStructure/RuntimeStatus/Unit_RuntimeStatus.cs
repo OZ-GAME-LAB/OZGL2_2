@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Units.Effects;
 using Units.Skills;
@@ -16,6 +16,9 @@ namespace Units
 
         [SerializeField]
         private UnitData _unitData;
+
+        private UnitData _runtimeUnitData;
+        public UnitData DefaultUnitData => _unitData;
 
         private IReadOnlyList<PassiveSkillData> _spawnPassiveSkills = Array.Empty<PassiveSkillData>();
 
@@ -105,11 +108,11 @@ namespace Units
         // Data Properties
         // ============================================================
 
-        public UnitData UnitData => _unitData;
+        public UnitData UnitData => _runtimeUnitData != null ? _runtimeUnitData : _unitData;
 
-        public BasicAttackData BasicAttackData => _unitData != null ? _unitData.BasicAttackData : null;
+        public BasicAttackData BasicAttackData => UnitData != null ? UnitData.BasicAttackData : null;
 
-        public IReadOnlyList<UnitActiveSkillEntry> ActiveSkills => _unitData != null ? _unitData.ActiveSkills : Array.Empty<UnitActiveSkillEntry>();
+        public IReadOnlyList<UnitActiveSkillEntry> ActiveSkills => UnitData != null ? UnitData.ActiveSkills : Array.Empty<UnitActiveSkillEntry>();
 
 
         public IReadOnlyList<PassiveSkillData> PassiveSkillDatas => _spawnPassiveSkills;
@@ -201,9 +204,16 @@ namespace Units
             FinalStatModifier spawnModifier,
             IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
         {
+            Initialize(spawnModifier, spawnPassiveSkills, null);
+        }
+
+        public void Initialize(FinalStatModifier spawnModifier,
+            IReadOnlyList<PassiveSkillData> spawnPassiveSkills, UnitData overrideData)
+        {
+            _runtimeUnitData = overrideData != null ? overrideData : _unitData;
             _spawnPassiveSkills = Array.Empty<PassiveSkillData>();
 
-            if (_unitData == null)
+            if (UnitData == null)
             {
                 Debug.LogError($"[Unit_RuntimeStatus] {name} : UnitData가 없습니다.");
 
@@ -220,7 +230,7 @@ namespace Units
 
             InitializePassiveSkills(spawnPassiveSkills);
 
-            _adjustedStatus = new AdjustedStatus(_unitData, spawnModifier);
+            _adjustedStatus = new AdjustedStatus(UnitData, spawnModifier);
 
             _finalStatus = new FinalStatus(_adjustedStatus);
 
@@ -237,9 +247,9 @@ namespace Units
             HashSet<PassiveSkillData> included = new();
 
             // 기본 목록의 기존 실행 순서와 중복 설정은 보존한다.
-            if (_unitData.PassiveSkillDatas != null)
+            if (UnitData.PassiveSkillDatas != null)
             {
-                foreach (PassiveSkillData passiveSkill in _unitData.PassiveSkillDatas)
+                foreach (PassiveSkillData passiveSkill in UnitData.PassiveSkillDatas)
                 {
                     if (passiveSkill == null)
                         continue;
@@ -491,10 +501,10 @@ namespace Units
 
         public bool IsImmuneToStatus(UnitStatusEffectType statusType)
         {
-            if (_unitData == null)
+            if (UnitData == null)
                 return false;
 
-            return _unitData.IsImmuneToStatus(statusType);
+            return UnitData.IsImmuneToStatus(statusType);
         }
 
         private void OnStatusChanged(

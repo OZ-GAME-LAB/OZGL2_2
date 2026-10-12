@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_CU_T1_\uAD11\uC2E0\uB3C4_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uD53C\uC758 \uAE30\uB3C4"
+    _icon: {fileID: 21300000, guid: f776c282c6dad8043a827389dd88dd4b, type: 3}
+    _description: "\uC8FC\uBCC0 \uC544\uAD70\uC758 \uCCB4\uB825\uC744 \uACF5\uACA9\uB825\uC758
+      200%\uB9CC\uD07C \uD68C\uBCF5\uD569\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 6\uCD08]"
   _skillRange: 7
   _skillCooldown: 6
   _targetSide: 1
@@ -26,6 +31,7 @@ MonoBehaviour:
   _areaAngle: 90
   _effects: []
   _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
   _dashDistance: 3
   _dashSpeed: 10
   _skillFXType: 0
@@ -40,7 +46,6 @@ MonoBehaviour:
     - rid: 4844432381217865745
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _executionDuration: 0
         _target:
           _source: 6
           _relation: 1
@@ -74,17 +79,18 @@ MonoBehaviour:
         _conditionalEffects: []
         _fxEntries: []
         _delivery: 0
+        _executionDuration: 0
+        _impactTiming: 0
         _area: 2
         _radius: 7
         _angle: 360
         _maxEffectTargets: 10
         _projectileSpeed: 10
+        _projectilePrefab: {fileID: 0}
         _isLegacy: 0
     - rid: 4844432381217865746
       type: {class: SkillHealEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _scalingStatType: 1
-        _healRatio: 2
         _applicationFX:
         - _key: VFX_OnApply_Heal
           _hook: 1
@@ -104,3 +110,5 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _scalingStatType: 1
+        _healRatio: 2

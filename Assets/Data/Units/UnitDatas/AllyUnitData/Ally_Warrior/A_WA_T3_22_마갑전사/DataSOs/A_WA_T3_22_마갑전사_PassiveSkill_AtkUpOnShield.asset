@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_WA_T3_22_\uB9C8\uAC11\uC804\uC0AC_PassiveSkill_AtkUpOnShield"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uB9C8\uAC11 \uC99D\uD3ED"
+    _icon: {fileID: 21300000, guid: 4787b4a24e31af24090365bef9eba70f, type: 3}
+    _description: "\uBCF4\uD638\uB9C9\uC774 \uC788\uB294 \uB3D9\uC548 \uACF5\uACA9\uB825\uC774
+      15% \uC99D\uAC00\uD569\uB2C8\uB2E4."
   _skillSchemaVersion: 1
   _triggerType: 5
   _tickInterval: 0.5
@@ -44,7 +49,6 @@ MonoBehaviour:
     - rid: 4844432377880510572
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 8034ea5e432b7b64192d43e67ed397a2, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -55,3 +59,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 8034ea5e432b7b64192d43e67ed397a2, type: 2}

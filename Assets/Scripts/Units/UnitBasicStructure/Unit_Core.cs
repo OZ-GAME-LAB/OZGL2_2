@@ -1,3 +1,4 @@
+﻿using Units.UnitDatas;
 using System;
 using System.Collections.Generic;
 using Units.Effects;
@@ -190,6 +191,12 @@ namespace Units
             FinalStatModifier spawnModifier,
             IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
         {
+            Initialize(spawnModifier, spawnPassiveSkills, null);
+        }
+
+        public void Initialize(FinalStatModifier spawnModifier,
+            IReadOnlyList<PassiveSkillData> spawnPassiveSkills, UnitData overrideData)
+        {
             GetComponent<Units.FX.UnitFXBridge>()?.Release();
             _facingDirection = Vector2.left;
 
@@ -204,7 +211,7 @@ namespace Units
                 _gateway.Initialize(this);
             }
 
-            _runtimeStatus.Initialize(spawnModifier, spawnPassiveSkills);
+            _runtimeStatus.Initialize(spawnModifier, spawnPassiveSkills, overrideData);
 
             if (_runtimeStatus.UnitData != null)
             {

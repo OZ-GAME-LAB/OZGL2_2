@@ -112,7 +112,8 @@ namespace Game.UI.Samples
         public UniTask SpawnEnemyWaveAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool isInfiniteWave = false)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
