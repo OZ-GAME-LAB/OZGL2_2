@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using Game.Archive;
 using Game.Cameras;
 using Game.Core;
 using Game.UI.InGame;
@@ -56,6 +57,8 @@ public class BootStrap : MonoBehaviour
     #region UI
     [Header("UI")]
     [SerializeField] private InGameUIStartup _uiStartup;
+    [SerializeField] private ArchiveController _archiveController;
+    private BuildingSlot[] _buildingSlots;
     public bool IsUIConnected => _uiStartup != null && _uiStartup.IsReady;
     #endregion
 
@@ -114,6 +117,9 @@ public class BootStrap : MonoBehaviour
                 StopStartup(error);
                 return;
             }
+            _archiveController.Initialize(_saveManager, _artifactManager, _buildingSlots,
+                _gameFlowController, _runtimeUnitManager);
+            _uiStartup.InitializeArchive(_archiveController);
             _gameFlowController.BeginRun();
         }
         catch (OperationCanceledException) when (this == null) { }
@@ -210,8 +216,9 @@ public class BootStrap : MonoBehaviour
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
+        _buildingSlots = buildingSlots.ToArray();
         if (!_uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
-                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(),
+                _waveController, _buildController, _buildingCoreProgress, _buildingSlots,
                 _cameraController, _consumableItemManager, _spawnManager))
         {
             Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
