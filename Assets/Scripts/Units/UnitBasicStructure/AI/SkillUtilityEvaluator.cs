@@ -48,7 +48,11 @@ namespace Units
                             (_core.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally) : _core.Team;
                         foreach (var target in _resolver.ResolveHitTargets(new TargetHitRequest(center, direction,
                             attack.Radius, attack.Angle, attack.MaxEffectTargets,
-                            attack.Area == ActiveSkillAreaType.SelfCone ? HitAreaType.Cone : HitAreaType.Circle, team)))
+                            attack.Area == ActiveSkillAreaType.SelfCone ? HitAreaType.Cone : HitAreaType.Circle, team,
+                            target => action.Target.Relation == SkillTargetRelation.Self
+                                ? ReferenceEquals(target, _core.CombatTarget)
+                                : action.Target.Relation != SkillTargetRelation.Friendly || action.Target.IncludeSelf
+                                    || !ReferenceEquals(target, _core.CombatTarget))))
                         {
                             bool self = ReferenceEquals(target, _core.CombatTarget);
                             if (action.Target.Relation == SkillTargetRelation.Self && !self ||

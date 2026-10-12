@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
@@ -15,6 +15,7 @@ namespace Units
         // ============================================================
 
         private readonly HashSet<(int, int)> _hits = new();
+        private readonly HashSet<(int, int)> _damageFXHits = new();
 
         private Action<bool> _completed;
 
@@ -26,6 +27,8 @@ namespace Units
 
         private Vector2 _position;
         private Vector2 _direction;
+        private float _attackRadius;
+        internal void SetFXRadius(float radius) => _attackRadius = Mathf.Max(0f, radius);
         private Transform _followTarget;
         private Units.FX.FXScope _fxScope;
         private IReadOnlyList<SkillFXEntry> _fxEntries;
@@ -89,7 +92,7 @@ namespace Units
 
                 if (fx != null && fx.Hook == hook)
                     Units.FX.UnitFXBridge.Dispatch(new SkillFXRequest(fx, _metadata, position,
-                        direction: _direction, target: target, followTarget: _followTarget, scope: _fxScope));
+                        direction: _direction, target: target, followTarget: _followTarget, scope: _fxScope, attackRadius: _attackRadius));
             }
         }
 
@@ -119,6 +122,20 @@ namespace Units
         // ============================================================
 
         public bool Enter(CombatTargetSnapshot target) => !Ended && _hits.Add((target.ObjectId, target.LifetimeVersion));
+
+        // 충돌 폭발은 Controller의 Collision 경로에서 한 번 재생한다.
+        // 여기서는 실제 피해 결과만 대상별 OnHit으로 전달한다. 여러 피해 효과도 한 발당 한 번이다.
+        internal void RecordImpactResult(CombatApplicationResult result)
+        {
+            if (result == null || Ended) return;
+            Record(result);
+            if (Ended || result.Kind != CombatApplicationKind.Damage || !result.WasApplied
+                || (result.HpDamage <= 0f && result.ShieldAbsorbed <= 0f)) return;
+
+            var target = result.Target;
+            if (_damageFXHits.Add((target.ObjectId, target.LifetimeVersion)))
+                NotifyFX(SkillFXHook.OnHit, target.Position, target);
+        }
 
         // 첫 실제 적용만 알리므로 Once 패시브가 거절된 타격에 소모되지 않는다.
         public void Record(CombatApplicationResult result)
@@ -154,6 +171,7 @@ namespace Units
             _completed = null;
 
             _hits.Clear();
+            _damageFXHits.Clear();
 
             var batch = _batch;
 

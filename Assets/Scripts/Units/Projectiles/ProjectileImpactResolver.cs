@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -110,9 +110,7 @@ namespace Units
 
             foreach (var result in DamageResolver.Instance.ResolveWithResults(new DamageRequest(pendingRequest.Attacker, unique, pendingRequest.SourceType, pendingRequest.DamageType, pendingRequest.DamageMultiplier, pendingRequest.Metadata, pendingRequest.SourceSnapshot)))
             {
-                flight.Record(result);
-                if (result.Status != CombatApplicationStatus.Invalid)
-                    flight.NotifyFX(SkillFXHook.OnHit, result.Target.Position, result.Target);
+                flight.RecordImpactResult(result);
             }
         }
 
@@ -163,7 +161,7 @@ namespace Units
                     );
 
                     foreach (var result in SkillAttackDelivery.Hit(pendingRequest.Batch, context))
-                        flight.Record(result);
+                        flight.RecordImpactResult(result);
 
                     pendingRequest.Batch.EventTemplate?.NotifyHit(
                         snapshots[i],
@@ -171,13 +169,12 @@ namespace Units
                         context.Position
                     );
 
-                    flight.NotifyFX(SkillFXHook.OnHit, context.Position, snapshots[i]);
 
                     continue;
                 }
 
                 foreach (var result in SkillEffectResolver.Instance.ResolveWithResults(new SkillEffectRequest(pendingRequest.Caster, target, pendingRequest.Effects, pendingRequest.Metadata, sourceSnapshot: pendingRequest.SourceSnapshot)))
-                    flight.Record(result);
+                    flight.RecordImpactResult(result);
             }
         }
     }

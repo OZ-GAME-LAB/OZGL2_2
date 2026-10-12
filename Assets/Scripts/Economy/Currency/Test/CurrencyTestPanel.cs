@@ -136,7 +136,7 @@ public class CurrencyTestPanel : MonoBehaviour
             }
             if (_artifactTestPanel != null)
             {
-                _artifactTestPanel.Initialize(_waveController, _effectManager);
+                _artifactTestPanel.Initialize(_waveController, _effectManager, _run);
             }
         }
         Report("Run 시작", _run.IsInitialized);
@@ -451,7 +451,7 @@ public class CurrencyTestPanel : MonoBehaviour
                 waiting.Initialize(_testFlow, _waveController);
                 _testFlow.Initialize(_waveController, waiting,
                     _artifactTestPanel != null ? _artifactTestPanel.Artifacts : null);
-                _testFlow.NewGame();
+                _testFlow.BeginRun();
             }
         }
         return _waveController.CurQuarter > 0 && _waveController.CurWave > 0;

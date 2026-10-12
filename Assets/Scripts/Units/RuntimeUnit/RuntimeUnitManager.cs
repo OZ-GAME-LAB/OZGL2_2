@@ -761,6 +761,9 @@ namespace Units
             }
 
 
+            // 전투 시작 중복 방어를 통과한 뒤에만 VFX 보관 세대를 진행한다.
+            Units.FX.VFXManager.Instance?.BeginGeneration();
+
             _battleStarted =
                 true;
 
@@ -981,7 +984,8 @@ namespace Units
 
 
             ResetGroupIds();
-            Units.FX.VFXManager.Instance?.Clear();
+            // 전투 사이에는 보관 풀을 유지하고, 오래 미사용한 인스턴스만 다음 세대에 정리한다.
+            Units.FX.VFXManager.Instance?.Clear(false);
             Units.FX.SFXManager.Instance?.Clear();
         }
 

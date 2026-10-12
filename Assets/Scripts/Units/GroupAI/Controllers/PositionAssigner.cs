@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -159,7 +159,7 @@ namespace Units
             float combatRange =
                 Mathf.Max(
                     0f,
-                    unit.PreferredCombatRange
+                    unit.PreferredCombatRange * PreferredRangeRatio
                 );
 
 

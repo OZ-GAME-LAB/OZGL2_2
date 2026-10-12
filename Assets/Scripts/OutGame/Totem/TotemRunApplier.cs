@@ -7,6 +7,7 @@ using UnityEngine;
 
 /// <summary>
 /// 이번 Run에 켠 토템 레벨만큼 유닛 스탯을 넣고, 끝날 때 해제합니다.
+/// 궁핍은 웨이브 보상·생산 골드 감소로 EffectManager에 등록합니다.
 /// 추가 혈석 퍼센트는 여기서 계산만 합니다. 정산 혈석이 나온 뒤에 TryGrantBonus로 지급합니다.
 /// PhaseChanged만 구독하며 Update에서 레벨을 확인하지 않습니다.
 /// 저장 파일 입출력은 하지 않습니다. 세이브 담당이 CaptureSaveData와 RestoreSaveData만 호출합니다.
@@ -23,9 +24,16 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     // 아웃게임에서 레벨 1 이상으로 켠 토템입니다. UI는 Data와 Level만 읽습니다.
     public IReadOnlyList<ActiveTotem> ActiveTotems => _activeTotems;
 
+    // 궁핍 1레벨당 골드 -10%입니다. Percent -0.1이 -10%이고, TotemData의 10은 화면 표시용입니다.
+    private const float GoldReductionPercentPerLevel = -0.1f;
+
     private TotemEffectCatalog _catalog;
     private UnitStatModifierManager _unitStatModifierManager;
+    private EffectManager _effectManager;
     private GameFlowController _gameFlow;
+
+    // 궁핍 보정 2개(웨이브 보상, 생산)를 Run마다 다시 담습니다. Update에서는 만들지 않습니다.
+    private readonly List<CurrencyModifier> _goldReductionModifiers = new List<CurrencyModifier>(2);
 
     // 아웃게임에서 전달받은 레벨 사본입니다. 원본 목록이 나중에 바뀌어도 이번 Run에 영향이 없습니다.
     private readonly List<TotemLevelEntry> _levels = new List<TotemLevelEntry>();
@@ -47,9 +55,11 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
 
     // unitStatModifierManager는 SpawnManager가 사용하는 것과 같은 인스턴스여야 스폰 유닛에 반영됩니다.
     // catalog가 없어도 격노·취약 기본 스탯은 적용됩니다. 혈석 퍼센트는 TotemData가 있어야 계산됩니다.
+    // 10.9 / 문규성 / 외부 레벨이 없으면 테스트 레벨을 SetLevels로 복사해 저장에도 같은 목록을 사용하도록 변경했습니다.
     public void Initialize(
         TotemEffectCatalog catalog,
         UnitStatModifierManager unitStatModifierManager,
+        EffectManager effectManager,
         GameFlowController gameFlow)
     {
         if (gameFlow == null)
@@ -61,6 +71,11 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         if (unitStatModifierManager == null)
         {
             Debug.LogWarning("[OutGame/TotemRunApplier] UnitStatModifierManager 참조가 없습니다. 유닛 스탯 효과를 적용할 수 없습니다.", this);
+        }
+
+        if (effectManager == null)
+        {
+            Debug.LogWarning("[OutGame/TotemRunApplier] EffectManager 참조가 없습니다. 궁핍의 골드 감소를 적용할 수 없습니다.", this);
         }
 
         if (catalog == null)
@@ -76,7 +91,12 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
 
         _catalog = catalog;
         _unitStatModifierManager = unitStatModifierManager;
+        _effectManager = effectManager;
         _gameFlow = gameFlow;
+        if (!_hasLevels)
+        {
+            SetLevels(_testLevels);
+        }
         _gameFlow.PhaseChanged += HandlePhaseChanged;
         BuildActiveTotems();
     }
@@ -104,6 +124,18 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
             ClearAll();
         }
     }
+
+    // Current date KDH 2026-10-08
+    // 이어하기는 상점·이벤트에서도 효과가 필요하므로 Preparation을 기다리지 않습니다.
+    // 토템 적용은 재화를 넣지 않고, 이미 적용됐으면 목록을 다시 돌지 않습니다.
+    // RestoreSaveData가 즉시 ApplyAll을 실행하므로 별도 복원 경로는 주석으로 보존합니다.
+    /*
+    public void ApplyOngoingEffects()
+    {
+        if (_isApplied) return;
+        ApplyAll();
+    }
+    */
 
     // OutGameStartContext.Totems를 그대로 넘기면 됩니다. BeginRun 전에 호출해야 이번 Run에 반영됩니다.
     public void SetLevels(IReadOnlyList<TotemLevelEntry> levels)
@@ -146,17 +178,46 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     }
 
     // Current date KDH 2026-10-02
-    // 레벨만 되돌립니다. 스탯은 이후 첫 Preparation의 ApplyAll이 넣습니다.
+    // 레벨과 지속 효과를 즉시 되돌립니다. Preparation 이외의 단계에서도 이어갈 수 있습니다.
     // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    // 10.9 / 문규성 / 저장된 레벨로 교체한 뒤 기존 효과를 해제하고 ApplyAll로 즉시 다시 적용하도록 변경했습니다.
+    // 준비 단계가 아닌 곳에서 이어가도 토템효과를 복원합니다.
     public void RestoreSaveData(TotemRunSaveData data)
     {
         if (data == null)
         {
-            Debug.LogError("[OutGame/TotemRunApplier] 복원할 토템 저장 데이터가 없습니다.", this);
-            return;
+            throw new ArgumentNullException(nameof(data));
+        }
+
+        if (_gameFlow == null)
+        {
+            throw new InvalidOperationException("토템 저장 데이터를 복원하려면 초기화가 필요합니다.");
+        }
+
+        // 복원은 필요한 전달 대상이 없으면 실패로 알립니다. 카탈로그 없는 기본 스탯 경로는 유지합니다.
+        if (data.Totems != null)
+        {
+            foreach (TotemLevelEntry entry in data.Totems)
+            {
+                if (entry == null || entry.Id == TotemId.None || entry.Level <= 0) continue;
+                if (entry.Id == TotemId.GoldReduction && _effectManager == null)
+                {
+                    throw new InvalidOperationException("EffectManager가 없어 궁핍 효과를 복원하지 못했습니다.");
+                }
+
+                IReadOnlyList<TotemStatEffect> effects = _catalog != null
+                    ? _catalog.GetStatEffects(entry.Id)
+                    : TotemBuiltinEffects.Get(entry.Id);
+                if (effects != null && effects.Count > 0 && _unitStatModifierManager == null)
+                {
+                    throw new InvalidOperationException($"UnitStatModifierManager가 없어 토템 스탯을 복원하지 못했습니다. ID: {entry.Id}");
+                }
+            }
         }
 
         SetLevels(data.Totems);
+        ClearAll();
+        ApplyAll();
     }
 
     // 정산으로 받은 혈석에 이번 Run 퍼센트를 곱한 추가분입니다. 10혈석의 10%는 1입니다.
@@ -266,9 +327,13 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         return true;
     }
 
+    // 10.9 / 문규성 / 복원 직후 이미 적용한 효과는 다시 등록하지 않고, 기존 적용을 마친 뒤 완료 상태를 기록하도록 변경했습니다.
     private void ApplyAll()
     {
-        _isApplied = true;
+        if (_isApplied)
+        {
+            return;
+        }
         _bonusGranted = false;
         _rewardBonusPercent = 0;
 
@@ -311,8 +376,13 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
             {
                 appliedStatCount++;
             }
+
+            // Current date KDH 2026-10-08
+            // 궁핍은 유닛 스탯이 없습니다. 골드 지급 계산이 읽는 재화 보정만 등록합니다.
+            AddGoldReduction(entry.Id, totem, level);
         }
 
+        _isApplied = true;
         Debug.Log(
             $"[OutGame/TotemRunApplier] 토템을 적용했습니다. 스탯 적용 수: {appliedStatCount}, 혈석 보너스: {_rewardBonusPercent}%",
             this);
@@ -361,7 +431,8 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         return (int)Math.Min(bonus, int.MaxValue);
     }
 
-    // 군세·궁핍·메아리처럼 스탯이 아닌 토템은 목록이 비어 있어 여기서 넘어갑니다.
+    // 군세·메아리처럼 스탯이 아닌 토템은 목록이 비어 있어 여기서 넘어갑니다.
+    // 궁핍은 AddGoldReduction에서 재화 보정으로 따로 등록합니다.
     private bool AddStatModifiers(TotemId id, TotemData totem, int level)
     {
         IReadOnlyList<TotemStatEffect> effects = _catalog != null
@@ -417,6 +488,39 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         return added;
     }
 
+    // Current date KDH 2026-10-08
+    // 웨이브 보상과 생산 골드에 같은 감소를 넣습니다. 지급할 때마다 계산하지 않고, 준비 단계에서 한 번만 등록합니다.
+    private void AddGoldReduction(TotemId id, TotemData totem, int level)
+    {
+        if (id != TotemId.GoldReduction || level <= 0)
+        {
+            return;
+        }
+
+        if (_effectManager == null)
+        {
+            Debug.LogWarning("[OutGame/TotemRunApplier] EffectManager가 없어 궁핍의 골드 감소를 적용하지 못했습니다.", this);
+            return;
+        }
+
+        float value = GoldReductionPercentPerLevel * level;
+        if (float.IsNaN(value) || float.IsInfinity(value))
+        {
+            Debug.LogError($"[OutGame/TotemRunApplier] 궁핍 감소 수치가 올바르지 않습니다. Level: {level}", this);
+            return;
+        }
+
+        object source = GetSource(id, totem);
+        _goldReductionModifiers.Clear();
+        _goldReductionModifiers.Add(new CurrencyModifier(
+            source, CurrencyType.Gold, CurrencyRewardType.WaveReward, CurrencyModifierType.Percent, value));
+        _goldReductionModifiers.Add(new CurrencyModifier(
+            source, CurrencyType.Gold, CurrencyRewardType.Production, CurrencyModifierType.Percent, value));
+        _effectManager.RegisterEffects(source, new ConvertedEffects(null, null, _goldReductionModifiers));
+        _appliedSources.Add(source);
+        Debug.Log($"[OutGame/TotemRunApplier] 궁핍을 적용했습니다. 골드 감소: {-value * 100f}%", this);
+    }
+
     private object GetSource(TotemId id, TotemData totem)
     {
         if (totem != null)
@@ -440,6 +544,16 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
             for (int i = 0; i < _appliedSources.Count; i++)
             {
                 _unitStatModifierManager.RemoveModifiersBySource(_appliedSources[i]);
+            }
+        }
+
+        // Current date KDH 2026-10-08
+        // 궁핍 재화 보정도 같은 출처로 제거합니다. 등록되지 않은 출처는 EffectManager가 무시합니다.
+        if (_effectManager != null)
+        {
+            for (int i = 0; i < _appliedSources.Count; i++)
+            {
+                _effectManager.RemoveEffects(_appliedSources[i]);
             }
         }
 

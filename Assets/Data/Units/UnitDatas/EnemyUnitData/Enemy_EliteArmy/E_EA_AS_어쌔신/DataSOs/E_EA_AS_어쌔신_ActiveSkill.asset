@@ -63,9 +63,20 @@ MonoBehaviour:
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _effectData: {fileID: 11400000, guid: a4cf006a8d844dc4f97aa8f31d4b1503, type: 2}
+        _applicationFX:
+        - _key: VFX_OnApply_Debuff
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
     - rid: 4844432381217865734
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _executionDuration: 0
         _target:
           _source: 2
           _relation: 0
@@ -98,7 +109,43 @@ MonoBehaviour:
           - rid: 4844432381217865735
           - rid: 4617381582868316274
         _conditionalEffects: []
-        _fxEntries: []
+        _fxEntries:
+        - _key: VFX_Enemy_ActiveAttack_Single
+          _hook: 0
+          _operation: 4
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 0
+          _followDirection: 0
+          _scaleMode: 2
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: SFX_Enemy_ActiveAttack_Single
+          _hook: 0
+          _operation: 4
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 0
+          _followDirection: 0
+          _scaleMode: 2
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: VFX_Enemy_ActiveOnHit_Melee
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: SFX_Enemy_ActiveOnHit_Melee
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
         _area: 0
         _radius: 2

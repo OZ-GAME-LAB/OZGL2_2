@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
+using Units.Effects;
 using UnityEngine;
 using System;
 
@@ -29,6 +30,10 @@ namespace Units
         // ============================================================
 
         private int _executionId;
+        private bool _waitingForAnimation;
+        private float _animationRemaining;
+        private CombatTargetSnapshot _pendingOwner, _pendingTarget;
+        private Action _pendingCompleted;
         private CombatEventMetadata _fxMetadata;
         private SkillFXEntry[] _fxEntries = Array.Empty<SkillFXEntry>();
         private Vector2 _fxDirection;
@@ -94,7 +99,42 @@ namespace Units
         // Execute
         // ============================================================
 
-        public void Execute(
+        public void Execute(ICombatTarget target, Action onCompleted)
+        {
+            if (_data == null || _core == null || _core.RuntimeStatus == null || !CombatTargetUtility.IsValid(target))
+            { onCompleted?.Invoke(); return; }
+            _core.SetFacingDirection((Vector2)target.Transform.position - (Vector2)_core.transform.position);
+            if (_data.ImpactTiming == AnimationImpactTiming.AnimationStart)
+            {
+                _core.PlayAnimation_Attack();
+                ExecuteImpact(target, onCompleted);
+                return;
+            }
+            ++_executionId;
+            _pendingOwner = new CombatTargetSnapshot(_core.CombatTarget);
+            _pendingTarget = new CombatTargetSnapshot(target);
+            _pendingCompleted = onCompleted;
+            _animationRemaining = _core.PlayBasicAttackForExecution();
+            _waitingForAnimation = true;
+        }
+
+        public void Tick(float deltaTime)
+        {
+            if (!_waitingForAnimation || deltaTime <= 0f) return;
+            bool ownerValid = _pendingOwner.IsTargetable && _core.isActiveAndEnabled
+                && !_core.RuntimeStatus.HasStatus(UnitStatusEffectType.Stun);
+            _animationRemaining -= Mathf.Max(0f, deltaTime);
+            if (ownerValid && _pendingTarget.IsTargetable && _animationRemaining > 0f) return;
+            var target = _pendingTarget;
+            var completed = _pendingCompleted;
+            _waitingForAnimation = false;
+            _pendingCompleted = null;
+            if (_pendingOwner.MatchesLifetime) _core.StopAnimation_SkillMotion();
+            if (!ownerValid || !target.IsTargetable) { completed?.Invoke(); return; }
+            ExecuteImpact(target.Target, completed);
+        }
+
+        private void ExecuteImpact(
             ICombatTarget target,
             Action onCompleted)
         {
@@ -113,14 +153,10 @@ namespace Units
 
                 _core.SetFacingDirection((Vector2)target.Transform.position - (Vector2)_core.transform.position);
 
-                _core.PlayAnimation_Attack();
-
                 var root = CombatEventMetadata.Create(_core.CombatTarget);
                 _fxMetadata = CombatEventMetadata.Create(_core.CombatTarget, root, executionId: root.EventId, actionIndex: 0);
                 _fxDirection = (Vector2)target.Transform.position - (Vector2)_core.transform.position;
-                var mapping = _core.GetComponent<Units.FX.UnitFXBridge>()?.BasicAttackMapping
-                    ?? Units.FX.VFXManager.Instance?.BasicAttackMapping;
-                _fxEntries = mapping != null ? mapping.Capture(_data.AttackFXType, _data.HitFXType) : Array.Empty<SkillFXEntry>();
+                _fxEntries = SkillDefinitionCopy.Copy(new List<SkillFXEntry>(_data.FXEntries)).ToArray();
                 fxStarted = true;
                 EmitFX(SkillFXHook.OnStart, _core.transform.position, new CombatTargetSnapshot(target));
                 if (_data.ExecutionType == BasicAttackExecutionType.Direct)
@@ -165,6 +201,11 @@ namespace Units
         public void Cancel()
         {
             _executionId++;
+            if (_waitingForAnimation && _pendingOwner.MatchesLifetime) _core.StopAnimation_SkillMotion();
+            _waitingForAnimation = false;
+            _pendingCompleted = null;
+            _pendingOwner = _pendingTarget = default;
+            _animationRemaining = 0f;
         }
 
 
@@ -491,7 +532,8 @@ namespace Units
                             ? 1
                             : _data.MaxDamageableCount,
                         damageRequest,
-                        flight: CreateFlight()
+                        flight: CreateFlight(),
+                        projectilePrefab: _data.ProjectilePrefab
                     );
 
 

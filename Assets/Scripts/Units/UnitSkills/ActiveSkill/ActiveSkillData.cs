@@ -9,6 +9,9 @@ namespace Units.Skills
     )]
     public class ActiveSkillData : ScriptableObject
     {
+        [SerializeField] private SkillDisplayData _display = new();
+        public SkillDisplayData Display => _display;
+
         // ============================================================
         // Basic
         // ============================================================
@@ -99,6 +102,10 @@ namespace Units.Skills
         [Header("Projectile")]
         [SerializeField]
         private float _projectileSpeed = 10f;
+
+        // 비워두면 ProjectileManager의 공용 투사체를 사용한다.
+        [SerializeField, Tooltip("이 공격 전용 투사체 프리팹. 루트의 Projectile_Controller를 지정합니다.")]
+        private Projectile_Controller _projectilePrefab;
 
 
         // ============================================================
@@ -235,6 +242,8 @@ namespace Units.Skills
         public float AreaAngle => _areaAngle;
 
         public IReadOnlyList<SkillEffectData> Effects => _effects;
+
+        public Projectile_Controller ProjectilePrefab => _projectilePrefab;
 
         public float ProjectileSpeed => _projectileSpeed;
 

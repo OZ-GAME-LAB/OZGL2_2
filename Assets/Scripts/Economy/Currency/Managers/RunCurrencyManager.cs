@@ -336,19 +336,6 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
                 }
                 break;
 
-            case GamePhase.Reward:
-                // 같은 웨이브의 Reward 재진입 시 중복 지급 방지
-                if (_waveRewardApplied)
-                {
-                    return;
-                }
-
-                if (!TryApplyWaveReward())
-                {
-                    Debug.LogError("[Economy/RunCurrencyManager] 준비된 웨이브 보상 지급에 실패했습니다.", this);
-                }
-                break;
-
             case GamePhase.None:
             case GamePhase.Finished:
                 ClearWaveReward();

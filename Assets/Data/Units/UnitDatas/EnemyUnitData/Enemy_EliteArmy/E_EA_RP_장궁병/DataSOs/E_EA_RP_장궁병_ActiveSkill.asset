@@ -40,6 +40,7 @@ MonoBehaviour:
     - rid: 4844432381217865734
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _executionDuration: 0
         _target:
           _source: 6
           _relation: 0
@@ -71,13 +72,43 @@ MonoBehaviour:
           _effects:
           - rid: 4844432381217865735
         _conditionalEffects: []
-        _fxEntries: []
+        _fxEntries:
+        - _key: VFX_ActiveProjectile_Arrow
+          _hook: 8
+          _operation: 3
+          _endPolicy: 3
+          _kind: 0
+          _attachment: 3
+          _followDirection: 1
+        - _key: SFX_ActiveProjectile_Arrow
+          _hook: 8
+          _operation: 3
+          _endPolicy: 3
+          _kind: 1
+          _attachment: 3
+          _followDirection: 1
+        - _key: VFX_ActiveOnHit_Arrow
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+        - _key: SFX_ActiveOnHit_Arrow
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 2
+          _followDirection: 1
         _delivery: 1
+        _impactTiming: 1
         _area: 0
         _radius: 2
         _angle: 360
         _maxEffectTargets: 1
         _projectileSpeed: 10
+        _projectilePrefab: {fileID: 7783028690776527434, guid: a452d73c14284c798fd60cbc9912fe06, type: 3}
         _isLegacy: 0
     - rid: 4844432381217865735
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}

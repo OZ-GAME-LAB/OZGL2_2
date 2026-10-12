@@ -67,7 +67,8 @@ namespace Game.UI
             IReadOnlyList<ArtifactData> candidates,
             CancellationToken token,
             bool allowForfeit = false,
-            string message = null)
+            string message = null,
+            ArtifactSelectionPurpose purpose = ArtifactSelectionPurpose.Reward)
         {
             token.ThrowIfCancellationRequested();
             if (_selectionCompletion != null || IsChoosing)
@@ -100,7 +101,7 @@ namespace Game.UI
             try
             {
                 _panel.SetForfeitAllowed(allowForfeit);
-                _panel.ShowReward(_viewData);
+                _panel.ShowReward(_viewData, purpose);
                 _panel.SetMessage(message);
                 using (token.Register(() => completion.TrySetCanceled(token)))
                     return await completion.Task;

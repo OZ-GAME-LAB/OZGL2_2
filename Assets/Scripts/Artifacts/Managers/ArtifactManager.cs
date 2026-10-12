@@ -34,6 +34,7 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
 
     [SerializeField] private ArtifactCatalog _artifactCatalog;
     [SerializeField] private ArtifactRewardTable _rewardTable;
+    private RunCurrencyManager _runCurrencyManager;
 
     private ArtifactInventory _inventory;
     private WaveController _waveController;
@@ -56,7 +57,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     // 10.2(문규성) : 인자 추가중 오류가 많이 발생해서 일단 null 허용으로 만들어놓았습니다.
     // 나중에 테스트시 문제가 생길 소지가 있어서 = null지우고 ArtifactRewardPresenter상속받거나 테스트용 인터페이스 구현체 만들어서 연결이 필요합니다. 
     // 웨이브와 공통 효과 매니저를 주입받아 새로운 Run의 보유 목록을 준비
-    public void Initialize(WaveController waveController, EffectManager effectManager, IArtifactSelectionUI artifactSelectionUI = null)
+    public void Initialize(WaveController waveController, EffectManager effectManager,
+        RunCurrencyManager runCurrencyManager, IArtifactSelectionUI artifactSelectionUI = null)
     {
         if (IsInitialized)
         {
@@ -88,12 +90,19 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return;
         }
         
+        if (runCurrencyManager == null)
+        {
+            Debug.LogError("[Artifacts/ArtifactManager] RunCurrencyManager 참조가 없습니다.", this);
+            return;
+        }
+
         if (artifactSelectionUI == null)
         {
             Debug.LogError("[Artifacts/ArtifactManager] ArtifactSelectionUI 참조가 없습니다.", this);
             return;
         }
         _effectManager = effectManager;
+        _runCurrencyManager = runCurrencyManager;
         _selectionUI = artifactSelectionUI;
         _waveController = waveController;
         _inventory = new ArtifactInventory(_artifactCatalog);
@@ -133,6 +142,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             return false;
         }
 
+        // Bootstrap에서는 재화 초기화 전에 참조를 주입하므로 실제 사용 시 준비 상태를 확인합니다.
+        if (_runCurrencyManager == null || !_runCurrencyManager.IsInitialized)
+        {
+            Debug.LogError("[Artifacts/ArtifactManager] 초기화된 RunCurrencyManager가 필요합니다.", this);
+            return false;
+        }
+
         PrepareRewardPosition();
         IReadOnlyList<ArtifactData> candidates = _testCandidates ?? (_hasRewardCandidates ? _selectionCandidates : null);
         _testCandidates = null;
@@ -144,13 +160,13 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         // 지급 직후 취소된 요청은 재지급 없이 완료
         if (_rewardApplied)
         {
-            return true;
+            return TryCompleteWaveCurrencyReward();
         }
         if (candidates.Count == 0)
         {
             _hasRewardCandidates = true;
             _rewardApplied = true;
-            return true;
+            return TryCompleteWaveCurrencyReward();
         }
 
         _selectionCandidates = new List<ArtifactData>(candidates);
@@ -178,7 +194,8 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
             }
 
             waitToken.ThrowIfCancellationRequested();
-            return true;
+            // SelectAsync의 UI 닫기와 아티팩트 획득 성공 이후에 재화를 지급합니다.
+            return TryCompleteWaveCurrencyReward();
         }
         //SelectAsync에서 취소나 예외 발생시에 _selectionWait를 정리해 다음 요청을 막지 않도록 하기 위한 조치입니다. 
         finally
@@ -207,6 +224,16 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         waitToken.ThrowIfCancellationRequested();
         return !canceled;
         */
+    }
+
+    private bool TryCompleteWaveCurrencyReward()
+    {
+        // 이전 저장에서 이미 지급했거나, 지급 후 재진입한 경우는 성공으로 종료합니다.
+        if (_runCurrencyManager.TryGetAppliedWaveReward(
+            _waveController.CurQuarter, _waveController.CurWave, out _, out _)) return true;
+        if (_runCurrencyManager.TryApplyWaveReward()) return true;
+        Debug.LogError("[Artifacts/ArtifactManager] 아티팩트 선택 후 웨이브 재화 지급에 실패했습니다.", this);
+        return false;
     }
 
     // 테스트 진입점만 별도 제공. 준비된 후보를 전달한 뒤 실제 게임과 같은 함수 실행
@@ -356,6 +383,118 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         StackChanged?.Invoke(add.Instance, add.PreviousStacks, add.CurrentStacks);
         _isChanging = false;
         return true;
+    }
+
+    // costas 아티팩트를 소모하고 reward아티팩트를 인벤토리에 추가한다. 
+    // 특정 아티팩트를 바치고 다른 아티팩트를 획득하는 이벤트 구현을 위해 추가한 메서드
+    public bool TryApplyTrade(IReadOnlyList<ArtifactData> costArtifacts, ArtifactData rewardArtifact = null)
+    {
+        if (!IsInitialized || _isChanging || _effectManager == null)
+        {
+            return false;
+        }
+
+        var costCounts = new Dictionary<ArtifactData, int>();
+        if (costArtifacts != null)
+        {
+            foreach (ArtifactData artifact in costArtifacts)
+            {
+                if (!_artifactCatalog.Contains(artifact)) return false;
+                costCounts.TryGetValue(artifact, out int count);
+                costCounts[artifact] = count + 1;
+            }
+        }
+
+        if (rewardArtifact != null)
+        {
+            if (!_artifactCatalog.Contains(rewardArtifact))
+            {
+                return false;
+            }
+            if (!costCounts.ContainsKey(rewardArtifact))
+            {
+                costCounts.Add(rewardArtifact, 0);
+            }
+        }
+        
+        var changes = new List<PreparedChange>(); //인벤토리 변경과 이벤트 발행에 필요한 객체 + 변경 전 갯수 + 변경 후 갯수 기록 
+        var removedSources = new List<object>(); //지울 효과들의 목록
+        var finalEffects = new Dictionary<object, ConvertedEffects>(); //교환 완료 후 적용할 효과
+        //해당 foreach문에서는 소모 & 추가되는 아티팩트의 최종 수량을 검증하고 적용할 효과를 준비합니다
+        foreach (var cost in costCounts)
+        {
+            ArtifactData costArtifact = cost.Key; //처리할 유물의 정보
+            
+            _inventory.TryGetById(costArtifact.Id, out ArtifactInstance inventoryArtifact); //삭제할 유물이 실제로 인벤토리에 있는지 확인
+            int previousStacks = inventoryArtifact == null ? 0 : inventoryArtifact.StackCount; //삭제할 유물이 인벤토리에 있으면 기존 보유 수량 기록
+            // 같은 유물을 보상으로 받더라도 소모할 아티팩트는 교환 전에 보유해야 함
+            // (A아티팩트 2개를 소모하고 A 아티팩트를 다시 1개 받는다고 해도 기존 인벤토리에 A아티팩트 2개가 있어야 교환가능)
+            if (previousStacks < cost.Value || (inventoryArtifact != null && inventoryArtifact.Data != costArtifact)) 
+                return false;
+            
+            //소모되는 아티팩트가 보상 아티팩트라면 스택 + 1 (416번째 줄에서 추가한 아티팩트)
+            long finalStacks = (long)previousStacks - cost.Value + (costArtifact == rewardArtifact ? 1 : 0);
+            if (finalStacks > costArtifact.MaxStacks) 
+                return false;
+            //최종 수량 변경이 없다면 효과갱신이 필요 없음
+            int currentStacks = (int)finalStacks;
+            if (currentStacks == previousStacks) 
+                continue;
+
+            //인벤토리에 아이템이 없었다면 신규획득이기 때문에 새 인스턴스를 만들어줌
+            if (inventoryArtifact == null) 
+                inventoryArtifact = new ArtifactInstance(costArtifact);
+            ConvertedEffects effects = null;
+            if (currentStacks > 0 && !_effectManager.TryConvertEffects(inventoryArtifact, new EffectDataGroup
+                {
+                    StatEffects = costArtifact.UnitStatEffects,
+                    CurrencyEffects = costArtifact.CurrencyEffects,
+                    SlotEffects = costArtifact.ConsumableSlotEffects,
+                    PassiveEffects = costArtifact.PassiveSkillEffects
+                }, currentStacks, out effects))
+            {
+                return false;
+            }
+            //해당 유물의 변경정보(객체 정보, 교환 전 갯수, 교환 후 갯수)를 기록
+            changes.Add(new PreparedChange
+            {
+                Instance = inventoryArtifact,
+                PreviousStacks = previousStacks,
+                CurrentStacks = currentStacks,
+            });
+            //기존 보유 유물의 변경 전 효과를 제거대상에 추가(교환으로 개수가 감소한 아티팩트)
+            if (previousStacks > 0) 
+                removedSources.Add(inventoryArtifact);
+            //교환 이후에도 보유하고 있다면 해당 효과를 적용 대상으로 기록(교환을 하고도 남은 아티팩트 + 교환의 대가로 받은 아티팩트)
+            if (currentStacks > 0) 
+                finalEffects.Add(inventoryArtifact, effects);
+        }
+        if (changes.Count == 0) return true;
+
+        _isChanging = true;
+        try
+        {
+            // 앞서 검증 및 준비한 수량 변경을 인벤토리에 적용한다. 지금은 변경 알림을 보내지 않는다
+            foreach (PreparedChange change in changes)
+            {
+                if (change.CurrentStacks > change.PreviousStacks)
+                {
+                    _inventory.TryAdd(change.Instance);
+                }
+                else
+                {
+                    //현재는 아티팩트의 장비 중첩을 여러번 깎는 메서드가 없어서 for문 사용
+                    for (int i = change.CurrentStacks; i < change.PreviousStacks; i++)
+                        _inventory.TryRemove(change.Instance);
+                }
+            }
+            //변경 대상 유물의 효과를 최종 수량에 맞게 교체
+            _effectManager.ReplaceSourceEffects(removedSources, finalEffects);
+            foreach (PreparedChange change in changes)
+                StackChanged?.Invoke(change.Instance, change.PreviousStacks, change.CurrentStacks);
+            return true;
+        }
+        finally { _isChanging = false; }
     }
 
     // 획득 가능 여부와 증가 후 효과만 준비. 보유 상태 변경 X

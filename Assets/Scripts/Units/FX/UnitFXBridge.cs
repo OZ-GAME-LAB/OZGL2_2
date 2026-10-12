@@ -7,7 +7,7 @@ namespace Units.FX
     [DisallowMultipleComponent]
     public sealed class UnitFXBridge : MonoBehaviour
     {
-        [SerializeField] private BasicAttackFXMappingSO _basicAttackMapping;
+        [SerializeField, HideInInspector] private BasicAttackFXMappingSO _basicAttackMapping;
         private Unit_Combat _combat;
         private Unit_Passive _passive;
         private CombatTargetSnapshot _owner;

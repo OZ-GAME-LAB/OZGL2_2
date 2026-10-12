@@ -128,6 +128,29 @@ namespace Units
         }
 
 
+        // 아티펙트 출처만 제거하여 다른 시스템의 스탯 보정을 유지한다.
+        public void RemoveArtifactModifiers()
+        {
+            _allModifiers.RemoveAll(modifier => modifier.Source is ArtifactInstance);
+
+            foreach (List<AllyStatModifier> modifiers in _classModifiers.Values)
+            {
+                modifiers.RemoveAll(modifier => modifier.Source is ArtifactInstance);
+            }
+
+            foreach (List<AllyStatModifier> modifiers in _typeModifiers.Values)
+            {
+                modifiers.RemoveAll(modifier => modifier.Source is ArtifactInstance);
+            }
+
+            foreach (List<AllyStatModifier> modifiers in _tierModifiers.Values)
+            {
+                modifiers.RemoveAll(modifier => modifier.Source is ArtifactInstance);
+            }
+
+        }
+
+
         public void RemoveBySource(
             object source)
         {

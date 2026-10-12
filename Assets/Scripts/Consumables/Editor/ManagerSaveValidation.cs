@@ -51,7 +51,7 @@ public static class ManagerSaveValidation
             Set(artifact, "_consumableSlotEffects", new List<ConsumableSlotEffectData> { (ConsumableSlotEffectData)slotEffect });
             var catalog = Asset<ArtifactCatalog>(); Set(catalog, "_artifacts", new List<ArtifactData> { artifact }); Call(catalog, "OnValidate");
             var artifacts = root.AddComponent<ArtifactManager>(); Set(artifacts, "_artifactCatalog", catalog); Set(artifacts, "_rewardTable", Asset<ArtifactRewardTable>());
-            artifacts.Initialize(root.AddComponent<WaveController>(), effects);
+            artifacts.Initialize(root.AddComponent<WaveController>(), effects, money);
             var artifactData = new ArtifactSaveData {
                 Owned = new List<ArtifactSaveEntry> { new() { ArtifactId = artifact.Id, StackCount = 2 } },
                 HasRewardCandidates = true, RewardQuarter = 1, RewardWave = 1, CandidateIds = new List<string> { artifact.Id }

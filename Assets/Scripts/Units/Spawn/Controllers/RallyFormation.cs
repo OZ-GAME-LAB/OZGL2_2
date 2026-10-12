@@ -16,15 +16,15 @@ namespace Units
 
         private readonly Vector2[] _formation2 =
         {
-            new Vector2(-0.5f, 0f),
-            new Vector2(0.5f, 0f)
+            new Vector2(0f, -0.5f),
+            new Vector2(0f, 0.5f)
         };
 
         private readonly Vector2[] _formation3 =
         {
-            new Vector2(-1f, 0f),
+            new Vector2(0f, -1f),
             new Vector2(0f, 0f),
-            new Vector2(1f, 0f)
+            new Vector2(0f, 1f)
         };
 
         private readonly Vector2[] _formation4 =
@@ -37,11 +37,11 @@ namespace Units
 
         private readonly Vector2[] _formation5 =
         {
-            new Vector2(0f, 1f),
-            new Vector2(-1f, 0f),
+            new Vector2(-1f, -1f),
+            new Vector2(-1f, 1f),
             new Vector2(0f, 0f),
-            new Vector2(1f, 0f),
-            new Vector2(0f, -1f)
+            new Vector2(1f, 1f),
+            new Vector2(1f, -1f)
         };
 
 

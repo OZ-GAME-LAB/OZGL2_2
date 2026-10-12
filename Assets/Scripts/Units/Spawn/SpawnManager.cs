@@ -70,7 +70,7 @@ namespace Units
         private Vector2 _rallySectorSize =
             new Vector2(
                 5f,
-                10f
+                5f
             );
 
         [SerializeField]
@@ -363,6 +363,10 @@ namespace Units
 
             if (_activeAllySpawnCount == 0)
             {
+                // 첫 요청에서만 아군 아티펙트 스탯·패시브를 최신화한다.
+                // 참조가 없는 독립 테스트 씬은 기존 등록을 보존한 채 스폰한다.
+                _unitStatModifierManager.RefreshAllyArtifactEffects();
+
                 _allySpawnGeneration = _unitPoolManager.BeginSpawn(UnitTeam.Ally);
                 _allySpawnFailed = false;
                 _allyGroupSpawner.ResetSpawnResult();
@@ -390,6 +394,10 @@ namespace Units
         {
             try
             {
+                // 같은 프레임의 건물 요청을 먼저 모아 빈 요청·즉시 실패도 한 묶음으로 처리한다.
+                // 다음 프레임까지 카운트를 유지하여 최신화와 완료 알림의 중복을 방지한다.
+                await UniTask.NextFrame(cancellationToken: this.GetCancellationTokenOnDestroy());
+
                 var group = await _allyGroupSpawner.SpawnGroupAsync(
                     unitType,
                     spawnPosition,
@@ -466,6 +474,9 @@ namespace Units
 
             if (_enemySpawning)
                 throw new InvalidOperationException("[SpawnManager] 적 스폰이 이미 진행 중입니다.");
+
+            // 적 웨이브 시작 시 적 아티펙트 스탯·패시브만 한 번 최신화한다.
+            _unitStatModifierManager.RefreshEnemyArtifactEffects();
 
             long generation = _unitPoolManager.BeginSpawn(UnitTeam.Enemy);
             _enemySpawning = true;
