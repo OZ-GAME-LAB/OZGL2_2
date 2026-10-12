@@ -27,7 +27,7 @@ public class MainSceneManager : MonoBehaviour
         //인게임 세이브파일이 없으면 새로 시작, 있으면 이어하기
         try
         {
-            string scene = SaveManager.HasSaveFile(InGameSaveCoordinator.SaveKey) ? "Test" : "OutGameSetupTest";
+            string scene = SaveManager.HasSaveFile(InGameSaveCoordinator.SaveKey) ? "Test_InGame" : "Test_OutGame";
             SceneManager.LoadScene(scene);
         }
         catch (System.Exception exception)

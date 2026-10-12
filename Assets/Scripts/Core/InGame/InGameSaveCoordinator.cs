@@ -13,14 +13,15 @@ public class InGameSaveData
     public ConsumableItemSaveData ConsumableItem;
     public BuildingSaveData Building;
     public ArchiveSaveData Archive;
+    public EventSaveData Event;
 }
 
 public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
 {
     // 기존 저장 테스트나 실제 영구재화 파일과 구분하는 키입니다.
-    // 특성·토템·제단은 아웃게임에서 복원하므로 해당 데이터를 함께 저장하던 구버전 파일과 구분합니다.
+    // 이벤트 진행·결과를 함께 저장합니다. 이전 버전의 인게임 저장은 지원하지 않습니다.
     public static readonly SaveKey<InGameSaveData> SaveKey =
-        new SaveKey<InGameSaveData>("ingame-test", version: 4);
+        new SaveKey<InGameSaveData>("ingame-test", version: 5);
 
     public bool IsReady { get; private set; }
     public string LastError { get; private set; }
@@ -51,6 +52,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     private ISaveDataProvider<ConsumableItemSaveData> _consumableItem;
     private ISaveDataProvider<BuildingSaveData> _building;
     private ISaveDataProvider<ArchiveSaveData> _archive;
+    private ISaveDataProvider<EventSaveData> _event;
     
     
     // 10.9 / 문규성 / 아웃게임에서 복원하는 특성·토템·제단 연결을 제거하고 인게임 저장 Provider만 받도록 정리했습니다.
@@ -62,10 +64,11 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         ISaveDataProvider<ConsumableItemSaveData> consumableItem,
         ISaveDataProvider<BuildingSaveData> building,
         ISaveDataProvider<ArchiveSaveData> archive,
+        ISaveDataProvider<EventSaveData> eventManager,
         Action initializeArchive = null)
     {
         if (saveManager == null || gameFlowController == null || runCurrency == null || artifact == null ||
-            shop == null || consumableItem == null || building == null || archive == null)
+            shop == null || consumableItem == null || building == null || archive == null || eventManager == null)
         {
             Debug.LogError("[InGameSaveCoordinator] 초기화에 필요한 참조가 없습니다. ");
             LastError = "초기화에 필요한 참조가 없습니다";
@@ -80,6 +83,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         _consumableItem = consumableItem;
         _building = building;
         _archive = archive;
+        _event = eventManager;
         _initializeArchive = initializeArchive;
         _archiveInitializationAttempted = false;
         _archiveInitializationFailure = null;
@@ -155,6 +159,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         data = null;
         if (!CheckReferences(out error)) return false;
         if (!_saveManager.TryLoad(SaveKey, out data, out error)) return Fail(error, out error);
+        if (!TryValidate(data, out error)) return false;
         LastError = null;
         return true;
     }
@@ -208,7 +213,8 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
             Shop = _shop.CaptureSaveData(),
             ConsumableItem = _consumableItem.CaptureSaveData(),
             Building = _building.CaptureSaveData(),
-            Archive = _archive.CaptureSaveData()
+            Archive = _archive.CaptureSaveData(),
+            Event = _event.CaptureSaveData()
         };
     }
 
@@ -230,6 +236,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     private bool TryValidate(InGameSaveData data, out string error)
     {
         if (data == null) return Fail("인게임 저장 데이터가 없습니다.", out error);
+        if (data.Event == null) return Fail("이벤트 저장 데이터가 없습니다.", out error);
         error = null;
         return true;
     }
@@ -246,6 +253,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
         _consumableItem.RestoreSaveData(data.ConsumableItem);
         _shop.RestoreSaveData(data.Shop);
         _archive.RestoreSaveData(data.Archive);
+        _event.RestoreSaveData(data.Event);
     }
 
     private void EnsureArchiveInitialized()
@@ -273,7 +281,7 @@ public class InGameSaveCoordinator : MonoBehaviour, IRunCheckpointWriter
     {
         error = null;
         if (_saveManager == null || _flowController == null || _runCurrency == null || _artifact == null ||
-            _shop == null || _consumableItem == null || _building == null || _archive == null)
+            _shop == null || _consumableItem == null || _building == null || _archive == null || _event == null)
         {
             return Fail("SaveManager와 모든 인게임 저장 Provider를 먼저 연결해주세요.", out error);
         }

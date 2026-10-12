@@ -43,6 +43,7 @@ namespace Game.UI.InGame
 
         [SerializeField] private UIScreen _screen;
         [SerializeField] private GameObject _panelRoot;
+        [SerializeField] private TMP_Text _title;
         [SerializeField] private TMP_Text _rewardText;
         [SerializeField] private TMP_Text _statusText;
         [SerializeField] private Sprite _fallbackIcon;
@@ -75,6 +76,9 @@ namespace Game.UI.InGame
         private bool _completed;
         private bool _listening;
         private string _message;
+        private ArtifactSelectionPurpose _purpose;
+        private string _defaultTitle;
+        private bool _titleCached;
         private readonly Vector2[] _defaultCardPositions = new Vector2[CardsPerPage];
         private bool _cardPositionsCached;
         private Vector2 _defaultConfirmPosition;
@@ -119,7 +123,8 @@ namespace Game.UI.InGame
         }
 
         /// <summary>실패 후 같은 후보를 다시 요청하면 페이지와 선택을 보존한다.</summary>
-        public void ShowSelection(IReadOnlyList<ArtifactData> candidates, bool allowForfeit, string message)
+        public void ShowSelection(IReadOnlyList<ArtifactData> candidates, bool allowForfeit, string message,
+            ArtifactSelectionPurpose purpose = ArtifactSelectionPurpose.Reward)
         {
             if (candidates == null) throw new ArgumentNullException(nameof(candidates));
             if (candidates.Count == 0)
@@ -148,6 +153,7 @@ namespace Game.UI.InGame
             _isRequestPending = false;
             _completed = false;
             _allowForfeit = allowForfeit;
+            _purpose = purpose;
             _message = message;
             _showRequested = true;
             Refresh();
@@ -179,6 +185,7 @@ namespace Game.UI.InGame
             _completed = false;
             _showRequested = false;
             _message = null;
+            _purpose = ArtifactSelectionPurpose.Reward;
             Refresh();
         }
 
@@ -266,8 +273,19 @@ namespace Game.UI.InGame
                 return;
             }
             bool opening = !IsVisible;
-            _rewardText.text = "유물 보상";
-            _instructionText.text = _candidates.Count == 1
+            bool exchange = _purpose == ArtifactSelectionPurpose.Exchange;
+            if (_title != null)
+            {
+                if (!_titleCached)
+                {
+                    _defaultTitle = _title.text;
+                    _titleCached = true;
+                }
+                _title.text = exchange ? "유물 교환" : _defaultTitle;
+            }
+            _rewardText.text = exchange ? "교환할 유물 선택" : "유물 보상";
+            _instructionText.text = exchange ? "교환할 보유 유물을 선택하세요"
+                : _candidates.Count == 1
                 ? "유물을 확인하세요"
                 : $"{_candidates.Count}개의 유물 중 하나를 선택하세요";
             bool unlocked = !IsRequestPending;
@@ -298,7 +316,9 @@ namespace Game.UI.InGame
             _clearButton.gameObject.SetActive(_selectedIndex >= 0);
             _clearButton.interactable = unlocked && _selectedIndex >= 0;
             _confirmButton.interactable = unlocked && _choiceRequested != null && (_allowForfeit || _selectedIndex >= 0);
-            _confirmText.text = IsRequestPending ? "처리 중…" : _selectedIndex >= 0 ? "선택하기" : _allowForfeit ? "건너뛰기" : "유물을 선택하세요";
+            _confirmText.text = IsRequestPending ? "처리 중…"
+                : _selectedIndex >= 0 ? (exchange ? "교환하기" : "선택하기")
+                : _allowForfeit ? (exchange ? "돌아가기" : "건너뛰기") : "유물을 선택하세요";
             ConfigureActionPresentation(_selectedIndex >= 0);
             bool hasPages = PageCount > 1;
             _previousPageButton.gameObject.SetActive(hasPages);
@@ -315,8 +335,12 @@ namespace Game.UI.InGame
             if (_compactPresentation && _showCardEffects && !IsRequestPending && _message == null && _selectedIndex >= 0)
                 _statusText.text = GetDescription(_candidates[_selectedIndex]);
 
-            // 내용 준비를 끝낸 뒤 기존 보상 화면을 교체한다.
-            if (opening) _screen.Manager?.ReplacePopup(_screen.Id);
+            // 교환은 사건 위에 쌓아 돌아갈 화면을 보존한다.
+            if (opening)
+            {
+                if (exchange) _screen.Manager?.OpenPopup(_screen.Id);
+                else _screen.Manager?.ReplacePopup(_screen.Id);
+            }
             if (!IsVisible) return;
             int focusIndex = _selectedIndex >= offset && _selectedIndex < offset + visibleCount ? _selectedIndex - offset : 0;
             if (opening && EventSystem.current != null)

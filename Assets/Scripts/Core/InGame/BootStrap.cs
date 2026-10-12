@@ -6,6 +6,7 @@ using Game.Core;
 using Game.UI.InGame;
 using OZGL.KDH;
 using Units;
+using Units.Skills;
 using UnityEngine;
 using UnityEngine.Serialization;
 /// 각 시스템의 참조 연결과 초기화 순서를 관리하고,
@@ -35,6 +36,7 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private RuntimeUnitManager _runtimeUnitManager;
     [SerializeField] private RunCurrencyManager _runCurrencyManager;
     [SerializeField] private ShopManager _shopManager;
+    [SerializeField] private EventManager _eventManager;
     [SerializeField] private ConsumableItemManager _consumableItemManager;
     [SerializeField] private RunSettlementManager _runSettlementManager;
     [SerializeField] private PersistentCurrencyManager _persistentCurrencyManager;
@@ -91,11 +93,19 @@ public class BootStrap : MonoBehaviour
                 _gameFlowController.BlockStartup();
                 return;
             }
+            if (!_eventManager.Initialize(_runCurrencyManager, _artifactManager, _gameFlowController,
+                    _uiStartup.EventUI, _uiStartup.ArtifactSelectionUI))
+            {
+                StopStartup("EventManager 초기화에 실패했습니다.");
+                return;
+            }
+            _gameFlowController.InitializeEventFlow(_eventManager);
             _testScript.Initialize(_gameFlowController, _waveController);
             _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
-                _artifactManager, _shopManager, _consumableItemManager, _buildController, _archiveManager,
+                _artifactManager, _shopManager, _consumableItemManager, _buildController, _archiveManager, _eventManager,
                 () => _archiveManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController));
             _gameFlowController.InitializeSave(_inGameSaveCoordinator);
+            _eventManager.InitializeSave(_inGameSaveCoordinator);
 
             bool hasRunSave = _saveManager.HasSaveFile(InGameSaveCoordinator.SaveKey);
             if (!_outGameSaveCoordinator.TryLoad(hasRunSave, out string error)
@@ -152,39 +162,38 @@ public class BootStrap : MonoBehaviour
 
     private bool InitializeManagers()
     {
-        _gameFlowController.Initialize
-            (_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController, _shopManager);
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _archiveManager, 
+            _runSettlementManager, _cameraController, _shopManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
         _artifactManager.Initialize(_waveController, _effectManager, _runCurrencyManager, _uiStartup.ArtifactSelectionUI);
-        _uiStartup.InitializeArtifactInventory(_artifactManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager,
-            Units.Skills.SkillEffectResolver.Instance);
+        _uiStartup.InitializeArtifactInventory(_artifactManager);
+
+        _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager, SkillEffectResolver.Instance);
         if (!_consumableItemManager.IsInitialized)
         {
-            Debug.LogError("[BootStrap] 상점에 연결할 소모품 매니저 초기화에 실패했습니다.", this);
+            Debug.LogError("[BootStrap] ConsumableItemManager 초기화에 실패했습니다.", this);
             return false;
         }
 
         _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI);
         if (!_shopManager.IsInitialized)
         {
-            Debug.LogError("[BootStrap] 상점 매니저 초기화에 실패했습니다.", this);
+            Debug.LogError("[BootStrap] ShopManager 초기화에 실패했습니다.", this);
             return false;
         }
 
         var settlementBridge = new RunSettlementSaveBridge(_outGameSaveCoordinator,
             () => _gameFlowController.RunId, _uiStartup.SettlementUI,
             _gameFlowController.PrepareSettlementViewAsync);
-        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier,
+        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier, 
             settlementBridge, settlementBridge);
+        
         _cameraController.Initialize(_buildController,_gameFlowController);
-        _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
-            _runCurrencyManager, _gameFlowController);
+        _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager, _runCurrencyManager, _gameFlowController);
         _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _effectManager, _gameFlowController);
-        _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
-            _gameFlowController);
+        _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager, _gameFlowController);
 
         return true;
     }
@@ -193,8 +202,7 @@ public class BootStrap : MonoBehaviour
     {
         _persistentCurrencyManager.Initialize();
         _persistentTraits.Initialize(_persistentCurrencyManager, _outGameSaveCoordinator);
-        _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager,
-            _altarManager, _totemRunApplier, _traitRunApplier);
+        _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager, _altarManager, _totemRunApplier, _traitRunApplier);
     }
     // UI 부분을 초기화 한다
     public bool InitializeUI()
@@ -270,6 +278,11 @@ public class BootStrap : MonoBehaviour
             valid = false;
         }
 
+        if (_eventManager == null)
+        {
+            Debug.LogError("[BootStrap] EventManager를 Inspector에서 연결해주세요.", this);
+            valid = false;
+        }
         return valid;
     }
 }
