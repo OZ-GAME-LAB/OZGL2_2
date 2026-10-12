@@ -68,7 +68,7 @@ public class OutGameStartController : MonoBehaviour
 
             LastStartContext = context;
             Debug.Log(BuildStartLog(context), this);
-            SceneManager.LoadScene("Test");
+            SceneManager.LoadScene("Test_InGame");
         }
         catch (System.Exception exception)
         {

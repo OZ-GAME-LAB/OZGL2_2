@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3d4af5fe790f9f9439c52d2c8a00778c, type: 3}
+  m_Name: ArtifactTrader
+  m_EditorClassIdentifier: Assembly-CSharp::EventData
+  _id: 20004
+  _title: "\uB5A0\uB3CC\uC774 \uC720\uBB3C\uC0C1"
+  _image: {fileID: 0}
+  _description: "\uB5A0\uB3CC\uC774 \uC0C1\uC778\uC774 \uBD09\uC778\uB41C \uC720\uBB3C
+    \uC0C1\uC790\uB97C \uB0B4\uBC09\uB2C8\uB2E4.\n\uC5B4\uB5A4 \uC720\uBB3C\uC774
+    \uB4E4\uC5B4 \uC788\uB294\uC9C0\uB294 \uC5F4\uC5B4\uBD10\uC57C \uC54C \uC218
+    \uC788\uC2B5\uB2C8\uB2E4."
+  _choices:
+  - _title: "\uC720\uBB3C \uC0C1\uC790\uB97C \uC0B0\uB2E4"
+    _description: "<color=#EF8888>400\uACE8\uB4DC \uC18C\uBAA8</color>\n<color=#E7CC72>\uBB34\uC791\uC704
+      \uC720\uBB3C 1\uAC1C \uD68D\uB4DD</color>"
+    _conditions: []
+    _cost:
+      _gold: 400
+      _artifacts: []
+    _action: {fileID: 11400000, guid: e3200b888dec23e449f66515a1ab1e1c, type: 2}
+  - _title: "\uD76C\uADC0 \uC720\uBB3C \uC0C1\uC790\uB97C \uC0B0\uB2E4"
+    _description: "<color=#EF8888>1500\uACE8\uB4DC \uC18C\uBAA8</color>\n<color=#E7CC72>\uD76C\uADC0
+      \uC774\uC0C1 \uBB34\uC791\uC704 \uC720\uBB3C 1\uAC1C \uD68D\uB4DD</color>"
+    _conditions: []
+    _cost:
+      _gold: 1500
+      _artifacts: []
+    _action: {fileID: 11400000, guid: dc96ec507183675418a456841b715399, type: 2}
+  - _title: "\uB5A0\uB098\uAE30"
+    _description: "\uC544\uBB34\uAC83\uB3C4 \uC18C\uBAA8\uD558\uC9C0 \uC54A\uACE0
+      \uB5A0\uB0A9\uB2C8\uB2E4."
+    _conditions: []
+    _cost:
+      _gold: 0
+      _artifacts: []
+    _action: {fileID: 11400000, guid: cce7ebca04ec2d641b55fd0126565d9f, type: 2}

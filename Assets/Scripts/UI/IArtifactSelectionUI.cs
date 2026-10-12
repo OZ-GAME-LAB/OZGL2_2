@@ -4,6 +4,8 @@ using Cysharp.Threading.Tasks;
 
 namespace Game.UI
 {
+    public enum ArtifactSelectionPurpose { Reward, Exchange }
+
     /// <summary>아티팩트 시스템이 후보를 표시하고 플레이어의 선택을 기다릴 때 사용하는 UI 계약.</summary>
     public interface IArtifactSelectionUI
     {
@@ -12,6 +14,7 @@ namespace Game.UI
             IReadOnlyList<ArtifactData> candidates,
             CancellationToken token,
             bool allowForfeit = false,
-            string message = null);
+            string message = null,
+            ArtifactSelectionPurpose purpose = ArtifactSelectionPurpose.Reward);
     }
 }
