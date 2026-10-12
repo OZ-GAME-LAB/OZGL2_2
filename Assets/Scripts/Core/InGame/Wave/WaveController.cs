@@ -19,6 +19,10 @@ namespace Game.Core
         }
     }
 
+    public enum QuarterType
+    {
+        Regular, Infinity
+    }
 
     //cost = 분기 * 10 + 웨이브 * 2 / 몬스터는 소환코스트 1로고정 (MVP)
     /// <summary>
@@ -87,7 +91,7 @@ namespace Game.Core
             SpawnContext context = new(
                 weights:CurrentPreset.Weights, 
                 monsterIDs:CurrentPreset.MonsterIDs);
-            
+            // 무한전투면 UnitStatModifierManager -> 중복처리 되서 매번 새로 보내면 될듯?
             return _spawner.SpawnEnemyWaveAsync(10, context, spawnToken);
         }
         internal void NotifyWaveCleared(WaveInfo info)
