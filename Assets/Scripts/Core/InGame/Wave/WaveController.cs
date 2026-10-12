@@ -55,6 +55,7 @@ namespace Game.Core
         private ISpawnManager _spawner;
         private IRuntimeUnitManager _runtimeUnitManager;
         private GameFlowController _controller;
+        private TotemFlowEffects _totemFlowEffects;
         private bool _isWaitingForPreparation;
         private CancellationToken _preparationToken;
 
@@ -75,7 +76,8 @@ namespace Game.Core
         /// <summary>
         /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
         /// </summary>
-        public void Initialize(GameFlowController controller, ISpawnManager spawner, IRuntimeUnitManager runtimeUnitManager)
+        public void Initialize(GameFlowController controller, ISpawnManager spawner,
+            IRuntimeUnitManager runtimeUnitManager, TotemFlowEffects totemFlowEffects)
         {
             _isWaitingForPreparation = false;
             if (_runtimeUnitManager != null)
@@ -86,6 +88,7 @@ namespace Game.Core
             _controller = controller;
             _spawner = spawner;
             _runtimeUnitManager = runtimeUnitManager;
+            _totemFlowEffects = totemFlowEffects;
             _runtimeUnitManager.UnitDied += HandleMonsterDead;
             _runtimeUnitManager.PreparationCompleted += HandleMonsterSpawnCompleted;
         }
@@ -100,7 +103,8 @@ namespace Game.Core
                 weights:CurrentPreset.Weights, 
                 monsterIDs:CurrentPreset.MonsterIDs);
             // 무한전투면 UnitStatModifierManager -> 중복처리 되서 매번 새로 보내면 될듯?
-            return _spawner.SpawnEnemyWaveAsync(10, context, spawnToken);
+            int enemyCount = _totemFlowEffects.CalculateEnemyCount(10);
+            return _spawner.SpawnEnemyWaveAsync(enemyCount, context, spawnToken);
         }
         internal void NotifyWaveCleared(WaveInfo info)
         {

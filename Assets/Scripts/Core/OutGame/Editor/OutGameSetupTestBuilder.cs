@@ -209,7 +209,7 @@ public static class OutGameSetupTestBuilder
             }
             OutGameTotemColumn viewColumn = column.gameObject.AddComponent<OutGameTotemColumn>();
             List<Object> steps = new List<Object>();
-            if (i == 1 || i == 4) steps.Add(Step(column.gameObject));
+            if (column.Find("Level3Button") == null) steps.Add(Step(column.gameObject));
             else
             {
                 // 기존 프리팹의 Level3Button이 아래에 있으므로 아래→위 순서로 연결합니다.
