@@ -493,7 +493,7 @@ MonoBehaviour:
   _allyCount2: 5
   _allySpawnPosition2: {fileID: 1621234831}
   _allyRallyPoint2: {x: -10, y: -10}
-  _allyUnitType3: 25
+  _allyUnitType3: 24
   _allyCount3: 5
   _allySpawnPosition3: {fileID: 1714150252}
   _allyRallyPoint3: {x: -20, y: 10}
@@ -502,6 +502,7 @@ MonoBehaviour:
   _allySpawnPosition4: {fileID: 669533017}
   _allyRallyPoint4: {x: -20, y: -10}
   _enemyCost: 20
+  _isInfiniteWave: 1
   _bossUnitTypes: 
   _enemyClassWeights:
     Tanker: 10
@@ -510,7 +511,7 @@ MonoBehaviour:
     RangedPhysical: 10
     RangedMagic: 10
     Supporter: 10
-  _enemyUnitTypes: 3d0000003e0000004000000042000000
+  _enemyUnitTypes: 01000000020000000500000006000000
 --- !u!4 &358314845
 Transform:
   m_ObjectHideFlags: 0
@@ -1175,6 +1176,7 @@ GameObject:
   - component: {fileID: 7545694283944111043}
   - component: {fileID: 7706617996778549658}
   - component: {fileID: 6125257778241295305}
+  - component: {fileID: 9029185880303096312}
   m_Layer: 5
   m_Name: UnitHPUI_Canvas
   m_TagString: Untagged
@@ -1707,7 +1709,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 696748146477513584}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a4bdc712ba4a074f960dd58df55afe0, type: 3}
   m_Name: 
@@ -1719,7 +1721,7 @@ MonoBehaviour:
   _bossUiPrefab: {fileID: 3721801271455258463, guid: 8eb505fe5fa43be4e96afdf75c725b1b, type: 3}
   _alwaysShowBossHp: 1
   _bossWorldOffset: {x: 0, y: 2, z: 0}
-  _bossPoolSize: 2
+  _bossPoolSize: 1
   _runtimeUnitManager: {fileID: 0}
   _detectionRadius: 5
   _detectionInterval: 0.1
@@ -2039,6 +2041,31 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &9029185880303096312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696748146477513584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9be03405759362f46882ef415f6382a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UI.UnitHPUIManager_HitAppear
+  _worldCamera: {fileID: 535314509}
+  _uiRoot: {fileID: 1466806233130935488}
+  _uiPrefab: {fileID: 164761138608501173, guid: 422d951d2fb03f640aa195c0d190c98e, type: 3}
+  _spawnManager: {fileID: 0}
+  _runtimeUnitManager: {fileID: 0}
+  _initialPoolSize: 50
+  _createPerFrame: 2
+  _bossUiPrefab: {fileID: 5401996202629105460, guid: 92b108ccfa83d5e478e528258f2a9556, type: 3}
+  _alwaysShowBossHp: 1
+  _bossWorldOffset: {x: 0, y: 2, z: 0}
+  _bossPoolSize: 1
+  _showWhenHasShield: 1
+  _worldOffset: {x: 0, y: 1, z: 0}
 --- !u!222 &9080510965614792245
 CanvasRenderer:
   m_ObjectHideFlags: 0

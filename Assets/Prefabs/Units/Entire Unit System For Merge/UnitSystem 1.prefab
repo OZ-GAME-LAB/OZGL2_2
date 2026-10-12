@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 7276244835869833616}
   - component: {fileID: 7403551533582492617}
   - component: {fileID: 6434680315140161946}
+  - component: {fileID: 3788201697730924683}
   m_Layer: 5
   m_Name: UnitHPUI_Canvas
   m_TagString: Untagged
@@ -92,7 +93,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 425170594235001123}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2a4bdc712ba4a074f960dd58df55afe0, type: 3}
   m_Name: 
@@ -101,17 +102,42 @@ MonoBehaviour:
   _uiRoot: {fileID: 1735854699996558995}
   _uiPrefab: {fileID: 6591311055882119978, guid: 1bc9e2cd0a2cc6b439f57b655c8b9a0b, type: 3}
   _poolSize: 10
+  _bossUiPrefab: {fileID: 3721801271455258463, guid: 8eb505fe5fa43be4e96afdf75c725b1b, type: 3}
+  _alwaysShowBossHp: 1
+  _bossWorldOffset: {x: 0, y: 2, z: 0}
+  _bossPoolSize: 2
+  _runtimeUnitManager: {fileID: 0}
   _detectionRadius: 5
   _detectionInterval: 0.1
   _unitLayerMask:
     serializedVersion: 2
     m_Bits: 8192
   _worldOffset: {x: 0, y: 1, z: 0}
-  _bossUiPrefab: {fileID: 3721801271455258463, guid: 8eb505fe5fa43be4e96afdf75c725b1b, type: 3}
+--- !u!114 &3788201697730924683
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 425170594235001123}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9be03405759362f46882ef415f6382a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UI.UnitHPUIManager_HitAppear
+  _worldCamera: {fileID: 0}
+  _uiRoot: {fileID: 1735854699996558995}
+  _uiPrefab: {fileID: 164761138608501173, guid: 422d951d2fb03f640aa195c0d190c98e, type: 3}
+  _spawnManager: {fileID: 0}
+  _runtimeUnitManager: {fileID: 0}
+  _initialPoolSize: 50
+  _createPerFrame: 2
+  _bossUiPrefab: {fileID: 5401996202629105460, guid: 92b108ccfa83d5e478e528258f2a9556, type: 3}
   _alwaysShowBossHp: 1
   _bossWorldOffset: {x: 0, y: 2, z: 0}
   _bossPoolSize: 2
-  _runtimeUnitManager: {fileID: 0}
+  _showWhenHasShield: 1
+  _worldOffset: {x: 0, y: 1, z: 0}
 --- !u!1 &837544860871848670
 GameObject:
   m_ObjectHideFlags: 0

@@ -12,6 +12,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "E_Boss_02_\uBCF4\uBCD1\uC7A5\uAD50_ActiveSkill_1"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uC911\uAC11 \uB3CC\uACA9"
+    _icon: {fileID: 21300000, guid: 28fd9fdd1600da7489f1701ff673abe7, type: 3}
+    _description: "\uB300\uC0C1\uC5D0\uAC8C \uB3CC\uC9C4\uD574 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C
+      \uACF5\uACA9\uB825\uC758 300% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4.
+      '\uBD88\uAD74\uC758 \uBC29\uC5B4' 50\uC911\uCCA9\uC744 \uC18C\uBE44\uD558\uBA74
+      \uC801\uC744 5\uCD08\uAC04 \uAE30\uC808\uC2DC\uD0B5\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784
+      7\uCD08]"
   _skillRange: 12
   _skillCooldown: 7
   _targetSide: 0
@@ -162,9 +170,9 @@ MonoBehaviour:
           _effects:
           - rid: 4617381741844758623
           _order: 1
-          _consumeOncePerExecution: 1
           _conditions:
           - rid: 4617381741844758621
+          _consumeOncePerExecution: 1
           _fxEntries: []
         _fxEntries:
         - _key: VFX_Enemy_ActiveAttack_Circle

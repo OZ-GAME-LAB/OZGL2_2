@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -477,7 +477,8 @@ namespace Units
         public async UniTask SpawnEnemyWaveAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool isInfiniteWave = false)
         {
             if (_enemyWaveSpawner == null)
             {
@@ -525,7 +526,7 @@ namespace Units
                 await WaitForSpawnStartAsync(enemySpawnStartsAt, cancellationToken);
                 _enemyRallyGridAllocator.Clear();
                 _enemyWaveSpawner.ResetSpawnResult();
-                succeeded = await _enemyWaveSpawner.SpawnWaveAsync(cost, context, cancellationToken);
+                succeeded = await _enemyWaveSpawner.SpawnWaveAsync(cost, context, cancellationToken, isInfiniteWave);
                 cancellationToken.ThrowIfCancellationRequested();
             }
             catch

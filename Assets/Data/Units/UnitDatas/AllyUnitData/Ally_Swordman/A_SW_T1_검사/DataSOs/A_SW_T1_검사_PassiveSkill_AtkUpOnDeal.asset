@@ -10,8 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
-  m_Name: "A_SW_T1_검사_PassiveSkill_AtkUpOnDeal"
+  m_Name: "A_SW_T1_\uAC80\uC0AC_PassiveSkill_AtkUpOnDeal"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uAC80\uC758 \uD750\uB984"
+    _icon: {fileID: 21300000, guid: 967f3590be479bc49b0cf9290ba949ff, type: 3}
+    _description: "\uD53C\uD574\uB97C \uC904 \uB54C\uB9C8\uB2E4 3\uCD08\uAC04 \uACF5\uACA9\uB825\uC774
+      5% \uC99D\uAC00\uD569\uB2C8\uB2E4. [\uCD5C\uB300 5\uC911\uCCA9]"
   _skillSchemaVersion: 1
   _triggerType: 3
   _tickInterval: 0.25
@@ -37,7 +42,6 @@ MonoBehaviour:
     - rid: 4844432381217865732
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: d5be459ca87233048958e1d95c6ddd73, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -48,3 +52,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: d5be459ca87233048958e1d95c6ddd73, type: 2}

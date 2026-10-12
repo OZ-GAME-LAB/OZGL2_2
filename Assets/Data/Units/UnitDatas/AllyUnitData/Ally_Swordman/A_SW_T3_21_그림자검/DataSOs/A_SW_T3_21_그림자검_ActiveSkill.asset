@@ -12,6 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_SW_T3_21_\uADF8\uB9BC\uC790\uAC80_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uADF8\uB9BC\uC790 \uAE09\uC2B5"
+    _icon: {fileID: 21300000, guid: bcbb766f4f347074fa6efe2dfd80dfd1, type: 3}
+    _description: "\uB300\uC0C1\uC5D0\uAC8C \uB3CC\uC9C4\uD574 \uACF5\uACA9\uB825\uC758
+      100% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC8FC\uACE0 2.5\uCD08\uAC04 \uCE58\uBA85\uD0C0
+      \uD53C\uD574\uAC00 75% \uC99D\uAC00\uD569\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784
+      5\uCD08]"
   _skillRange: 15
   _skillCooldown: 5
   _targetSide: 0
@@ -27,6 +34,7 @@ MonoBehaviour:
   _effects:
   - rid: 4844432152660541519
   _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
   _dashDistance: 10
   _dashSpeed: 12
   _skillFXType: 0
@@ -42,6 +50,7 @@ MonoBehaviour:
     - rid: 4844432152660541519
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
         _damageMultiplier: 1
     - rid: 4844432359097368580
@@ -68,7 +77,6 @@ MonoBehaviour:
     - rid: 4844432359097368581
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _executionDuration: 0
         _target:
           _source: 2
           _relation: 0
@@ -152,16 +160,18 @@ MonoBehaviour:
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
+        _executionDuration: 0
+        _impactTiming: 0
         _area: 0
         _radius: 3
         _angle: 360
         _maxEffectTargets: 5
         _projectileSpeed: 10
+        _projectilePrefab: {fileID: 0}
         _isLegacy: 1
     - rid: 4844432377880510552
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 16150412751ef25489dbee6a4887ee61, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -172,3 +182,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 16150412751ef25489dbee6a4887ee61, type: 2}
