@@ -47,7 +47,8 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
     public bool TryChangeLevel(TotemId id, int delta)
     {
         // 한 번의 클릭으로 한 단계만 변경합니다.
-        if (delta != 1 && delta != -1) return false;
+        // 단, 최대 단계에서 좌클릭하여 0단계로 순환하는 경우에는 현재 레벨만큼 한 번에 감소할 수 있습니다.
+        if (delta == 0) return false;
 
         int index = FindIndex(id);
         if (index < 0) return false;
