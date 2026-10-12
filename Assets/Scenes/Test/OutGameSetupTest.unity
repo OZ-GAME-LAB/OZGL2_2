@@ -325,18 +325,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 697719085863776987, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_fontColor32.rgba
-      value: 4281019179
-      objectReference: {fileID: 0}
-    - target: {fileID: 697719085863776987, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 1059749749118909087, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 1072019051224296481, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -416,54 +404,6 @@ PrefabInstance:
     - target: {fileID: 1072019051224296481, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1258477393270700282, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_fontColor32.rgba
-      value: 4281019179
-      objectReference: {fileID: 0}
-    - target: {fileID: 1258477393270700282, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 2857774988817632623, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_fontColor32.rgba
-      value: 4281019179
-      objectReference: {fileID: 0}
-    - target: {fileID: 2857774988817632623, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 3411437062930232037, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3471100185130104377, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3767920757123793249, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: altarController
-      value: 
-      objectReference: {fileID: 2092167973}
-    - target: {fileID: 3767920757123793249, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: startController
-      value: 
-      objectReference: {fileID: 2092167970}
-    - target: {fileID: 3767920757123793249, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: totemController
-      value: 
-      objectReference: {fileID: 2092167971}
-    - target: {fileID: 3767920757123793249, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: traitController
-      value: 
-      objectReference: {fileID: 2092167972}
-    - target: {fileID: 3975238382577291440, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: _bloodstone
-      value: 
-      objectReference: {fileID: 11400000, guid: 652b535a23e144b42a29a04a1d3c4409, type: 2}
-    - target: {fileID: 4544279699987134057, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5082180956329569876, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
       propertyPath: m_AdditionalShaderChannelsFlag
@@ -1260,50 +1200,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
   m_Asset: {fileID: 2025881921}
   m_ActionId: 15cef263-9014-4fd5-94d9-4e4a6234a6ef
---- !u!114 &2092167970 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 3677419675910754256, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-  m_PrefabInstance: {fileID: 1373504227}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c282dae0e282450b9da0de58e7c4ebb6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OutGameController
---- !u!114 &2092167971 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 730582021174827131, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-  m_PrefabInstance: {fileID: 1373504227}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 98d2b733bfe0f524597bed8c38057848, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OutGameTotemSelector
---- !u!114 &2092167972 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 2347817448905611829, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-  m_PrefabInstance: {fileID: 1373504227}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0fd857feee190b9448ec085d327a42b7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OutGameTraitSelector
---- !u!114 &2092167973 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 74453098102138555, guid: 76b891d457165f441bc3edf3efe6d73d, type: 3}
-  m_PrefabInstance: {fileID: 1373504227}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bb84812c5fa47a64a8ba28785905e290, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::OutGameAltarSelector
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
