@@ -27,6 +27,16 @@ namespace Game.UI.InGame
 
         public void ShowSingle(UnitData unit)
         {
+            if (unit == null) return;
+            Bind(unit);
+            _screen.Manager.OpenPopup(_screen.Id);
+            ResetSkillScroll();
+        }
+
+        // 도감 등 다른 화면의 내용으로도 사용할 수 있도록 팝업 표시와 바인딩을 분리한다.
+        public void Bind(UnitData unit)
+        {
+            if (unit == null) return;
             _nameText.text = string.IsNullOrWhiteSpace(unit.UnitName) ? unit.name : unit.UnitName;
             _subtitleText.text = "1마리 기본 정보 · 전투 중 강화 효과 미포함";
             _healthText.text = $"기본 체력 {unit.GetStat(UnitStatType.MaxHp):0.##}";
@@ -62,7 +72,11 @@ namespace Game.UI.InGame
             }
 
             _emptySkillsText.gameObject.SetActive(_skillSlots.Count == 0);
-            _screen.Manager.OpenPopup(_screen.Id);
+            ResetSkillScroll();
+        }
+
+        private void ResetSkillScroll()
+        {
             _skillScroll.StopMovement();
             _skillScroll.verticalNormalizedPosition = 1;
         }

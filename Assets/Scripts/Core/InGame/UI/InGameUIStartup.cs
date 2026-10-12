@@ -1,4 +1,5 @@
 using Game.Cameras;
+using Game.Archive;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
@@ -24,6 +25,7 @@ namespace Game.UI.InGame
         [SerializeField] private ConsumableItemActionButton _consumableUsePopup;
         [SerializeField] private BuildingUIPresenter _buildingUI;
         [SerializeField] private BuildingUIConnection _buildingUIConnection;
+        [SerializeField] private ArchiveView _archiveView;
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
@@ -33,6 +35,8 @@ namespace Game.UI.InGame
         public IRunSettlementUI SettlementUI => _settlementUI;
         public IShopUI ShopUI => _shopView;
         public bool IsReady { get; private set; }
+
+        public void InitializeArchive(ArchiveController archive) => _archiveView.Initialize(archive);
 
         public void InitializeArtifactInventory(IArtifactReader artifactReader)
         {
