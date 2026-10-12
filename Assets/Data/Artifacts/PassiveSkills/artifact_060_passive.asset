@@ -12,25 +12,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: artifact_060_passive
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: 
+    _icon: {fileID: 0}
+    _description: 
   _skillSchemaVersion: 1
   _triggerType: 1
   _tickInterval: 1
   _conditions:
-  - rid: 1967714782231658620
+  - rid: 1967714872633852221
   _effectMode: 2
   _actions:
-  - rid: 1967714782231658621
+  - rid: 1967714872633852222
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 1967714782231658620
+    - rid: 1967714872633852221
       type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _subjectType: 0
         _comparisonType: 1
         _healthRatio: 0.4
-    - rid: 1967714782231658621
+    - rid: 1967714872633852222
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 0
@@ -40,9 +44,10 @@ MonoBehaviour:
         _areaRadius: 1
         _areaAngle: 360
         _effects:
-        - rid: 1967714782231658622
-    - rid: 1967714782231658622
+        - rid: 1967714872633852223
+    - rid: 1967714872633852223
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _scalingStatType: 0
         _shieldRatio: 0.4
