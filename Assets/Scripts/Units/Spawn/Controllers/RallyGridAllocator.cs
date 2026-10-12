@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -250,7 +250,7 @@ namespace Units
         // ============================================================
 
         public bool PrepareCenteredAllocation(
-            int groupCount)
+            int groupCount, int minimumColumns = 1)
         {
             _preparedSectorIndices.Clear();
 
@@ -318,6 +318,9 @@ namespace Units
                     )
                 );
 
+
+            if (minimumColumns > 1 && _columnCount > 1 && groupCount > 1)
+                requiredRows = Mathf.Min(requiredRows, Mathf.CeilToInt(groupCount / 2f));
 
             int requiredColumns =
                 Mathf.CeilToInt(
@@ -494,6 +497,23 @@ namespace Units
             return true;
         }
 
+
+        public bool PreparePreferredAllocation(IReadOnlyList<RallyZone> zones,
+            IReadOnlyList<bool> bosses)
+        {
+            bool front = false, rear = false;
+            foreach (var zone in zones) { front |= zone == RallyZone.Front; rear |= zone == RallyZone.Rear; }
+            if (!PrepareCenteredAllocation(zones.Count, front && rear ? 2 : 1)) return false;
+            var sectors = _preparedSectorIndices.ToArray();
+            var plan = RallyZonePlanner.Plan(sectors, _columnCount, _rowCount, zones, bosses);
+            _preparedSectorIndices.Clear();
+            foreach (int index in plan)
+            {
+                if (index < 0) { _preparedSectorIndices.Clear(); return false; }
+                _preparedSectorIndices.Enqueue(index);
+            }
+            return true;
+        }
 
         private List<int> BuildCenterOutRowOrder(
             int startRow,

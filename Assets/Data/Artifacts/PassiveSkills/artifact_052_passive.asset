@@ -12,18 +12,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: artifact_052_passive
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: 
+    _icon: {fileID: 0}
+    _description: 
   _skillSchemaVersion: 1
   _triggerType: 10
   _tickInterval: 1
   _conditions: []
   _effectMode: 0
   _actions:
-  - rid: 1967714782231658604
+  - rid: 1967714872633852205
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 1967714782231658604
+    - rid: 1967714872633852205
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 2
@@ -33,9 +37,10 @@ MonoBehaviour:
         _areaRadius: 3
         _areaAngle: 360
         _effects:
-        - rid: 1967714782231658605
-    - rid: 1967714782231658605
+        - rid: 1967714872633852206
+    - rid: 1967714872633852206
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _scalingStatType: 0
         _shieldRatio: 0.08

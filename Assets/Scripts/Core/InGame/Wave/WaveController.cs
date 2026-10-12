@@ -10,12 +10,20 @@ namespace Game.Core
     public struct SpawnContext
     {
         public ClassWeights Weights;
-        public List<EnemyUnitType> MonsterIDs; //몬스터 id 리스트
-        
+        // General-unit candidates; their counts are determined by cost and weights.
+        public List<EnemyUnitType> MonsterIDs;
+        // One boss per entry. Duplicates are intentional; null/empty means no bosses.
+        public List<EnemyUnitType> BossIDs;
+
         public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs)
+            : this(weights, monsterIDs, null) { }
+
+        public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs,
+            List<EnemyUnitType> bossIDs)
         {
             Weights = weights;
             MonsterIDs = monsterIDs;
+            BossIDs = bossIDs;
         }
     }
 

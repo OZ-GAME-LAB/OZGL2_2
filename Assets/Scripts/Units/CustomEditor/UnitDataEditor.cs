@@ -173,6 +173,8 @@ namespace Units.Editor
                     _team
                 );
 
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("_rallyZone"));
+
 
                 EditorGUI.indentLevel--;
             }
@@ -518,6 +520,8 @@ namespace Units.Editor
 
         private void DrawEnemyIdentity()
         {
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("_enemyRank"));
+
             SerializedProperty unitClass =
                 _enemyIdentity.FindPropertyRelative(
                     "_unitClass"
@@ -554,6 +558,14 @@ namespace Units.Editor
             EnemyUnitFaction faction =
                 (EnemyUnitFaction)unitFaction.intValue;
 
+
+            if ((EnemyRank)serializedObject.FindProperty("_enemyRank").intValue == EnemyRank.Boss)
+            {
+                // Boss identity and faction are independent; do not coerce a boss
+                // ID into the ordinary faction's numeric range.
+                EditorGUILayout.PropertyField(unitType);
+                return;
+            }
 
             if (factionChanged)
             {

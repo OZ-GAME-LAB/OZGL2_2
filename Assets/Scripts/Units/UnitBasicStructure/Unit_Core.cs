@@ -16,32 +16,6 @@ namespace Units
 
         [SerializeField]
         private Unit_Gateway _gateway;
-        private Hero_Phase _heroPhase;
-        public bool HasHeroPhase => _heroPhase != null && _heroPhase.IsInitialized;
-        public int HeroPhaseVersion => _heroPhase != null ? _heroPhase.Version : 0;
-        public bool IsCombatBusy => _combat != null && _combat.IsBusy;
-        internal bool BlocksNewExecution => _heroPhase != null && _heroPhase.BlocksNewExecution;
-        public UnitDecision SelectedSkillDecision { get; private set; }
-        internal SkillUsePolicyData GetSkillPolicy(UnitActiveSkillEntry entry)
-            => HasHeroPhase ? _heroPhase.GetPolicy(entry) : entry.Policy;
-        public bool TryGetHeroPhaseInfo(out Hero_PhaseInfo info)
-        { info = default; return _heroPhase != null && _heroPhase.TryGetInfo(out info); }
-        internal void NotifyHeroPhaseChanged()
-        {
-            if (_gateway is Hero_Gateway hero && TryGetHeroPhaseInfo(out var info))
-                hero.NotifyHeroPhaseChanged(info);
-        }
-        internal void InterruptCombatForPhase() => _combat?.InterruptForPhase();
-        public bool TrySelectActiveSkill(ICombatTarget target, out UnitDecision decision)
-        {
-            decision = default;
-            bool found = _combat != null && _combat.TrySelectActiveSkill(target, out decision);
-            SelectedSkillDecision = decision;
-            return found;
-        }
-        public bool TryActiveSkill(UnitDecision decision, Action onStarting = null)
-            => _combat != null && _combat.TryActiveSkill(decision, onStarting);
-
 
         [SerializeField]
         private Unit_RuntimeStatus _runtimeStatus;
@@ -81,6 +55,13 @@ namespace Units
         // ============================================================
         // Properties
         // ============================================================
+
+        [SerializeField, Min(0f)]
+        [Tooltip("로컬 전투 몸 반지름. 월드 반지름에는 루트의 XY 스케일이 반영됩니다. Collider와 크기를 맞춰주세요.")]
+        private float _bodyRadius = CombatRangeUtility.StandardBodyRadius;
+
+        public float BodyRadius => Mathf.Max(0f, _bodyRadius)
+            * Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.y));
 
         public UnitTeam Team => _team;
 
@@ -470,6 +451,20 @@ namespace Units
         // Combat
         // ============================================================
 
+        public UnitDecision SelectedSkillDecision { get; private set; }
+
+        public bool IsCombatBusy => _combat != null && _combat.IsBusy;
+
+        public bool TrySelectActiveSkill(ICombatTarget target, out UnitDecision decision)
+        {
+            decision = default;
+            bool found = _combat != null && _combat.TrySelectActiveSkill(target, out decision);
+            SelectedSkillDecision = decision;
+            return found;
+        }
+        public bool TryActiveSkill(UnitDecision decision, Action onStarting = null)
+            => _combat != null && _combat.TryActiveSkill(decision, onStarting);
+
         public bool TryBasicAttack(ICombatTarget target)
         {
             if (_combat == null)
@@ -490,6 +485,29 @@ namespace Units
         {
             NotifyTargetReevaluation();
         }
+
+
+        // ============================================================
+        // Phase
+        // ============================================================
+
+        private Hero_Phase _heroPhase;
+        public bool HasHeroPhase => _heroPhase != null && _heroPhase.IsInitialized;
+        public int HeroPhaseVersion => _heroPhase != null ? _heroPhase.Version : 0;
+        internal bool BlocksNewExecution => _heroPhase != null && _heroPhase.BlocksNewExecution;
+        internal SkillUsePolicyData GetSkillPolicy(UnitActiveSkillEntry entry)
+            => HasHeroPhase ? _heroPhase.GetPolicy(entry) : entry.Policy;
+        public bool TryGetHeroPhaseInfo(out Hero_PhaseInfo info)
+        {
+            info = default;
+            return _heroPhase != null && _heroPhase.TryGetInfo(out info);
+        }
+        internal void NotifyHeroPhaseChanged()
+        {
+            if (_gateway is Hero_Gateway hero && TryGetHeroPhaseInfo(out var info))
+                hero.NotifyHeroPhaseChanged(info);
+        }
+        internal void InterruptCombatForPhase() => _combat?.InterruptForPhase();
 
 
         // ============================================================
@@ -673,6 +691,8 @@ namespace Units
         {
             _gateway?.NotifyCombatStateChanged(CombatStateChange.Health);
 
+            _gateway?.NotifyHpChanged(previousHp, currentHp);
+
             _passive?.NotifyHealthChanged();
         }
 
@@ -681,6 +701,8 @@ namespace Units
             float currentShield)
         {
             _gateway?.NotifyCombatStateChanged(CombatStateChange.Shield);
+
+            _gateway?.NotifyShieldChanged(previousShield,currentShield);
 
             _passive?.NotifyShieldChanged();
         }

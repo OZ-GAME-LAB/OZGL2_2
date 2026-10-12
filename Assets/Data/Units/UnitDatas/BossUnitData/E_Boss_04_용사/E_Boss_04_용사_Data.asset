@@ -1,0 +1,146 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e23934c87954349a191080fd430d5f, type: 3}
+  m_Name: "E_Boss_04_\uC6A9\uC0AC_Data"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UnitDatas.UnitData
+  _unitId: "E_Boss_04_\uC6A9\uC0AC"
+  _unitName: "\uC6A9\uC0AC"
+  _team: 1
+  _rallyZone: 0
+  _enemyRank: 1
+  _allyIdentity:
+    _unitClass: 0
+    _unitTier: 0
+    _unitType: 0
+  _enemyIdentity:
+    _unitClass: 2
+    _unitFaction: 3
+    _unitType: 104
+  _stats:
+  - _statType: 0
+    _value: 50000
+  - _statType: 10
+    _value: 50
+  - _statType: 20
+    _value: 1
+  - _statType: 30
+    _value: 1
+  - _statType: 100
+    _value: 250
+  - _statType: 110
+    _value: 1
+  - _statType: 120
+    _value: 1
+  - _statType: 130
+    _value: 1
+  - _statType: 140
+    _value: 0
+  - _statType: 150
+    _value: 0
+  - _statType: 160
+    _value: 1
+  - _statType: 170
+    _value: 1
+  - _statType: 180
+    _value: 0
+  - _statType: 200
+    _value: 0.15
+  - _statType: 210
+    _value: 1.5
+  - _statType: 300
+    _value: 9
+  - _statType: 400
+    _value: 10
+  _statusImmunities: 000000000100000002000000
+  _basicAttackData: {fileID: 11400000, guid: 5ca10988f5c0b334cb0e7470fb4403d8, type: 2}
+  _activeSkills:
+  - _id: "DashAttack_Boss_04_\uC6A9\uC0AC"
+    _skill: {fileID: 11400000, guid: 80f9e0abb982fe6499169621a5a3533d, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  - _id: "BraveAttack_Boss_04_\uC6A9\uC0AC"
+    _skill: {fileID: 11400000, guid: 6b57e5e1cfee8a74697cf38862b9c7b9, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  - _id: "AreaShield_Boss_04_\uC6A9\uC0AC"
+    _skill: {fileID: 11400000, guid: 2112721c04c8bf044942a607d26222ab, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  - _id: "ChargeShield_Boss_04_\uC6A9\uC0AC"
+    _skill: {fileID: 11400000, guid: abb9e9100c95c174a83ad19ccb175dc0, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions: []
+      _urgentConditions: []
+  - _id: "DivineStrike_Boss_04_\uC6A9\uC0AC"
+    _skill: {fileID: 11400000, guid: 85e0b32c7b260ae48bd6f867c3c6428f, type: 2}
+    _policy:
+      _enabled: 1
+      _priority: 0
+      _utilityWeight: 1
+      _minimumUtility: 0.001
+      _baseUtility: 0
+      _runtimeEffectUtility: 10
+      _urgentPriority: 100
+      _conditions:
+      - rid: 9100405001
+      _urgentConditions: []
+  _passiveSkillDatas:
+  - {fileID: 11400000, guid: 30de4e1d86366fe4c9f257b4ce54fe71, type: 2}
+  - {fileID: 11400000, guid: edf5caeb1cdec914eabef2763aa87eea, type: 2}
+  - {fileID: 11400000, guid: adb27d8c85aa54e459f10289e591f69b, type: 2}
+  - {fileID: 11400000, guid: 5da4a6017cf4a6e4b83a4aad52585ba5, type: 2}
+  references:
+    version: 2
+    RefIds:
+    - rid: 9100405001
+      type: {class: SkillStackCondition, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _subject: 0
+        _query:
+          _kind: 0
+          _key: "E_Boss_04_\uC6A9\uC0AC_GoddessBless"
+          _statusType: 0
+        _comparison: 3
+        _count: 10
+        _consumeOnApply: 0
+        _consumeCount: 1

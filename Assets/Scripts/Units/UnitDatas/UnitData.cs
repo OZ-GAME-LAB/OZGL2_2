@@ -32,6 +32,16 @@ namespace Units.UnitDatas
         [SerializeField]
         private UnitTeam _team;
 
+        [SerializeField, Tooltip("집결 선호 구역. 공간이 부족하면 반대 구역을 사용합니다.")]
+        private RallyZone _rallyZone;
+
+        [SerializeField]
+        private EnemyRank _enemyRank;
+
+        public RallyZone RallyZone => _rallyZone;
+        public EnemyRank EnemyRank => _enemyRank;
+        public bool IsBoss => _team == UnitTeam.Enemy && _enemyRank == EnemyRank.Boss;
+
 
         // ============================================================
         // Unit Identity

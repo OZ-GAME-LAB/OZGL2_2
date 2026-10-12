@@ -16,6 +16,7 @@ namespace Units
 
         private Vector2 _lastTargetPosition;
         private float _lastCombatRange;
+        private float _lastSizeCorrection;
         private float _nextPositionRefreshTime;
         private const float PositionRefreshInterval = 0.1f;
         private const float TargetMovementThreshold = 0.05f;
@@ -24,6 +25,7 @@ namespace Units
         {
             _lastTargetPosition = target.Transform.position;
             _lastCombatRange = _core.PreferredCombatRange;
+            _lastSizeCorrection = CombatRangeUtility.Correction(_core.CombatTarget, target);
             _nextPositionRefreshTime = Time.time + PositionRefreshInterval;
             // GroupAI가 현재 대상과 장애물 배치를 기준으로 목적지를 다시 선택한다.
             // 이동 중 갱신은 Unit_AI에서 Stop/Enter 없이 반영한다.
@@ -125,7 +127,8 @@ namespace Units
             if (Time.time >= _nextPositionRefreshTime
                 && (Vector2.Distance(_lastTargetPosition, currentAssignment.Target.Transform.position)
                         >= TargetMovementThreshold
-                    || Mathf.Abs(_lastCombatRange - _core.PreferredCombatRange) > 0.01f))
+                    || Mathf.Abs(_lastCombatRange - _core.PreferredCombatRange) > 0.01f
+                    || Mathf.Abs(_lastSizeCorrection - CombatRangeUtility.Correction(_core.CombatTarget, currentAssignment.Target)) > 0.01f))
                 RefreshPosition(currentAssignment.Target);
 
             return null;
