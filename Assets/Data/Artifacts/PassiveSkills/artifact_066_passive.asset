@@ -20,21 +20,21 @@ MonoBehaviour:
   _triggerType: 5
   _tickInterval: 6
   _conditions:
-  - rid: 1967714872633852144
+  - rid: 1967714872633852234
   _effectMode: 0
   _actions:
-  - rid: 1967714872633852145
+  - rid: 1967714872633852235
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 1967714872633852144
+    - rid: 1967714872633852234
       type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _subjectType: 0
         _comparisonType: 1
         _healthRatio: 0.5
-    - rid: 1967714872633852145
+    - rid: 1967714872633852235
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 0
@@ -44,8 +44,8 @@ MonoBehaviour:
         _areaRadius: 0
         _areaAngle: 360
         _effects:
-        - rid: 1967714872633852146
-    - rid: 1967714872633852146
+        - rid: 1967714872633852236
+    - rid: 1967714872633852236
       type: {class: SkillHealEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
