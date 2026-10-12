@@ -12,6 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "E_Boss_04_\uC6A9\uC0AC_ActiveSkill_3"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: 
+    _icon: {fileID: 0}
+    _description: 
   _skillRange: 7
   _skillCooldown: 15
   _targetSide: 2
@@ -61,7 +65,7 @@ MonoBehaviour:
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         _scalingStatType: 0
-        _shieldRatio: 0.1
+        _shieldRatio: 0.03
     - rid: 4617381741844758674
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:

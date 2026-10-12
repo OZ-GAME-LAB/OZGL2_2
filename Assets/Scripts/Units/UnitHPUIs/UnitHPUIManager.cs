@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -9,8 +9,8 @@ namespace Units.UI
     /// 마우스 주변의 유닛을 탐색하고,
     /// 미리 생성된 UnitHpUI를 가까운 유닛부터 할당한다.
     ///
-    /// Physics2D 탐색 버퍼와 후보 버퍼는 고정 크기로 재사용하며,
-    /// HP UI 역시 시작 시 지정된 수만큼 생성한 뒤 계속 재사용한다.
+    /// 일반/보스 UI 풀을 분리한다. 보스는 마우스 감지 또는 항상 표시를 선택한다.
+    /// 탐색 버퍼와 보스 UI 풀은 필요한 경우 확장한 뒤 재사용한다.
     ///
     /// HP / Shield 값 갱신은 UnitHpUI가 담당하고,
     /// 이 Manager는 대상 탐색, UI 할당, 위치 갱신만 담당한다.
@@ -50,6 +50,25 @@ namespace Units.UI
 
         private UnitHPUI[] _uiSlots;
 
+        [Header("Boss UI")]
+        [SerializeField, Tooltip("보스 전용 UnitHPUI 프리팹. 미지정 시 일반 프리팹을 사용합니다.")]
+        private UnitHPUI _bossUiPrefab;
+
+        [SerializeField, Tooltip("켜면 등록된 모든 보스를 표시하고, 끄면 일반 유닛과 같은 마우스 감지 조건을 사용합니다.")]
+        private bool _alwaysShowBossHp = true;
+
+        [SerializeField]
+        private Vector3 _bossWorldOffset = new Vector3(0f, 2f, 0f);
+
+        [SerializeField, Min(1), Tooltip("보스 UI 초기 개수. 동시에 표시할 보스가 더 많으면 자동 확장합니다.")]
+        private int _bossPoolSize = 2;
+
+        [SerializeField, Tooltip("항상 표시할 보스 목록. 비어 있으면 씬에서 자동으로 찾습니다.")]
+        private RuntimeUnitManager _runtimeUnitManager;
+
+        private readonly List<UnitHPUI> _bossUiSlots = new();
+        private readonly List<Unit_Gateway> _bossCandidates = new();
+
 
         // ============================================================
         // Detection
@@ -82,10 +101,10 @@ namespace Units.UI
         // Buffers
         // ============================================================
 
-        private readonly Collider2D[] _detectionBuffer =
+        private Collider2D[] _detectionBuffer =
             new Collider2D[DetectionBufferSize];
 
-        private readonly HpUICandidate[] _candidateBuffer =
+        private HpUICandidate[] _candidateBuffer =
             new HpUICandidate[DetectionBufferSize];
 
 
@@ -139,11 +158,10 @@ namespace Units.UI
 
         private void Update()
         {
-            UpdateUIPositions();
-
             if (Time.unscaledTime <
                 _nextDetectionTime)
             {
+                UpdateUIPositions();
                 return;
             }
 
@@ -152,6 +170,22 @@ namespace Units.UI
                 _detectionInterval;
 
             DetectUnits();
+            UpdateUIPositions();
+        }
+
+        private void OnEnable()
+        {
+            _nextDetectionTime = 0f;
+        }
+
+        private void OnDestroy()
+        {
+            HideAll();
+            if (_uiSlots != null)
+                foreach (var ui in _uiSlots)
+                    if (ui != null) Destroy(ui.gameObject);
+            foreach (var ui in _bossUiSlots)
+                if (ui != null) Destroy(ui.gameObject);
         }
 
 
@@ -174,6 +208,7 @@ namespace Units.UI
 
             InitializeContactFilter();
             InitializeUIPool();
+            EnsureBossPool(Mathf.Max(1, _bossPoolSize));
         }
 
 
@@ -252,44 +287,82 @@ namespace Units.UI
 
         private void DetectUnits()
         {
-            if (_worldCamera == null ||
-                Mouse.current == null ||
-                _uiSlots == null)
+            _bossCandidates.Clear();
+            int candidateCount = 0;
+            if (_worldCamera == null) _worldCamera = Camera.main;
+            if (_worldCamera == null)
             {
+                HideAll();
                 return;
             }
 
-            Vector2 mouseScreenPosition =
-                Mouse.current.position.ReadValue();
+            // 마우스가 없어도 항상 표시하는 보스의 목록은 갱신한다.
+            if (Mouse.current != null)
+            {
+                InitializeContactFilter();
+                Vector2 mouseWorldPosition = _worldCamera.ScreenToWorldPoint(Mouse.current.position.ReadValue());
+                int hitCount;
+                while (true)
+                {
+                    hitCount = Physics2D.OverlapCircle(mouseWorldPosition, _detectionRadius,
+                        _contactFilter, _detectionBuffer);
+                    if (hitCount < _detectionBuffer.Length) break;
+                    Array.Resize(ref _detectionBuffer, _detectionBuffer.Length * 2);
+                }
+                if (_candidateBuffer.Length < hitCount)
+                    Array.Resize(ref _candidateBuffer, _detectionBuffer.Length);
+                candidateCount = CollectCandidates(hitCount, mouseWorldPosition);
+                SortCandidates(candidateCount);
+            }
 
-            Vector2 mouseWorldPosition =
-                _worldCamera.ScreenToWorldPoint(
-                    mouseScreenPosition
-                );
-
-            int hitCount =
-                Physics2D.OverlapCircle(
-                    mouseWorldPosition,
-                    _detectionRadius,
-                    _contactFilter,
-                    _detectionBuffer
-                );
-
-            int candidateCount =
-                CollectCandidates(
-                    hitCount,
-                    mouseWorldPosition
-                );
-
-            SortCandidates(
-                candidateCount
-            );
-
-            BindCandidates(
-                candidateCount
-            );
+            BindCandidates(candidateCount);
+            if (_alwaysShowBossHp)
+            {
+                if (_runtimeUnitManager == null)
+                    _runtimeUnitManager = FindFirstObjectByType<RuntimeUnitManager>();
+                if (_runtimeUnitManager != null)
+                {
+                    var bosses = _runtimeUnitManager.BossUnits;
+                    for (int i = 0; i < bosses.Count; i++)
+                    {
+                        var boss = bosses[i];
+                        if (boss != null && boss.IsTargetable && IsBoss(boss)
+                            && !_bossCandidates.Contains(boss))
+                            _bossCandidates.Add(boss);
+                    }
+                }
+            }
+            BindBossCandidates();
         }
 
+        private static bool IsBoss(Unit_Gateway unit)
+            => unit != null && unit.RuntimeStatus != null
+                && unit.RuntimeStatus.UnitData != null && unit.RuntimeStatus.UnitData.IsBoss;
+
+        private void EnsureBossPool(int count)
+        {
+            var prefab = _bossUiPrefab != null ? _bossUiPrefab : _uiPrefab;
+            if (prefab == null || _uiRoot == null) return;
+            while (_bossUiSlots.Count < count)
+            {
+                var ui = Instantiate(prefab, _uiRoot);
+                ui.name = $"{prefab.name}_Boss_{_bossUiSlots.Count + 1:00}";
+                ui.Unbind();
+                _bossUiSlots.Add(ui);
+            }
+        }
+
+        private void BindBossCandidates()
+        {
+            EnsureBossPool(_bossCandidates.Count);
+            for (int i = 0; i < _bossUiSlots.Count; i++)
+            {
+                var ui = _bossUiSlots[i];
+                if (ui == null) continue;
+                if (i < _bossCandidates.Count) ui.Bind(_bossCandidates[i]);
+                else ui.Unbind();
+            }
+        }
 
         // ============================================================
         // Candidate Collection
@@ -397,54 +470,25 @@ namespace Units.UI
         // UI Binding
         // ============================================================
 
-        private void BindCandidates(
-            int candidateCount)
+        private void BindCandidates(int candidateCount)
         {
-            if (_uiSlots == null)
-                return;
-
-            int visibleCount =
-                Mathf.Min(
-                    candidateCount,
-                    _uiSlots.Length
-                );
-
-            for (int i = 0;
-                 i < visibleCount;
-                 i++)
+            int normalCount = 0;
+            for (int i = 0; i < candidateCount; i++)
             {
-                UnitHPUI ui =
-                    _uiSlots[i];
-
-                if (ui == null)
-                    continue;
-
-                Unit_Gateway unit =
-                    _candidateBuffer[i].Unit;
-
-                if (ui.Target != unit)
+                var unit = _candidateBuffer[i].Unit;
+                if (IsBoss(unit))
                 {
-                    ui.Bind(unit);
-                }
-            }
-
-            for (int i = visibleCount;
-                 i < _uiSlots.Length;
-                 i++)
-            {
-                UnitHPUI ui =
-                    _uiSlots[i];
-
-                if (ui == null ||
-                    !ui.IsBound)
-                {
+                    if (!_alwaysShowBossHp) _bossCandidates.Add(unit);
                     continue;
                 }
-
-                ui.Unbind();
+                if (_uiSlots == null || normalCount >= _uiSlots.Length) continue;
+                var ui = _uiSlots[normalCount++];
+                if (ui != null) ui.Bind(unit);
             }
+            if (_uiSlots != null)
+                for (int i = normalCount; i < _uiSlots.Length; i++)
+                    if (_uiSlots[i] != null) _uiSlots[i].Unbind();
         }
-
 
         // ============================================================
         // UI Position
@@ -452,82 +496,31 @@ namespace Units.UI
 
         private void UpdateUIPositions()
         {
-            if (_uiSlots == null ||
-                _worldCamera == null)
+            if (_worldCamera == null) return;
+            if (_uiSlots != null)
+                foreach (var ui in _uiSlots) UpdateUIPosition(ui, _worldOffset);
+            foreach (var ui in _bossUiSlots) UpdateUIPosition(ui, _bossWorldOffset);
+        }
+
+        private void UpdateUIPosition(UnitHPUI ui, Vector3 offset)
+        {
+            if (ui == null || !ui.IsBound) return;
+            var target = ui.Target;
+            if (target == null || !target.IsTargetable)
             {
+                ui.Unbind();
                 return;
             }
-
-            for (int i = 0;
-                 i < _uiSlots.Length;
-                 i++)
-            {
-                UnitHPUI ui =
-                    _uiSlots[i];
-
-                if (ui == null ||
-                    !ui.IsBound)
-                {
-                    continue;
-                }
-
-                Unit_Gateway target =
-                    ui.Target;
-
-                if (target == null ||
-                    !target.IsTargetable)
-                {
-                    ui.Unbind();
-                    continue;
-                }
-
-                UpdateUIPosition(
-                    ui,
-                    target
-                );
-            }
+            ui.transform.position = _worldCamera.WorldToScreenPoint(target.Transform.position + offset);
         }
-
-
-        private void UpdateUIPosition(
-            UnitHPUI ui,
-            Unit_Gateway target)
-        {
-            Vector3 worldPosition =
-                target.Transform.position +
-                _worldOffset;
-
-            Vector3 screenPosition =
-                _worldCamera.WorldToScreenPoint(
-                    worldPosition
-                );
-
-            ui.transform.position =
-                screenPosition;
-        }
-
-
-        // ============================================================
-        // Hide
-        // ============================================================
 
         private void HideAll()
         {
-            if (_uiSlots == null)
-                return;
-
-            for (int i = 0;
-                 i < _uiSlots.Length;
-                 i++)
-            {
-                UnitHPUI ui =
-                    _uiSlots[i];
-
-                if (ui == null)
-                    continue;
-
-                ui.Unbind();
-            }
+            if (_uiSlots != null)
+                foreach (var ui in _uiSlots)
+                    if (ui != null) ui.Unbind();
+            foreach (var ui in _bossUiSlots)
+                if (ui != null) ui.Unbind();
         }
 
 
