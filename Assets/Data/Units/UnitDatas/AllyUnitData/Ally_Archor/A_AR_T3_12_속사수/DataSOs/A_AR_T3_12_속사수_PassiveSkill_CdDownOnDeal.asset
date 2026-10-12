@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_AR_T3_12_\uC18D\uC0AC\uC218_PassiveSkill_CdDownOnDeal"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uC804\uD22C \uAC00\uC18D"
+    _icon: {fileID: 21300000, guid: c5ffd85fd296cd842b3b3e9affb6e8b9, type: 3}
+    _description: "\uD53C\uD574\uB97C \uC904 \uB54C\uB9C8\uB2E4 3\uCD08\uAC04 \uCFE8\uB2E4\uC6B4
+      \uAC10\uC18C\uC728\uC774 1% \uC99D\uAC00\uD569\uB2C8\uB2E4. [\uCD5C\uB300 50\uC911\uCCA9]"
   _skillSchemaVersion: 1
   _triggerType: 3
   _tickInterval: 0.25
@@ -41,7 +46,6 @@ MonoBehaviour:
     - rid: 4844432426836164615
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 44afece51f87b3d45af63307af5c8cf4, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -52,3 +56,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 44afece51f87b3d45af63307af5c8cf4, type: 2}

@@ -144,6 +144,9 @@ namespace Units
         [SerializeField]
         private int _enemyCost = 20;
 
+        [SerializeField]
+        private bool _isInfiniteWave = false;
+
         [Header("Boss Types (one boss per entry)")]
         [SerializeField]
         private List<EnemyUnitType> _bossUnitTypes = new List<EnemyUnitType>();
@@ -566,7 +569,8 @@ namespace Units
             _spawnManager.SpawnEnemyWaveAsync(
                 _enemyCost,
                 context,
-                cancellationToken
+                cancellationToken,
+                _isInfiniteWave
             ).Forget();
 
 

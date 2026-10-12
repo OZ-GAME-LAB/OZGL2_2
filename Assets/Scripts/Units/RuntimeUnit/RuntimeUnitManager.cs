@@ -130,6 +130,9 @@ namespace Units
         public event Action
             AllBossesDefeated;
 
+        public event Action
+            RuntimeCleared;
+
 
         // =========================
         // Properties
@@ -1248,6 +1251,8 @@ namespace Units
             );
 
             Units.FX.SFXManager.Instance?.Clear();
+
+            RuntimeCleared?.Invoke();
         }
 
 

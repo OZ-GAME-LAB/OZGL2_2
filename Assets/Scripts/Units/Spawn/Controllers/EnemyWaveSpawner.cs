@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -102,14 +102,44 @@ namespace Units
         private readonly BossSpawner _bossSpawner = new BossSpawner();
         private readonly List<Unit_GroupAI> _spawnedGroups = new List<Unit_GroupAI>();
 
-        internal async UniTask<bool> SpawnWaveAsync(int cost, SpawnContext context,
-            CancellationToken cancellationToken)
+        // Per-wave overrides: keys remain appearance IDs; values carry combat identity.
+        private readonly Dictionary<EnemyUnitType, UnitData> _waveData = new();
+
+        private void BuildInfiniteData(IEnumerable<EnemyUnitType> appearances)
         {
+            var crusaders = new Dictionary<EnemyUnitClass, UnitData>();
+            foreach (var entry in _spawnEntries.Values)
+            {
+                if (entry.Faction != EnemyUnitFaction.Crusaders || entry.Rank == EnemyRank.Boss)
+                    continue;
+                var data = entry.Prefab != null
+                    ? entry.Prefab.GetComponent<Unit_RuntimeStatus>()?.DefaultUnitData : null;
+                if (data == null || data.Team != UnitTeam.Enemy || data.IsBoss ||
+                    data.GetEnemyFaction() != EnemyUnitFaction.Crusaders || data.GetEnemyClass() != entry.UnitClass)
+                    throw new InvalidOperationException("[EnemyWaveSpawner] Invalid Crusaders data: " + entry.UnitClass);
+                if (crusaders.ContainsKey(entry.UnitClass))
+                    throw new InvalidOperationException("[EnemyWaveSpawner] Duplicate Crusaders class: " + entry.UnitClass);
+                crusaders.Add(entry.UnitClass, data);
+            }
+            foreach (var type in appearances)
+            {
+                var entry = _spawnEntries[type];
+                if (entry.Rank == EnemyRank.Boss) continue;
+                if (!crusaders.TryGetValue(entry.UnitClass, out var data))
+                    throw new InvalidOperationException("[EnemyWaveSpawner] Missing Crusaders class for: " + type);
+                _waveData[type] = data;
+            }
+        }
+
+        internal async UniTask<bool> SpawnWaveAsync(int cost, SpawnContext context,
+            CancellationToken cancellationToken, bool isInfiniteWave = false)
+        {
+            _waveData.Clear();
             _spawnedGroups.Clear();
             bool succeeded = false;
             try
             {
-                succeeded = await SpawnWaveCoreAsync(cost, context, cancellationToken);
+                succeeded = await SpawnWaveCoreAsync(cost, context, cancellationToken, isInfiniteWave);
                 cancellationToken.ThrowIfCancellationRequested();
                 return succeeded;
             }
@@ -126,13 +156,14 @@ namespace Units
                     _rallyGridAllocator.Clear();
                 }
                 _spawnedGroups.Clear();
+                _waveData.Clear();
             }
         }
 
         private async UniTask<bool> SpawnWaveCoreAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, bool isInfiniteWave)
         {
             if (!ValidateWaveRequest(
                 cost,
@@ -153,12 +184,19 @@ namespace Units
             if (cost > 0 && context.MonsterIDs != null && context.MonsterIDs.Count > 0)
                 groupSpawnDataList.AddRange(BuildGroupSpawnData(cost, context));
 
+            if (isInfiniteWave)
+            {
+                var appearances = new List<EnemyUnitType>();
+                foreach (var group in groupSpawnDataList) appearances.Add(group.UnitType);
+                BuildInfiniteData(appearances);
+            }
+
             var zones = new List<RallyZone>();
             var bosses = new List<bool>();
             foreach (var group in groupSpawnDataList)
             {
                 var entry = _spawnEntries[group.UnitType];
-                zones.Add(entry.RallyZone);
+                zones.Add(_waveData.TryGetValue(group.UnitType, out var data) ? data.RallyZone : entry.RallyZone);
                 bosses.Add(entry.Rank == EnemyRank.Boss);
             }
 
@@ -1157,7 +1195,8 @@ namespace Units
 
 
             UnitData unitData =
-                runtimeStatus.UnitData;
+                _waveData.TryGetValue(unitType, out var overrideData)
+                    ? overrideData : runtimeStatus.DefaultUnitData;
 
 
             if (unitData == null)
@@ -1197,7 +1236,8 @@ namespace Units
                         unitData.GetEnemyClass(),
                         unitData.GetEnemyType(),
                         unitData.GetEnemyFaction()
-                    )
+                    ),
+                    unitData
                 );
 
 

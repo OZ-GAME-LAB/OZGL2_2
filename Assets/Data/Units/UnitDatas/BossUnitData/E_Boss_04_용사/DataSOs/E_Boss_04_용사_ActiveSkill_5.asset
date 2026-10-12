@@ -12,6 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "E_Boss_04_\uC6A9\uC0AC_ActiveSkill_5"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uACB0\uC804\uC758 \uC77C\uACA9"
+    _icon: {fileID: 21300000, guid: f4c4cb213aa31f543bc71fe10bf38358, type: 3}
+    _description: "5\uCD08\uAC04 \uD798\uC744 \uBAA8\uC73C\uB294 \uB3D9\uC548 \uBC1B\uB294
+      \uD53C\uD574\uAC00 50% \uC99D\uAC00\uD569\uB2C8\uB2E4. '\uCD95\uBCF5' 10\uC911\uCCA9\uC744
+      \uC18C\uBE44\uD558\uBA74 \uC804\uBC29\uC5D0 \uACF5\uACA9\uB825\uC758 1500%
+      \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 30\uCD08]"
   _skillRange: 20
   _skillCooldown: 30
   _targetSide: 0
@@ -167,18 +174,18 @@ MonoBehaviour:
           _effects:
           - rid: 4617381741844758683
           _order: 1
-          _consumeOncePerExecution: 1
           _conditions:
           - rid: 4617381741844758682
+          _consumeOncePerExecution: 1
           _fxEntries: []
         _fxEntries:
-        - _key: VFX_Enemy_ActiveAttack_Cone
+        - _key: VFX_Enemy_ActiveAttack_Single
           _hook: 0
           _operation: 4
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Cone
