@@ -1,4 +1,4 @@
-﻿
+
 
 
 namespace Units
@@ -44,6 +44,12 @@ namespace Units
         CR_AS_발키리 = 63,
         CR_RP_집행관 = 64,
         CR_RM_대행자 = 65,
-        CR_SP_클래릭 = 66
+        CR_SP_클래릭 = 66,
+
+        // Boss IDs are explicit; existing serialized IDs remain unchanged.
+        Boss_용병단장 = 101,
+        Boss_보병장교 = 102,
+        Boss_대마법사 = 103,
+        Boss_용사 = 104
     }
 }

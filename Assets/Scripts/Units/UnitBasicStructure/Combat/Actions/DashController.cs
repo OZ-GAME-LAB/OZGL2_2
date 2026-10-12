@@ -63,6 +63,9 @@ namespace Units
 
         public bool HasMoved { get; private set; }
 
+        private float StopDistance => TargetStopDistance
+            + CombatRangeUtility.Correction(_core?.CombatTarget, _target);
+
 
         // 재선택은 정지 대상만 바꾼다. 시작 시 고정한 진행 방향은 유지한다.
         public void Retarget(ICombatTarget target)
@@ -93,14 +96,15 @@ namespace Units
         // ============================================================
 
         // 대상이 현재 위치에 머무를 때의 예상 도착 위치. 상태·Transform·물리 설정은 변경하지 않는다.
-        internal static Vector2 PredictEndPosition(Vector2 start, Vector2 target, float distance, float speed)
+        internal static Vector2 PredictEndPosition(Vector2 start, Vector2 target, float distance, float speed, float sizeCorrection = 0f)
         {
+            float stopDistance = TargetStopDistance + Mathf.Max(0f, sizeCorrection);
             Vector2 offset = target - start;
             float length = offset.magnitude;
-            if (speed <= 0f || distance <= ArrivalTolerance || length <= TargetStopDistance + ArrivalTolerance)
+            if (speed <= 0f || distance <= ArrivalTolerance || length <= stopDistance + ArrivalTolerance)
                 return start;
 
-            float travel = Mathf.Min(Mathf.Max(0f, distance), Mathf.Max(0f, length - TargetStopDistance));
+            float travel = Mathf.Min(Mathf.Max(0f, distance), Mathf.Max(0f, length - stopDistance));
             return start + offset.normalized * travel;
         }
 
@@ -210,7 +214,7 @@ namespace Units
 
             float availableDistance = Mathf.Max(
                 0f,
-                distanceToTarget - TargetStopDistance
+                distanceToTarget - StopDistance
             );
 
             step = Mathf.Min(step, availableDistance);
@@ -264,7 +268,7 @@ namespace Units
             // TargetStopDistance의 정확한 경계값에 의존하지 않고
             // 작은 허용 오차 안에 들어오면 Dash 도착으로 처리한다.
             float arrivalDistance =
-                TargetStopDistance + ArrivalTolerance;
+                StopDistance + ArrivalTolerance;
 
             if (toTarget.sqrMagnitude
                 <= arrivalDistance * arrivalDistance)

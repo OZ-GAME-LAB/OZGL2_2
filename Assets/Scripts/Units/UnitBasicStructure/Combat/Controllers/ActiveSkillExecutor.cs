@@ -898,7 +898,8 @@ namespace Units
                 initialTarget: run.Initial,
                 currentTarget: run.Current,
                 previousTarget: run.Previous,
-                hostileFilter: filter
+                hostileFilter: filter,
+                useBodyRange: action.Origin == SkillAreaOrigin.Owner
             );
 
             var selected = _targetResolver.ResolveSkillTargets(Request(run.Engagement.HostileFilter));
@@ -926,7 +927,8 @@ namespace Units
             {
                 if (_data.UsesLegacyTargetSelection)
                 {
-                    var candidates = _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, GetTargetTeam(settings.Relation), run.Engagement.HostileFilter));
+                    var candidates = _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, GetTargetTeam(settings.Relation), run.Engagement.HostileFilter,
+                        action.Origin == SkillAreaOrigin.Owner ? _core.BodyRadius : (float?)null));
 
                     var fallback = new SkillTargetSelector(_core, _data).SelectTarget(run.Initial.Target, candidates);
 
@@ -1060,7 +1062,8 @@ namespace Units
 
             if (action.IsLegacy && action.Target.MaxTargetCount > 1)
             {
-                foreach (var candidate in _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, run.Targets.PrimaryTarget.Team, action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null)))
+                foreach (var candidate in _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, run.Targets.PrimaryTarget.Team, action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null,
+                    action.Origin == SkillAreaOrigin.Owner ? _core.BodyRadius : (float?)null)))
                 {
                     if (targets.Count >= action.Target.MaxTargetCount)
                         break;
