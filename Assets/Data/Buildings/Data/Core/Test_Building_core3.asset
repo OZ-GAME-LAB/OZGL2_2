@@ -27,7 +27,7 @@ MonoBehaviour:
   requiredCoreLevel: 2
   requiredFamilyIds: []
   coreLevel: 3
-  buildLimit: 10
+  buildLimit: 20
   production:
     enabled: 0
     resourceType: 0
@@ -38,4 +38,10 @@ MonoBehaviour:
     unitType: 1
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 1
+    statType: 100
+    modifierType: 1
+    value: 0.2
   upgrades: []

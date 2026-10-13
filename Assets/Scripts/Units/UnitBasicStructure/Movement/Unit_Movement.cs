@@ -40,6 +40,10 @@ namespace Units
         [SerializeField, Min(0.1f)]
         private float _rallyStuckDelay = 3f;
 
+        // 아군 경유 이동과 적 집결 이동은 전투 스탯과 별도의 속도를 사용한다.
+        [SerializeField, Min(0f)]
+        private float _rallyMoveSpeed = 12f;
+
         [SerializeField, Min(0.1f)]
         private float _rallyFailureDelay = 8f;
 
@@ -487,7 +491,7 @@ namespace Units
                 Mathf.Min(
                     Mathf.Max(
                         0f,
-                        _core.RuntimeStatus.MoveSpeed
+                        _isRallyMovement ? _rallyMoveSpeed : _core.RuntimeStatus.MoveSpeed
                     ),
                     distance
                     / Time.fixedDeltaTime

@@ -398,6 +398,7 @@ Transform:
   - {fileID: 6664268405185740916}
   - {fileID: 7307899774046925785}
   - {fileID: 4724061821991201121}
+  - {fileID: 7088043979786479602}
   m_Father: {fileID: 5421153721552506957}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &7816424286511988888
@@ -425,6 +426,7 @@ MonoBehaviour:
   _allyRallyAreaPointA: {fileID: 3226164567534235992}
   _allyRallyAreaPointB: {fileID: 6059216695445244944}
   _allyRallySectorRoot: {fileID: 7307899774046925785}
+  _allyRallyViaPoint: {fileID: 7088043979786479602}
   _enemySpawnPoints:
   - {fileID: 7480073423502478011}
   - {fileID: 3638060669485205825}
@@ -1090,6 +1092,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3f7efb9581a22674abe9c3c247442962, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.RuntimeEffectManager
+--- !u!1 &8339739257359690898
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7088043979786479602}
+  m_Layer: 0
+  m_Name: AllyRallyVia
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7088043979786479602
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8339739257359690898}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9172868870645680895}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &8353904673142604123
 GameObject:
   m_ObjectHideFlags: 0
