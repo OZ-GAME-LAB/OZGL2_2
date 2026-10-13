@@ -14,6 +14,7 @@ public class TotemData : ScriptableObject
     public bool IsAvailable => _isAvailable;
     public string DisplayName => _displayName;
     public string Description => _description;
+    public string ActiveDescription => _activeDescription;
     public Sprite Icon => _icon;
     public TotemSelectionMode SelectionMode => _selectionMode;
     public string EffectLabel => _effectLabel;
@@ -28,6 +29,10 @@ public class TotemData : ScriptableObject
     [SerializeField] private bool _isAvailable = true;
     [SerializeField] private string _displayName;
     [SerializeField, TextArea] private string _description;
+
+    [Tooltip("현재 활성화된 토템 효과 목록에 표시할 짧은 설명입니다. {level}, {max}, {value}, {unit}을 사용할 수 있습니다.")]
+    [SerializeField, TextArea] private string _activeDescription;
+
     [SerializeField] private Sprite _icon;
 
     [SerializeField] private TotemSelectionMode _selectionMode;

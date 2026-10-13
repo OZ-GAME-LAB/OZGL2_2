@@ -19,6 +19,9 @@ public class AltarSelectionUI : MonoBehaviour
     [SerializeField]
     private GameObject selectedInfoPanel;
 
+    [Header("Totem Info")]
+    [SerializeField] private GameObject totemInfoPanel;
+
     [SerializeField]
     private TMP_Text selectedTitleText;
 
