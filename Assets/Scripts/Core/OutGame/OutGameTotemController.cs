@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>토템 선택 레벨과 테스트용 누적 보너스를 관리합니다.</summary>
+/// <summary>토템 선택 레벨과 누적 보너스를 관리합니다.</summary>
 public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataProvider<TotemRunSaveData>
 {
     [SerializeField] private List<TotemData> _totemDatas = new List<TotemData>();
@@ -54,6 +54,7 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
         if (index < 0) return false;
 
         TotemData data = _data[index];
+        if (!data.IsAvailable) return false;
         int maxLevel = data.SelectionMode == TotemSelectionMode.Toggle ? 1 : data.MaxLevel;
         int level = Mathf.Clamp(_levels[index].Level + delta, 0, maxLevel);
         if (level == _levels[index].Level) return false;
@@ -65,14 +66,14 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
 
     public int GetRewardBonusPercent()
     {
-        int totalLevel = 0;
+        long total = 0;
         for (int i = 0; i < _levels.Count; i++)
         {
-            totalLevel += _levels[i].Level;
+            if (_data[i].IsAvailable)
+                total += _data[i].GetRewardBonusPercent(_levels[i].Level);
         }
 
-        // 현재 테스트를 위해 토템 종류 수가 아니라 선택 레벨의 합에 20%를 곱합니다.
-        return totalLevel * 20;
+        return (int)Math.Min(total, int.MaxValue);
     }
 
     public List<TotemLevelEntry> CaptureLevels()
@@ -123,7 +124,8 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
             if (entry.Level < 0 || entry.Level > maxLevel)
                 throw new ArgumentException("저장된 토템 레벨이 허용 범위를 벗어났습니다.", nameof(data));
 
-            restoredLevels[index] = entry.Level;
+            // 보류한 토템도 저장 ID는 유지하되 선택은 해제합니다.
+            restoredLevels[index] = totem.IsAvailable ? entry.Level : 0;
         }
 
         bool changed = false;

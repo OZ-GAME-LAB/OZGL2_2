@@ -13,15 +13,25 @@ MonoBehaviour:
   m_Name: Totem_GoldReduction
   m_EditorClassIdentifier: Assembly-CSharp::TotemData
   _id: 10003
+  _category: 1
+  _isAvailable: 1
   _displayName: "\uAD81\uD54D\uC758 \uD1A0\uD15C"
-  _description: "\uD50C\uB808\uC774 \uC911 \uBCF4\uC0C1\uACFC \uC0DD\uC0B0\uC73C\uB85C
-    \uD68D\uB4DD\uD558\uB294 \uACE8\uB4DC\uAC00 \uAC10\uC18C\uD569\uB2C8\uB2E4."
-  _activeDescription: "\uBCF4\uC0C1\uACFC \uC0DD\uC0B0\uC73C\uB85C \uD68D\uB4DD\uD558\uB294
-    \uACE8\uB4DC \uAC10\uC18C"
+  _description: "\uC6E8\uC774\uBE0C \uBCF4\uC0C1\uACFC \uC0DD\uC0B0\uC73C\uB85C \uD68D\uB4DD\uD558\uB294
+    \uACE8\uB4DC\uAC00 \uAC10\uC18C\uD569\uB2C8\uB2E4."
+  _activeDescription: "\uC6E8\uC774\uBE0C \uBCF4\uC0C1\uACFC \uC0DD\uC0B0 \uACE8\uB4DC \uAC10\uC18C"
   _icon: {fileID: 0}
   _selectionMode: 0
-  _effectLabel: "\uACE8\uB4DC \uD68D\uB4DD\uB7C9 \uAC10\uC18C"
+  _effectLabel: "\uC6E8\uC774\uBE0C \uBCF4\uC0C1\xB7\uC0DD\uC0B0 \uACE8\uB4DC \uAC10\uC18C"
   _valuePerLevel: 10
   _valueUnit: '%'
   _maxLevel: 3
   _rewardBonusPerLevel: 10
+  _currencyEffects:
+  - _currencyType: 1
+    _rewardType: 1
+    _modifierType: 1
+    _value: -0.1
+  - _currencyType: 1
+    _rewardType: 2
+    _modifierType: 1
+    _value: -0.1

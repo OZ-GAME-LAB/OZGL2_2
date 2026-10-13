@@ -27,8 +27,11 @@ namespace Game.Core
         }
     }
 
+    public enum QuarterType
+    {
+        Regular, Infinity
+    }
 
-    //cost = 분기 * 10 + 웨이브 * 2 / 몬스터는 소환코스트 1로고정 (MVP)
     /// <summary>
     /// 현재 전투의 스폰 준비 요청, 생존 수 조회를 통한 승패 판정, 전투 정리 요청
     /// </summary>
@@ -37,6 +40,10 @@ namespace Game.Core
         // 기존 외부 참조를 위한 호환 API. 진행 상태는 GameFlow의 NodeController가 소유한다.
         public const int MAX_WAVE = NodeController.WavesPerQuarter;
         public const int MAIN_QUARTERS = NodeController.MainQuarters;
+        private const int InitialSpawnCost = 5;
+        private const int SpawnCostPerWave = 2;
+        private const float InfinityBonusPerWave = 0.02f;
+        private const float InfinityBonusPerQuarter = 0.15f;
         [SerializeField] private WaveSODictionary _waveCatalog;
         public WaveSODictionary WaveCatalog => _waveCatalog;
         public WaveSO CurrentPreset => _controller?.CurrentNode?.Preset;
@@ -51,6 +58,9 @@ namespace Game.Core
         private ISpawnManager _spawner;
         private IRuntimeUnitManager _runtimeUnitManager;
         private GameFlowController _controller;
+        private TotemFlowEffects _totemFlowEffects;
+        private IUnitStatModifierRegister _unitStatModifiers;
+        private readonly object _infinityModifierSource = new();
         private bool _isWaitingForPreparation;
         private CancellationToken _preparationToken;
 
@@ -60,6 +70,7 @@ namespace Game.Core
         private void OnDestroy()
         {
             _isWaitingForPreparation = false;
+            _unitStatModifiers?.RemoveModifiersBySource(_infinityModifierSource);
             if (_runtimeUnitManager != null)
             {
                 _runtimeUnitManager.UnitDied -= HandleMonsterDead;
@@ -71,9 +82,13 @@ namespace Game.Core
         /// <summary>
         /// 의존성을 주입해 필요한 참조 및 이벤트 연결 실행
         /// </summary>
-        public void Initialize(GameFlowController controller, ISpawnManager spawner, IRuntimeUnitManager runtimeUnitManager)
+        public void Initialize(GameFlowController controller, ISpawnManager spawner,
+            IRuntimeUnitManager runtimeUnitManager, TotemFlowEffects totemFlowEffects,
+            IUnitStatModifierRegister unitStatModifiers)
         {
+            if (unitStatModifiers == null) throw new ArgumentNullException(nameof(unitStatModifiers));
             _isWaitingForPreparation = false;
+            _unitStatModifiers?.RemoveModifiersBySource(_infinityModifierSource);
             if (_runtimeUnitManager != null)
             {
                 _runtimeUnitManager.UnitDied -= HandleMonsterDead;
@@ -82,6 +97,8 @@ namespace Game.Core
             _controller = controller;
             _spawner = spawner;
             _runtimeUnitManager = runtimeUnitManager;
+            _totemFlowEffects = totemFlowEffects;
+            _unitStatModifiers = unitStatModifiers;
             _runtimeUnitManager.UnitDied += HandleMonsterDead;
             _runtimeUnitManager.PreparationCompleted += HandleMonsterSpawnCompleted;
         }
@@ -90,14 +107,62 @@ namespace Game.Core
         public UniTask PrepareEnemy(CancellationToken runToken, CancellationToken spawnToken)
         {
             runToken.ThrowIfCancellationRequested();
+            spawnToken.ThrowIfCancellationRequested();
             _preparationToken = runToken;
             _isWaitingForPreparation = true;
             SpawnContext context = new(
                 weights:CurrentPreset.Weights, 
                 monsterIDs:CurrentPreset.MonsterIDs);
-            
-            return _spawner.SpawnEnemyWaveAsync(10, context, spawnToken);
+            RefreshInfinityModifiers();
+            int cost = CalculateSpawnCost(CurQuarter, CurWave);
+            int enemyCount = _totemFlowEffects.CalculateEnemyCount(cost);
+            return _spawner.SpawnEnemyWaveAsync(enemyCount, context, spawnToken);
         }
+
+        private static int CalculateSpawnCost(int quarter, int wave)
+        {
+            // 무한 모드는 일반 모드의 마지막 웨이브 코스트를 유지한다.
+            int waveIndex = quarter > MAIN_QUARTERS
+                ? MAIN_QUARTERS * MAX_WAVE - 1
+                : (quarter - 1) * MAX_WAVE + wave - 1;
+            return InitialSpawnCost + waveIndex * SpawnCostPerWave;
+        }
+
+        private static float CalculateInfinityBonus(int quarter, int wave)
+        {
+            int infinityQuarter = quarter - MAIN_QUARTERS;
+            if (infinityQuarter <= 0) return 0f;
+
+            // 첫 무한 분기는 2~10%, 이후 분기 시작값은 15%, 30%, 45%...이다.
+            float quarterStartBonus = infinityQuarter == 1
+                ? InfinityBonusPerWave
+                : (infinityQuarter - 1) * InfinityBonusPerQuarter;
+            return quarterStartBonus + (wave - 1) * InfinityBonusPerWave;
+        }
+
+        private void RefreshInfinityModifiers()
+        {
+            // 재준비·불러오기에도 중복되지 않도록 현재 위치의 총 강화율로 교체한다.
+            _unitStatModifiers.RemoveModifiersBySource(_infinityModifierSource);
+            float bonus = CalculateInfinityBonus(CurQuarter, CurWave);
+            if (bonus <= 0f) return;
+
+            AddInfinityModifier(UnitStatType.MaxHp, bonus);
+            AddInfinityModifier(UnitStatType.AttackPower, bonus);
+        }
+
+        private void AddInfinityModifier(UnitStatType statType, float bonus)
+        {
+            _unitStatModifiers.AddEnemyModifier(new EnemyStatModifier(
+                source: _infinityModifierSource,
+                applyType: UnitModifierApplyType.All,
+                targetClass: default,
+                targetUnitType: default,
+                statType: statType,
+                modifierType: UnitStatModifierType.Percent,
+                value: bonus));
+        }
+
         internal void NotifyWaveCleared(WaveInfo info)
         {
             WaveCleared?.Invoke(info);

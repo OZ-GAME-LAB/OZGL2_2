@@ -283,6 +283,9 @@ public class OutGameTotemView : MonoBehaviour
                 continue;
             }
 
+            button.gameObject
+                .SetActive(data.IsAvailable);
+
 
             button.Initialize(
                 data,
@@ -340,7 +343,8 @@ public class OutGameTotemView : MonoBehaviour
                 FindData(button.TotemId);
 
 
-            if (data == null)
+            if (data == null ||
+                !data.IsAvailable)
             {
                 button.gameObject
                     .SetActive(false);
@@ -386,7 +390,8 @@ public class OutGameTotemView : MonoBehaviour
             FindData(button.TotemId);
 
 
-        if (data == null)
+        if (data == null ||
+            !data.IsAvailable)
             return;
 
 
@@ -505,7 +510,8 @@ public class OutGameTotemView : MonoBehaviour
                 selection.Data[i];
 
 
-            if (data == null)
+            if (data == null ||
+                !data.IsAvailable)
                 continue;
 
 
@@ -716,7 +722,7 @@ public class OutGameTotemView : MonoBehaviour
             return 0;
 
 
-        int maximumLevelTotal =
+        long maximumBonus =
             0;
 
 
@@ -728,25 +734,22 @@ public class OutGameTotemView : MonoBehaviour
                 selection.Data[i];
 
 
-            if (data == null)
+            if (data == null ||
+                !data.IsAvailable)
                 continue;
 
 
-            if (data.SelectionMode ==
-                TotemSelectionMode.Toggle)
-            {
-                maximumLevelTotal += 1;
-            }
-            else
-            {
-                maximumLevelTotal +=
-                    data.MaxLevel;
-            }
+            maximumBonus +=
+                data.GetRewardBonusPercent(
+                    data.MaxLevel
+                );
         }
 
 
-        // 현재 테스트를 위해 토템 종류 수가 아니라 선택 레벨의 합에 20%를 곱합니다.
-        return maximumLevelTotal * 20;
+        return (int)Math.Min(
+            maximumBonus,
+            int.MaxValue
+        );
     }
 
 
@@ -843,8 +846,14 @@ public class OutGameTotemView : MonoBehaviour
             FindData(button.TotemId);
 
 
-        if (data == null)
+        if (data == null ||
+            !data.IsAvailable)
+        {
+            hoverInfoPanel.gameObject
+                .SetActive(false);
+
             return;
+        }
 
 
         int level =

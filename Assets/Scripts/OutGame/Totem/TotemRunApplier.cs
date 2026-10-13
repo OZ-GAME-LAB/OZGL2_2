@@ -6,8 +6,7 @@ using Units;
 using UnityEngine;
 
 /// <summary>
-/// 이번 Run에 켠 토템 레벨만큼 유닛 스탯을 넣고, 끝날 때 해제합니다.
-/// 궁핍은 웨이브 보상·생산 골드 감소로 EffectManager에 등록합니다.
+/// 이번 Run의 토템을 Stat, Currency, Flow로 나누어 적용하고 끝날 때 해제합니다.
 /// 추가 혈석 퍼센트는 여기서 계산만 합니다. 정산 혈석이 나온 뒤에 TryGrantBonus로 지급합니다.
 /// PhaseChanged만 구독하며 Update에서 레벨을 확인하지 않습니다.
 /// 저장 파일 입출력은 하지 않습니다. 세이브 담당이 CaptureSaveData와 RestoreSaveData만 호출합니다.
@@ -24,6 +23,8 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     // 아웃게임에서 레벨 1 이상으로 켠 토템입니다. UI는 Data와 Level만 읽습니다.
     public IReadOnlyList<ActiveTotem> ActiveTotems => _activeTotems;
 
+    public TotemFlowEffects FlowEffects { get; } = new TotemFlowEffects();
+
     // 궁핍 1레벨당 골드 -10%입니다. Percent -0.1이 -10%이고, TotemData의 10은 화면 표시용입니다.
     private const float GoldReductionPercentPerLevel = -0.1f;
 
@@ -32,7 +33,7 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
     private EffectManager _effectManager;
     private GameFlowController _gameFlow;
 
-    // 궁핍 보정 2개(웨이브 보상, 생산)를 Run마다 다시 담습니다. Update에서는 만들지 않습니다.
+    private readonly EffectConverter _effectConverter = new EffectConverter();
     private readonly List<CurrencyModifier> _goldReductionModifiers = new List<CurrencyModifier>(2);
 
     // 아웃게임에서 전달받은 레벨 사본입니다. 원본 목록이 나중에 바뀌어도 이번 Run에 영향이 없습니다.
@@ -148,7 +149,10 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
                 TotemLevelEntry entry = levels[i];
                 if (entry != null)
                 {
-                    _levels.Add(new TotemLevelEntry { Id = entry.Id, Level = entry.Level });
+                    int level = entry.Level;
+                    if (_catalog != null && _catalog.TryGetTotem(entry.Id, out TotemData totem) && !totem.IsAvailable)
+                        level = 0;
+                    _levels.Add(new TotemLevelEntry { Id = entry.Id, Level = level });
                 }
             }
         }
@@ -200,15 +204,19 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
             foreach (TotemLevelEntry entry in data.Totems)
             {
                 if (entry == null || entry.Id == TotemId.None || entry.Level <= 0) continue;
-                if (entry.Id == TotemId.GoldReduction && _effectManager == null)
+                TotemData totem = null;
+                if (_catalog != null) _catalog.TryGetTotem(entry.Id, out totem);
+                if (totem != null && !totem.IsAvailable) continue;
+                TotemEffectCategory category = totem != null ? totem.Category : TotemBuiltinEffects.GetCategory(entry.Id);
+                if (category == TotemEffectCategory.Currency && _effectManager == null)
                 {
-                    throw new InvalidOperationException("EffectManager가 없어 궁핍 효과를 복원하지 못했습니다.");
+                    throw new InvalidOperationException("EffectManager가 없어 토템 재화 효과를 복원하지 못했습니다.");
                 }
 
                 IReadOnlyList<TotemStatEffect> effects = _catalog != null
                     ? _catalog.GetStatEffects(entry.Id)
                     : TotemBuiltinEffects.Get(entry.Id);
-                if (effects != null && effects.Count > 0 && _unitStatModifierManager == null)
+                if (category == TotemEffectCategory.Stat && effects != null && effects.Count > 0 && _unitStatModifierManager == null)
                 {
                     throw new InvalidOperationException($"UnitStatModifierManager가 없어 토템 스탯을 복원하지 못했습니다. ID: {entry.Id}");
                 }
@@ -271,6 +279,8 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
                 Debug.LogWarning($"[OutGame/TotemRunApplier] 활성 토템의 TotemData가 없습니다. ID: {entry.Id}", this);
                 continue;
             }
+
+            if (!totem.IsAvailable) continue;
 
             int level = Mathf.Min(entry.Level, totem.MaxLevel);
             if (level <= 0)
@@ -364,6 +374,8 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
                 _catalog.TryGetTotem(entry.Id, out totem);
             }
 
+            if (totem != null && !totem.IsAvailable) continue;
+
             int level = totem != null ? Mathf.Min(entry.Level, totem.MaxLevel) : entry.Level;
             if (level <= 0)
             {
@@ -372,14 +384,19 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
 
             _appliedIds.Add(entry.Id);
             AddRewardPercent(totem, entry.Id, level);
-            if (AddStatModifiers(entry.Id, totem, level))
+            TotemEffectCategory category = totem != null ? totem.Category : TotemBuiltinEffects.GetCategory(entry.Id);
+            switch (category)
             {
-                appliedStatCount++;
+                case TotemEffectCategory.Stat:
+                    if (AddStatModifiers(entry.Id, totem, level)) appliedStatCount++;
+                    break;
+                case TotemEffectCategory.Currency:
+                    AddCurrencyModifiers(entry.Id, totem, level);
+                    break;
+                case TotemEffectCategory.Flow:
+                    AddFlowEffects(totem, level);
+                    break;
             }
-
-            // Current date KDH 2026-10-08
-            // 궁핍은 유닛 스탯이 없습니다. 골드 지급 계산이 읽는 재화 보정만 등록합니다.
-            AddGoldReduction(entry.Id, totem, level);
         }
 
         _isApplied = true;
@@ -398,7 +415,7 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
 
         // Current date KDH 2026-10-02
         // 결산 항목과 같은 퍼센트를 합산합니다. 10% × 3레벨 = 30처럼 정수로 모읍니다.
-        int bonus = CalculateRewardPercent(totem, level);
+        int bonus = totem.GetRewardBonusPercent(level);
         if (bonus <= 0)
         {
             return;
@@ -408,31 +425,7 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         _rewardBonusPercent = (int)Math.Min(sum, int.MaxValue);
     }
 
-    // Current date KDH 2026-10-02
-    private static int CalculateRewardPercent(TotemData totem, int level)
-    {
-        if (totem == null || level <= 0)
-        {
-            return 0;
-        }
-
-        float perLevel = totem.RewardBonusPerLevel;
-        if (float.IsNaN(perLevel) || float.IsInfinity(perLevel) || perLevel <= 0f)
-        {
-            return 0;
-        }
-
-        long bonus = (long)Math.Round(perLevel * level, MidpointRounding.AwayFromZero);
-        if (bonus <= 0)
-        {
-            return 0;
-        }
-
-        return (int)Math.Min(bonus, int.MaxValue);
-    }
-
-    // 군세·메아리처럼 스탯이 아닌 토템은 목록이 비어 있어 여기서 넘어갑니다.
-    // 궁핍은 AddGoldReduction에서 재화 보정으로 따로 등록합니다.
+    // 카탈로그에 별도 설정이 없으면 기존 기본 스탯을 사용합니다.
     private bool AddStatModifiers(TotemId id, TotemData totem, int level)
     {
         IReadOnlyList<TotemStatEffect> effects = _catalog != null
@@ -488,8 +481,35 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         return added;
     }
 
-    // Current date KDH 2026-10-08
-    // 웨이브 보상과 생산 골드에 같은 감소를 넣습니다. 지급할 때마다 계산하지 않고, 준비 단계에서 한 번만 등록합니다.
+    private void AddCurrencyModifiers(TotemId id, TotemData totem, int level)
+    {
+        // 카탈로그 없이 실행하던 기존 궁핍 테스트 경로를 유지합니다.
+        if (totem == null)
+        {
+            AddGoldReduction(id, null, level);
+            return;
+        }
+
+        if (_effectManager == null)
+        {
+            Debug.LogWarning("[OutGame/TotemRunApplier] EffectManager가 없어 재화 효과를 적용하지 못했습니다.", this);
+            return;
+        }
+
+        object source = GetSource(id, totem);
+        List<CurrencyModifier> modifiers = _effectConverter.ConvertCurrencyEffects(source, totem.CurrencyEffects, level);
+        if (modifiers == null) return;
+        _effectManager.RegisterEffects(source, new ConvertedEffects(null, null, modifiers));
+        _appliedSources.Add(source);
+    }
+
+    private void AddFlowEffects(TotemData totem, int level)
+    {
+        if (totem == null) return;
+        FlowEffects.AddEnemyCountPercent(totem.ValuePerLevel / 100f * level);
+    }
+
+    // 카탈로그가 없는 경우에만 사용하는 궁핍 기본 효과입니다.
     private void AddGoldReduction(TotemId id, TotemData totem, int level)
     {
         if (id != TotemId.GoldReduction || level <= 0)
@@ -559,6 +579,7 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
 
         _appliedSources.Clear();
         _appliedIds.Clear();
+        FlowEffects.Clear();
         _isApplied = false;
     }
 

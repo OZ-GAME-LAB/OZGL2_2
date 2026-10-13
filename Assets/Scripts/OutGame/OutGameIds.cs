@@ -12,7 +12,13 @@ public enum TotemId
     EchoAttack = 10004,
     Crossfire = 10005,
     DeathBurst = 10006,
-    Pursuer = 10007
+    Pursuer = 10007,
+    EnemyHealth = 10008,
+    EnemyDefense = 10009,
+    EnemyAttackSpeed = 10010,
+    EnemyMoveSpeed = 10011,
+    ProductionGoldReduction = 10012,
+    WaveGoldReduction = 10013
 }
 
 /// <summary>제단 식별자입니다. 새 제단은 11000~11999 범위에서 고유 번호를 지정합니다.</summary>

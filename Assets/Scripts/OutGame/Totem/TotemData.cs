@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -8,6 +10,8 @@ using UnityEngine;
 public class TotemData : ScriptableObject
 {
     public TotemId Id => _id;
+    public TotemEffectCategory Category => _category;
+    public bool IsAvailable => _isAvailable;
     public string DisplayName => _displayName;
     public string Description => _description;
     public string ActiveDescription => _activeDescription;
@@ -18,8 +22,11 @@ public class TotemData : ScriptableObject
     public string ValueUnit => _valueUnit;
     public int MaxLevel => _maxLevel;
     public float RewardBonusPerLevel => _rewardBonusPerLevel;
+    public IReadOnlyList<CurrencyEffectData> CurrencyEffects => _currencyEffects;
 
     [SerializeField] private TotemId _id;
+    [SerializeField] private TotemEffectCategory _category;
+    [SerializeField] private bool _isAvailable = true;
     [SerializeField] private string _displayName;
     [SerializeField, TextArea] private string _description;
 
@@ -40,6 +47,31 @@ public class TotemData : ScriptableObject
 
     [Tooltip("선택 레벨당 표시할 보상 보너스(%)입니다. 10은 10%입니다. ON/OFF형에서는 활성화 시 보너스입니다.")]
     [SerializeField, Min(0f)] private float _rewardBonusPerLevel;
+
+    [Tooltip("재화 효과의 Value는 레벨당 수치입니다. Percent는 -0.1 = -10%입니다.")]
+    [SerializeField] private List<CurrencyEffectData> _currencyEffects = new();
+
+    public int GetRewardBonusPercent(int level)
+    {
+        if (level <= 0)
+        {
+            return 0;
+        }
+
+        float perLevel = RewardBonusPerLevel;
+        if (float.IsNaN(perLevel) || float.IsInfinity(perLevel) || perLevel <= 0f)
+        {
+            return 0;
+        }
+
+        long bonus = (long)Math.Round(perLevel * level, MidpointRounding.AwayFromZero);
+        if (bonus <= 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Min(bonus, int.MaxValue);
+    }
 
     private void OnValidate()
     {

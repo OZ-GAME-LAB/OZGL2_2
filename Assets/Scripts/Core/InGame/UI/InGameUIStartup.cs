@@ -26,6 +26,8 @@ namespace Game.UI.InGame
         [SerializeField] private BuildingUIPresenter _buildingUI;
         [SerializeField] private BuildingUIConnection _buildingUIConnection;
         [SerializeField] private ArchiveView _archiveView;
+        [SerializeField] private PausePopupView _pausePopupView;
+        [SerializeField] private ConfirmPopupView _confirmPopupView;
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
@@ -65,6 +67,7 @@ namespace Game.UI.InGame
             flow.InitializeUI(_continueUI, _runDecisionUI);
             _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI, spawnManager);
             if (!_buildingUIConnection.IsReady) return false;
+            _pausePopupView.Initialize(flow, _uiManager, _confirmPopupView);
             IsReady = true;
             _uiManager.ShowHud();
             return true;
