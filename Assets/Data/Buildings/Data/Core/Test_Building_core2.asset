@@ -27,7 +27,7 @@ MonoBehaviour:
   requiredCoreLevel: 1
   requiredFamilyIds: []
   coreLevel: 2
-  buildLimit: 7
+  buildLimit: 12
   production:
     enabled: 0
     resourceType: 0
@@ -38,6 +38,12 @@ MonoBehaviour:
     unitType: 1
     countPerWave: 2
     maxAlive: 2
+  support:
+    enabled: 0
+    targetClass: 1
+    statType: 100
+    modifierType: 1
+    value: 0.2
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 636c035baa190cd4eaa966366026b806, type: 2}
     cost:

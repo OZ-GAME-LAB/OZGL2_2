@@ -22,9 +22,9 @@ namespace Units
 
         private readonly Vector2[] _formation3 =
         {
-            new Vector2(0f, -1f),
-            new Vector2(0f, 0f),
-            new Vector2(0f, 1f)
+            new Vector2(-0.5f, -0.5f),
+            new Vector2(0.5f, 0f),
+            new Vector2(-0.5f, 0.5f)
         };
 
         private readonly Vector2[] _formation4 =
