@@ -37,11 +37,11 @@ namespace Units
 
         private readonly Vector2[] _formation5 =
         {
-            new Vector2(-1f, -1f),
-            new Vector2(-1f, 1f),
+            new Vector2(-0.8f, -0.8f),
+            new Vector2(-0.8f, 0.8f),
             new Vector2(0f, 0f),
-            new Vector2(1f, 1f),
-            new Vector2(1f, -1f)
+            new Vector2(0.8f, 0.8f),
+            new Vector2(0.8f, -0.8f)
         };
 
 

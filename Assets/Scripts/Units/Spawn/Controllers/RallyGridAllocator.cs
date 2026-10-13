@@ -179,6 +179,10 @@ namespace Units
                 );
 
 
+            // 섹터로 나누고 남는 여백은 양쪽에 균등하게 두어 영역 중앙과 격자 중앙을 맞춘다.
+            Vector2 gridMin = (_areaMin + _areaMax) * 0.5f -
+                new Vector2(_columnCount * _sectorSize.x, _rowCount * _sectorSize.y) * 0.5f;
+
             for (int y = 0;
                  y < _rowCount;
                  y++)
@@ -189,11 +193,11 @@ namespace Units
                 {
                     Vector2 sectorCenter =
                         new Vector2(
-                            _areaMin.x +
+                            gridMin.x +
                             x * _sectorSize.x +
                             _sectorSize.x * 0.5f,
 
-                            _areaMin.y +
+                            gridMin.y +
                             y * _sectorSize.y +
                             _sectorSize.y * 0.5f
                         );
@@ -501,10 +505,14 @@ namespace Units
         public bool PreparePreferredAllocation(IReadOnlyList<RallyZone> zones,
             IReadOnlyList<bool> bosses)
         {
-            bool front = false, rear = false;
-            foreach (var zone in zones) { front |= zone == RallyZone.Front; rear |= zone == RallyZone.Rear; }
-            if (!PrepareCenteredAllocation(zones.Count, front && rear ? 2 : 1)) return false;
-            var sectors = _preparedSectorIndices.ToArray();
+            _preparedSectorIndices.Clear();
+            var sectors = GetAvailableSectorIndices();
+            if (zones == null || bosses == null || zones.Count == 0 ||
+                zones.Count != bosses.Count || zones.Count > sectors.Count || _columnCount < 1 || _rowCount < 1)
+            {
+                Debug.LogError($"[RallyGridAllocator] 배치 공간 부족 또는 요청 오류. Required={zones?.Count ?? 0} / Available={sectors.Count}");
+                return false;
+            }
             var plan = RallyZonePlanner.Plan(sectors, _columnCount, _rowCount, zones, bosses);
             _preparedSectorIndices.Clear();
             foreach (int index in plan)
@@ -513,6 +521,30 @@ namespace Units
                 _preparedSectorIndices.Enqueue(index);
             }
             return true;
+        }
+
+        // 아군은 요청이 순차 도착하므로 점유된 칸을 제외하고 같은 중앙/전후열 규칙을 적용한다.
+        public IReadOnlyList<Vector2> AllocateCentered(int unitCount, RallyZone zone,
+            bool frontOnRight, Unit_GroupAI group)
+        {
+            if (!ValidateUnitCount(unitCount) || !ValidateGroup(group)) return null;
+            var available = GetAvailableSectorIndices();
+            if (available.Count == 0)
+            {
+                Debug.LogError($"[RallyGridAllocator] Rally Sector 부족. Capacity={_sectors.Count}");
+                return null;
+            }
+            int[] plan = RallyZonePlanner.Plan(available, _columnCount, _rowCount,
+                new[] { zone }, new[] { false }, frontOnRight);
+            return plan[0] < 0 ? null : AllocateSector(plan[0], unitCount, group);
+        }
+
+        private List<int> GetAvailableSectorIndices()
+        {
+            var result = new List<int>();
+            for (int i = 0; i < _sectors.Count; i++)
+                if (_sectors[i] != null && !_sectors[i].IsOccupied) result.Add(i);
+            return result;
         }
 
         private List<int> BuildCenterOutRowOrder(

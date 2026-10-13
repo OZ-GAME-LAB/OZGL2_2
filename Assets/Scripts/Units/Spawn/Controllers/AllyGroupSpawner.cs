@@ -120,7 +120,7 @@ namespace Units
             IReadOnlyList<Vector2> rallyPositions =
                 AllocateRallyPositions(
                     count,
-                    rallyPoint,
+                    _spawnEntries[unitType].RallyZone,
                     group
                 );
 
@@ -764,13 +764,15 @@ namespace Units
 
         private IReadOnlyList<Vector2> AllocateRallyPositions(
             int count,
-            Vector2 rallyPoint,
+            RallyZone zone,
             Unit_GroupAI group)
         {
             IReadOnlyList<Vector2> rallyPositions =
-                _rallyGridAllocator.Allocate(
+                // 기존 rallyPoint 인자는 API 호환용으로만 받으며 배치는 중앙/전후열 기준이다.
+                _rallyGridAllocator.AllocateCentered(
                     count,
-                    rallyPoint,
+                    zone,
+                    true,
                     group
                 );
 
