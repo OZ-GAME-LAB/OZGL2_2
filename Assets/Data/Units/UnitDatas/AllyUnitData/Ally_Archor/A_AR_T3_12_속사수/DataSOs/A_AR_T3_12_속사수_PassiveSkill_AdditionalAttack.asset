@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_AR_T3_12_\uC18D\uC0AC\uC218_PassiveSkill_AdditionalAttack"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uCD94\uACA9 \uC0AC\uACA9"
+    _icon: {fileID: 21300000, guid: d3b1849a2d667c94f89c9c8702914982, type: 3}
+    _description: "\uD53C\uD574\uB97C \uC904 \uB54C \uB300\uC0C1\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
+      100% \uCD94\uAC00 \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
   _skillSchemaVersion: 1
   _triggerType: 3
   _tickInterval: 0.25
@@ -64,6 +69,7 @@ MonoBehaviour:
           _fxEntries: []
           _delivery: 1
           _executionDuration: 0.3
+          _impactTiming: 0
           _area: 0
           _radius: 1
           _angle: 90

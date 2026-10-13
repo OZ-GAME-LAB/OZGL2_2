@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_WA_T1_\uC804\uC0AC_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uB3CC\uACA9"
+    _icon: {fileID: 21300000, guid: 7289b6576e24cc849a3b96d1c519e069, type: 3}
+    _description: "\uB300\uC0C1\uC5D0\uAC8C \uB3CC\uC9C4\uD574 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C
+      \uACF5\uACA9\uB825\uC758 300% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4.
+      [\uCFE8\uD0C0\uC784 8\uCD08]"
   _skillRange: 10
   _skillCooldown: 8
   _targetSide: 0
@@ -43,6 +49,7 @@ MonoBehaviour:
     - rid: 4844432152660541519
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
         _damageMultiplier: 3
     - rid: 4844432359097368580
@@ -69,7 +76,6 @@ MonoBehaviour:
     - rid: 4844432359097368581
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _executionDuration: 0
         _target:
           _source: 2
           _relation: 0
@@ -138,6 +144,8 @@ MonoBehaviour:
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
+        _executionDuration: 0
+        _impactTiming: 0
         _area: 2
         _radius: 3
         _angle: 360

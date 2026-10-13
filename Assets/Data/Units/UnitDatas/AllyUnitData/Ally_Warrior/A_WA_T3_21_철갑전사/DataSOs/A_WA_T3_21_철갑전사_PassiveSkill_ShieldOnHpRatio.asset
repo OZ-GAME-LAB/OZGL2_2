@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_WA_T3_21_\uCCA0\uAC11\uC804\uC0AC_PassiveSkill_ShieldOnHpRatio"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uCD5C\uD6C4\uC758 \uC7A5\uBCBD"
+    _icon: {fileID: 21300000, guid: 691fd88b1a42e804b93da8b9427e2028, type: 3}
+    _description: "\uCCB4\uB825\uC774 30% \uC774\uD558\uAC00 \uB418\uBA74 \uCD5C\uB300
+      \uCCB4\uB825\uC758 50%\uB9CC\uD07C \uBCF4\uD638\uB9C9\uC744 \uC5BB\uC2B5\uB2C8\uB2E4.
+      \uC804\uD22C \uC911 1\uD68C \uBC1C\uB3D9\uD569\uB2C8\uB2E4."
   _skillSchemaVersion: 1
   _triggerType: 4
   _tickInterval: 1
@@ -44,8 +50,6 @@ MonoBehaviour:
     - rid: 4844432377880510561
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _scalingStatType: 0
-        _shieldRatio: 0.5
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -56,3 +60,5 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _scalingStatType: 0
+        _shieldRatio: 0.5

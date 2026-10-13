@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_WA_T2_1_\uAD11\uC804\uC0AC_PassiveSkill_AtkSpdUpOnHit"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uAD11\uBD84"
+    _icon: {fileID: 21300000, guid: 784c2d6362b8c6c4aaa82be1c251ee8a, type: 3}
+    _description: "\uD53C\uD574\uB97C \uBC1B\uC744 \uB54C\uB9C8\uB2E4 3\uCD08\uAC04
+      \uACF5\uACA9\uC18D\uB3C4\uAC00 5% \uC99D\uAC00\uD569\uB2C8\uB2E4. [\uCD5C\uB300
+      10\uC911\uCCA9]"
   _skillSchemaVersion: 1
   _triggerType: 4
   _tickInterval: 1
@@ -41,7 +47,6 @@ MonoBehaviour:
     - rid: 4844432377880510555
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 0b9be9692793eb14989b6013ed63a61b, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -52,3 +57,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 0b9be9692793eb14989b6013ed63a61b, type: 2}

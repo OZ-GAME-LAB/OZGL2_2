@@ -74,7 +74,8 @@ namespace Units
             {
                 UnitTeam team = settings.Relation == SkillTargetRelation.Hostile ? (request.Owner.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally) : request.Owner.Team;
 
-                candidates.AddRange(ResolveCandidates(new TargetCandidateRequest(request.Origin, settings.Range, team)));
+                candidates.AddRange(ResolveCandidates(new TargetCandidateRequest(request.Origin, settings.Range, team,
+                    sourceBodyRadius: request.UseBodyRange ? request.Owner.BodyRadius : (float?)null)));
             }
             else
             {
@@ -150,7 +151,11 @@ namespace Units
             if (request.Range <= 0f)
                 return _targets.ToArray();
 
-            int hitCount = CollectColliders(request.Origin, request.Range);
+            // 대상의 증가분은 해당 몸 Collider와의 겹침으로 넓은 단계에서 포함된다.
+            // Core의 몸 반지름과 Collider는 일치해야 한다.
+            float searchRange = request.Range + (request.SourceBodyRadius.HasValue
+                ? CombatRangeUtility.Expansion(request.SourceBodyRadius.Value) : 0f);
+            int hitCount = CollectColliders(request.Origin, searchRange);
 
             for (int i = 0; i < hitCount; i++)
             {
@@ -162,7 +167,9 @@ namespace Units
             // Collider 일부만 사거리에 걸친 대상은 위치 기준으로 다시 검사한다.
             float rangeSquared = request.Range * request.Range;
 
-            _targets.RemoveAll(target => !IsValidTarget(target, request.TargetTeam) || ((Vector2)target.Transform.position - request.Origin).sqrMagnitude > rangeSquared);
+            _targets.RemoveAll(target => !IsValidTarget(target, request.TargetTeam) || (request.SourceBodyRadius.HasValue
+                ? CombatRangeUtility.Distance(request.Origin, request.SourceBodyRadius.Value, target) > request.Range
+                : ((Vector2)target.Transform.position - request.Origin).sqrMagnitude > rangeSquared));
 
             // 외부 필터가 같은 Resolver를 재진입해도 이번 조회의 목록은 독립적이다.
             var resolved = new List<ICombatTarget>(_targets);
@@ -177,7 +184,7 @@ namespace Units
 
             resolved.RemoveAll(target => !lifetimes[target].IsTargetable || !IsValidTarget(target, request.TargetTeam));
 
-            SortByDistance(resolved, request.Origin);
+            SortByDistance(resolved, request.Origin, request.SourceBodyRadius);
 
             return resolved.ToArray();
         }
@@ -340,15 +347,19 @@ namespace Units
 
         private void SortByDistance(
             List<ICombatTarget> targets,
-            Vector2 origin)
+            Vector2 origin, float? sourceBodyRadius = null)
         {
             targets.Sort((
                 a,
                 b) =>
             {
-                float distanceA = ((Vector2)a.Transform.position - origin).sqrMagnitude;
+                float distanceA = sourceBodyRadius.HasValue
+                    ? CombatRangeUtility.Distance(origin, sourceBodyRadius.Value, a)
+                    : Vector2.Distance(a.Transform.position, origin);
 
-                float distanceB = ((Vector2)b.Transform.position - origin).sqrMagnitude;
+                float distanceB = sourceBodyRadius.HasValue
+                    ? CombatRangeUtility.Distance(origin, sourceBodyRadius.Value, b)
+                    : Vector2.Distance(b.Transform.position, origin);
 
                 return distanceA.CompareTo(distanceB);
             });

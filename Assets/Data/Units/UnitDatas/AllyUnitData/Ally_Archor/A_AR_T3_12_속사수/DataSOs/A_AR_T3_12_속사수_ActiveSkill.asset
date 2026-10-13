@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_AR_T3_12_\uC18D\uC0AC\uC218_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uC18D\uC0AC"
+    _icon: {fileID: 21300000, guid: 071b79758c9634a41aab36c0bf35812b, type: 3}
+    _description: "\uCD5C\uB300 3\uBA85\uC758 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
+      200% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784
+      6\uCD08]"
   _skillRange: 10
   _skillCooldown: 6
   _targetSide: 0
@@ -110,8 +116,8 @@ MonoBehaviour:
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 1
-        _impactTiming: 1
         _executionDuration: 0
+        _impactTiming: 1
         _area: 0
         _radius: 2
         _angle: 360

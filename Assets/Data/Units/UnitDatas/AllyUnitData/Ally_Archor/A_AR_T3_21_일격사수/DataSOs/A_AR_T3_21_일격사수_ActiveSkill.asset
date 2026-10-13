@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_AR_T3_21_\uC77C\uACA9\uC0AC\uC218_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uD544\uC0B4\uC758 \uD654\uC0B4"
+    _icon: {fileID: 21300000, guid: 52c7d62f495ea57448c1f91cdcf2f5a3, type: 3}
+    _description: "2\uCD08\uAC04 \uC870\uC900\uD55C \uB4A4 \uC801 \uD558\uB098\uC5D0\uAC8C
+      \uACF5\uACA9\uB825\uC758 1000% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4.
+      [\uCFE8\uD0C0\uC784 10\uCD08]"
   _skillRange: 15
   _skillCooldown: 10
   _targetSide: 0
@@ -42,7 +48,6 @@ MonoBehaviour:
     - rid: 4844432381217865734
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _executionDuration: 0
         _target:
           _source: 6
           _relation: 0
@@ -82,6 +87,8 @@ MonoBehaviour:
           _kind: 0
           _attachment: 3
           _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveProjectile_Arrow
           _hook: 8
           _operation: 3
@@ -89,6 +96,8 @@ MonoBehaviour:
           _kind: 1
           _attachment: 3
           _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_ActiveOnHit_Arrow
           _hook: 1
           _operation: 5
@@ -96,6 +105,8 @@ MonoBehaviour:
           _kind: 0
           _attachment: 2
           _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveOnHit_Arrow
           _hook: 1
           _operation: 5
@@ -103,7 +114,10 @@ MonoBehaviour:
           _kind: 1
           _attachment: 2
           _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         _delivery: 1
+        _executionDuration: 0
         _impactTiming: 1
         _area: 0
         _radius: 2
@@ -115,6 +129,7 @@ MonoBehaviour:
     - rid: 4844432381217865735
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
         _damageMultiplier: 10
     - rid: 4844432426836164624

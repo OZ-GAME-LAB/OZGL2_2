@@ -473,7 +473,8 @@ namespace Units
                     new TargetCandidateRequest(
                         origin,
                         _data.BasicAttackRange,
-                        GetEnemyTeam()
+                        GetEnemyTeam(),
+                        sourceBodyRadius: _core.BodyRadius
                     );
 
 

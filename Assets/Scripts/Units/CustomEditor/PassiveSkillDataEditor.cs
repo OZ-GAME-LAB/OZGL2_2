@@ -66,7 +66,7 @@ namespace Units.Editor
 
             SkillInspectorUI.Header("패시브 스킬", "발동 조건 → 적용 방식 → 실행 효과");
 
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_display"), new GUIContent("UI 표시 정보"), true);
+            SkillInspectorUI.DisplaySection(serializedObject.FindProperty("_display"));
 
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
