@@ -90,29 +90,16 @@ namespace Game.Archive.Editor
                 title.color = Ink;
                 title.enableAutoSizing = true;
                 title.fontSizeMin = 15;
-                title.fontSizeMax = relation ? 21 : 19;
+                title.fontSizeMax = relation ? 21 : 20;
                 title.alignment = relation ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Center;
                 title.overflowMode = TextOverflowModes.Ellipsis;
-                value.fontSize = relation ? 16 : 14;
+                value.fontSize = relation ? 16 : 18;
                 value.color = Accent;
                 value.alignment = relation ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Center;
                 title.text = "?";
                 value.text = string.Empty;
-                if (relation)
-                {
-                    Place(root.transform, 0, 0, 668, 76);
-                    Place(icon.transform, 16, 12, 48, 48);
-                    Place(title.transform, 80, 8, 564, 30);
-                    Place(value.transform, 80, 39, 564, 26);
-                    root.AddComponent<UnityEngine.UI.LayoutElement>().preferredHeight = 76;
-                }
-                else
-                {
-                    Place(root.transform, 0, 0, 132, 146);
-                    Place(icon.transform, 32, 14, 68, 68);
-                    Place(title.transform, 5, 88, 122, 32);
-                    Place(value.transform, 5, 119, 122, 22);
-                }
+                if (relation) root.AddComponent<UnityEngine.UI.LayoutElement>().preferredHeight = 76;
+                ConfigureArchiveSlotLayout(root, relation);
                 RectTransform selection = Rect("Selection", root.transform);
                 Stretch(selection);
                 var border = selection.gameObject.AddComponent<UnityEngine.UI.Image>();
@@ -144,32 +131,20 @@ namespace Game.Archive.Editor
                 Set(view, "_screen", null);
                 Stretch(panel.GetComponent<RectTransform>());
                 panel.GetComponent<UnityEngine.UI.Image>().color = Panel;
-                Stretch(panel.Find("TopAccent").GetComponent<RectTransform>(), 0, 0, 0, 477);
                 if (view is ArtifactPopupView)
                 {
-                    Place(panel.Find("Header"), 22, 22, 648, 114);
-                    Place(panel.Find("Header/IconFrame"), 0, 0, 90, 90);
-                    Place(panel.Find("Header/Name"), 112, 0, 510, 64);
-                    Place(Read<TMP_Text>(view, "_rarityText").transform, 112, 72, 510, 32);
-                    Place(panel.Find("Effect"), 24, 160, 636, 278);
                     panel.Find("Effect").GetComponent<TMP_Text>().fontSize = 23;
                     panel.Find("Lore").gameObject.SetActive(false);
                 }
                 else
                 {
-                    Place(panel.Find("Name"), 24, 15, 634, 44);
-                    Place(panel.Find("Lore"), 24, 65, 634, 30);
-                    Place(panel.Find("UnitRows"), 24, 105, 634, 60);
-                    Place(panel.Find("BaseStats"), 24, 175, 634, 130);
                     panel.Find("BaseStats").GetComponent<TMP_Text>().fontSize = 21;
-                    Place(panel.Find("SkillsTitle"), 24, 309, 634, 32);
-                    Place(panel.Find("SkillsScroll"), 24, 350, 634, 112);
-                    Place(panel.Find("EmptySkills"), 24, 359, 634, 40);
                     var skillContent = Read<Transform>(view, "_skillContent");
                     foreach (Transform unused in skillContent.Cast<Transform>().ToArray())
                         if (unused.GetComponent<UIItemSlot>() == null) Object.DestroyImmediate(unused.gameObject);
                 }
                 root.name = destination.Replace(".prefab", string.Empty);
+                ConfigureArchiveDetailLayout(root, view is ArtifactPopupView);
                 PrefabUtility.SaveAsPrefabAsset(root, Folder + destination);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
@@ -194,9 +169,140 @@ namespace Game.Archive.Editor
                 Stretch((RectTransform)scroll.transform, 12, 10, 12, 10);
                 root.AddComponent<UnityEngine.UI.Image>().color = Panel;
                 root.name = "ArchiveBuildingContent";
+                ConfigureArchiveBuildingLayout(root);
                 PrefabUtility.SaveAsPrefabAsset(root, Folder + root.name + ".prefab");
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        public static void RefineContentLayouts()
+        {
+            foreach (string name in new[] { "ArchiveEntrySlot", "ArchiveRelationSlot", "ArchiveArtifactContent", "ArchiveUnitContent", "ArchiveBuildingContent" })
+            {
+                string path = Folder + name + ".prefab";
+                GameObject root = PrefabUtility.LoadPrefabContents(path);
+                try
+                {
+                    switch (name)
+                    {
+                        case "ArchiveEntrySlot": ConfigureArchiveSlotLayout(root, false); break;
+                        case "ArchiveRelationSlot": ConfigureArchiveSlotLayout(root, true); break;
+                        case "ArchiveArtifactContent": ConfigureArchiveDetailLayout(root, true); break;
+                        case "ArchiveUnitContent": ConfigureArchiveDetailLayout(root, false); break;
+                        case "ArchiveBuildingContent": ConfigureArchiveBuildingLayout(root); break;
+                    }
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(root); }
+            }
+        }
+
+        private static void ConfigureArchiveSlotLayout(GameObject root, bool relation)
+        {
+            var slot = root.GetComponent<UIItemSlot>();
+            var icon = Read<UnityEngine.UI.Image>(slot, "_icon");
+            var title = Read<TMP_Text>(slot, "_title");
+            var value = Read<TMP_Text>(slot, "_value");
+            if (relation)
+            {
+                Place(root.transform, 0, 0, 668, 76);
+                Place(icon.transform, 16, 12, 48, 48);
+                ArchiveHorizontalRect(title.transform, 80, 16, 8, 30);
+                ArchiveHorizontalRect(value.transform, 80, 16, 39, 26);
+                return;
+            }
+            Place(root.transform, 0, 0, 160, 174);
+            var iconRect = (RectTransform)icon.transform;
+            iconRect.anchorMin = iconRect.anchorMax = iconRect.pivot = new Vector2(.5f, 1);
+            iconRect.anchoredPosition = new Vector2(0, -14);
+            iconRect.sizeDelta = new Vector2(84, 84);
+            ArchiveHorizontalRect(title.transform, 8, 8, 108, 34);
+            ArchiveHorizontalRect(value.transform, 8, 8, 142, 30);
+            title.fontSizeMax = 20;
+            value.fontSize = 18;
+        }
+
+        private static void ConfigureArchiveDetailLayout(GameObject root, bool artifact)
+        {
+            Transform panel = root.transform.Find("Panel");
+            ArchiveHorizontalRect(panel.Find("TopAccent"), 0, 0, 0, 3);
+            if (artifact)
+            {
+                ArchiveHorizontalRect(panel.Find("Header"), 24, 24, 24, 114);
+                Place(panel.Find("Header/IconFrame"), 0, 0, 90, 90);
+                ArchiveHorizontalRect(panel.Find("Header/Name"), 112, 0, 0, 64);
+                var name = panel.Find("Header/Name").GetComponent<TMP_Text>();
+                name.enableAutoSizing = true;
+                name.fontSizeMin = 22;
+                name.fontSizeMax = 32;
+                ArchiveHorizontalRect(Read<TMP_Text>(root.GetComponent<ArtifactPopupView>(), "_rarityText").transform, 112, 0, 72, 32);
+                ArchiveFillRect(panel.Find("Effect"), 24, 160, 24, 24);
+                return;
+            }
+            ArchiveHorizontalRect(panel.Find("Name"), 24, 24, 15, 44);
+            ArchiveHorizontalRect(panel.Find("Lore"), 24, 24, 65, 30);
+            var lore = panel.Find("Lore").GetComponent<TMP_Text>();
+            lore.enableAutoSizing = true;
+            lore.fontSizeMin = 14;
+            lore.fontSizeMax = 18;
+            lore.textWrappingMode = TextWrappingModes.NoWrap;
+            ArchiveHorizontalRect(panel.Find("UnitRows"), 24, 24, 105, 60);
+            foreach (Transform row in panel.Find("UnitRows"))
+            {
+                var icon = (RectTransform)row.Find("IconFrame");
+                icon.anchorMin = icon.anchorMax = icon.pivot = new Vector2(0, .5f);
+                icon.anchoredPosition = Vector2.zero;
+                var health = (RectTransform)row.Find("HealthBar");
+                health.anchorMin = new Vector2(0, .5f);
+                health.anchorMax = new Vector2(1, .5f);
+                health.pivot = new Vector2(0, .5f);
+                health.anchoredPosition = new Vector2(72, 0);
+                health.sizeDelta = new Vector2(-72, 40);
+                ArchiveFillRect(health.Find("HealthText"), 10, 3, 10, 3);
+            }
+            ArchiveHorizontalRect(panel.Find("BaseStats"), 24, 24, 175, 130);
+            ArchiveHorizontalRect(panel.Find("SkillsTitle"), 24, 24, 309, 32);
+            ArchiveFillRect(panel.Find("SkillsScroll"), 24, 350, 24, 18);
+            ArchiveHorizontalRect(panel.Find("EmptySkills"), 24, 24, 359, 40);
+            var skill = Read<UIItemSlot>(root.GetComponent<UnitPopupView>(), "_skillTemplate");
+            var skillName = Read<TMP_Text>(skill, "_title");
+            ArchiveHorizontalRect(skillName.transform, 16, 16, 6, 32);
+            skillName.enableAutoSizing = true;
+            skillName.fontSizeMin = 14;
+            skillName.fontSizeMax = 21;
+            skillName.overflowMode = TextOverflowModes.Ellipsis;
+            ArchiveHorizontalRect(Read<TMP_Text>(skill, "_value").transform, 16, 16, 39, 24);
+        }
+
+        private static void ConfigureArchiveBuildingLayout(GameObject root)
+        {
+            Transform heading = root.transform.Find("Information/Viewport/Content/Building/DisplayContent/Heading");
+            ArchiveHorizontalRect(heading.Find("Name"), 72, 0, 0, 40);
+            var name = heading.Find("Name").GetComponent<TMP_Text>();
+            name.enableAutoSizing = true;
+            name.fontSizeMin = 18;
+            name.fontSizeMax = 25;
+            ArchiveHorizontalRect(heading.Find("Category"), 72, 0, 44, 28);
+        }
+
+        private static void ArchiveHorizontalRect(Transform target, float left, float right, float top, float height)
+        {
+            var rect = (RectTransform)target;
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(0, 1);
+            rect.anchoredPosition = new Vector2(left, -top);
+            rect.sizeDelta = new Vector2(-left - right, height);
+        }
+
+        private static void ArchiveFillRect(Transform target, float left, float top, float right, float bottom)
+        {
+            var rect = (RectTransform)target;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(.5f, .5f);
+            rect.offsetMin = new Vector2(left, bottom);
+            rect.offsetMax = new Vector2(-right, -top);
         }
 
         private static void CreateWindow()
@@ -250,8 +356,6 @@ namespace Game.Archive.Editor
                 Set(view, "_listContent", entries);
                 Set(view, "_slotTemplate", Instance("ArchiveEntrySlot.prefab", entries).GetComponent<UIItemSlot>());
                 Label(window, "Hint", "?  아직 발견하지 못한 항목", 30, 885, 710, 25, 17).color = Muted;
-                Set(view, "_backButton", Button(window, "Previous", "‹  이전 정보", 792, 130, 186, 48));
-                Label(window, "DetailLabel", "상세 정보", 1090, 136, 408, 38, 21).alignment = TextAlignmentOptions.Right;
                 var details = Rect("Details", window);
                 Place(details, 792, 196, 706, 480);
                 var empty = Label(details, "EmptyDetail", "목록에서 발견한 항목을 선택하세요", 32, 195, 642, 90, 23);
@@ -283,6 +387,7 @@ namespace Game.Archive.Editor
                 Set(view, "_placeholderIcon", icons.OfType<Sprite>().Single(s => s.name == "KnownUnit"));
                 Set(view, "_unknownIcon", icons.OfType<Sprite>().Single(s => s.name == "Unknown"));
                 ConfigureRightPane(window);
+                ConfigureFullscreenLayout(window);
                 PrefabUtility.SaveAsPrefabAsset(host, Folder + "ArchiveWindow.prefab");
             }
             finally { EditorSceneManager.ClosePreviewScene(preview); }
@@ -294,6 +399,7 @@ namespace Game.Archive.Editor
             try
             {
                 ConfigureRightPane(root.transform.Find("Root/Window"));
+                ConfigureFullscreenLayout(root.transform.Find("Root/Window"));
                 foreach (var scroll in root.GetComponentsInChildren<UnityEngine.UI.ScrollRect>(true))
                     if (scroll.name == "Entries" || scroll.name == "Relations") AddScrollbar(scroll);
                 PrefabUtility.SaveAsPrefabAsset(root, Folder + "ArchiveWindow.prefab");
@@ -303,7 +409,7 @@ namespace Game.Archive.Editor
 
         private static void ConfigureRightPane(Transform window)
         {
-            Transform body = window.Find("RightBody");
+            Transform body = window.Find("RightBody") ?? window.Find("RightPane/RightBody");
             if (body != null) return;
             body = Rect("RightBody", window);
             Place(body, 792, 196, 706, 710);
@@ -329,6 +435,75 @@ namespace Game.Archive.Editor
             var relationsLayout = relations.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
             relationsLayout.minHeight = relationsLayout.preferredHeight = 180;
             relationsLayout.flexibleHeight = 1;
+        }
+
+        private static void ConfigureFullscreenLayout(Transform window)
+        {
+            Stretch((RectTransform)window);
+            Place(window.Find("Title"), 48, 28, 300, 48);
+            Place(window.Find("Subtitle"), 48, 84, 900, 32);
+            var close = (RectTransform)window.Find("Close");
+            close.anchorMin = close.anchorMax = close.pivot = Vector2.one;
+            close.anchoredPosition = new Vector2(-48, -36);
+            close.sizeDelta = new Vector2(136, 48);
+
+            Transform tabs = window.Find("Tabs");
+            if (tabs == null)
+            {
+                tabs = Rect("Tabs", window);
+                var layout = tabs.gameObject.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+                layout.spacing = 12;
+                layout.childControlWidth = layout.childControlHeight = true;
+                layout.childForceExpandWidth = layout.childForceExpandHeight = true;
+                foreach (string name in new[] { "ArtifactTab", "BuildingTab", "UnitTab" })
+                    window.Find(name).SetParent(tabs, false);
+            }
+            foreach (var button in tabs.GetComponentsInChildren<UnityEngine.UI.Button>())
+                Stretch((RectTransform)button.transform.Find("Label"), 4, 0, 4, 0);
+            Stretch((RectTransform)close.Find("Label"), 4, 0, 4, 0);
+            Place(window.Find("Teams"), 48, 208, 326, 40);
+            window.Find("Progress").GetComponent<TMP_Text>().alignment = TextAlignmentOptions.MidlineRight;
+            var grid = window.Find("Entries/Viewport/Content").GetComponent<UnityEngine.UI.GridLayoutGroup>();
+            grid.cellSize = new Vector2(160, 174);
+            grid.spacing = new Vector2(12, 16);
+            grid.constraint = UnityEngine.UI.GridLayoutGroup.Constraint.Flexible;
+            grid.childAlignment = TextAnchor.UpperCenter;
+            Transform detailLabel = window.Find("DetailLabel");
+            if (detailLabel != null) Object.DestroyImmediate(detailLabel.gameObject);
+            Transform pane = window.Find("RightPane") ?? Rect("RightPane", window);
+            var archiveLayout = window.GetComponent<ArchiveLayout>() ?? window.gameObject.AddComponent<ArchiveLayout>();
+            Set(archiveLayout, "_tabs", tabs);
+            Set(archiveLayout, "_progress", window.Find("Progress"));
+            Set(archiveLayout, "_entries", window.Find("Entries"));
+            Set(archiveLayout, "_hint", window.Find("Hint"));
+            Set(archiveLayout, "_details", pane);
+            Transform body = window.Find("RightBody") ?? pane.Find("RightBody");
+            body.SetParent(pane, false);
+            var card = (RectTransform)body;
+            card.pivot = new Vector2(.5f, .5f);
+            var aspect = body.GetComponent<UnityEngine.UI.AspectRatioFitter>() ?? body.gameObject.AddComponent<UnityEngine.UI.AspectRatioFitter>();
+            aspect.aspectMode = UnityEngine.UI.AspectRatioFitter.AspectMode.FitInParent;
+            aspect.aspectRatio = 5f / 7f;
+            var background = body.GetComponent<UnityEngine.UI.Image>() ?? body.gameObject.AddComponent<UnityEngine.UI.Image>();
+            background.color = Panel;
+            var bodyLayout = body.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
+            bodyLayout.padding = new RectOffset(16, 16, 16, 16);
+            bodyLayout.spacing = 16;
+            Transform details = body.Find("Details");
+            var detailSize = details.GetComponent<UnityEngine.UI.LayoutElement>() ?? details.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+            detailSize.flexibleHeight = 1;
+            details.GetComponent<UnityEngine.UI.VerticalLayoutGroup>().childForceExpandHeight = true;
+            foreach (Transform detail in details)
+            {
+                var size = detail.GetComponent<UnityEngine.UI.LayoutElement>();
+                bool building = detail.GetComponent<BuildingInfoView>() != null;
+                size.minHeight = building ? 300 : 460;
+                size.preferredHeight = building ? 300 : 520;
+                size.flexibleHeight = 1;
+            }
+            var relationSize = body.Find("Relations").GetComponent<UnityEngine.UI.LayoutElement>();
+            relationSize.minHeight = 128;
+            relationSize.preferredHeight = 200;
         }
 
         private static void RegisterWindow()

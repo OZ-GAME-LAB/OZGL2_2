@@ -17,6 +17,34 @@ public static class TotemBuiltinEffects
             UnitStatType.AttackPower, UnitStatModifierType.Percent, 0.15f)
     };
 
+    private static readonly TotemStatEffect[] EnemyHealth =
+    {
+        new TotemStatEffect(
+            UnitTeam.Enemy, UnitModifierApplyType.All,
+            UnitStatType.MaxHp, UnitStatModifierType.Percent, 0.15f)
+    };
+
+    private static readonly TotemStatEffect[] EnemyDefense =
+    {
+        new TotemStatEffect(
+            UnitTeam.Enemy, UnitModifierApplyType.All,
+            UnitStatType.Defense, UnitStatModifierType.Flat, 2f)
+    };
+
+    private static readonly TotemStatEffect[] EnemyAttackSpeed =
+    {
+        new TotemStatEffect(
+            UnitTeam.Enemy, UnitModifierApplyType.All,
+            UnitStatType.AttackSpeed, UnitStatModifierType.Percent, 0.08f)
+    };
+
+    private static readonly TotemStatEffect[] EnemyMoveSpeed =
+    {
+        new TotemStatEffect(
+            UnitTeam.Enemy, UnitModifierApplyType.All,
+            UnitStatType.MoveSpeed, UnitStatModifierType.Percent, 0.10f)
+    };
+
     // 취약: 아군이 받는 피해 +10%/레벨. 기본 배율이 1이라 0.10은 +10%입니다.
     private static readonly TotemStatEffect[] DamageTaken =
     {
@@ -33,10 +61,31 @@ public static class TotemBuiltinEffects
         {
             case TotemId.EnemyDamage:
                 return EnemyDamage;
+            case TotemId.EnemyHealth:
+                return EnemyHealth;
+            case TotemId.EnemyDefense:
+                return EnemyDefense;
+            case TotemId.EnemyAttackSpeed:
+                return EnemyAttackSpeed;
+            case TotemId.EnemyMoveSpeed:
+                return EnemyMoveSpeed;
             case TotemId.DamageTaken:
                 return DamageTaken;
             default:
                 return Empty;
+        }
+    }
+
+    public static TotemEffectCategory GetCategory(TotemId id)
+    {
+        switch (id)
+        {
+            case TotemId.GoldReduction:
+                return TotemEffectCategory.Currency;
+            case TotemId.EnemyCount:
+                return TotemEffectCategory.Flow;
+            default:
+                return TotemEffectCategory.Stat;
         }
     }
 }
