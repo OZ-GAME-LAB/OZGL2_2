@@ -65,6 +65,8 @@ namespace Units
 
         private bool _isSpawnCompleted;
 
+        private readonly HashSet<Unit_Gateway> _rallyFailedMembers = new();
+
         private readonly HashSet<Unit_Gateway>
             _rallyCompletedMembers =
             new();
@@ -262,6 +264,8 @@ namespace Units
 
             _rallyCompletedMembers.Clear();
 
+            _rallyFailedMembers.Clear();
+
 
             SetState(
                 GroupAIState.Spawning
@@ -368,6 +372,8 @@ namespace Units
             unit.RallyCompleted +=
                 HandleRallyCompleted;
 
+            unit.RallyFailed += HandleRallyFailed;
+
 
             if (_state == GroupAIState.Engaged)
             {
@@ -407,6 +413,10 @@ namespace Units
 
             unit.RallyCompleted -=
                 HandleRallyCompleted;
+
+            unit.RallyFailed -= HandleRallyFailed;
+
+            _rallyFailedMembers.Remove(unit);
 
 
             _rallyCompletedMembers.Remove(
@@ -527,6 +537,8 @@ namespace Units
             }
 
 
+            _rallyFailedMembers.Remove(unit);
+
             if (!_rallyCompletedMembers.Add(
                 unit))
             {
@@ -537,6 +549,21 @@ namespace Units
             TryCompleteSpawning();
         }
 
+
+        private void HandleRallyFailed(Unit_Gateway unit)
+        {
+            if (_state != GroupAIState.Spawning || unit == null
+                || !_memberController.Contains(unit))
+                return;
+
+            _rallyCompletedMembers.Remove(unit);
+
+            if (!_rallyFailedMembers.Add(unit))
+                return;
+
+            // 실패를 성공으로 집계하지 않되 그룹 전체의 준비 대기는 종료할 수 있다.
+            TryCompleteSpawning();
+        }
 
         private void TryCompleteSpawning()
         {
@@ -552,7 +579,7 @@ namespace Units
                 return;
 
 
-            if (_rallyCompletedMembers.Count <
+            if (_rallyCompletedMembers.Count + _rallyFailedMembers.Count <
                 _members.Count)
             {
                 return;

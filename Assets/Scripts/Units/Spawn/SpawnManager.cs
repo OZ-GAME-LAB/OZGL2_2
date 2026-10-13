@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -95,6 +95,10 @@ namespace Units
 
         [SerializeField]
         private Transform _allyRallySectorRoot;
+
+        [Tooltip("아군이 최종 Rally 자리로 이동하기 전에 통과할 좌표. 미지정 시 직접 이동합니다.")]
+        [SerializeField]
+        private Transform _allyRallyViaPoint;
 
 
         // ============================================================
@@ -254,7 +258,8 @@ namespace Units
                     _allySpawnEntries,
                     _groupPrefab,
                     _allyRallyGridAllocator,
-                    _groupSpawnDuration
+                    _groupSpawnDuration,
+                    _allyRallyViaPoint
                 );
 
 
