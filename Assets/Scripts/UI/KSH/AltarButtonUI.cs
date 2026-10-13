@@ -8,19 +8,10 @@ public class AltarButtonUI : MonoBehaviour,
     IPointerMoveHandler,
     IPointerClickHandler
 {
-    [Header("Altar Info")]
-    [SerializeField] private string altarName;
-
-    [TextArea(2, 6)]
-    [SerializeField] private string altarDescription;
-
     [Header("Visual States")]
     [SerializeField] private GameObject disabledState;
     [SerializeField] private GameObject mouseOverState;
     [SerializeField] private GameObject enableState;
-
-    public string AltarName => altarName;
-    public string AltarDescription => altarDescription;
 
     public bool IsSelected { get; private set; }
     public bool IsHovered { get; private set; }
@@ -30,13 +21,35 @@ public class AltarButtonUI : MonoBehaviour,
     public event Action<AltarButtonUI> PointerExited;
     public event Action<AltarButtonUI> Clicked;
 
+
     private void Awake()
     {
         SetSelected(false);
         SetHovered(false);
     }
 
-    public void OnPointerEnter(PointerEventData eventData)
+
+    public bool ValidateReferences()
+    {
+        bool valid =
+            disabledState != null &&
+            mouseOverState != null &&
+            enableState != null;
+
+        if (!valid)
+        {
+            Debug.LogError(
+                "[AltarButtonUI] Disabled / MouseOver / Enable 상태를 모두 연결해주세요.",
+                this
+            );
+        }
+
+        return valid;
+    }
+
+
+    public void OnPointerEnter(
+        PointerEventData eventData)
     {
         IsHovered = true;
 
@@ -48,7 +61,9 @@ public class AltarButtonUI : MonoBehaviour,
         );
     }
 
-    public void OnPointerMove(PointerEventData eventData)
+
+    public void OnPointerMove(
+        PointerEventData eventData)
     {
         if (!IsHovered)
             return;
@@ -59,7 +74,9 @@ public class AltarButtonUI : MonoBehaviour,
         );
     }
 
-    public void OnPointerExit(PointerEventData eventData)
+
+    public void OnPointerExit(
+        PointerEventData eventData)
     {
         IsHovered = false;
 
@@ -68,42 +85,62 @@ public class AltarButtonUI : MonoBehaviour,
         PointerExited?.Invoke(this);
     }
 
-    public void OnPointerClick(PointerEventData eventData)
+
+    public void OnPointerClick(
+        PointerEventData eventData)
     {
-        if (eventData.button != PointerEventData.InputButton.Left)
+        if (eventData.button !=
+            PointerEventData.InputButton.Left)
+        {
             return;
+        }
 
         Clicked?.Invoke(this);
     }
 
-    public void SetSelected(bool selected)
+
+    public void SetSelected(
+        bool selected)
     {
         IsSelected = selected;
 
         RefreshVisual();
     }
 
-    public void SetHovered(bool hovered)
+
+    public void SetHovered(
+        bool hovered)
     {
         IsHovered = hovered;
 
         RefreshVisual();
     }
 
+
     private void RefreshVisual()
     {
         // 선택 상태가 가장 우선
         if (enableState != null)
-            enableState.SetActive(IsSelected);
+        {
+            enableState.SetActive(
+                IsSelected
+            );
+        }
 
         if (mouseOverState != null)
+        {
             mouseOverState.SetActive(
-                !IsSelected && IsHovered
+                !IsSelected &&
+                IsHovered
             );
+        }
 
         if (disabledState != null)
+        {
             disabledState.SetActive(
-                !IsSelected && !IsHovered
+                !IsSelected &&
+                !IsHovered
             );
+        }
     }
 }
