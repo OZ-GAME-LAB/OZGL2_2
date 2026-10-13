@@ -237,7 +237,8 @@ namespace Units
                 new AllySpawnEntry(
                     unitData.GetAllyTier(),
                     unitData.GetAllyClass(),
-                    prefab
+                    prefab,
+                    unitData.RallyZone
                 )
             );
         }
