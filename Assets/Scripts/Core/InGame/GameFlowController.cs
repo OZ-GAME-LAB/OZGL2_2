@@ -109,6 +109,8 @@ namespace Game.Core
         public bool IsResumingStep { get; private set; }
         private bool _isTransitioning;
         private bool _isResetting;
+        private bool _isEndingRun;
+        private UniTaskCompletionSource _flowCompletion;
         private UniTaskCompletionSource _spawnCompletion;
         private CancellationTokenSource _cts;
         private RunDecision? _runDecision;
@@ -139,6 +141,7 @@ namespace Game.Core
             ClearToken();
             ResetDecisionState();
             _isTransitioning = false;
+            _isEndingRun = false;
             _curPhase = GamePhase.None;
             _resumeStep = RunResumeStep.Preparation;
             HasClearedMainGame = false;
@@ -196,6 +199,8 @@ namespace Game.Core
             _isTransitioning = true;
             var lifetime = _cts;
             var token = lifetime.Token;
+            var completion = new UniTaskCompletionSource();
+            _flowCompletion = completion;
             try
             {
                 if (_resumeStep == RunResumeStep.Finished)
@@ -221,6 +226,8 @@ namespace Game.Core
             {
                 IsResumingStep = false;
                 if (ReferenceEquals(_cts, lifetime) && !_startupBlocked) _isTransitioning = false;
+                if (ReferenceEquals(_flowCompletion, completion)) _flowCompletion = null;
+                completion.TrySetResult();
             }
         }
 
@@ -238,6 +245,30 @@ namespace Game.Core
             _isResetting = true;
             ReturnToMainMenuAsync().Forget();
         }
+
+        /// <summary>현재 진행을 중단하고 누적 기록으로 정산한 뒤 런을 종료한다.</summary>
+        public void AbandonRun() => AbandonRunAsync().SuppressCancellationThrow().Forget();
+
+        private async UniTask AbandonRunAsync()
+        {
+            if (_isEndingRun || _isResetting || _curPhase == GamePhase.None || _curPhase == GamePhase.Finished) return;
+            _isEndingRun = true;
+            _isTransitioning = true;
+            var pendingFlow = _flowCompletion?.Task ?? UniTask.CompletedTask;
+            var pendingSpawn = _spawnCompletion?.Task ?? UniTask.CompletedTask;
+            _waveController.BattlePause();
+            ClearToken();
+            var token = _cts.Token;
+            ChangePhase(GamePhase.BattleResolving);
+
+            // 취소된 UI의 finally와 스폰 정리가 끝난 뒤 정산 UI를 연다.
+            await pendingFlow;
+            await pendingSpawn;
+            token.ThrowIfCancellationRequested();
+            await CleanupBattleAsync(token);
+            await FinishRun(ResultType.Defeat, token);
+        }
+
         //현재 진행중인 값 저장
         public GameFlowSaveData CaptureSaveData()
         {
@@ -335,9 +366,9 @@ namespace Game.Core
             }
             finally
             {
-                completion.TrySetResult();
                 if (ReferenceEquals(_spawnCompletion, completion))
                     _spawnCompletion = null;
+                completion.TrySetResult();
             }
         }
 
@@ -357,6 +388,8 @@ namespace Game.Core
             _isTransitioning = true;
             CancellationTokenSource lifetime = _cts;
             var token = lifetime.Token;
+            var completion = new UniTaskCompletionSource();
+            _flowCompletion = completion;
             try
             {
                 await ResolveBattleCoreAsync(result, token).SuppressCancellationThrow();
@@ -365,6 +398,8 @@ namespace Game.Core
             {
                 // 화면 취소/오류도 현재 작업의 잠금을 해제한다. 이전 판은 새 판을 변경하지 않는다.
                 if (ReferenceEquals(_cts, lifetime)) _isTransitioning = false;
+                if (ReferenceEquals(_flowCompletion, completion)) _flowCompletion = null;
+                completion.TrySetResult();
             }
         }
 
@@ -565,6 +600,7 @@ namespace Game.Core
         // 게임 종료 및 내부 상태 관리
         private async UniTask FinishRun(ResultType type, CancellationToken token)
         {
+            _isEndingRun = true;
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
             token.ThrowIfCancellationRequested();
@@ -648,9 +684,10 @@ namespace Game.Core
 
         private void ClearToken()
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
+            var previous = _cts;
             _cts = new CancellationTokenSource();
+            previous?.Cancel();
+            previous?.Dispose();
         }
 
         private void ResetDecisionState()

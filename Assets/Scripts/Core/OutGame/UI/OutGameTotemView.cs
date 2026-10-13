@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
-/// <summary>고정된 6열에 두 페이지의 토템을 표시하고, 입력을 UIController에 전달합니다.</summary>
+/// <summary>사용 가능한 토템을 6열씩 표시하고, 입력을 UIController에 전달합니다.</summary>
 public class OutGameTotemView : MonoBehaviour
 {
     [SerializeField] private OutGameTotemColumn[] _columns;
@@ -14,6 +15,7 @@ public class OutGameTotemView : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _startButton;
 
     private ITotemSelection _selection;
+    private readonly List<TotemData> _visibleTotems = new List<TotemData>();
     private TotemId _inspectedTotem;
     private int _page;
 
@@ -43,7 +45,7 @@ public class OutGameTotemView : MonoBehaviour
         if (!ValidateReferences() || selection == null) return;
         _selection = selection;
         _page = 0;
-        _inspectedTotem = TotemId.EnemyDamage;
+        _inspectedTotem = TotemId.None;
         for (int i = 0; i < _columns.Length; i++)
         {
             _columns[i].Initialize();
@@ -59,18 +61,32 @@ public class OutGameTotemView : MonoBehaviour
     public void Refresh()
     {
         if (_selection == null) return;
+        _visibleTotems.Clear();
+        foreach (TotemData data in _selection.Data)
+        {
+            if (data.IsAvailable) _visibleTotems.Add(data);
+        }
+        int lastPage = Mathf.Max(0, (_visibleTotems.Count - 1) / _columns.Length);
+        _page = Mathf.Clamp(_page, 0, lastPage);
+        TotemData inspected = null;
         for (int i = 0; i < _columns.Length; i++)
         {
-            TotemData data = FindData(GetColumnId(i));
+            TotemData data = GetColumnData(i);
             _columns[i].gameObject.SetActive(data != null);
             if (data != null) _columns[i].SetDisplay(data, _selection.GetLevel(data.Id));
+            if (data != null && data.Id == _inspectedTotem) inspected = data;
         }
         _leftButton.interactable = _page > 0;
-        _rightButton.interactable = _page < 1;
+        _rightButton.interactable = _page < lastPage;
         _bonusLabel.text = "누적 보너스 " + _selection.GetRewardBonusPercent() + "%";
 
-        TotemData inspected = FindData(_inspectedTotem);
-        if (inspected == null) return;
+        if (inspected == null) inspected = GetColumnData(0);
+        _inspectedTotem = inspected != null ? inspected.Id : TotemId.None;
+        if (inspected == null)
+        {
+            _description.text = string.Empty;
+            return;
+        }
         int level = _selection.GetLevel(inspected.Id);
         _description.text = inspected.DisplayName + " (" + level + " / " + inspected.MaxLevel + ")\n" +
             inspected.Description + "\n" + inspected.EffectLabel + ": " +
@@ -93,37 +109,13 @@ public class OutGameTotemView : MonoBehaviour
         if (_backButton != null) _backButton.onClick.RemoveListener(OnBackClicked);
         if (_startButton != null) _startButton.onClick.RemoveListener(OnStartClicked);
         _selection = null;
+        _visibleTotems.Clear();
     }
 
-    // 기존 열 순서는 3단 / 단일 / 3단 / 3단 / 단일 / 3단입니다.
-    private TotemId GetColumnId(int column)
+    private TotemData GetColumnData(int column)
     {
-        if (_page == 1)
-        {
-            if (column == 1) return TotemId.DeathBurst;
-            if (column == 4) return TotemId.Pursuer;
-            return TotemId.None;
-        }
-
-        switch (column)
-        {
-            case 0: return TotemId.EnemyDamage;
-            case 1: return TotemId.EchoAttack;
-            case 2: return TotemId.EnemyCount;
-            case 3: return TotemId.DamageTaken;
-            case 4: return TotemId.Crossfire;
-            case 5: return TotemId.GoldReduction;
-        }
-        return TotemId.None;
-    }
-
-    private TotemData FindData(TotemId id)
-    {
-        for (int i = 0; i < _selection.Data.Count; i++)
-        {
-            if (_selection.Data[i].Id == id) return _selection.Data[i];
-        }
-        return null;
+        int index = _page * _columns.Length + column;
+        return index < _visibleTotems.Count ? _visibleTotems[index] : null;
     }
 
     private void OnLevelChangeRequested(TotemId id, int delta)
@@ -136,15 +128,15 @@ public class OutGameTotemView : MonoBehaviour
 
     private void OnLeftClicked()
     {
-        _page = 0;
-        _inspectedTotem = TotemId.EnemyDamage;
+        _page--;
+        _inspectedTotem = TotemId.None;
         Refresh();
     }
 
     private void OnRightClicked()
     {
-        _page = 1;
-        _inspectedTotem = TotemId.DeathBurst;
+        _page++;
+        _inspectedTotem = TotemId.None;
         Refresh();
     }
 

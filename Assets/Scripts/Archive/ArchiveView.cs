@@ -7,6 +7,9 @@ using TMPro;
 using Units;
 using Units.UnitDatas;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace Game.Archive
 {
@@ -20,17 +23,16 @@ namespace Game.Archive
         [SerializeField] private EnemyUnitSpawnDatabaseSO _enemyUnitDatabase;
 
         [Header("Navigation")]
-        [SerializeField] private UnityEngine.UI.Button _artifactTabButton;
-        [SerializeField] private UnityEngine.UI.Button _buildingTabButton;
-        [SerializeField] private UnityEngine.UI.Button _unitTabButton;
-        [SerializeField] private UnityEngine.UI.Button _allyButton;
-        [SerializeField] private UnityEngine.UI.Button _enemyButton;
-        [SerializeField] private UnityEngine.UI.Button _backButton;
+        [SerializeField] private Button _artifactTabButton;
+        [SerializeField] private Button _buildingTabButton;
+        [SerializeField] private Button _unitTabButton;
+        [SerializeField] private Button _allyButton;
+        [SerializeField] private Button _enemyButton;
         [SerializeField] private GameObject _teamControls;
         [SerializeField] private TMP_Text _progressText;
 
         [Header("List")]
-        [SerializeField] private UnityEngine.UI.ScrollRect _listScroll;
+        [SerializeField] private ScrollRect _listScroll;
         [SerializeField] private Transform _listContent;
         [SerializeField] private UIItemSlot _slotTemplate;
         [SerializeField] private Sprite _placeholderIcon;
@@ -53,7 +55,6 @@ namespace Game.Archive
         private readonly Dictionary<AllyUnitType, Entry> _allyByType = new();
         private readonly List<UIItemSlot> _slots = new();
         private readonly List<GameObject> _relationObjects = new();
-        private readonly Stack<NavigationState> _history = new();
         private ArchiveController _controller;
         private NavigationState _state = new() { Category = ArchiveCategory.Artifact, IsAlly = true, Scroll = 1f };
         private bool _refreshing;
@@ -66,9 +67,9 @@ namespace Game.Archive
             public readonly ArchiveCategory Category;
             public readonly string Id;
             public readonly bool IsAlly;
-            public readonly UnityEngine.Object Data;
+            public readonly Object Data;
 
-            public Entry(ArchiveCategory category, string id, UnityEngine.Object data, bool isAlly = false)
+            public Entry(ArchiveCategory category, string id, Object data, bool isAlly = false)
             {
                 Category = category;
                 Id = id;
@@ -114,7 +115,6 @@ namespace Game.Archive
         private void OnDisable()
         {
             CaptureScroll();
-            _history.Clear();
             SetListeners(false);
             RestoreTimeScale();
             if (_controller != null)
@@ -140,10 +140,9 @@ namespace Game.Archive
             SetListener(_unitTabButton, ShowUnits, add);
             SetListener(_allyButton, ShowAllies, add);
             SetListener(_enemyButton, ShowEnemies, add);
-            SetListener(_backButton, GoBack, add);
         }
 
-        private static void SetListener(UnityEngine.UI.Button button, UnityEngine.Events.UnityAction action, bool add)
+        private static void SetListener(Button button, UnityAction action, bool add)
         {
             if (add) button.onClick.AddListener(action);
             else button.onClick.RemoveListener(action);
@@ -158,7 +157,6 @@ namespace Game.Archive
         private void ChangeList(ArchiveCategory category, bool isAlly)
         {
             if (_state.Category == category && (category != ArchiveCategory.Unit || _state.IsAlly == isAlly)) return;
-            SaveHistory();
             _state = new NavigationState { Category = category, IsAlly = isAlly, Scroll = 1f };
             Refresh();
         }
@@ -170,7 +168,7 @@ namespace Game.Archive
                 !IsDiscovered(entry)) return false;
             if (_state.Category == category && _state.SelectedId == id &&
                 (category != ArchiveCategory.Unit || _state.IsAlly == isAlly)) return true;
-            SaveHistory();
+            CaptureScroll();
             bool sameList = _state.Category == category &&
                 (category != ArchiveCategory.Unit || _state.IsAlly == isAlly);
             _state = new NavigationState
@@ -183,22 +181,9 @@ namespace Game.Archive
             return true;
         }
 
-        private void SaveHistory()
-        {
-            CaptureScroll();
-            _history.Push(_state);
-        }
-
         private void CaptureScroll()
         {
             _state.Scroll = _listScroll.verticalNormalizedPosition;
-        }
-
-        private void GoBack()
-        {
-            if (_history.Count == 0) return;
-            _state = _history.Pop();
-            Refresh();
         }
 
         private void HandleChanged()
@@ -272,7 +257,6 @@ namespace Game.Archive
                 SetInteractable(_unitTabButton, _state.Category != ArchiveCategory.Unit);
                 SetInteractable(_allyButton, !_state.IsAlly);
                 SetInteractable(_enemyButton, _state.IsAlly);
-                SetInteractable(_backButton, _history.Count > 0);
                 _teamControls.SetActive(_state.Category == ArchiveCategory.Unit);
 
                 ClearSlots();
@@ -301,7 +285,7 @@ namespace Game.Archive
             finally { _refreshing = false; }
         }
 
-        private static void SetInteractable(UnityEngine.UI.Button button, bool interactable)
+        private static void SetInteractable(Button button, bool interactable)
         {
             button.interactable = interactable;
         }

@@ -83,7 +83,9 @@ namespace Game.UI.Samples
                 _runtimeCombat = GetComponent<MvpRuntimeCombatFixture>() ??
                     gameObject.AddComponent<MvpRuntimeCombatFixture>();
             _flow.Initialize(_waves, _rewardGate, _artifactManager); //
-            _waves.Initialize(_flow, _runtimeCombat, _runtimeCombat);
+            var unitStatModifiers = GetComponent<UnitStatModifierManager>() ??
+                gameObject.AddComponent<UnitStatModifierManager>();
+            _waves.Initialize(_flow, _runtimeCombat, _runtimeCombat, new TotemFlowEffects(), unitStatModifiers);
             _goldBinding.Initialize(_ui, _currencyManager);
             _coreBinding.Initialize(_ui, _flow, _waves);
             if (_runDecisionBinding != null) _runDecisionBinding.Initialize(_flow, _waves);

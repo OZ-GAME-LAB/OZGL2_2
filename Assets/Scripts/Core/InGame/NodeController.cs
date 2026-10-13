@@ -54,7 +54,7 @@ namespace Game.Core
     public sealed class NodeController 
     {
         public const int WavesPerQuarter = 5;
-        public const int MainQuarters = 3;
+        public const int MainQuarters = 4;
         
         private readonly WaveSODictionary _catalog;
         private readonly Random _random;

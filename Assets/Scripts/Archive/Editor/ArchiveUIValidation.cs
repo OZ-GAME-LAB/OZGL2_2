@@ -178,7 +178,6 @@ namespace Game.Archive.Editor
                 Check(Text(lockedUpgradeSlot, "_title") == "?" && !Button(lockedUpgradeSlot).interactable,
                     "unbuilt upgrade explains the path while remaining locked");
 
-                scroll.verticalNormalizedPosition = .37f;
                 ClickSlot(view, Relations(view).Single(slot => Text(slot, "_title") == ally.UnitName));
                 Check(unitDetail.gameObject.activeSelf && ((GameObject)Get(view, "_teamControls")).activeSelf,
                     "produced unit link changes category and team");
@@ -186,10 +185,7 @@ namespace Game.Archive.Editor
                     Relations(view).Any(slot => Text(slot, "_title") == "?" && !Button(slot).interactable) &&
                     Relations(view).All(slot => Text(slot, "_title") != disabledProducer.DisplayName),
                     "reverse producers include multiple buildings, lock unbuilt ones, and exclude disabled spawn modules");
-                ClickNavigation(view, "_backButton");
-                Check(buildingDetail.SelectionId == "archive:" + primary.BuildingId &&
-                    Mathf.Abs(scroll.verticalNormalizedPosition - .37f) < .01f,
-                    "back restores category, selection, and prior list scroll");
+                ClickSlot(view, Relations(view).Single(slot => Text(slot, "_title") == primary.DisplayName));
                 ClickSlot(view, Relations(view).Single(slot => Text(slot, "_title") == knownUpgrade.DisplayName));
                 Check(Relations(view).Any(slot => Text(slot, "_title") == primary.DisplayName) &&
                     Relations(view).Any(slot => Text(slot, "_title") == previous2.DisplayName), "upgrade reverse graph retains multiple parents");
@@ -217,8 +213,7 @@ namespace Game.Archive.Editor
                 Close(manager, view);
                 Check(Mathf.Approximately(Time.timeScale, 1.5f), "close restores the captured speed");
                 Open(manager, view, 2f);
-                Check(Text(unitDetail, "_nameText") == knownEnemy.UnitName &&
-                    !((UnityEngine.UI.Button)Get(view, "_backButton")).interactable, "reopen preserves selection and clears history");
+                Check(Text(unitDetail, "_nameText") == knownEnemy.UnitName, "reopen preserves selection");
                 Close(manager, view);
                 Check(Mathf.Approximately(Time.timeScale, 2f), "reopen restores its own captured speed");
 
