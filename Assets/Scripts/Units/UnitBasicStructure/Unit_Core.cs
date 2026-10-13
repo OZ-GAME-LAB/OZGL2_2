@@ -1,4 +1,4 @@
-﻿using Units.UnitDatas;
+using Units.UnitDatas;
 using System;
 using System.Collections.Generic;
 using Units.Effects;
@@ -422,6 +422,11 @@ namespace Units
                 return;
 
             _movement.MoveTo(targetPosition);
+        }
+
+        public void MoveToRally(Vector2 targetPosition, bool isViaPoint = false)
+        {
+            _movement?.MoveToRally(targetPosition, isViaPoint);
         }
 
         public void UpdateMovementDestination(Vector2 targetPosition)
@@ -994,7 +999,7 @@ namespace Units
             _heroPhase?.PausePhase();
             _ai?.PauseAI();
 
-            _movement?.Stop();
+            _movement?.PauseMovement();
 
             _combat?.Pause();
 
@@ -1008,7 +1013,10 @@ namespace Units
 
             _passive?.Resume();
 
-            _ai?.StartAI();
+            _movement?.ResumeMovement();
+
+            if (_gateway == null || !_gateway.IsRallyMoving)
+                _ai?.StartAI();
         }
 
 

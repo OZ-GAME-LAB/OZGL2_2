@@ -34,6 +34,21 @@ namespace Units
 
 
         // ============================================================
+        // Rally Settings
+        // ============================================================
+
+        [SerializeField, Min(0.1f)]
+        private float _rallyStuckDelay = 3f;
+
+        [SerializeField, Min(0.1f)]
+        private float _rallyFailureDelay = 8f;
+
+        // 경유점은 통과 판정만 넓히고 최종 집결 자리의 도착 정밀도는 유지한다.
+        [SerializeField, Min(0.01f)]
+        private float _rallyViaArrivalDistance = 1f;
+
+
+        // ============================================================
         // Hold Settings
         // ============================================================
 
@@ -130,6 +145,19 @@ namespace Units
 
         private bool _isMoving;
 
+        // 재시도 중에도 최단 거리와 무진전 시간을 유지하여 제자리 흔들림을 제외한다.
+        private bool _isRallyMovement;
+
+        private bool _isRallyViaMovement;
+
+        private bool _isMovementPaused;
+
+        private float _rallyNoProgressTime;
+
+        private float _rallyAttemptTime;
+
+        private float _rallyRetryRemaining;
+
 
         // ============================================================
         // Hold Runtime State
@@ -213,6 +241,8 @@ namespace Units
                 false;
 
 
+            _isMovementPaused = false;
+
             Stop();
         }
 
@@ -221,13 +251,20 @@ namespace Units
         // Unity Lifecycle
         // ============================================================
 
+        private void OnDisable()
+        {
+            Stop();
+
+            _isMovementPaused = false;
+        }
+
         private void FixedUpdate()
         {
             if (_rigidbody == null)
                 return;
 
 
-            if (_isMovementBlocked)
+            if (_isMovementBlocked || _isMovementPaused)
             {
                 if (_rigidbody.linearVelocity !=
                     Vector2.zero)
@@ -262,11 +299,35 @@ namespace Units
         public void MoveTo(
             Vector2 targetPosition)
         {
+            _isRallyMovement = false;
+
+            _isRallyViaMovement = false;
+
+            BeginMovement(targetPosition);
+        }
+
+        public void MoveToRally(Vector2 targetPosition, bool isViaPoint = false)
+        {
+            _isRallyMovement = true;
+
+            _isRallyViaMovement = isViaPoint;
+
+            _rallyNoProgressTime = 0f;
+
+            _rallyAttemptTime = 0f;
+
+            _rallyRetryRemaining = 0f;
+
+            BeginMovement(targetPosition);
+        }
+
+        private void BeginMovement(Vector2 targetPosition)
+        {
             if (_rigidbody == null)
                 return;
 
 
-            if (!CanMove)
+            if (!CanMove && !_isRallyMovement)
                 return;
 
 
@@ -302,8 +363,35 @@ namespace Units
             _targetPosition = targetPosition;
         }
 
+        public void PauseMovement()
+        {
+            _isMovementPaused = true;
+
+            // Rally 경로와 정체 누적값은 일시 정지 동안 보존한다.
+            if (!_isRallyMovement)
+                Stop();
+
+            if (_rigidbody != null)
+                _rigidbody.linearVelocity = Vector2.zero;
+        }
+
+        public void ResumeMovement()
+        {
+            _isMovementPaused = false;
+        }
+
         public void Stop()
         {
+            _isRallyMovement = false;
+
+            _isRallyViaMovement = false;
+
+            _rallyNoProgressTime = 0f;
+
+            _rallyAttemptTime = 0f;
+
+            _rallyRetryRemaining = 0f;
+
             _core?.PlayAnimation_Idle();
             _isMoving =
                 false;
@@ -343,6 +431,15 @@ namespace Units
             if (!isBlocked)
                 return;
 
+            // 이동 제한은 통행 실패가 아니다. 해제 후 같은 Rally 구간을 재개한다.
+            if (_isRallyMovement)
+            {
+                if (_rigidbody != null)
+                    _rigidbody.linearVelocity = Vector2.zero;
+
+                return;
+            }
+
 
             Stop();
         }
@@ -373,7 +470,9 @@ namespace Units
             if (distance
                 <= Mathf.Max(
                     0.01f,
-                    _arrivalDistance
+                    _isRallyViaMovement
+                        ? Mathf.Max(_arrivalDistance, _rallyViaArrivalDistance)
+                        : _arrivalDistance
                 ))
             {
                 Stop();
@@ -403,6 +502,15 @@ namespace Units
             if (!_isMoving)
                 return;
 
+            if (_isRallyMovement && _rallyRetryRemaining > 0f)
+            {
+                _rigidbody.linearVelocity = Vector2.zero;
+
+                _core.PlayAnimation_Idle();
+
+                return;
+            }
+
 
             // 속도를 덮어쓰지 않고 제한된 힘으로 접근하여
             // 가벼운 접촉 중에도 상대를 조금 밀며 진입한다.
@@ -430,6 +538,10 @@ namespace Units
             if (!CanMove)
                 return;
 
+
+            _isRallyMovement = false;
+
+            _isRallyViaMovement = false;
 
             _isMoving =
                 false;
@@ -1287,6 +1399,13 @@ namespace Units
         private void CheckProgress(
             float distance)
         {
+            if (_isRallyMovement)
+            {
+                CheckRallyProgress(distance, Time.fixedDeltaTime);
+
+                return;
+            }
+
             float threshold =
                 Mathf.Max(
                     0.01f,
@@ -1330,6 +1449,64 @@ namespace Units
             Stop();
 
             _core?.NotifyMovementFailed();
+        }
+
+
+        // ============================================================
+        // Rally Stuck Detection
+        // ============================================================
+
+        private void CheckRallyProgress(float distance, float deltaTime)
+        {
+            float threshold = Mathf.Max(0.01f, _stuckDistanceThreshold);
+
+            if (distance <= _moveBestDistance - threshold)
+            {
+                _moveBestDistance = distance;
+
+                _rallyNoProgressTime = 0f;
+
+                _rallyAttemptTime = 0f;
+
+                _rallyRetryRemaining = 0f;
+
+                return;
+            }
+
+            _rallyNoProgressTime += deltaTime;
+
+            float stuckDelay = Mathf.Max(0.1f, _rallyStuckDelay);
+
+            if (_rallyNoProgressTime >= Mathf.Max(stuckDelay, _rallyFailureDelay))
+            {
+                Stop();
+
+                _core?.NotifyMovementFailed();
+
+                return;
+            }
+
+            if (_rallyRetryRemaining > 0f)
+            {
+                _rallyRetryRemaining = Mathf.Max(0f, _rallyRetryRemaining - deltaTime);
+
+                return;
+            }
+
+            _rallyAttemptTime += deltaTime;
+
+            if (_rallyAttemptTime < stuckDelay)
+                return;
+
+            _rallyAttemptTime = 0f;
+
+            _rallyRetryRemaining = Random.Range(0.5f, 1f);
+
+            // 같은 목적지를 유지하고 회피 방향만 다시 선택한다.
+            // MoveTo를 재호출하면 무진전 누적값이 초기화되므로 호출하지 않는다.
+            _steeringSide = 0f;
+
+            _steeringSideUntil = 0f;
         }
 
 
