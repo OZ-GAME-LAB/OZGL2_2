@@ -85,7 +85,7 @@ namespace Game.UI
             Refresh();
         }
 
-        private void HandleWaveChanged(WaveChangedInfo info)
+        private void HandleWaveChanged(WaveInfo info)
         {
             Refresh();
         }

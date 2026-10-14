@@ -4,7 +4,7 @@ using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
 
-public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunCurrencyRewards
+public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpender, IRunCurrencyRewards, ISaveDataProvider<RunCurrencySaveData>
 {
     public event Action<CurrencyData, int, int> BalanceChanged;
 
@@ -15,6 +15,18 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
     // 보상 UI 표시용 : BattlePreparing에서 확정한 현재 웨이브의 지급 예정 재화량
     public int CurrentGoldReward { get; private set; }
     public int CurrentGemReward { get; private set; }
+
+    /// <summary>지정한 전투에서 이미 지급한 재화만 조회한다. 준비 예정 보상은 반환하지 않는다.</summary>
+    public bool TryGetAppliedWaveReward(int quarter, int wave, out int gold, out int gems)
+    {
+        gold = 0;
+        gems = 0;
+        if (!IsInitialized || !_waveRewardApplied || _preparedRewards == null ||
+            _preparedQuarter != quarter || _preparedWave != wave) return false;
+        gold = CurrentGoldReward;
+        gems = CurrentGemReward;
+        return true;
+    }
 
     [SerializeField] private CurrencyCatalog _currencyCatalog;
     [SerializeField] private WaveRewardTable _waveRewardTable;
@@ -324,19 +336,6 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
                 }
                 break;
 
-            case GamePhase.Reward:
-                // 같은 웨이브의 Reward 재진입 시 중복 지급 방지
-                if (_waveRewardApplied)
-                {
-                    return;
-                }
-
-                if (!TryApplyWaveReward())
-                {
-                    Debug.LogError("[Economy/RunCurrencyManager] 준비된 웨이브 보상 지급에 실패했습니다.", this);
-                }
-                break;
-
             case GamePhase.None:
             case GamePhase.Finished:
                 ClearWaveReward();
@@ -605,5 +604,80 @@ public class RunCurrencyManager : MonoBehaviour, ICurrencyReader, ICurrencySpend
         }
 
         return true;
+    }
+
+    public RunCurrencySaveData CaptureSaveData()
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("런 재화 초기화 및 거래 완료 후 저장하세요.");
+        var data = new RunCurrencySaveData {
+            HasPreparedReward = _preparedRewards != null, PreparedQuarter = _preparedQuarter,
+            PreparedWave = _preparedWave, WaveRewardApplied = _waveRewardApplied
+        };
+        foreach (var balance in _wallet.Balances)
+            data.Balances.Add(new RunCurrencySaveEntry { Type = balance.Key.Type, Amount = balance.Value });
+        if (_preparedRewards != null)
+            foreach (var reward in _preparedRewards)
+                data.PreparedRewards.Add(new RunCurrencySaveEntry { Type = reward.Currency.Type, Amount = reward.Amount });
+        return data;
+    }
+
+    public void RestoreSaveData(RunCurrencySaveData data)
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("런 재화 초기화 및 거래 완료 후 복원하세요.");
+        if (data == null || data.Balances == null || data.PreparedRewards == null)
+            throw new ArgumentException("런 재화 저장 데이터가 없습니다.");
+        var wallet = new CurrencyWallet(CurrencyLifetime.Run);
+        if (!TryRegisterRunCurrencies(wallet)) throw new InvalidOperationException("런 재화 카탈로그를 확인하세요.");
+        var seen = new HashSet<CurrencyType>();
+        foreach (var entry in data.Balances)
+        {
+            CurrencyData currency = ResolveSavedCurrency(entry, seen);
+            if (!wallet.TrySetBalance(currency, entry.Amount)) throw new ArgumentException("런 재화 잔액 복원 실패");
+        }
+        if (seen.Count != wallet.Balances.Count) throw new ArgumentException("저장 데이터에 런 재화 잔액이 누락되었습니다.");
+        if (data.HasPreparedReward)
+        {
+            if (data.PreparedQuarter < 1 || data.PreparedWave < 1 || data.PreparedWave > WaveController.MAX_WAVE)
+                throw new ArgumentException("저장된 보상 웨이브가 올바르지 않습니다.");
+        }
+        else if (data.WaveRewardApplied || data.PreparedQuarter != 0 || data.PreparedWave != 0 || data.PreparedRewards.Count != 0)
+            throw new ArgumentException("준비되지 않은 웨이브 보상 데이터입니다.");
+        seen.Clear();
+        var rewards = new List<CurrencyAmount>();
+        int gold = 0, gem = 0;
+        foreach (var entry in data.PreparedRewards)
+        {
+            CurrencyData currency = ResolveSavedCurrency(entry, seen);
+            rewards.Add(new CurrencyAmount(currency, entry.Amount));
+            if (entry.Type == CurrencyType.Gold) gold = entry.Amount;
+            if (entry.Type == CurrencyType.Gem) gem = entry.Amount;
+        }
+        var previous = _wallet;
+        _isTrading = true;
+        try
+        {
+            _wallet = wallet;
+            _preparedRewards = data.HasPreparedReward ? rewards.ToArray() : null;
+            _preparedQuarter = data.PreparedQuarter;
+            _preparedWave = data.PreparedWave;
+            _waveRewardApplied = data.WaveRewardApplied;
+            CurrentGoldReward = gold;
+            CurrentGemReward = gem;
+            foreach (var balance in wallet.Balances)
+            {
+                int before = previous.GetBalance(balance.Key);
+                if (before != balance.Value) BalanceChanged?.Invoke(balance.Key, before, balance.Value);
+            }
+        }
+        finally { _isTrading = false; }
+    }
+
+    private CurrencyData ResolveSavedCurrency(RunCurrencySaveEntry entry, HashSet<CurrencyType> seen)
+    {
+        if (entry == null || entry.Amount < 0 || !seen.Add(entry.Type) ||
+            !_currencyCatalog.TryGetByType(entry.Type, out var currency) || currency.Lifetime != CurrencyLifetime.Run ||
+            !_wallet.Balances.ContainsKey(currency))
+            throw new ArgumentException("저장 재화의 종류·잔액·중복을 확인하세요.");
+        return currency;
     }
 }

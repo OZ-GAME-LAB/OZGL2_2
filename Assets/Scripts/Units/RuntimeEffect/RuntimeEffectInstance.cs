@@ -1,8 +1,8 @@
-﻿using UnityEngine;
+using System.Collections.Generic;
+using UnityEngine;
 
 
-
-namespace Units
+namespace Units.Effects
 {
     public class RuntimeEffectInstance
     {
@@ -10,35 +10,126 @@ namespace Units
         // Data
         // ============================================================
 
-        public EffectData Data { get; }
+        private CombatEventMetadata _metadata;
 
-        public Unit_Gateway Source { get; }
+        public CombatEventMetadata Metadata => _metadata;
 
-        public Unit_Gateway Target { get; }
+        private static long _nextOrder;
+
+        public long AppliedOrder { get; } = System.Threading.Interlocked.Increment(ref _nextOrder);
+
+        internal void MergeLineage(CombatEventMetadata incoming)
+        {
+            _metadata = _metadata.WithAdditionalAttack(incoming.IsAdditionalAttack);
+        }
+
+        internal void ConsumeStacks(int count)
+        {
+            _stackCount = Mathf.Max(0, _stackCount - count);
+        }
+
+        private readonly EffectData _data;
+
+        public EffectDefinitionSnapshot Definition { get; }
+
+        public object OwnershipKey { get; }
+
+        private readonly ICombatTarget _source;
+
+        private readonly ICombatTarget _target;
+
+        private readonly int _sourceLifetimeVersion;
+
+        private readonly int _targetLifetimeVersion;
 
 
         // ============================================================
-        // Runtime
+        // Runtime Data
         // ============================================================
 
-        public int StackCount { get; private set; }
+        private int _stackCount;
 
-        public float AppliedTime { get; private set; }
+        private readonly float _appliedTime;
 
-        public float ExpireTime { get; private set; }
+        private float _expireTime;
+
+        private float _nextTickTime;
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        public bool IsInfinite =>
-            Data.DurationType == EffectDurationType.Infinite;
+        public EffectData Data => _data;
+
+        public ICombatTarget Source => _source;
+
+        public ICombatTarget Target => _target;
+
+        public int SourceLifetimeVersion => _sourceLifetimeVersion;
+
+        public int TargetLifetimeVersion => _targetLifetimeVersion;
+
+        public int StackCount => _stackCount;
+
+        public float AppliedTime => _appliedTime;
+
+        public float ExpireTime => _expireTime;
+
+        public float NextTickTime => _nextTickTime;
+
+        public bool IsInfinite => Definition.DurationType == EffectDurationType.Infinite;
+
+        public bool HasPeriodicTick => _nextTickTime > 0f;
+
+
+        // ============================================================
+        // Constructor
+        // ============================================================
+
+        public RuntimeEffectInstance(
+            EffectData data,
+            ICombatTarget source,
+            ICombatTarget target,
+            float currentTime,
+            CombatEventMetadata metadata = default,
+            EffectDefinitionSnapshot definition = null, object ownershipKey = null)
+        {
+            OwnershipKey = ownershipKey;
+            Definition = definition ?? new EffectDefinitionSnapshot(data);
+
+            _metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(source);
+
+            _data = data;
+
+            _source = source;
+
+            _target = target;
+
+            _sourceLifetimeVersion = _metadata.Owner.LifetimeVersion;
+
+            _targetLifetimeVersion = target != null ? target.LifetimeVersion : 0;
+
+            _stackCount = 1;
+
+            _appliedTime = currentTime;
+
+            InitializeDuration(currentTime);
+
+            InitializePeriodic(currentTime);
+        }
+
+
+        // ============================================================
+        // Duration
+        // ============================================================
 
         public bool IsExpired(float currentTime)
         {
-            return !IsInfinite &&
-                   currentTime >= ExpireTime;
+            if (IsInfinite)
+                return false;
+
+            return currentTime >= _expireTime;
         }
 
         public float GetRemainingDuration(float currentTime)
@@ -46,42 +137,120 @@ namespace Units
             if (IsInfinite)
                 return float.PositiveInfinity;
 
-            return Mathf.Max(
-                0f,
-                ExpireTime - currentTime
-            );
+            return Mathf.Max(0f, _expireTime - currentTime);
         }
 
-        // ============================================================
-        // Management
-        // ============================================================
-
-        public void Refresh(float currentTime)
+        public void RefreshDuration(float currentTime)
         {
             if (IsInfinite)
                 return;
 
-            ExpireTime =
-                currentTime + Data.Duration;
+            _expireTime = currentTime + Definition.Duration;
         }
 
-        public void Extend()
+        public void ExtendDuration()
         {
             if (IsInfinite)
                 return;
 
-            ExpireTime +=
-                Data.Duration;
+            _expireTime += Definition.Duration;
         }
+
+
+        // ============================================================
+        // Stack
+        // ============================================================
 
         public bool TryAddStack()
         {
-            if (StackCount >= Data.MaxStack)
+            if (_stackCount >= Definition.MaxStack)
+            {
                 return false;
+            }
 
-            StackCount++;
+            _stackCount++;
 
             return true;
+        }
+
+
+        // ============================================================
+        // Periodic
+        // ============================================================
+
+        public bool CanTick(float currentTime)
+        {
+            if (!HasPeriodicTick)
+                return false;
+
+            return currentTime >= _nextTickTime;
+        }
+
+        public float GetTickProcessUntilTime(float currentTime)
+        {
+            if (IsInfinite)
+                return currentTime;
+
+            return Mathf.Min(currentTime, _expireTime);
+        }
+
+        public void AdvanceTick(float interval)
+        {
+            if (interval <= 0f)
+                return;
+
+            _nextTickTime += interval;
+        }
+
+
+        // ============================================================
+        // Initialize
+        // ============================================================
+
+        private void InitializeDuration(float currentTime)
+        {
+            if (IsInfinite)
+            {
+                _expireTime = float.PositiveInfinity;
+
+                return;
+            }
+
+            _expireTime = currentTime + Definition.Duration;
+        }
+
+        private void InitializePeriodic(float currentTime)
+        {
+            float interval = GetPeriodicInterval();
+
+            if (interval <= 0f)
+            {
+                _nextTickTime = 0f;
+
+                return;
+            }
+
+            _nextTickTime = currentTime + interval;
+        }
+
+        private float GetPeriodicInterval()
+        {
+            IReadOnlyList<EffectActionData> actions = Definition.Actions;
+
+            for (int i = 0; i < actions.Count; i++)
+            {
+                if (actions[i] is PeriodicDamageEffectActionData periodicDamage)
+                {
+                    return periodicDamage.Interval;
+                }
+
+                if (actions[i] is PeriodicHealEffectActionData periodicHeal)
+                {
+                    return periodicHeal.Interval;
+                }
+            }
+
+            return 0f;
         }
     }
 }

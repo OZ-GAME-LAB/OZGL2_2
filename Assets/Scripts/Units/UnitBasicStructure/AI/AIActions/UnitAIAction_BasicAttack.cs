@@ -11,6 +11,8 @@ namespace Units
 
         private readonly Unit_Core _core;
 
+        private bool _started;
+
 
         // ============================================================
         // Properties
@@ -38,8 +40,19 @@ namespace Units
         public void Enter(
             UnitAssignment? assignment)
         {
+            _started =
+                false;
+
+
             if (!assignment.HasValue)
                 return;
+
+
+            if (_core == null
+                || !_core.CanUseBasicAttack)
+            {
+                return;
+            }
 
 
             ICombatTarget target =
@@ -55,16 +68,19 @@ namespace Units
 
             _core.StopMovement();
 
-            _core.TryBasicAttack(
-                target
-            );
+
+            _started =
+                _core.TryBasicAttack(
+                    target
+                );
         }
 
 
         public UnitAIActionType? Evaluate(
             UnitAssignment? assignment)
         {
-            if (!assignment.HasValue)
+            if (!_started
+                || !assignment.HasValue)
             {
                 return UnitAIActionType.Idle;
             }
@@ -83,6 +99,8 @@ namespace Units
 
         public void Exit()
         {
+            _started =
+                false;
         }
 
 

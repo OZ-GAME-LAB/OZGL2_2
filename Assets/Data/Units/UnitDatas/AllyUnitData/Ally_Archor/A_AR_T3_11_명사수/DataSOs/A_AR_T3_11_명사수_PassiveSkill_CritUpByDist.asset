@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "A_AR_T3_11_\uBA85\uC0AC\uC218_PassiveSkill_CritUpByDist"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uC6D0\uAC70\uB9AC \uC870\uC900"
+    _icon: {fileID: 21300000, guid: dcc1e360c6667d74c8d54544840167cf, type: 3}
+    _description: "\uAC70\uB9AC\uAC00 6 \uC774\uC0C1\uC778 \uC801\uC744 \uACF5\uACA9\uD560
+      \uB54C \uCE58\uBA85\uD0C0 \uD655\uB960\uC774 25% \uC99D\uAC00\uD569\uB2C8\uB2E4."
+  _skillSchemaVersion: 1
+  _triggerType: 3
+  _tickInterval: 0.25
+  _conditions:
+  - rid: 4844432426836164611
+  _effectMode: 0
+  _actions:
+  - rid: 4844432426836164612
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432426836164611
+      type: {class: PassiveDistanceConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _minimumDistance: 6
+    - rid: 4844432426836164612
+      type: {class: PassiveCriticalModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _ownerType: 0
+        _modifierType: 0
+        _value: 0.25

@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "A_SW_T3_11_\uD658\uC601\uAC80\uC0AC_PassiveSkill_DmgReduceOnce"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uC0DD\uC874 \uBCF8\uB2A5"
+    _icon: {fileID: 21300000, guid: f96c362917c4e1f4b9245db3b3d23ff4, type: 3}
+    _description: "\uCCB4\uB825\uC774 30% \uC774\uD558\uAC00 \uB418\uBA74 6\uCD08\uAC04
+      \uBC1B\uB294 \uD53C\uD574\uAC00 75% \uAC10\uC18C\uD569\uB2C8\uB2E4. \uC804\uD22C
+      \uC911 1\uD68C \uBC1C\uB3D9\uD569\uB2C8\uB2E4."
+  _skillSchemaVersion: 1
+  _triggerType: 4
+  _tickInterval: 0.25
+  _conditions:
+  - rid: 4617381517528662027
+  _effectMode: 2
+  _actions:
+  - rid: 4617381517528662029
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381517528662027
+      type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _subjectType: 0
+        _comparisonType: 1
+        _healthRatio: 0.3
+    - rid: 4617381517528662029
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 0
+        _targetRelation: 2
+        _maxEffectTargetCount: 1
+        _areaType: 0
+        _areaRadius: 1
+        _areaAngle: 90
+        _effects:
+        - rid: 4617381517528662030
+    - rid: 4617381517528662030
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _applicationFX:
+        - _key: VFX_OnApply_Buff
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 03d4bca4dde92754ca6bbd33fef5238e, type: 2}
