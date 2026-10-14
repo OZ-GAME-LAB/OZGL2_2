@@ -1,4 +1,4 @@
-// Current date KDH 2026-09-14
+﻿// Current date KDH 2026-09-14
 // 씬에 올라간 건물 실물. SO는 읽기만 하고, 점유/소환 위치/집결지는 이 인스턴스가 가집니다.
 using UnityEngine;
 
@@ -100,17 +100,43 @@ namespace OZGL.KDH
 
         private void CacheRefs()
         {
-            // GetComponent는 여기서 한 번만. Update에서 호출하면 매 프레임 비용이 납니다.
+            // Visual 자식이 있으면 건물 그림은 Visual의 SpriteRenderer로 출력합니다.
+            // 루트에 붙은 SpriteRenderer와 논리적인 건물 위치는 그대로 유지합니다.
+            Transform visual = transform.Find("Visual");
+            if (visual != null)
+            {
+                SpriteRenderer visualRenderer = visual.GetComponent<SpriteRenderer>();
+                if (visualRenderer != null)
+                {
+                    spriteRenderer = visualRenderer;
+                    return;
+                }
+            }
+
+            // 기존 프리팹(Visual 자식이 없는 경우)은 기존 동작을 유지합니다.
             if (spriteRenderer == null)
                 spriteRenderer = GetComponent<SpriteRenderer>();
         }
 
         private void ApplyWorldSprite()
         {
-            if (spriteRenderer == null || data == null || data.WorldSprite == null)
+            if (data == null)
                 return;
 
-            spriteRenderer.sprite = data.WorldSprite;
+            // 건물 데이터의 WorldSprite를 실제 표시용 렌더러에 적용합니다.
+            if (spriteRenderer != null && data.WorldSprite != null)
+                spriteRenderer.sprite = data.WorldSprite;
+
+            // 루트 렌더러는 기존 참조용으로 남기되, Visual이 별도라면 숨깁니다.
+            // 다른 시스템이 루트 SpriteRenderer.sprite를 읽는 경우를 위해 동기화합니다.
+            SpriteRenderer rootRenderer = GetComponent<SpriteRenderer>();
+            if (rootRenderer != null && rootRenderer != spriteRenderer)
+            {
+                if (data.WorldSprite != null)
+                    rootRenderer.sprite = data.WorldSprite;
+
+                rootRenderer.enabled = false;
+            }
         }
 
         private void EnsureFeatureModules()

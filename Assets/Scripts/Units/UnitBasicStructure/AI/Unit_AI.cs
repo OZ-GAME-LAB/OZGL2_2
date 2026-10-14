@@ -63,6 +63,7 @@ namespace Units
         private float _nextTargetReevaluationTime;
 
         private float _nextAssignmentRetryTime;
+        private float _nextWaitingPositionRetryTime;
         private const float AssignmentRetryInterval = 0.5f;
 
 
@@ -312,21 +313,27 @@ namespace Units
                 Time.time + _thinkInterval;
 
 
-            if (_pendingSkillTargetReevaluation)
+            // Do not replace the target/assignment during an attack or skill execution.
+            if (_core.IsCombatBusy) return;
+            if ((_pendingSkillTargetReevaluation || Time.time >= _nextTargetReevaluationTime)
+                && HasAssignment)
             {
-                _pendingSkillTargetReevaluation =
-                    false;
-
-                if (!ValidateCurrentAssignment())
-                    return;
-
+                _pendingSkillTargetReevaluation = false;
+                _nextTargetReevaluationTime = Time.time + Mathf.Max(0.1f, _targetReevaluationInterval);
+                if (!ValidateCurrentAssignment()) return;
                 RequestTargetReevaluation();
-
-                return;
+                if (_core.IsCombatBusy) return;
             }
 
+            // Retry a blocked position independently of the slower target-distribution tick.
+            if (_currentAssignment.HasValue && _currentAssignment.Value.WaitingForPosition
+                && Time.time >= _nextWaitingPositionRetryTime)
+            {
+                _nextWaitingPositionRetryTime = Time.time + 0.15f;
+                _core.RequestPositionAssignment();
+                if (_core.IsCombatBusy) return;
+            }
 
-            if (_core.IsCombatBusy) return;
             if (_core.TrySelectActiveSkill(CurrentTarget, out _))
             { ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!ValidateCurrentAssignment()) return;
@@ -652,23 +659,9 @@ namespace Units
 
         public void NotifyTargetReevaluation()
         {
-            if (!_isRunning)
-                return;
-
-
-            if (Time.time <
-                _nextTargetReevaluationTime)
-            {
-                return;
-            }
-
-
-            _nextTargetReevaluationTime =
-                Time.time
-                + _targetReevaluationInterval;
-
-
-            RequestTargetReevaluation();
+            // UpdateThinking owns throttling and the execution-safe boundary.
+            if (_isRunning && Time.time >= _nextTargetReevaluationTime)
+                _pendingSkillTargetReevaluation = true;
         }
 
 
@@ -686,6 +679,10 @@ namespace Units
                 true;
 
             _nextAssignmentRetryTime = 0f;
+            _nextWaitingPositionRetryTime = Time.time + 0.15f;
+            _nextTargetReevaluationTime = Time.time
+                + Mathf.Max(0.1f, _targetReevaluationInterval)
+                    * (0.5f + (GetInstanceID() & 255) / 510f);
 
             _nextThinkTime =
                 0f;

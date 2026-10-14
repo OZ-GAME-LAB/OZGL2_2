@@ -142,6 +142,11 @@ namespace Units
         public Unit_GroupAI AdvanceReference
             => _advanceReference;
 
+        private IReadOnlyList<Unit_GroupAI> _engagementAllies;
+        internal IReadOnlyList<Unit_GroupAI> EngagementAllies => _engagementAllies;
+        internal void SetEngagementAllies(IReadOnlyList<Unit_GroupAI> groups)
+            => _engagementAllies = groups;
+
         public IReadOnlyList<Unit_GroupAI> EnemyGroups
             => _enemyGroups;
 
@@ -703,6 +708,7 @@ namespace Units
 
         public void ClearEnemyGroups()
         {
+            _engagementAllies = null;
             _enemyGroupController.Clear();
 
 
@@ -892,13 +898,10 @@ namespace Units
             }
 
 
-            if (_targetSelector.TryReevaluateTarget(
-                unit))
-            {
-                // Target이 변경되었으므로
-                // 기존 Target을 기준으로 만들어진 Position과 Assignment는 무효다.
-                context.ClearPosition();
-            }
+            bool changed = _targetSelector.TryReevaluateTarget(unit);
+            if (!changed && context.HasAssignment && !context.WaitingForPosition)
+                return;
+            if (changed) context.ClearPosition();
 
             if (!_positionAssigner.TryAssignPosition(
                 unit))

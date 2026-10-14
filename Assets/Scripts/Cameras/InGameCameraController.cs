@@ -268,7 +268,7 @@ namespace Game.Cameras
             if (_phase == GamePhase.BattlePreparing)
             {
                 UpdateBattlePreparation(
-                    Time.unscaledDeltaTime);
+                    Time.deltaTime);
 
                 return;
             }

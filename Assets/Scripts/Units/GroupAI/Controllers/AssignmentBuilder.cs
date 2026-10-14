@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 
 
@@ -61,7 +61,8 @@ namespace Units
                 new UnitAssignment(
                     context.AssignedTarget,
                     context.AssignedPosition.Value,
-                    context.PositionTolerance
+                    context.PositionTolerance,
+                    context.WaitingForPosition
                 );
 
 

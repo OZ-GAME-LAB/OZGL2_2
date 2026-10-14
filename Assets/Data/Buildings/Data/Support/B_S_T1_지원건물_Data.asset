@@ -19,7 +19,7 @@ MonoBehaviour:
     \uC788\uB294 \uC5F0\uAD6C\uB97C \uC9C4\uD589\uD558\uB294 \uAC74\uBB3C"
   buildingType: 3
   icon: {fileID: 21300000, guid: 880c56ca234a476ea3eaeb7fe36044bf, type: 3}
-  worldSprite: {fileID: 21300000, guid: 880c56ca234a476ea3eaeb7fe36044bf, type: 3}
+  worldSprite: {fileID: 21300000, guid: e3e136723abcbcb43a9d39ff9dd2a2ae, type: 3}
   prefab: {fileID: 2582411243664127221, guid: c8503ff11c494a65b6043fd210223079, type: 3}
   buildCost:
   - type: 0
@@ -43,6 +43,8 @@ MonoBehaviour:
     enabled: 0
     targetClass: 1
     effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: f408ee67df96f1c47ade325eedce076f, type: 2}
     cost:
