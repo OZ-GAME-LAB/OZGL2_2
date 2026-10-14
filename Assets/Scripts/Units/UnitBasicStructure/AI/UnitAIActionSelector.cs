@@ -12,6 +12,9 @@ namespace Units
 
         private readonly Unit_Core _core;
 
+        private ICombatTarget _rangeTarget;
+        private float _rangeExitGraceUntil;
+
 
         // ============================================================
         // Constructor
@@ -39,14 +42,14 @@ namespace Units
                 return UnitAIActionType.ActiveSkill;
             if (!IsTargetValid(assignment.Target)) return UnitAIActionType.Idle;
             float distance = GetDistanceToTarget(assignment.Target);
-
-            // 접근을 시작했으면 사거리 안쪽까지 이동하여 경계에서의 반복 정지를 막는다.
-            // 공격 판정 자체의 사거리는 변경하지 않는다.
-            if (approaching && _core.CanMove
-                && Vector2.Distance(_core.transform.position, assignment.Target.Transform.position)
-                    > CombatRangeUtility.PreferredCenterDistance(_core.CombatTarget,
-                        assignment.Target, _core.PreferredCombatRange) + 0.001f)
-                return UnitAIActionType.Move;
+            var basicAttack = _core.RuntimeStatus?.BasicAttackData;
+            if (!ReferenceEquals(_rangeTarget, assignment.Target))
+            {
+                _rangeTarget = assignment.Target;
+                _rangeExitGraceUntil = 0f;
+            }
+            if (basicAttack != null && distance <= basicAttack.BasicAttackRange)
+                _rangeExitGraceUntil = Time.time + 0.2f;
 
             if (CanUseBasicAttack(
                 distance))
@@ -54,6 +57,16 @@ namespace Units
                 return UnitAIActionType.BasicAttack;
             }
 
+
+            // Cooldown is not a reason to push farther into a formation.
+            if (basicAttack != null && distance <= basicAttack.BasicAttackRange)
+                return UnitAIActionType.Idle;
+            // Briefly tolerate boundary motion without extending the attack hit range.
+            if (!approaching && !_core.CanUseBasicAttack && basicAttack != null && Time.time < _rangeExitGraceUntil
+                && distance <= basicAttack.BasicAttackRange + 0.1f)
+                return UnitAIActionType.Idle;
+            if (assignment.WaitingForPosition)
+                return UnitAIActionType.Idle;
 
             if (ShouldMove(
                 distance))

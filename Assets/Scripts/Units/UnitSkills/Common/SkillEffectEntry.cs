@@ -286,7 +286,7 @@ namespace Units.Skills
         private FXAttachment _attachment;
 
         [SerializeField, Tooltip("위치 추적과 별도로 대상의 방향 변화를 반영합니다.")]
-        private bool _followDirection;
+        private bool _followDirection = true;
 
         [SerializeField] private SkillFXScaleMode _scaleMode;
         [SerializeField] private Vector2 _scaleMultiplier = Vector2.one;
@@ -319,8 +319,7 @@ namespace Units.Skills
                 : operation == SkillFXOperation.Hit ? FXAttachment.Target
                 : operation == SkillFXOperation.Cast || operation == SkillFXOperation.Dash ? FXAttachment.Owner
                 : FXAttachment.World;
-            _followDirection = operation == SkillFXOperation.ProjectileFlight || operation == SkillFXOperation.Dash
-                || operation == SkillFXOperation.Hit;
+            _followDirection = true;
             _endPolicy = operation == SkillFXOperation.ProjectileFlight ? SkillFXEndPolicy.ClearImmediately
                 : operation == SkillFXOperation.Cast || operation == SkillFXOperation.Dash ? SkillFXEndPolicy.StopEmission
                 : SkillFXEndPolicy.Independent;
@@ -334,7 +333,7 @@ namespace Units.Skills
             _endPolicy = endPolicy;
             _kind = kind;
             _attachment = attachment ?? (hook == SkillFXHook.OnHit ? FXAttachment.Target : FXAttachment.World);
-            _followDirection = followDirection ?? hook == SkillFXHook.OnHit;
+            _followDirection = followDirection ?? true;
         }
 
         public string Key => _key;

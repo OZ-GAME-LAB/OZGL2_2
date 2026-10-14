@@ -11,10 +11,11 @@ namespace Units
         [SerializeField, Min(0f)] private float _maxJoinDistance = 6f;
         [SerializeField, Min(0f)] private float _maxCombinedExtent = 15f;
         [SerializeField, Min(2)] private int _maxCombinedGroups = 10;
+        [SerializeField, Min(0f)] private float _closeContactGap = 1f;
 
         public bool Allows(
             IReadOnlyList<Unit_GroupAI> first,
-            IReadOnlyList<Unit_GroupAI> second)
+            IReadOnlyList<Unit_GroupAI> second, bool closeContact = false)
         {
             if (first == null || second == null || first.Count == 0 || second.Count == 0)
                 return false;
@@ -30,6 +31,8 @@ namespace Units
                 || (max - min).sqrMagnitude > Mathf.Max(0f, _maxCombinedExtent) * Mathf.Max(0f, _maxCombinedExtent))
                 return false;
 
+            if (closeContact) return true;
+
             float maxDistance = Mathf.Max(0f, _maxJoinDistance);
             for (int i = 0; i < first.Count; i++)
             {
@@ -41,6 +44,19 @@ namespace Units
                 }
             }
 
+            return false;
+        }
+
+        // Body-to-body distance, not the potentially distant group centers.
+        public bool HasCloseContact(Unit_GroupAI first, Unit_GroupAI second)
+        {
+            if (first == null || second == null || first.Team == second.Team) return false;
+            foreach (var a in first.Members)
+                foreach (var b in second.Members)
+                    if (a != null && b != null && a.IsTargetable && b.IsTargetable
+                        && Vector2.Distance(a.Transform.position, b.Transform.position)
+                            <= a.BodyRadius + b.BodyRadius + Mathf.Max(0f, _closeContactGap))
+                        return true;
             return false;
         }
 

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -100,17 +100,17 @@ namespace Units
             if (allyEngaged
                 && enemyEngaged)
             {
-                return ReferenceEquals(
-                    allyContext,
-                    enemyContext
-                );
+                if (ReferenceEquals(allyContext, enemyContext)) return true;
+                if (!_expansionPolicy.HasCloseContact(allyGroup, enemyGroup)) return false;
+                return TryExpandForSkill(allyGroup, enemyGroup) == SkillEngagementResult.Expanded;
             }
 
 
-            // 탐지만으로 기존 교전끼리 병합하지 않는다. 신규 그룹 합류에도 같은 상한을 적용한다.
+            // 가까운 실제 접촉은 중심 거리 제한만 완화한다. 전체 범위/그룹 상한은 유지한다.
             if (!_expansionPolicy.Allows(
                 GetParticipants(allyContext, allyGroup),
-                GetParticipants(enemyContext, enemyGroup)))
+                GetParticipants(enemyContext, enemyGroup),
+                _expansionPolicy.HasCloseContact(allyGroup, enemyGroup)))
                 return false;
 
             if (allyEngaged)
@@ -152,7 +152,8 @@ namespace Units
             List<Unit_GroupAI> targetGroups = GetParticipants(target, targetGroup);
             if (!AreRegistered(sourceGroups) || !AreRegistered(targetGroups))
                 return SkillEngagementResult.Invalid;
-            if (!_expansionPolicy.Allows(sourceGroups, targetGroups))
+            if (!_expansionPolicy.Allows(sourceGroups, targetGroups,
+                _expansionPolicy.HasCloseContact(sourceGroup, targetGroup)))
                 return SkillEngagementResult.Denied;
 
             if (source != null && target != null)
@@ -504,6 +505,7 @@ namespace Units
                 if (allyGroup == null)
                     continue;
 
+                allyGroup.SetEngagementAllies(allyGroups);
                 allyGroup.SetEnemyGroups(
                     enemyGroups,
                     false
@@ -521,6 +523,7 @@ namespace Units
                 if (enemyGroup == null)
                     continue;
 
+                enemyGroup.SetEngagementAllies(enemyGroups);
                 enemyGroup.SetEnemyGroups(
                     allyGroups,
                     false

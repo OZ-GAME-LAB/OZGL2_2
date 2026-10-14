@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 
 
@@ -15,6 +15,8 @@ namespace Units
         public Vector2? AssignedPosition { get; private set; }
 
         public float PositionTolerance { get; private set; }
+
+        public bool WaitingForPosition { get; private set; }
 
         public UnitAssignment? Assignment { get; private set; }
 
@@ -44,6 +46,7 @@ namespace Units
 
             AssignedTarget = target;
 
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
@@ -51,8 +54,9 @@ namespace Units
 
         public void SetPosition(
             Vector2 position,
-            float positionTolerance)
+            float positionTolerance, bool waitingForPosition = false)
         {
+            WaitingForPosition = waitingForPosition;
             AssignedPosition = position;
             PositionTolerance = Mathf.Max(0f, positionTolerance);
 
@@ -67,6 +71,7 @@ namespace Units
         public void ClearTarget()
         {
             AssignedTarget = null;
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
@@ -74,6 +79,7 @@ namespace Units
 
         public void ClearPosition()
         {
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
@@ -87,6 +93,7 @@ namespace Units
         public void Clear()
         {
             AssignedTarget = null;
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
