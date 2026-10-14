@@ -85,7 +85,7 @@ MonoBehaviour:
           _clusterRadius: 1.5
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -128,7 +128,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Dash_OnHit
@@ -137,7 +137,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Ally_ActiveOnHit_Melee

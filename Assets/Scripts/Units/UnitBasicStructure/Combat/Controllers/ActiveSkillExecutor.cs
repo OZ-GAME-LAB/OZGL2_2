@@ -568,7 +568,18 @@ namespace Units
             }
 
             // 이미 타격한 대상의 사망은 남은 공격 동작을 취소하지 않는다.
-            return run.AttackHolding || EnsureTarget(run);
+            if (run.AttackHolding) return true;
+
+            // 후속 공격이 재탐색을 담당한다. 선행 동작 중에는 대상을 바꾸지 않는다.
+            // Cast는 남은 시간을 마치고, Dash는 기존 타겟 상실 종료 처리로 끝낸다.
+            if (run.Entered && run.Index + 1 < run.Actions.Count
+                && (run.Actions[run.Index] is SkillCastActionData
+                    || run.Actions[run.Index] is SkillDashActionData)
+                && run.Actions[run.Index + 1] is SkillAttackActionData nextAttack
+                && nextAttack.TargetLostPolicy == SkillTargetLostPolicy.Reselect)
+                return true;
+
+            return EnsureTarget(run);
         }
 
         private void CompleteDelayed(

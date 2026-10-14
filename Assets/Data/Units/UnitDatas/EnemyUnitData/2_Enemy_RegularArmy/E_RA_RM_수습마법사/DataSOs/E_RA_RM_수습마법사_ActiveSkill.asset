@@ -113,7 +113,7 @@ MonoBehaviour:
           _filters: []
           _priorities:
           - _policy: 2
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -180,7 +180,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveExplosion_Electric
@@ -189,7 +189,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_ActiveOnHit_Electric
