@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using UnityEngine;
+using System.Collections.Generic;
 
 
 namespace Units
@@ -27,7 +28,7 @@ namespace Units
         private float _arrivalDistance = 0.15f;
 
         [SerializeField]
-        private float _stuckDistanceThreshold = 1f;
+        private float _stuckDistanceThreshold = 0.2f;
 
         [SerializeField]
         private float _stuckTimeLimit = 1f;
@@ -82,6 +83,14 @@ namespace Units
 
         [SerializeField]
         private float _environmentCheckDistance = 0.5f;
+
+        // 장애물 외곽을 따라갈 때 몸체와 벽 사이에 확보할 여유 거리다.
+        [SerializeField, Min(0.02f)]
+        private float _wallClearance = 0.15f;
+
+        private Collider2D _followObstacle;
+        private float _wallSide;
+        private readonly List<Vector2> _wallVisited = new List<Vector2>();
 
 
         // ============================================================
@@ -153,6 +162,19 @@ namespace Units
 
         private bool _isMoving;
 
+        // 재시도 중에도 최단 거리와 무진전 시간을 유지하여 제자리 흔들림을 제외한다.
+        private bool _isRallyMovement;
+
+        private bool _isRallyViaMovement;
+
+        private bool _isMovementPaused;
+
+        private float _rallyNoProgressTime;
+
+        private float _rallyAttemptTime;
+
+        private float _rallyRetryRemaining;
+
 
         // ============================================================
         // Hold Runtime State
@@ -187,6 +209,13 @@ namespace Units
 
 
         // ============================================================
+        // Restriction Runtime State
+        // ============================================================
+
+        private bool _isMovementBlocked;
+
+
+        // ============================================================
         // Properties
         // ============================================================
 
@@ -195,6 +224,9 @@ namespace Units
 
         public bool IsHoldingPosition
             => _isHoldingPosition;
+
+        public bool CanMove
+            => !_isMovementBlocked;
 
 
         // ============================================================
@@ -222,6 +254,12 @@ namespace Units
             }
 
 
+            _isMovementBlocked =
+                false;
+
+
+            _isMovementPaused = false;
+
             Stop();
         }
 
@@ -230,15 +268,39 @@ namespace Units
         // Unity Lifecycle
         // ============================================================
 
+        private void OnDisable()
+        {
+            Stop();
+
+            _isMovementPaused = false;
+        }
+
         private void FixedUpdate()
         {
             if (_rigidbody == null)
                 return;
 
 
+            if (_isMovementBlocked || _isMovementPaused)
+            {
+                if (_rigidbody.linearVelocity !=
+                    Vector2.zero)
+                {
+                    _rigidbody.linearVelocity =
+                        Vector2.zero;
+                }
+
+                return;
+            }
+
+
             if (_isMoving)
             {
                 UpdateMovement();
+
+                // 목적지 이동의 실제 속도를 사용한다. 자리 유지 보정은 시선을 바꾸지 않는다.
+                if (_isMoving)
+                    _core?.SetMovementFacingDirection(_rigidbody.linearVelocity);
             }
             else if (_isHoldingPosition)
             {
@@ -254,11 +316,41 @@ namespace Units
         public void MoveTo(
             Vector2 targetPosition)
         {
+            _isRallyMovement = false;
+
+            _isRallyViaMovement = false;
+
+            BeginMovement(targetPosition);
+        }
+
+        public void MoveToRally(Vector2 targetPosition, bool isViaPoint = false)
+        {
+            _isRallyMovement = true;
+
+            _isRallyViaMovement = isViaPoint;
+
+            _rallyNoProgressTime = 0f;
+
+            _rallyAttemptTime = 0f;
+
+            _rallyRetryRemaining = 0f;
+
+            BeginMovement(targetPosition);
+        }
+
+        private void BeginMovement(Vector2 targetPosition)
+        {
             if (_rigidbody == null)
                 return;
 
 
+            if (!CanMove && !_isRallyMovement)
+                return;
+
+
             ReleasePosition();
+
+            ResetWallFollowing();
 
 
             _targetPosition =
@@ -272,8 +364,55 @@ namespace Units
         }
 
 
+        /// <summary>추적 목적지만 갱신하고 속도, 회피 방향과 정체 감시는 유지한다.</summary>
+        public void UpdateDestination(Vector2 targetPosition)
+        {
+            if (_rigidbody == null || !CanMove) return;
+            if (!_isMoving)
+            {
+                MoveTo(targetPosition);
+                return;
+            }
+
+            // 목적지가 움직인 거리는 유닛 자신의 전진/후퇴로 계산하지 않는다.
+            // 진행 시간을 초기화하면 움직이는 대상을 쫓다 막힌 상태를 영원히 감지하지 못한다.
+            float previousDistance = Vector2.Distance(_rigidbody.position, _targetPosition);
+            float nextDistance = Vector2.Distance(_rigidbody.position, targetPosition);
+            _moveBestDistance += nextDistance - previousDistance;
+            _targetPosition = targetPosition;
+        }
+
+        public void PauseMovement()
+        {
+            _isMovementPaused = true;
+
+            // Rally 경로와 정체 누적값은 일시 정지 동안 보존한다.
+            if (!_isRallyMovement)
+                Stop();
+
+            if (_rigidbody != null)
+                _rigidbody.linearVelocity = Vector2.zero;
+        }
+
+        public void ResumeMovement()
+        {
+            _isMovementPaused = false;
+        }
+
         public void Stop()
         {
+            ResetWallFollowing();
+            _isRallyMovement = false;
+
+            _isRallyViaMovement = false;
+
+            _rallyNoProgressTime = 0f;
+
+            _rallyAttemptTime = 0f;
+
+            _rallyRetryRemaining = 0f;
+
+            _core?.PlayAnimation_Idle();
             _isMoving =
                 false;
 
@@ -288,6 +427,41 @@ namespace Units
                 _rigidbody.linearVelocity =
                     Vector2.zero;
             }
+        }
+
+
+        // ============================================================
+        // Movement Restriction
+        // ============================================================
+
+        public void SetMovementBlocked(
+            bool isBlocked)
+        {
+            if (_isMovementBlocked ==
+                isBlocked)
+            {
+                return;
+            }
+
+
+            _isMovementBlocked =
+                isBlocked;
+
+
+            if (!isBlocked)
+                return;
+
+            // 이동 제한은 통행 실패가 아니다. 해제 후 같은 Rally 구간을 재개한다.
+            if (_isRallyMovement)
+            {
+                if (_rigidbody != null)
+                    _rigidbody.linearVelocity = Vector2.zero;
+
+                return;
+            }
+
+
+            Stop();
         }
 
 
@@ -316,13 +490,9 @@ namespace Units
             if (distance
                 <= Mathf.Max(
                     0.01f,
-<<<<<<< HEAD
                     _isRallyViaMovement
                         ? Mathf.Max(_arrivalDistance, _rallyViaArrivalDistance)
                         : _isRallyMovement ? _rallyArrivalDistance : _arrivalDistance
-=======
-                    _arrivalDistance
->>>>>>> origin/dev
                 ))
             {
                 Stop();
@@ -337,7 +507,7 @@ namespace Units
                 Mathf.Min(
                     Mathf.Max(
                         0f,
-                        _core.RuntimeStatus.MoveSpeed
+                        _isRallyMovement ? _rallyMoveSpeed : _core.RuntimeStatus.MoveSpeed
                     ),
                     distance
                     / Time.fixedDeltaTime
@@ -351,6 +521,15 @@ namespace Units
 
             if (!_isMoving)
                 return;
+
+            if (_isRallyMovement && _rallyRetryRemaining > 0f)
+            {
+                _rigidbody.linearVelocity = Vector2.zero;
+
+                _core.PlayAnimation_Idle();
+
+                return;
+            }
 
 
             // 속도를 덮어쓰지 않고 제한된 힘으로 접근하여
@@ -376,6 +555,15 @@ namespace Units
                 return;
 
 
+            if (!CanMove)
+                return;
+
+            ResetWallFollowing();
+
+            _isRallyMovement = false;
+
+            _isRallyViaMovement = false;
+
             _isMoving =
                 false;
 
@@ -396,6 +584,10 @@ namespace Units
 
         public void ReleasePosition()
         {
+            ResetWallFollowing();
+            if (!_isMoving)
+                _core?.PlayAnimation_Idle();
+
             _isHoldingPosition =
                 false;
 
@@ -482,7 +674,7 @@ namespace Units
 
             // 이전보다 Hold 위치에 가까워졌다면
             // 정상적으로 복귀가 진행되고 있는 것으로 판단한다.
-            if (distance
+            if (HasWallProgress() || distance
                 < _holdBestDistance - 0.05f)
             {
                 ResetHoldProgress();
@@ -580,6 +772,11 @@ namespace Units
         private void ApplyHoldVelocity(
             Vector2 targetVelocity)
         {
+            if (targetVelocity.sqrMagnitude > 0.0001f)
+                _core?.PlayAnimation_Move();
+            else
+                _core?.PlayAnimation_Idle();
+
             Vector2 acceleration =
                 Vector2.ClampMagnitude(
                     (
@@ -617,6 +814,8 @@ namespace Units
                 return Vector2.zero;
             }
 
+            desired = FollowEnvironment(desired, speed);
+
 
             GatherNeighbours(
                 speed
@@ -650,6 +849,7 @@ namespace Units
             {
                 _steeringSideUntil =
                     0f;
+
 
                 return desired
                     * speed
@@ -779,6 +979,8 @@ namespace Units
             ref float bestAngle,
             ref float bestRisk)
         {
+            // 외곽 추종 중에는 유닛 회피 후보도 진행 방향을 뒤집지 않도록 제한한다.
+            if (_followObstacle != null && Mathf.Abs(angle) > 60f) return;
             float radians =
                 angle
                 * Mathf.Deg2Rad;
@@ -992,8 +1194,8 @@ namespace Units
 
 
             for (int i = 0;
-                i < _neighbourCount;
-                i++)
+                 i < _neighbourCount;
+                 i++)
             {
                 Collider2D other =
                     _neighbours[i];
@@ -1215,6 +1417,96 @@ namespace Units
                 > 0;
         }
 
+        // ============================================================
+        // Environment Following
+        // ============================================================
+
+        private bool CastEnvironment(Vector2 direction, float distance, out RaycastHit2D nearest)
+        {
+            nearest = default;
+            if (_collider == null || _environmentMask.value == 0) return false;
+            var filter = new ContactFilter2D();
+            filter.SetLayerMask(_environmentMask);
+            filter.useTriggers = false;
+            int count = _collider.Cast(direction, filter, _environmentHits, distance);
+            float best = float.PositiveInfinity;
+            for (int i = 0; i < count; i++)
+            {
+                var hit = _environmentHits[i];
+                if (hit.collider == null || hit.collider == _collider || hit.distance >= best) continue;
+                best = hit.distance;
+                nearest = hit;
+            }
+            return nearest.collider != null;
+        }
+
+        private Vector2 FollowEnvironment(Vector2 desired, float speed)
+        {
+            Vector2 position = _rigidbody.position;
+            Vector2 target = _isMoving ? _targetPosition : _holdPosition;
+            float distance = Vector2.Distance(position, target);
+            float lookAhead = Mathf.Max(_environmentCheckDistance, speed * Time.fixedDeltaTime + _wallClearance);
+            bool blocked = CastEnvironment(desired, lookAhead, out var hit);
+            if (_followObstacle == null || !_followObstacle.enabled || !_followObstacle.gameObject.activeInHierarchy)
+            {
+                _followObstacle = null;
+                if (!blocked) return desired;
+                _followObstacle = hit.collider;
+                Vector2 tangent = new Vector2(-hit.normal.y, hit.normal.x);
+                // 목표 방향과 잘 맞는 쪽을 우선하며 실제로 막힌 쪽은 선택하지 않는다.
+                _wallSide = Vector2.Dot(tangent, desired) >= 0f ? 1f : -1f;
+                if (CastEnvironment(tangent * _wallSide, lookAhead, out _) &&
+                    !CastEnvironment(-tangent * _wallSide, lookAhead, out _)) _wallSide = -_wallSide;
+                if (_wallVisited.Count == 0) _wallVisited.Add(position);
+            }
+
+            // 목적지까지의 전체 직선이 아니라 당장 전진할 구간만 검사한다.
+            // 진입 검사보다 조금 긴 여유 구간을 확보해 모서리에서 상태가 반복 전환되지 않게 한다.
+            float forwardDistance = Mathf.Min(distance, lookAhead + _wallClearance);
+            if (!CastEnvironment(desired, forwardDistance, out _))
+            {
+                _followObstacle = null;
+                return desired;
+            }
+
+            Vector2 normal = position - _followObstacle.ClosestPoint(position);
+            if (normal.sqrMagnitude < 0.0001f) normal = blocked ? hit.normal : -desired;
+            normal.Normalize();
+            Vector2 along = new Vector2(-normal.y, normal.x) * _wallSide;
+            // 연결된 건물로 접촉 대상이 바뀌어도 우회 방향과 방문 기록은 보존한다.
+            if (CastEnvironment(along, lookAhead, out var next) && next.collider != _followObstacle)
+            {
+                _followObstacle = next.collider;
+                normal = next.normal;
+                along = new Vector2(-normal.y, normal.x) * _wallSide;
+            }
+            float radius = Mathf.Abs(normal.x) * _collider.bounds.extents.x +
+                Mathf.Abs(normal.y) * _collider.bounds.extents.y;
+            float gap = Vector2.Distance(position, _followObstacle.ClosestPoint(position)) - radius;
+            float correction = Mathf.Clamp((_wallClearance - gap) * 2f, -0.75f, 0.75f);
+            return (along + normal * correction).normalized;
+        }
+
+        private bool HasWallProgress()
+        {
+            if (_followObstacle == null || _rigidbody == null || _wallVisited.Count >= 2048) return false;
+            Vector2 position = _rigidbody.position;
+            float step = Mathf.Max(0.25f, _stuckDistanceThreshold);
+            // 같은 공간을 왕복하거나 한 바퀴 도는 움직임은 새 진전으로 인정하지 않는다.
+            foreach (Vector2 visited in _wallVisited)
+                if ((position - visited).sqrMagnitude < step * step) return false;
+            _wallVisited.Add(position);
+            _moveProgressTime = Time.time;
+            return true;
+        }
+
+        private void ResetWallFollowing()
+        {
+            _followObstacle = null;
+            _wallSide = 0f;
+            _wallVisited.Clear();
+        }
+
 
         // ============================================================
         // Stuck Detection
@@ -1223,6 +1515,13 @@ namespace Units
         private void CheckProgress(
             float distance)
         {
+            if (_isRallyMovement)
+            {
+                CheckRallyProgress(distance, Time.fixedDeltaTime);
+
+                return;
+            }
+
             float threshold =
                 Mathf.Max(
                     0.01f,
@@ -1232,12 +1531,12 @@ namespace Units
 
             // 마지막으로 인정한 거리보다 충분히 가까워졌을 때만
             // 실제 이동 진전이 있었다고 판단한다.
-            if (distance
+            if (HasWallProgress() || distance
                 <= _moveBestDistance
                 - threshold)
             {
                 _moveBestDistance =
-                    distance;
+                    Mathf.Min(_moveBestDistance, distance);
 
                 _moveProgressTime =
                     Time.time;
@@ -1266,6 +1565,67 @@ namespace Units
             Stop();
 
             _core?.NotifyMovementFailed();
+        }
+
+
+        // ============================================================
+        // Rally Stuck Detection
+        // ============================================================
+
+        private void CheckRallyProgress(float distance, float deltaTime)
+        {
+            float threshold = Mathf.Max(0.01f, _stuckDistanceThreshold);
+
+            if (HasWallProgress() || distance <= _moveBestDistance - threshold)
+            {
+                _moveBestDistance = Mathf.Min(_moveBestDistance, distance);
+
+                _moveProgressTime = Time.time;
+
+                _rallyNoProgressTime = 0f;
+
+                _rallyAttemptTime = 0f;
+
+                _rallyRetryRemaining = 0f;
+
+                return;
+            }
+
+            _rallyNoProgressTime += deltaTime;
+
+            float stuckDelay = Mathf.Max(0.1f, _rallyStuckDelay);
+
+            if (_rallyNoProgressTime >= Mathf.Max(stuckDelay, _rallyFailureDelay))
+            {
+                Stop();
+
+                _core?.NotifyMovementFailed();
+
+                return;
+            }
+
+            if (_rallyRetryRemaining > 0f)
+            {
+                _rallyRetryRemaining = Mathf.Max(0f, _rallyRetryRemaining - deltaTime);
+
+                return;
+            }
+
+            _rallyAttemptTime += deltaTime;
+
+            if (_rallyAttemptTime < stuckDelay)
+                return;
+
+            _rallyAttemptTime = 0f;
+
+            _rallyRetryRemaining = Random.Range(0.5f, 1f);
+
+            // 같은 목적지를 유지하고 회피 방향만 다시 선택한다.
+            // MoveTo를 재호출하면 무진전 누적값이 초기화되므로 호출하지 않는다.
+            // 정체 재시도는 유닛 회피만 초기화한다. 장애물 우회 방향은 계속 유지한다.
+            _steeringSide = 0f;
+
+            _steeringSideUntil = 0f;
         }
 
 

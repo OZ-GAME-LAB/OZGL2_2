@@ -2,78 +2,119 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Game.Core;
 using UnityEngine;
 
-// 상점 품목을 보관하고 재화·아티팩트 매니저에 거래 요청
-public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
+// 상점 품목을 보관하고 재화·아티팩트·소모성 아이템 매니저에 거래 요청
+public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, ISaveDataProvider<ShopSaveData>
 {
-    public bool IsInitialized => _selector != null && _artifactManager != null &&
-        _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized;
+    public bool IsInitialized => _gameFlowController != null && _selector != null && _artifactManager != null &&
+        _artifactManager.IsInitialized && _runCurrencyManager != null && _runCurrencyManager.IsInitialized &&
+        (!HasConsumableSales || (_consumables != null && _consumables.IsInitialized));
     public bool HasStock { get; private set; }
     public IReadOnlyList<ShopArtifactSlot> PurchaseSlots => _purchaseSlots;
     public IReadOnlyList<ShopArtifactExchangeSlot> ExchangeSlots => _exchangeSlots;
+    public IReadOnlyList<ShopConsumableSlot> ConsumableSlots => _consumableSlots;
     public event Action ShopChanged;
 
     [SerializeField] private ShopTable _shopTable;
 
     private ArtifactManager _artifactManager;
+    private GameFlowController _gameFlowController;
+    private int _stockQuarter;
     private RunCurrencyManager _runCurrencyManager;
     private ShopArtifactSelector _selector;
+    private ConsumableItemManager _consumables;
+    private ShopConsumableSelector _consumableSelector;
+    private List<ShopConsumableSlot> _consumableSlots = new List<ShopConsumableSlot>();
+    private bool HasConsumableSales => _shopTable != null && _shopTable.ShopConsumableTable != null &&
+        _shopTable.ShopConsumableTable.SlotCount > 0;
     private List<ShopArtifactSlot> _purchaseSlots = new List<ShopArtifactSlot>();
     private List<ShopArtifactExchangeSlot> _exchangeSlots = new List<ShopArtifactExchangeSlot>();
     private bool _isTrading;
+    private IShopUI _shopUI;
+    private bool _isOpen;
+    private CancellationTokenSource _openCancellation;
 
-    // 두 매니저 초기화 후 호출. 품목 생성은 TryGenerateStock에서 별도로 처리
-    public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager)
+
+    // 판매에 사용하는 매니저 초기화 후 호출. 소모성 판매 설정이 있으면 소모성 매니저도 필요
+    public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager,
+        GameFlowController gameFlowController, ConsumableItemManager consumableItemManager = null, IShopUI shopUI = null)
     {
         if (_isTrading || IsInitialized)
         {
             return;
         }
 
-        if (_shopTable == null || artifactManager == null || !artifactManager.IsInitialized ||
+        if (gameFlowController == null || _shopTable == null || artifactManager == null || !artifactManager.IsInitialized ||
             artifactManager.ArtifactCatalog == null || runCurrencyManager == null || !runCurrencyManager.IsInitialized)
         {
-            Debug.LogError("[Shop/ShopManager] ShopTable 및 초기화된 아티팩트·Run 재화 매니저 연결 필요", this);
+            Debug.LogError("[Shop/ShopManager] GameFlowController, ShopTable 및 초기화된 아티팩트·Run 재화 매니저 연결 필요", this);
+            return;
+        }
+
+        if (HasConsumableSales && (consumableItemManager == null || !consumableItemManager.IsInitialized ||
+            consumableItemManager.Catalog == null))
+        {
+            Debug.LogError("[Shop/ShopManager] 소모성 판매에 사용할 초기화된 ConsumableItemManager 연결 필요", this);
             return;
         }
 
         _artifactManager = artifactManager;
+        _gameFlowController = gameFlowController;
+        _consumables = consumableItemManager;
+        _consumableSelector = new ShopConsumableSelector(
+            _consumables != null ? _consumables.Catalog : null, _shopTable);
         _runCurrencyManager = runCurrencyManager;
+        _shopUI = shopUI;
         _selector = new ShopArtifactSelector(artifactManager.ArtifactCatalog, artifactManager, _shopTable);
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
+        _consumableSlots.Clear();
         HasStock = false;
+        _stockQuarter = 0;
     }
 
-    // 게임 플로우에서 호출 : 상점 UI를 열고 종료 버튼을 누를 때까지 대기 (UI 연결 예정)
-    public UniTask OpenShopAsync(CancellationToken token)
+    // 게임 플로우에서 호출 : 상점 UI를 열고 나가기 버튼을 누를 때까지 대기.
+    public async UniTask OpenShopAsync(CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if (_isOpen) throw new InvalidOperationException("상점이 이미 열려 있습니다.");
+        if (_shopUI == null) throw new InvalidOperationException("상점 UI를 먼저 연결해주세요.");
 
         if (!IsInitialized || _isTrading)
         {
-            Debug.LogWarning("[Shop/ShopManager] 초기화 및 거래 처리 완료 후 상점을 열어주세요.", this);
-            return UniTask.CompletedTask;
+            throw new InvalidOperationException("초기화 및 거래 처리 완료 후 상점을 열어주세요.");
         }
 
-        if (!HasStock && !TryGenerateStock())
+        int currentQuarter = _gameFlowController.CurrentQuarter;
+        if (currentQuarter < 1)
+            throw new InvalidOperationException("분기 시작 후 상점을 열어주세요.");
+
+        // 분기 정보가 없는 이전 저장 데이터는 첫 진입 분기에 귀속시켜 기존 구매 상태를 유지합니다.
+        if (HasStock && _stockQuarter == 0) _stockQuarter = currentQuarter;
+        if ((!HasStock || _stockQuarter != currentQuarter) && !TryGenerateStock())
         {
-            Debug.LogError("[Shop/ShopManager] 상점 품목 생성에 실패했습니다.", this);
-            return UniTask.CompletedTask;
+            throw new InvalidOperationException("상점 품목 생성에 실패했습니다.");
         }
 
-        // UI 연결 시 async UniTask로 변경
-        // UI에 이 ShopManager를 전달하여 목록 조회 및 구매·판매·교환 요청 연결
-        // 상점 UI Open 및 Close 버튼 대기를 한 함수로 제공받는 경우의 예시
-        // await _shopUI.OpenAndWaitForCloseAsync(this, token);
-        // token.ThrowIfCancellationRequested();
-        // UI 연결 시 중복 Open 요청 방지 및 Run 종료·취소 시 UI 닫기와 대기 상태 정리 필요
-        // UI를 열어둔 동안에는 구매·판매가 가능해야 하므로 _isTrading으로 대기 잠금 X
-
-        // UI Close 이후 완료. 현재는 UI 미연결로 즉시 완료
-        return UniTask.CompletedTask;
+        // 화면 대기는 별도 상태로 관리한다. _isTrading으로 잠그면 구매할 수 없다.
+        _isOpen = true;
+        _openCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
+        try
+        {
+            await _shopUI.OpenAndWaitForCloseAsync(this, _openCancellation.Token);
+            _openCancellation.Token.ThrowIfCancellationRequested();
+        }
+        finally
+        {
+            _openCancellation.Dispose();
+            _openCancellation = null;
+            _isOpen = false;
+        }
     }
+
+    private void OnDestroy() => _openCancellation?.Cancel();
 
     // 최초 생성 또는 명시적인 갱신 시 호출. UI를 다시 열 때는 기존 목록 사용
     public bool TryGenerateStock()
@@ -83,20 +124,26 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
         {
             return false;
         }
+        int currentQuarter = _gameFlowController.CurrentQuarter;
+        if (currentQuarter < 1) return false;
 
         // 한쪽 추첨이 실패하면 기존 상점 목록 유지
         if (!_selector.TryCreatePurchaseSlots(out List<ShopArtifactSlot> purchases) ||
-            !_selector.TryCreateExchangeSlots(out List<ShopArtifactExchangeSlot> exchanges))
+            !_selector.TryCreateExchangeSlots(out List<ShopArtifactExchangeSlot> exchanges) ||
+            _consumableSelector == null ||
+            !_consumableSelector.TryCreatePurchaseSlots(out List<ShopConsumableSlot> consumables))
         {
             return false;
         }
 
         _purchaseSlots = purchases;
         _exchangeSlots = exchanges;
+        _consumableSlots = consumables;
         HasStock = true;
+        _stockQuarter = currentQuarter;
         _isTrading = true;
-        ShopChanged?.Invoke();
-        _isTrading = false;
+        try { ShopChanged?.Invoke(); }
+        finally { _isTrading = false; }
         return true;
     }
 
@@ -122,6 +169,34 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
             return true;
         });
 
+        if (succeeded)
+        {
+            ShopChanged?.Invoke();
+        }
+        _isTrading = false;
+        return succeeded;
+    }
+
+    // 공간 부족은 구매 실패. 지급 실패 시 TryApplyTrade에서 잔액 복원
+    public bool TryPurchaseConsumable(ShopConsumableSlot slot)
+    {
+        if (!IsInitialized || _isTrading || _consumables == null || !_consumables.IsInitialized ||
+            !_consumables.HasEmptySlot || slot == null || !_consumableSlots.Contains(slot) ||
+            slot.IsPurchased || slot.Price < 0 || !_runCurrencyManager.CanSpend(slot.Currency, slot.Price))
+        {
+            return false;
+        }
+
+        _isTrading = true;
+        bool succeeded = _runCurrencyManager.TryApplyTrade(slot.Currency, -slot.Price, () =>
+        {
+            if (!_consumables.TryAdd(slot.Item))
+            {
+                return false;
+            }
+            slot.MarkPurchased();
+            return true;
+        });
         if (succeeded)
         {
             ShopChanged?.Invoke();
@@ -219,15 +294,96 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader
             return false;
         }
 
+        _openCancellation?.Cancel();
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
         _selector = null;
+        _consumableSlots.Clear();
+        _consumableSelector = null;
+        _consumables = null;
         _artifactManager = null;
         _runCurrencyManager = null;
+        _gameFlowController = null;
         HasStock = false;
+        _stockQuarter = 0;
         _isTrading = true;
         ShopChanged?.Invoke();
         _isTrading = false;
         return true;
+    }
+
+    public ShopSaveData CaptureSaveData()
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("상점 초기화 및 거래 완료 후 저장하세요.");
+        var data = new ShopSaveData { HasStock = HasStock, StockQuarter = _stockQuarter };
+        foreach (var slot in _purchaseSlots)
+            data.Artifacts.Add(new ShopPurchaseSaveEntry { ItemId = slot.Artifact.Id, Currency = slot.Currency, Price = slot.Price, Purchased = slot.IsPurchased });
+        foreach (var slot in _consumableSlots)
+            data.Consumables.Add(new ShopPurchaseSaveEntry { ItemId = slot.Item.Id, Currency = slot.Currency, Price = slot.Price, Purchased = slot.IsPurchased });
+        foreach (var slot in _exchangeSlots)
+            data.Exchanges.Add(new ShopExchangeSaveEntry { ArtifactId = slot.Artifact.Id, Exchanged = slot.IsExchanged });
+        return data;
+    }
+
+    public void RestoreSaveData(ShopSaveData data)
+    {
+        if (!IsInitialized || _isTrading) throw new InvalidOperationException("상점 초기화 및 거래 완료 후 복원하세요.");
+        if (data == null || data.Artifacts == null || data.Consumables == null || data.Exchanges == null)
+            throw new ArgumentException("상점 저장 데이터가 없습니다.");
+        if (data.StockQuarter < 0 || (!data.HasStock && data.StockQuarter != 0))
+            throw new ArgumentException("저장된 상점 분기 정보를 확인하세요.");
+        if (!data.HasStock && (data.Artifacts.Count != 0 || data.Consumables.Count != 0 || data.Exchanges.Count != 0))
+            throw new ArgumentException("미생성 상점에 저장 상품이 있습니다.");
+        var artifacts = new List<ShopArtifactSlot>();
+        var consumables = new List<ShopConsumableSlot>();
+        var exchanges = new List<ShopArtifactExchangeSlot>();
+        var seen = new HashSet<string>();
+        foreach (var entry in data.Artifacts)
+        {
+            ValidateSavedPurchase(entry, seen);
+            if (!_artifactManager.ArtifactCatalog.TryGetById(entry.ItemId, out var artifact))
+                throw new ArgumentException("상점 아티팩트 ID를 찾을 수 없습니다: " + entry.ItemId);
+            var slot = new ShopArtifactSlot(artifact, entry.Currency, entry.Price);
+            if (entry.Purchased) slot.MarkPurchased();
+            artifacts.Add(slot);
+        }
+        seen.Clear();
+        foreach (var entry in data.Consumables)
+        {
+            ValidateSavedPurchase(entry, seen);
+            if (_consumables == null || _consumables.Catalog == null || !_consumables.Catalog.TryGetById(entry.ItemId, out var item))
+                throw new ArgumentException("상점 소모성 아이템 ID를 찾을 수 없습니다: " + entry.ItemId);
+            var slot = new ShopConsumableSlot(item, entry.Currency, entry.Price);
+            if (entry.Purchased) slot.MarkPurchased();
+            consumables.Add(slot);
+        }
+        seen.Clear();
+        foreach (var entry in data.Exchanges)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.ArtifactId) || !seen.Add(entry.ArtifactId) ||
+                !_artifactManager.ArtifactCatalog.TryGetById(entry.ArtifactId, out var artifact))
+                throw new ArgumentException("상점 교환 아티팩트 ID·중복을 확인하세요.");
+            var slot = new ShopArtifactExchangeSlot(artifact);
+            if (entry.Exchanged) slot.MarkExchanged();
+            exchanges.Add(slot);
+        }
+        _isTrading = true;
+        try
+        {
+            _purchaseSlots = artifacts;
+            _consumableSlots = consumables;
+            _exchangeSlots = exchanges;
+            HasStock = data.HasStock;
+            _stockQuarter = data.StockQuarter;
+            ShopChanged?.Invoke();
+        }
+        finally { _isTrading = false; }
+    }
+
+    private void ValidateSavedPurchase(ShopPurchaseSaveEntry entry, HashSet<string> seen)
+    {
+        if (entry == null || string.IsNullOrWhiteSpace(entry.ItemId) || !seen.Add(entry.ItemId) || entry.Price < 0 ||
+            (entry.Currency != CurrencyType.Gold && entry.Currency != CurrencyType.Gem) || !_runCurrencyManager.CanSpend(entry.Currency, 0))
+            throw new ArgumentException("저장 상품의 ID·가격·재화·중복을 확인하세요.");
     }
 }

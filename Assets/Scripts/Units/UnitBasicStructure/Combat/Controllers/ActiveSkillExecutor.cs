@@ -1,129 +1,165 @@
+using System;
 using System.Collections.Generic;
 using Units.Skills;
+using Units.Effects;
 using UnityEngine;
-using System;
-
-
 
 namespace Units
 {
     public class ActiveSkillExecutor
     {
         // ============================================================
-        // Reference
+        // Reference / Data
         // ============================================================
-
         private readonly Unit_Core _core;
 
         private readonly TargetResolver _targetResolver;
 
-
-        // ============================================================
-        // Data
-        // ============================================================
-
         private readonly ActiveSkillData _data;
-
 
         // ============================================================
         // Action Controllers
         // ============================================================
-
-        private readonly CastController _castController = new CastController();
+        private readonly CastController _castController = new();
 
         private readonly DashController _dashController;
-
 
         // ============================================================
         // Runtime State
         // ============================================================
+        private sealed class Execution
+        {
 
-        private Action _onCompleted;
+            public CombatTargetSnapshot Owner, Initial, Current, Previous;
 
-        private ICombatTarget _target;
+            public IReadOnlyList<SkillActionData> Actions;
 
-        private int _executionId;
+            public SkillTargetResult Targets;
 
-        private bool _isExecuting;
-        private Predicate<ICombatTarget> _targetFilter;
+            public SkillEngagementSession Engagement;
 
+            public CombatEventMetadata Metadata;
+
+            public SkillEffectLedger Ledger = new();
+
+            public readonly List<ActionExecutionResult> Results = new();
+
+            public readonly List<ProjectileLaunchResult> Launches = new();
+
+            public readonly List<CombatTargetSnapshot> Hits = new();
+
+            public readonly List<CombatApplicationResult> Applications = new();
+
+            public ActionExecutionResult PreviousResult;
+
+            public Action<SkillExecutionResult> Callback;
+
+            public int Index, Reselections, Successes;
+
+            public bool Waiting, Moved, HitsObserved, Entered, DashStarted;
+
+            // 타격 완료 후에도 액션 동작 시간이 끝날 때까지 다음 액션 진입을 막는다.
+            public bool AttackHolding;
+            public float AttackRemaining;
+            public SkillAttackActionData PendingAttack;
+            public Vector2 Position;
+
+            public SkillEffectBatch Batch;
+        }
+
+        private Execution _execution;
+
+        private bool _pumping;
+
+        public SkillExecutionResult LastResult { get; private set; }
+
+        public event Action<SkillFXRequest> FXRequested;
 
         // ============================================================
-        // Properties
+        // Properties / Constructor
         // ============================================================
-
         public bool IsCasting => _castController.IsCasting;
 
         public bool IsDashing => _dashController.IsDashing;
 
-
-        // ============================================================
-        // Runtime Buffer
-        // ============================================================
-
-        private readonly List<ICombatTarget> _singleTargetBuffer;
-
-        private readonly List<ICombatTarget> _projectileTargetBuffer;
-
-
-        // ============================================================
-        // Constructor
-        // ============================================================
+        public bool IsExecuting => _execution != null;
 
         public ActiveSkillExecutor(
             Unit_Core core,
             ActiveSkillData data,
             TargetResolver targetResolver)
         {
-            _core =
-                core;
+            _core = core;
 
-            _dashController =
-                new DashController(
-                    core
-                );
+            _data = data;
 
-            _data =
-                data;
+            _targetResolver = targetResolver;
 
-            _targetResolver =
-                targetResolver;
-
-
-            _singleTargetBuffer =
-                new List<ICombatTarget>(
-                    1
-                );
-
-
-            _projectileTargetBuffer =
-                new List<ICombatTarget>();
+            _dashController = new DashController(core);
         }
-
 
         // ============================================================
         // Execute
         // ============================================================
-
         public bool CanExecute(ICombatTarget target)
         {
-            if (_core == null || !_core.IsAlive || !_core.isActiveAndEnabled
-                || _core.RuntimeStatus == null || _data == null
-                || !CombatTargetUtility.IsValid(target) || !target.IsTargetable)
+            if (_core == null || !_core.IsAlive || !_core.isActiveAndEnabled || _data == null || _core.RuntimeStatus == null || SkillEffectResolver.Instance == null)
                 return false;
-            if (_data.ActionType != ActiveSkillActionType.Instant
-                && _data.ActionType != ActiveSkillActionType.Cast
-                && _data.ActionType != ActiveSkillActionType.Dash)
+
+            var actions = SkillActionPlan.Create(_data);
+
+            if (actions.Count == 0 || actions[0] == null || !actions[0].IsConfigured)
                 return false;
-            if (_data.ExecutionType != ActiveSkillExecutionType.Direct
-                && _data.ExecutionType != ActiveSkillExecutionType.Projectile)
+
+            var source = actions[0].Target.Source;
+
+            return source == SkillTargetSource.None || source == SkillTargetSource.Self || source == SkillTargetSource.Search || CombatTargetUtility.IsValid(target);
+        }
+
+        public bool TryPreview(ICombatTarget initial, out SkillTargetResult targets)
+        {
+            targets = null;
+            if (!CanExecute(initial)) return false;
+            var preview = new Execution
+            {
+                Owner = new CombatTargetSnapshot(_core.CombatTarget),
+                Initial = new CombatTargetSnapshot(initial),
+                Current = new CombatTargetSnapshot(initial),
+                Engagement = new SkillEngagementSession(null, null),
+                Actions = SkillActionPlan.Create(_data)
+            };
+            var first = preview.Actions[0];
+            if (first.Origin == SkillAreaOrigin.PreviousResult) return false;
+            targets = SelectTargets(preview, first, false, true);
+            return targets.Success;
+        }
+
+        public bool TryPrepare(
+            ICombatTarget initial,
+            SkillEngagementSession engagement,
+            out SkillTargetResult targets)
+        {
+            targets = null;
+
+            if (!CanExecute(initial))
                 return false;
-            if (_data.ActionType == ActiveSkillActionType.Dash
-                && (_data.DashDistance <= 0f || _data.DashSpeed <= 0f))
-                return false;
-            if (_data.ExecutionType == ActiveSkillExecutionType.Projectile && _data.ProjectileSpeed <= 0f)
-                return false;
-            return DamageResolver.Instance != null;
+
+            var preview = new Execution
+            {
+                Owner = new CombatTargetSnapshot(_core.CombatTarget),
+                Initial = new CombatTargetSnapshot(initial),
+                Current = new CombatTargetSnapshot(initial),
+                Engagement = engagement,
+                Actions = SkillActionPlan.Create(_data)
+            };
+
+            targets = SelectTargets(
+                preview,
+                preview.Actions[0],
+                false
+            );
+
+            return targets.Success && preview.Owner.IsTargetable;
         }
 
         public void Execute(
@@ -131,694 +167,1079 @@ namespace Units
             Action onCompleted,
             Predicate<ICombatTarget> targetFilter = null)
         {
-            Cancel();
+            var session = new SkillEngagementSession(_ => SkillEngagementResult.AlreadyEngaged, () => targetFilter ?? (_ => true));
 
-
-            if (!CanExecute(target) || (targetFilter != null && !targetFilter(target)))
+            if (!TryPrepare(
+                target,
+                session,
+                out var prepared
+            ))
             {
                 onCompleted?.Invoke();
 
                 return;
             }
 
-
-            _targetFilter = targetFilter;
-
-            _target =
-                target;
-
-            _onCompleted =
-                onCompleted;
-
-            _isExecuting =
-                true;
-
-
-            switch (_data.ActionType)
-            {
-                case ActiveSkillActionType.Instant:
-
-                    FinishAttack(
-                        target
-                    );
-
-                    break;
-
-
-                case ActiveSkillActionType.Cast:
-
-                    ExecuteCast(
-                        target
-                    );
-
-                    break;
-
-
-                case ActiveSkillActionType.Dash:
-
-                    ExecuteDash(
-                        target
-                    );
-
-                    break;
-
-
-                default:
-
-                    CompleteExecution();
-
-                    break;
-            }
+            Execute(
+                target,
+                _ => onCompleted?.Invoke(),
+                session,
+                prepared
+            );
         }
 
+        public void Execute(
+            ICombatTarget initial,
+            Action<SkillExecutionResult> onCompleted,
+            SkillEngagementSession engagement,
+            SkillTargetResult prepared)
+        {
+            Cancel();
+
+            var root = CombatEventMetadata.Create(_core.CombatTarget);
+
+            var run = new Execution
+            {
+                Owner = new CombatTargetSnapshot(_core.CombatTarget),
+                Initial = new CombatTargetSnapshot(initial),
+                Current = new CombatTargetSnapshot(initial),
+                Actions = SkillActionPlan.Create(_data),
+                Engagement = engagement,
+                Targets = prepared,
+                Callback = onCompleted,
+                Metadata = CombatEventMetadata.Create(
+                    _core.CombatTarget,
+                    root,
+                    executionId: root.EventId,
+                    actionIndex: 0
+                )
+            };
+
+            _execution = run;
+
+            Notify(run, PassiveSkillTriggerType.ActiveSkillStarted);
+
+            Pump();
+        }
+
+        // 동기 Cast(0)/Direct가 연달아 완료되어도 콜백 재귀로 다음 Action을 쌓지 않는다.
+        private void Pump()
+        {
+            if (_pumping)
+                return;
+
+            var run = _execution;
+
+            if (run == null)
+                return;
+
+            _pumping = true;
+
+            try
+            {
+                while (_execution == run && !run.Waiting)
+                {
+                    if (!OwnerValid(run))
+                    {
+                        Finish(
+                            run,
+                            SkillCompletionKind.Interrupted,
+                            "Owner unavailable"
+                        );
+
+                        break;
+                    }
+
+                    if (run.Index >= run.Actions.Count)
+                    {
+                        Finish(
+                            run,
+                            run.Successes > 0 ? SkillCompletionKind.Success : SkillCompletionKind.Failed,
+                            "All actions finished"
+                        );
+
+                        break;
+                    }
+
+                    var action = run.Actions[run.Index];
+
+                    run.Entered = false;
+
+                    run.Reselections = 0;
+
+                    run.Launches.Clear();
+
+                    run.Hits.Clear();
+
+                    run.Applications.Clear();
+
+                    run.HitsObserved = true;
+
+                    run.Metadata = CombatEventMetadata.Create(
+                        run.Owner.Target,
+                        run.Metadata,
+                        executionId: run.Metadata.ExecutionId,
+                        actionIndex: run.Index
+                    );
+
+                    if (action == null || !action.IsConfigured)
+                    {
+                        FailAction(
+                            run,
+                            false,
+                            "Invalid action configuration"
+                        );
+
+                        continue;
+                    }
+
+                    if (action.Origin == SkillAreaOrigin.PreviousResult && (run.PreviousResult == null || !run.PreviousResult.HasPosition))
+                    {
+                        FailAction(
+                            run,
+                            false,
+                            "Previous result position unavailable"
+                        );
+
+                        continue;
+                    }
+
+                    if (run.Index != 0 || run.Targets == null)
+                        run.Targets = SelectTargets(
+                            run,
+                            action,
+                            false
+                        );
+
+                    if (!EnsureTarget(run))
+                        continue;
+
+                    run.Batch = new SkillEffectBatch(
+                        action,
+                        run.Ledger,
+                        run.PreviousResult,
+                        DispatchFX,
+                        () => _execution == run && OwnerValid(run),
+                        run.Engagement.HostileFilter
+                    );
+
+                    run.Position = Origin(run, action);
+
+                    run.Entered = true;
+
+                    FaceActionTarget(run);
+
+                    run.Batch.EventTemplate = Event(run, PassiveSkillTriggerType.ActiveSkillActionHit);
+
+                    Notify(run, PassiveSkillTriggerType.ActiveSkillActionStarted);
+
+                    if (_execution != run || !OwnerValid(run))
+                    {
+                        if (_execution == run)
+                            Finish(
+                                run,
+                                SkillCompletionKind.Interrupted,
+                                "Interrupted at action entry"
+                            );
+
+                        continue;
+                    }
+
+                    // 효과 모션의 시작 FX도 끝 실행 설정이면 실제 타격/발사에 맞춘다.
+                    if (action is not SkillAttackActionData timedAttack || timedAttack.ImpactTiming != AnimationImpactTiming.AnimationEnd)
+                        EmitFX(run, SkillFXHook.OnStart);
+
+                    ApplyTiming(run, SkillEffectTiming.OnStart);
+
+                    if (_execution != run || !OwnerValid(run))
+                    {
+                        if (_execution == run)
+                            Finish(
+                                run,
+                                SkillCompletionKind.Interrupted,
+                                "Interrupted during OnStart"
+                            );
+
+                        continue;
+                    }
+
+                    if (!EnsureTarget(run))
+                        continue;
+
+                    // OnStart 이후 대상을 재선정했다면 실제 실행 대상 쪽으로 갱신한다.
+                    FaceActionTarget(run);
+
+                    run.Waiting = true;
+
+                    int index = run.Index;
+
+                    switch (action)
+                    {
+                        case SkillCastActionData cast:
+                            _core.StopMovement();
+
+                            EmitFX(run, SkillFXHook.Cast);
+
+                            if (_execution != run)
+                                break;
+
+                            _core.PlayAnimation_Cast();
+                            _castController.StartCast(cast.Duration / Mathf.Max(0.01f, _core.RuntimeStatus.AttackSpeed), () => CompleteDelayed(run, index));
+
+                            break;
+
+                        case SkillDashActionData dash:
+                            EmitFX(run, SkillFXHook.Dash);
+
+                            if (_execution != run)
+                                break;
+
+                            // Dash 이동은 별도 컨트롤러가 담당하며 일반 MovementCompleted를 발생시키지 않는다.
+                            run.DashStarted = true;
+
+                            _core.PlayAnimation_Dash();
+                            _dashController.StartDash(
+                                run.Targets.PrimaryTarget.Target,
+                                dash.Distance,
+                                dash.Speed,
+                                () => CompleteDelayed(run, index)
+                            );
+
+                            break;
+
+                        case SkillAttackActionData attack:
+                            float duration = Mathf.Max(0.1f, attack.ExecutionDuration / Mathf.Max(0.01f, _core.RuntimeStatus.AttackSpeed));
+                            // Self 대상 지원 액션은 자가 버프, 나머지는 스킬 공격으로 표시한다.
+                            if (attack.Target.Source == SkillTargetSource.Self
+                                || attack.Target.Relation == SkillTargetRelation.Self)
+                                _core.PlayAnimation_Buff(duration);
+                            else
+                                _core.PlayAnimation_Skill(duration);
+                            if (attack.ImpactTiming == AnimationImpactTiming.AnimationEnd)
+                            {
+                                run.PendingAttack = attack;
+                                run.AttackHolding = true;
+                                run.AttackRemaining = duration;
+                                break;
+                            }
+                            bool success = ExecuteAttack(run, attack);
+
+                            if (_execution != run)
+                                break;
+
+                            if (!OwnerValid(run))
+                                Finish(
+                                    run,
+                                    SkillCompletionKind.Interrupted,
+                                    "Interrupted during impact"
+                                );
+
+                            else if (success)
+                            {
+                                if (duration > 0f)
+                                {
+                                    run.AttackHolding = true;
+                                    run.AttackRemaining = duration;
+                                }
+                                else CompleteAction(run, ActionCompletionKind.Success);
+                            }
+
+                            else
+                                FailAction(
+                                    run,
+                                    false,
+                                    "No valid hit or successful projectile"
+                                );
+
+                            break;
+
+                        default:
+                            FailAction(
+                                run,
+                                false,
+                                "Unsupported action"
+                            );
+
+                            break;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                if (_execution == run)
+                    Finish(
+                        run,
+                        SkillCompletionKind.Failed,
+                        exception.Message
+                    );
+
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                _pumping = false;
+
+                if (_execution != null && _execution != run && !_execution.Waiting)
+                    Pump();
+            }
+        }
 
         // ============================================================
         // Action
         // ============================================================
-
-        public void Tick(
-            float deltaTime)
+        public void Tick(float deltaTime)
         {
-            if (ValidateExecution())
-                _castController.Tick(deltaTime);
+            var run = _execution;
+
+            if (!ValidateExecution(run))
+                return;
+
+            // 새 액션에 같은 프레임의 deltaTime을 다시 적용하지 않는다.
+            if (run.AttackHolding)
+            {
+                run.AttackRemaining -= Mathf.Max(0f, deltaTime);
+                if (run.AttackRemaining <= 0f)
+                {
+                    if (run.PendingAttack != null) ExecutePendingAttack(run);
+                    else CompleteAction(run, ActionCompletionKind.Success);
+                }
+                return;
+            }
+            _castController.Tick(deltaTime);
         }
 
-
-        public void FixedTick(
-            float deltaTime)
+        private void ExecutePendingAttack(Execution run)
         {
-            if (ValidateExecution())
-                _dashController.FixedTick(deltaTime);
+            var attack = run.PendingAttack;
+            int index = run.Index;
+            run.PendingAttack = null; // 효과 콜백의 재진입으로 중복 실행하지 않는다.
+            try
+            {
+                if (!OwnerValid(run) || !EnsureTarget(run)) return;
+                if (_execution != run) return;
+                run.Position = _core.transform.position;
+                FaceActionTarget(run);
+                EmitFX(run, SkillFXHook.OnStart);
+                if (_execution != run || run.Index != index) return;
+                if (!OwnerValid(run))
+                { Finish(run, SkillCompletionKind.Interrupted, "Interrupted before delayed impact"); return; }
+                bool success = ExecuteAttack(run, attack);
+                if (_execution != run) return;
+                if (!OwnerValid(run)) Finish(run, SkillCompletionKind.Interrupted, "Interrupted during delayed impact");
+                else if (success) CompleteAction(run, ActionCompletionKind.Success);
+                else FailAction(run, false, "No valid hit or successful projectile");
+            }
+            catch (Exception exception)
+            {
+                if (_execution == run) Finish(run, SkillCompletionKind.Failed, exception.Message);
+                Debug.LogException(exception);
+            }
         }
 
+        public void FixedTick(float deltaTime)
+        {
+            var run = _execution;
+
+            if (!ValidateExecution(run))
+                return;
+
+            _dashController.FixedTick(deltaTime);
+
+            if (_execution == run)
+                run.Moved |= run.DashStarted && _dashController.HasMoved;
+        }
+
+        private bool OwnerValid(Execution run) => run.Owner.IsTargetable && _core.isActiveAndEnabled && !_core.RuntimeStatus.HasStatus(UnitStatusEffectType.Stun) && !_core.RuntimeStatus.HasStatus(UnitStatusEffectType.Silence);
+
+        private bool ValidateExecution(Execution run)
+        {
+            if (run == null || run != _execution)
+                return false;
+
+            if (!OwnerValid(run))
+            {
+                Finish(
+                    run,
+                    SkillCompletionKind.Interrupted,
+                    "Owner blocked or lifetime changed"
+                );
+
+                return false;
+            }
+
+            // 이미 타격한 대상의 사망은 남은 공격 동작을 취소하지 않는다.
+            return run.AttackHolding || EnsureTarget(run);
+        }
+
+        private void CompleteDelayed(
+            Execution run,
+            int index)
+        {
+            if (_execution != run || run.Index != index || !ValidateExecution(run))
+                return;
+
+            run.Moved |= run.DashStarted && _dashController.HasMoved;
+
+            run.Position = _core.transform.position;
+
+            CompleteAction(run, ActionCompletionKind.Success);
+        }
 
         public void Cancel()
         {
-            _executionId++;
-            _targetFilter = null;
+            if (_execution != null)
+                Finish(
+                    _execution,
+                    SkillCompletionKind.Interrupted,
+                    "Cancelled"
+                );
 
-            _isExecuting =
-                false;
+            else
+            {
+                _castController.Cancel();
 
-            _onCompleted =
-                null;
+                _dashController.Cancel();
+            }
+        }
 
-            _target =
-                null;
+        private void FaceActionTarget(Execution run)
+        {
+            if (_execution != run || !OwnerValid(run))
+                return;
+
+            var target = run.Targets?.PrimaryTarget ?? default;
+
+            if (target.IsTargetable && !ReferenceEquals(target.Target, run.Owner.Target))
+            {
+                _core.SetFacingDirection((Vector2)target.Target.Transform.position - (Vector2)_core.transform.position);
+            }
+        }
+
+
+        private bool EnsureTarget(Execution run)
+        {
+            var action = run.Actions[run.Index];
+
+            if (action == null)
+            {
+                FailAction(
+                    run,
+                    false,
+                    "Missing action"
+                );
+
+                return false;
+            }
+
+            if (action.Target.Source == SkillTargetSource.None)
+                return true;
+
+            var target = run.Targets?.PrimaryTarget ?? default;
+
+            bool valid = target.IsTargetable && (action.Target.Relation != SkillTargetRelation.Hostile || (run.Engagement.HostileFilter != null && run.Engagement.HostileFilter(target.Target)));
+
+            if (valid)
+            {
+                run.Current = target;
+
+                return true;
+            }
+
+            if (action.TargetLostPolicy == SkillTargetLostPolicy.Reselect && run.Reselections++ == 0)
+            {
+                run.Targets = SelectTargets(
+                    run,
+                    action,
+                    true
+                );
+
+                if (run.Targets.Success && run.Targets.PrimaryTarget.IsTargetable)
+                {
+                    run.Current = run.Targets.PrimaryTarget;
+
+                    if (_dashController.IsDashing)
+                        _dashController.Retarget(run.Targets.PrimaryTarget.Target);
+
+                    return true;
+                }
+            }
+
+            FailAction(
+                run,
+                true,
+                "Target lost or engagement denied"
+            );
+
+            return false;
+        }
+
+        private void FailAction(
+            Execution run,
+            bool targetLost,
+            string reason)
+        {
+            if (_execution != run)
+                return;
+
+            var action = run.Index < run.Actions.Count ? run.Actions[run.Index] : null;
+
+            bool skip = targetLost ? action?.TargetLostPolicy == SkillTargetLostPolicy.Skip : action?.FailurePolicy == SkillFailurePolicy.Skip;
+
+            _castController.Cancel();
+
+            run.Moved |= run.DashStarted && _dashController.HasMoved;
+
+            _dashController.Cancel();
+
+            if (skip)
+                CompleteAction(
+                    run,
+                    ActionCompletionKind.Skipped,
+                    reason
+                );
+
+            else
+            {
+                run.Results.Add(Result(run, ActionCompletionKind.Failed, reason));
+
+                Finish(
+                    run,
+                    SkillCompletionKind.Failed,
+                    reason
+                );
+            }
+        }
+
+        private ActionExecutionResult Result(
+            Execution run,
+            ActionCompletionKind kind,
+            string reason = null) => new(
+            kind,
+            run.Index,
+            run.Targets?.PrimaryTarget ?? default,
+            run.Position,
+            run.Entered,
+            run.HitsObserved,
+            run.Hits,
+            run.Applications,
+            reason,
+            run.Launches
+        );
+
+        private void CompleteAction(
+            Execution run,
+            ActionCompletionKind kind,
+            string reason = null)
+        {
+            if (_execution != run)
+                return;
+
+            if (kind == ActionCompletionKind.Success)
+            {
+                ApplyTiming(run, SkillEffectTiming.OnComplete);
+
+                if (_execution != run)
+                    return;
+
+                if (!OwnerValid(run))
+                {
+                    Finish(
+                        run,
+                        SkillCompletionKind.Interrupted,
+                        "Interrupted during OnComplete"
+                    );
+
+                    return;
+                }
+
+                EmitFX(run, SkillFXHook.OnComplete);
+            }
+
+            if (_execution != run)
+                return;
+
+            var result = Result(
+                run,
+                kind,
+                reason
+            );
+
+            run.Results.Add(result);
+
+            if (kind == ActionCompletionKind.Success)
+            {
+                run.Successes++;
+
+                run.Previous = result.Target;
+
+                run.PreviousResult = result;
+
+                Notify(run, PassiveSkillTriggerType.ActiveSkillActionCompleted);
+
+                if (_execution != run)
+                    return;
+            }
+
+            // 실행 시간이 있는 공격도 액션 완료와 동시에 유지 연출을 해제한다.
+            run.PendingAttack = null;
+            run.AttackHolding = false;
+            run.AttackRemaining = 0f;
+            if (run.Owner.MatchesLifetime)
+                _core.StopAnimation_SkillMotion();
+
+            CleanupFX(run);
+
+            run.Waiting = false;
+
+            run.Index++;
+
+            run.Targets = null;
+
+            Pump();
+        }
+
+        private void Finish(
+            Execution run,
+            SkillCompletionKind kind,
+            string reason)
+        {
+            if (_execution != run)
+                return;
+
+            _execution = null; // 정리/이벤트 재진입보다 먼저 이 실행의 진행 소유권을 해제한다.
+            if (run.Owner.MatchesLifetime)
+                _core.StopAnimation_SkillMotion();
+            run.Moved |= run.DashStarted && _dashController.HasMoved;
 
             _castController.Cancel();
 
             _dashController.Cancel();
-        }
 
+            if (kind == SkillCompletionKind.Interrupted && run.Index < run.Actions.Count)
+                run.Results.Add(Result(run, ActionCompletionKind.Interrupted, reason));
 
-        private bool ValidateExecution()
-        {
-            if (!_isExecuting)
-                return false;
-
-
-            if (_core == null || !_core.isActiveAndEnabled || !_core.IsAlive)
+            if (run.Entered)
             {
-                CompleteExecution();
+                if (kind != SkillCompletionKind.Success)
+                    EmitFX(run, kind == SkillCompletionKind.Interrupted ? SkillFXHook.OnInterrupted : SkillFXHook.OnFailed);
 
-                return false;
+                CleanupFX(run);
             }
 
+            LastResult = new SkillExecutionResult(
+                run.Metadata.ExecutionId,
+                kind,
+                run.Moved,
+                run.Results,
+                reason
+            );
 
-            if (!CombatTargetUtility.IsValid(_target)
-                || (_targetFilter != null && !_targetFilter(_target)))
-            {
-                // Target이 무효화되면 지연 공격 없이 현재 행동을 완료한다.
-                CompleteExecution();
+            var finalResult = LastResult;
 
-                return false;
-            }
-
-
-            return true;
-        }
-
-
-        private void FinishAttack(
-            ICombatTarget target)
-        {
-            if (!_isExecuting)
-                return;
-
-
-            int executionId =
-                _executionId;
-
-
-            try
-            {
-                if (_core != null
-                    && _core.IsAlive
-                    && CombatTargetUtility.IsValid(target)
-                    && (_targetFilter == null || _targetFilter(target)))
-                {
-                    ExecuteAttack(
-                        target
-                    );
-                }
-            }
-            finally
-            {
-                if (executionId == _executionId)
-                    CompleteExecution();
-            }
-        }
-
-
-        private void CompleteExecution()
-        {
-            var callback =
-                _onCompleted;
-
-
-            Cancel();
-
-
-            callback?.Invoke();
-        }
-
-
-        private void ExecuteCast(
-            ICombatTarget target)
-        {
-            float attackSpeed =
-                Mathf.Max(
-                    0.01f,
-                    _core.RuntimeStatus.AttackSpeed
+            if (kind == SkillCompletionKind.Success)
+                Notify(
+                    run,
+                    PassiveSkillTriggerType.ActiveSkillCompleted,
+                    kind
                 );
 
+            run.Callback?.Invoke(finalResult);
+        }
 
-            float finalCastTime =
-                _data.CastTime
-                / attackSpeed;
+        // ============================================================
+        // Target / Area
+        // ============================================================
+        private CombatSkillEvent Event(
+            Execution run,
+            PassiveSkillTriggerType type,
+            SkillCompletionKind? completion = null) => new(
+            type,
+            run.Metadata,
+            run.Initial,
+            run.Targets?.PrimaryTarget ?? run.Previous,
+            position: run.Position,
+            completion: completion
+        );
 
+        private void Notify(
+            Execution run,
+            PassiveSkillTriggerType type,
+            SkillCompletionKind? completion = null) => Event(
+            run,
+            type,
+            completion
+        ).Notify();
 
-            _core.StopMovement();
+        private Vector2 Origin(
+            Execution run,
+            SkillActionData action) => action.Origin switch
+        {
+            SkillAreaOrigin.Target => run.Targets != null && run.Targets.PrimaryTarget.IsTargetable ? (Vector2)run.Targets.PrimaryTarget.Target.Transform.position : run.Initial.Position,
+            SkillAreaOrigin.PreviousResult => run.PreviousResult != null && run.PreviousResult.HasPosition ? run.PreviousResult.Position : (Vector2)_core.transform.position,
+            _ => _core.transform.position
+        };
 
+        private SkillTargetResult SelectTargets(
+            Execution run,
+            SkillActionData action,
+            bool reselect, bool previewOnly = false)
+        {
+            var settings = reselect ? action.Target.WithSource(SkillTargetSource.Search) : action.Target;
 
-            int executionId =
-                _executionId;
+            Vector2 origin = Origin(run, action);
 
+            Vector2 direction = run.Initial.IsTargetable ? (Vector2)run.Initial.Target.Transform.position - origin : _core.FacingDirection;
 
-            _castController.StartCast(
-                finalCastTime,
-                () =>
-                {
-                    if (executionId == _executionId)
-                        FinishAttack(target);
-                }
+            SkillTargetRequest Request(Predicate<ICombatTarget> filter) => new(
+                run.Owner.Target,
+                settings,
+                origin,
+                direction,
+                initialTarget: run.Initial,
+                currentTarget: run.Current,
+                previousTarget: run.Previous,
+                hostileFilter: filter,
+                useBodyRange: action.Origin == SkillAreaOrigin.Owner
             );
 
-            // Cast 완료 후 현재 실행이 유효한 경우
-            // FinishAttack을 통해 실제 공격을 실행하고 Skill Action을 완료한다.
-        }
+            var selected = _targetResolver.ResolveSkillTargets(Request(run.Engagement.HostileFilter));
 
+            if (settings.Relation != SkillTargetRelation.Hostile || settings.Source == SkillTargetSource.None || !selected.Success)
+                return selected;
 
-        private void ExecuteDash(
-            ICombatTarget target)
-        {
-            float dashDistance =
-                _data.DashDistance;
+            if (previewOnly) return selected;
 
-            float dashSpeed =
-                _data.DashSpeed;
+            var approval = run.Engagement.Ensure(settings.Relation, selected.PrimaryTarget.Target);
 
-
-            int executionId =
-                _executionId;
-
-
-            _dashController.StartDash(
-                target,
-                dashDistance,
-                dashSpeed,
-                () =>
-                {
-                    if (executionId == _executionId)
-                        FinishAttack(target);
-                }
-            );
-
-            // Dash는 일반 Movement와 분리해서 처리하며
-            // MovementCompleted는 발생시키지 않는다.
-            //
-            // Dash 완료 후 현재 실행이 유효한 경우
-            // FinishAttack을 통해 실제 공격을 실행하고 Skill Action을 완료한다.
-        }
-
-
-        // ============================================================
-        // Attack
-        // ============================================================
-
-        private void ExecuteAttack(
-            ICombatTarget target)
-        {
-            switch (_data.ExecutionType)
-            {
-                case ActiveSkillExecutionType.Direct:
-
-                    ExecuteDirect(
-                        target
-                    );
-
-                    break;
-
-
-                case ActiveSkillExecutionType.Projectile:
-
-                    ExecuteProjectile(
-                        target
-                    );
-
-                    break;
-            }
-        }
-
-
-        // ============================================================
-        // Direct
-        // ============================================================
-
-        private void ExecuteDirect(
-            ICombatTarget target)
-        {
-            switch (_data.AreaType)
-            {
-                case ActiveSkillAreaType.Single:
-
-                    ExecuteSingle(
-                        target
-                    );
-
-                    break;
-
-
-                case ActiveSkillAreaType.TargetCircle:
-
-                    ExecuteTargetCircle(
-                        target
-                    );
-
-                    break;
-
-
-                case ActiveSkillAreaType.SelfCircle:
-
-                    ExecuteSelfCircle();
-
-                    break;
-
-
-                case ActiveSkillAreaType.SelfCone:
-
-                    ExecuteSelfCone(
-                        target
-                    );
-
-                    break;
-            }
-        }
-
-
-        // ============================================================
-        // Single
-        // ============================================================
-
-        private void ExecuteSingle(
-            ICombatTarget target)
-        {
-            _singleTargetBuffer.Clear();
-
-
-            _singleTargetBuffer.Add(
-                target
-            );
-
-
-            RequestDamage(
-                _singleTargetBuffer
-            );
-
-
-            // TODO:
-            // Skill FX 실행
-
-            // TODO:
-            // Hit FX 실행
-        }
-
-
-        // ============================================================
-        // Target Circle
-        // ============================================================
-
-        private void ExecuteTargetCircle(
-            ICombatTarget target)
-        {
-            if (_targetResolver == null)
-                return;
-
-
-            Vector2 center =
-                target.Transform.position;
-
-
-            TargetHitRequest hitRequest =
-                new TargetHitRequest(
-                    center,
-                    Vector2.zero,
-                    _data.AreaRadius,
-                    0f,
-                    _data.MaxDamageableCount,
-                    HitAreaType.Circle,
-                    target.Team,
-                    _targetFilter
-                );
-
-
-            IReadOnlyList<ICombatTarget> targets =
-                _targetResolver.ResolveHitTargets(
-                    hitRequest
-                );
-
-
-            RequestDamage(
-                targets
-            );
-
-
-            // TODO:
-            // Skill FX 실행
-
-            // TODO:
-            // Hit FX 실행
-        }
-
-
-        // ============================================================
-        // Self Circle
-        // ============================================================
-
-        private void ExecuteSelfCircle()
-        {
-            if (_targetResolver == null)
-                return;
-
-
-            Vector2 center =
-                _core.transform.position;
-
-
-            TargetHitRequest hitRequest =
-                new TargetHitRequest(
-                    center,
-                    Vector2.zero,
-                    _data.AreaRadius,
-                    0f,
-                    _data.MaxDamageableCount,
-                    HitAreaType.Circle,
-                    GetTargetTeam(),
-                    _targetFilter
-                );
-
-
-            IReadOnlyList<ICombatTarget> targets =
-                _targetResolver.ResolveHitTargets(
-                    hitRequest
-                );
-
-
-            RequestDamage(
-                targets
-            );
-
-
-            // TODO:
-            // Skill FX 실행
-
-            // TODO:
-            // Hit FX 실행
-        }
-
-
-        // ============================================================
-        // Self Cone
-        // ============================================================
-
-        private void ExecuteSelfCone(
-            ICombatTarget target)
-        {
-            if (_targetResolver == null)
-                return;
-
-
-            Vector2 origin =
-                _core.transform.position;
-
-
-            Vector2 direction =
-                (
-                    (Vector2)target.Transform.position
-                    - origin
-                ).normalized;
-
-
-            TargetHitRequest hitRequest =
-                new TargetHitRequest(
+            if (approval == SkillEngagementResult.Invalid)
+                return new SkillTargetResult(
+                    null,
                     origin,
                     direction,
-                    _data.AreaRadius,
-                    _data.AreaAngle,
-                    _data.MaxDamageableCount,
-                    HitAreaType.Cone,
-                    GetTargetTeam(),
-                    _targetFilter
+                    false,
+                    "Invalid engagement"
                 );
 
+            selected = _targetResolver.ResolveSkillTargets(Request(run.Engagement.HostileFilter));
 
-            IReadOnlyList<ICombatTarget> targets =
-                _targetResolver.ResolveHitTargets(
-                    hitRequest
-                );
-
-
-            RequestDamage(
-                targets
-            );
-
-
-            // TODO:
-            // Skill FX 실행
-
-            // TODO:
-            // Hit FX 실행
-        }
-
-
-        // ============================================================
-        // Projectile
-        // ============================================================
-
-        private void ExecuteProjectile(
-            ICombatTarget target)
-        {
-            if (_targetResolver == null)
-                return;
-
-
-            ProjectileImpactType impactType =
-                GetProjectileImpactType();
-
-            // Projectile의 SelfCircle / SelfCone도 충돌 위치에서 범위를 판정한다.
-
-            Vector2 origin =
-                _core.transform.position;
-
-
-            _projectileTargetBuffer.Clear();
-
-
-            _projectileTargetBuffer.Add(
-                target
-            );
-
-
-            if (_data.MaxTargetCount > 1)
+            // 거절 후에는 내부 후보만 사용하고 두 번째 확대 요청을 하지 않는다.
+            if (!selected.Success && approval == SkillEngagementResult.Denied)
             {
-                TargetCandidateRequest candidateRequest =
-                    new TargetCandidateRequest(
-                        origin,
-                        _data.SkillRange,
-                        target.Team,
-                        _targetFilter
-                    );
-
-
-                IReadOnlyList<ICombatTarget> candidates =
-                    _targetResolver.ResolveCandidates(
-                        candidateRequest
-                    );
-
-
-                for (int i = 0;
-                    i < candidates.Count
-                    && _projectileTargetBuffer.Count < _data.MaxTargetCount;
-                    i++)
+                if (_data.UsesLegacyTargetSelection)
                 {
-                    ICombatTarget candidate =
-                        candidates[i];
+                    var candidates = _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, GetTargetTeam(settings.Relation), run.Engagement.HostileFilter,
+                        action.Origin == SkillAreaOrigin.Owner ? _core.BodyRadius : (float?)null));
 
+                    var fallback = new SkillTargetSelector(_core, _data).SelectTarget(run.Initial.Target, candidates);
 
-                    if (candidate == target)
-                        continue;
-
-
-                    _projectileTargetBuffer.Add(
-                        candidate
+                    return new SkillTargetResult(
+                        fallback == null ? null : new[] { fallback },
+                        origin,
+                        direction
                     );
+                }
+
+                if (settings.Source == SkillTargetSource.Search)
+                    return selected;
+
+                if (action.TargetLostPolicy == SkillTargetLostPolicy.Reselect)
+                {
+                    settings = settings.WithSource(SkillTargetSource.Search);
+
+                    selected = _targetResolver.ResolveSkillTargets(Request(run.Engagement.HostileFilter));
                 }
             }
 
-
-            // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
-            for (int i = 0; i < _projectileTargetBuffer.Count; i++)
-            {
-                ProjectileRequest request =
-                    new ProjectileRequest(
-                        _core,
-                        _projectileTargetBuffer[i],
-                        origin,
-                        _data.ProjectileSpeed,
-                        impactType,
-                        _data.AreaRadius,
-                        _data.AreaAngle,
-                        impactType == ProjectileImpactType.Single
-                            ? 1
-                            : _data.MaxDamageableCount,
-                        DamageSourceType.Skill,
-                        _core.RuntimeStatus.SkillDamageMultiplier,
-                        _targetFilter
-                    );
-
-
-                ProjectileManager.GetOrCreate().Fire(
-                    request
-                );
-            }
-
-            // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
-            // 실제 피해 처리는 Projectile 충돌 시 ImpactType에 따라 처리된다.
-            //
-            // Single
-            // → 충돌 대상에게 피해 적용
-            //
-            // Circle / Cone
-            // → 충돌 위치 기준 범위 판정 후 피해 적용
-
-
-            // TODO:
-            // Skill FX 실행
+            return selected;
         }
 
-
-        private ProjectileImpactType GetProjectileImpactType()
+        // ============================================================
+        // Attack / Direct / Projectile
+        // ============================================================
+        private bool ExecuteAttack(
+            Execution run,
+            SkillAttackActionData action)
         {
-            switch (_data.AreaType)
-            {
-                case ActiveSkillAreaType.Single:
+            var primary = run.Targets.PrimaryTarget;
 
-                    return ProjectileImpactType.Single;
+            if (!primary.IsTargetable)
+                return false;
 
+            Vector2 origin = Origin(run, action);
 
-                case ActiveSkillAreaType.SelfCone:
+            Vector2 direction = ((Vector2)primary.Target.Transform.position - origin).normalized;
 
-                    return ProjectileImpactType.Cone;
-
-
-                case ActiveSkillAreaType.TargetCircle:
-                case ActiveSkillAreaType.SelfCircle:
-
-                    return ProjectileImpactType.Circle;
-
-
-                default:
-
-                    return ProjectileImpactType.Single;
-            }
-        }
-
-
-        // ============================================================
-        // Target Team
-        // ============================================================
-
-        private UnitTeam GetTargetTeam()
-        {
-            switch (_data.TargetSide)
-            {
-                case SkillTargetRelation.Friendly:
-                case SkillTargetRelation.Self:
-
-                    return _core.Team;
-
-
-                case SkillTargetRelation.Hostile:
-
-                    return _core.Team == UnitTeam.Ally
-                        ? UnitTeam.Enemy
-                        : UnitTeam.Ally;
-
-
-                default:
-
-                    return _core.Team;
-            }
-        }
-
-
-        // ============================================================
-        // Damage
-        // ============================================================
-
-        private void RequestDamage(
-            IReadOnlyList<ICombatTarget> targets)
-        {
-            if (targets == null)
-                return;
-
-            if (targets.Count <= 0)
-                return;
-
-
-            if (DamageResolver.Instance == null)
-            {
-                Debug.LogError(
-                    "[ActiveSkillExecutor] DamageResolver가 존재하지 않습니다."
+            if (action.Delivery == ActiveSkillDeliveryType.Projectile)
+                return ExecuteProjectile(
+                    run,
+                    action,
+                    origin,
+                    direction
                 );
 
-                return;
+            var targets = new List<CombatTargetSnapshot>();
+
+            if (action.Area == ActiveSkillAreaType.Single)
+            {
+                targets.Add(primary);
+
+                run.Position = primary.Target.Transform.position;
+            }
+            else
+            {
+                var center = action.Area == ActiveSkillAreaType.TargetCircle ? (Vector2)primary.Target.Transform.position : origin;
+
+                bool AllowsEffectTarget(ICombatTarget target)
+                {
+                    if (action.Target.Relation == SkillTargetRelation.Hostile)
+                        return run.Engagement.HostileFilter == null || run.Engagement.HostileFilter(target);
+                    bool self = ReferenceEquals(target, run.Owner.Target);
+                    return action.Target.Relation == SkillTargetRelation.Self
+                        ? self : action.Target.IncludeSelf || !self;
+                }
+
+                // 인원 제한 전에 제외해야 자신이 효과 슬롯을 소비하지 않는다.
+                foreach (var target in _targetResolver.ResolveHitTargets(new TargetHitRequest(
+                    center, direction, action.Radius, action.Angle, action.MaxEffectTargets,
+                    action.Area == ActiveSkillAreaType.SelfCone ? HitAreaType.Cone : HitAreaType.Circle,
+                    GetTargetTeam(action.Target.Relation), AllowsEffectTarget)))
+                    targets.Add(new CombatTargetSnapshot(target));
+
+                run.Position = center;
             }
 
+            // 즉시 피해형도 실제 공격 중심에서 폭발을 한 번 재생한다.
+            // 대상별 OnHit과 분리하고, 투사체 경로는 위에서 반환하므로 중복하지 않는다.
+            EmitFX(run, SkillFXHook.Collision, primary, run.Position, direction);
 
-            DamageRequest request =
-                new DamageRequest(
-                    _core,
-                    targets,
-                    DamageSourceType.Skill,
-                    _core.RuntimeStatus.SkillDamageMultiplier
+            if (_execution != run || !OwnerValid(run))
+                return false;
+
+            var impact = NewImpact(run);
+
+            foreach (var target in targets)
+            {
+                if (_execution != run || !OwnerValid(run))
+                    break;
+
+                if (!target.IsTargetable)
+                    continue;
+
+                run.Hits.Add(target); // 유효 명중과 실제 적용량은 독립이다. 방어로 0 피해여도 명중은 남는다.
+                var context = new SkillConditionContext(
+                    run.Owner.Target,
+                    target,
+                    _targetResolver,
+                    impact,
+                    true,
+                    run.Index,
+                    run.PreviousResult,
+                    run.Position
                 );
 
+                run.Applications.AddRange(SkillAttackDelivery.Hit(run.Batch, context));
 
-            DamageResolver.Instance.Resolve(
-                request
+                run.Batch.EventTemplate?.NotifyHit(
+                    target,
+                    impact,
+                    run.Position
+                );
+
+                EmitFX(run, SkillFXHook.OnHit, target, target.Position, direction);
+            }
+
+            // TODO: Skill FX / Hit FX 실제 재생은 수신 측에서 구현한다.
+            return run.Hits.Count > 0;
+        }
+
+        private bool ExecuteProjectile(
+            Execution run,
+            SkillAttackActionData action,
+            Vector2 origin,
+            Vector2 direction)
+        {
+            var targets = new List<CombatTargetSnapshot>(run.Targets.Targets);
+
+            if (action.IsLegacy && action.Target.MaxTargetCount > 1)
+            {
+                foreach (var candidate in _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, run.Targets.PrimaryTarget.Team, action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null,
+                    action.Origin == SkillAreaOrigin.Owner ? _core.BodyRadius : (float?)null)))
+                {
+                    if (targets.Count >= action.Target.MaxTargetCount)
+                        break;
+
+                    if (ReferenceEquals(candidate, run.Targets.PrimaryTarget.Target))
+                        continue;
+
+                    targets.Add(new CombatTargetSnapshot(candidate));
+                }
+            }
+
+            int fired = 0;
+
+            var type = action.Area == ActiveSkillAreaType.Single ? ProjectileImpactType.Single : action.Area == ActiveSkillAreaType.SelfCone ? ProjectileImpactType.Cone : ProjectileImpactType.Circle;
+
+            run.HitsObserved = false;
+
+            foreach (var target in targets)
+            {
+                if (_execution != run || !OwnerValid(run))
+                    break;
+
+                if (!target.IsTargetable)
+                {
+                    run.Launches.Add(new(target, false, "Target unavailable"));
+
+                    continue;
+                }
+
+                // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
+                // SkillEffectRequest는 발사 시점의 Skill Effect 정보를 보관하고,
+                // 실제 효과 대상은 Projectile 충돌 시 ImpactType에 따라 확정된다.
+                // Single
+                // → 충돌 대상을 SkillEffectRequest의 대상으로 사용
+                // Circle / Cone
+                // → 충돌 위치 기준 범위 판정 후 SkillEffectRequest의 대상으로 사용
+                var flightBatch = new SkillEffectBatch(
+                    action,
+                    run.Ledger,
+                    run.PreviousResult,
+                    DispatchFX,
+                    hostileFilter: run.Engagement.HostileFilter
+                );
+
+                flightBatch.EventTemplate = Event(run, PassiveSkillTriggerType.ActiveSkillActionHit);
+
+                // 목표마다 1발씩 발사하고, 각 투사체의 효과 적용 인원은 별도로 제한한다.
+                bool launched = SkillAttackDelivery.Fire(
+                    run.Owner.Target,
+                    target.Target,
+                    origin,
+                    action,
+                    flightBatch,
+                    NewImpact(run),
+                    action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null
+                );
+
+                run.Launches.Add(new(target, launched, launched ? null : "Fire rejected"));
+
+                if (launched)
+                {
+                    fired++;
+
+                    EmitFX(run, SkillFXHook.Fire, target, origin, target.Position - origin);
+                }
+            }
+
+            // Projectile의 SelfCircle / SelfCone도 충돌 위치에서 범위를 판정한다.
+            // 이미 발사된 요청은 진행 중인 Execution을 참조하지 않는다. 완료는 비행/명중을 기다리지 않는다.
+            return fired > 0;
+        }
+
+        // ============================================================
+        // Target Team / Skill Effect / FX
+        // ============================================================
+        private UnitTeam GetTargetTeam(SkillTargetRelation relation) => relation == SkillTargetRelation.Hostile ? (_core.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally) : _core.Team;
+
+        private CombatEventMetadata NewImpact(Execution run)
+        {
+            var id = CombatEventMetadata.Create(run.Owner.Target, run.Metadata);
+
+            return CombatEventMetadata.Create(
+                run.Owner.Target,
+                id,
+                impactId: id.EventId
             );
         }
+
+        private void ApplyTiming(
+            Execution run,
+            SkillEffectTiming timing)
+        {
+            if (_execution != run || run.Batch == null)
+                return;
+
+            var impact = NewImpact(run);
+
+            var targets = run.Targets != null && run.Targets.Targets.Count > 0 ? run.Targets.Targets : new[]
+            {
+                default(CombatTargetSnapshot)
+            };
+
+            foreach (var target in targets)
+            {
+                if (_execution != run || !OwnerValid(run))
+                    break;
+
+                var context = new SkillConditionContext(
+                    run.Owner.Target,
+                    target,
+                    _targetResolver,
+                    impact,
+                    true,
+                    run.Index,
+                    run.PreviousResult,
+                    run.Position
+                );
+
+                run.Applications.AddRange(SkillEffectPipeline.Resolve(run.Batch, context, timing));
+            }
+        }
+
+        private void EmitFX(
+            Execution run,
+            SkillFXHook hook,
+            CombatTargetSnapshot target = default,
+            Vector2? position = null,
+            Vector2? direction = null)
+        {
+            if (run.Index >= run.Actions.Count || run.Actions[run.Index] == null)
+                return;
+
+            if (target.ObjectId == 0 && run.Targets != null) target = run.Targets.PrimaryTarget;
+            var origin = Origin(run, run.Actions[run.Index]);
+            var aim = direction ?? (target.MatchesLifetime ? (Vector2)target.Target.Transform.position - origin : _core.FacingDirection);
+            foreach (var entry in run.Actions[run.Index].FXEntries)
+                if (entry != null && entry.Hook == hook)
+                    DispatchFX(new SkillFXRequest(entry, run.Metadata, position ?? origin,
+                        direction: aim, target: target, facingDirection: _core.FacingDirection,
+                        attackRadius: run.Actions[run.Index] is SkillAttackActionData attack
+                            ? (attack.Area == ActiveSkillAreaType.Single ? attack.Target.Range : attack.Radius) : 0f));
+        }
+
+        private void DispatchFX(SkillFXRequest request)
+        {
+            if (FXRequested == null)
+                return;
+
+            foreach (Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
+            {
+                try
+                {
+                    listener(request);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+        }
+
+        private void CleanupFX(Execution run)
+        {
+            if (!run.Entered || run.Index >= run.Actions.Count)
+                return;
+
+            run.Entered = false;
+
+            run.Batch?.CleanupConditionalFX();
+
+            foreach (var entry in run.Actions[run.Index].FXEntries)
+                if (entry != null)
+                    DispatchFX(new SkillFXRequest(entry, run.Metadata, run.Position, true));
+
+        }
+
+
     }
 }

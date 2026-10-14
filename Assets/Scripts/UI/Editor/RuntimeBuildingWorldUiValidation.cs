@@ -156,7 +156,7 @@ namespace Game.UI.Editor
                 Click(Point(slots[0]));
                 Check(binding.SelectedSlot == null, "battle blocks world construction selection");
                 await flow.ResolveBattleAsync(ResultType.Defeat);
-                flow.ResetRun();
+                flow.QuitRun();
                 await Wait(() => flow.CanEnterBuildMode());
                 for (int i = 0; i < 3; i++)
                 {

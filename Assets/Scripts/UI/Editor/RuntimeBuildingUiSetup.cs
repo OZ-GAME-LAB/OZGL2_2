@@ -36,8 +36,10 @@ namespace Game.UI.Editor
                 var roots = scene.GetRootGameObjects();
                 T Find<T>() where T : Component => roots.SelectMany(r => r.GetComponentsInChildren<T>(true)).Single();
                 var preview = Find<PlayerUiPreviewBindings>();
+                var sample = Find<MvpRuntimeHudSample>();
                 var flow = Find<GameFlowController>();
                 var wallet = Find<RunCurrencyManager>();
+                var coreProgress = Find<BuildingCoreProgress>();
                 var catalog = Find<BuildingCatalogPanel>();
                 var info = Find<BuildingInfoPanel>();
                 var actions = Find<BuildingActionPanel>();
@@ -66,8 +68,9 @@ namespace Game.UI.Editor
                 var owner = new GameObject("UI Building Integration - real building API, fixture data");
                 owner.SetActive(false);
                 var controller = owner.AddComponent<BuildingBuildController>();
-                MvpHudBuilder.Assign(controller, "database", database, "wallet", wallet, "gameFlow", flow,
+                MvpHudBuilder.Assign(controller, "database", database,
                     "worldCamera", roots.SelectMany(r => r.GetComponentsInChildren<Camera>(true)).Single());
+                MvpHudBuilder.Assign(sample, "_buildingController", controller, "_buildingCoreProgress", coreProgress);
                 // UI 지도 버튼이 입력을 소유한다. 원본 임시 메뉴의 월드 클릭 입력만 차단한다.
                 Set(controller, "slotMask", 0);
                 var binding = owner.AddComponent<RuntimeBuildingUiBinding>();

@@ -40,6 +40,23 @@ namespace Game.UI
         private void OnEnable() => Bind();
         private void OnDisable() => Unbind();
 
+        public void Initialize(BuildingBuildController controller, RunCurrencyManager wallet,
+            GameFlowController flow, BuildingCoreProgress coreProgress, BuildingSlot[] slots)
+        {
+            if (controller == null) throw new ArgumentNullException(nameof(controller));
+            if (wallet == null) throw new ArgumentNullException(nameof(wallet));
+            if (flow == null) throw new ArgumentNullException(nameof(flow));
+            if (coreProgress == null) throw new ArgumentNullException(nameof(coreProgress));
+            if (slots == null) throw new ArgumentNullException(nameof(slots));
+            Unbind();
+            _controller = controller;
+            _wallet = wallet;
+            _flow = flow;
+            _coreProgress = coreProgress;
+            _slots = slots;
+            if (isActiveAndEnabled) Bind();
+        }
+
         private void LateUpdate()
         {
             if (_selectionId == null || _executing) return;
@@ -127,11 +144,16 @@ namespace Game.UI
                 ? "재화 연결을 기다리고 있습니다." : "재화가 부족합니다.";
             bool occupied = _slot.IsOccupied;
             bool coreSlot = occupied && _controller.IsCoreSlot(_slot);
+            // Current date KDH 2026-10-01
+            // 건설 한도 초과면 재화보다 한도 안내를 먼저 보여 줍니다. 문자열은 Refresh(이벤트) 때만 만들어 매 프레임 GC가 없습니다.
+            string buildReason = valid && !occupied && !_controller.HasBuildCapacity
+                ? $"건설 한도에 도달했습니다. ({_controller.BuiltCount}/{_controller.BuildLimit}) 코어를 업그레이드하세요."
+                : reason;
             var offer = occupied
                 ? new BuildingActionOffer(BuildingUiAction.Dismantle, "해체", refundGold, refundGems,
                     valid && _wallet.IsInitialized, reason)
                 : new BuildingActionOffer(BuildingUiAction.Build, data.DisplayName, gold, gems,
-                    valid && _wallet.IsInitialized && _controller.CanAffordCandidate(_slot, data), reason, data.BuildingId);
+                    valid && _wallet.IsInitialized && _controller.CanAffordCandidate(_slot, data), buildReason, data.BuildingId);
             BuildingActionOffer upgrade = null;
             if (occupied && _candidate != null && IsCurrentUpgrade(_candidate))
             {
@@ -229,20 +251,28 @@ namespace Game.UI
 
         private bool IsCurrentCandidate(BuildingData data)
         {
-            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel(), GetCensus());
             return _candidates.Contains(data);
         }
 
         private bool IsCurrentUpgrade(BuildingData data)
         {
             if (!_slot.IsOccupied || _slot.CurrentBuilding.Data == null) return false;
-            _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            // Current date KDH 2026-10-08
+            // 컨트롤러가 이미 서 있는 지원 T2를 뺀 목록으로 현재 선택인지 확인합니다.
+            if (_controller != null)
+                _controller.CollectAvailableUpgrades(_slot, _candidates);
+            else
+                _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
             return _candidates.Contains(data);
         }
 
         private void PopulateUpgradeCatalog()
         {
-            _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
+            if (_controller != null)
+                _controller.CollectAvailableUpgrades(_slot, _candidates);
+            else
+                _slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
             _items.Clear(); _byId.Clear();
             foreach (var next in _candidates)
             {
@@ -260,7 +290,7 @@ namespace Game.UI
 
         private void PopulateCatalog()
         {
-            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel());
+            _slot.CollectCandidates(_candidates, _database, GetCurrentCoreLevel(), GetCensus());
             _items.Clear(); _byId.Clear();
             var duplicates = new HashSet<string>();
             foreach (var data in _candidates)
@@ -290,6 +320,11 @@ namespace Game.UI
             return _coreProgress != null ? _coreProgress.CurrentLevel : 0;
         }
 
+        private BuildingCensus GetCensus()
+        {
+            return _controller != null ? _controller.Census : null;
+        }
+
         private void Bind()
         {
             if (_bound || _catalog == null || _info == null || _actions == null ||
@@ -299,6 +334,7 @@ namespace Game.UI
             _info.InfoPanelClosed += HandleInfoClosed;
             _wallet.BalanceChanged += HandleBalanceChanged;
             _flow.PhaseChanged += HandlePhaseChanged;
+            _controller.SlotSelected += SelectSlot;
             _bound = true;
         }
 

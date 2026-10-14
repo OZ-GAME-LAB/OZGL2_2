@@ -12,7 +12,7 @@ namespace OZGL.KDH
     {
         public bool enabled;
         [Tooltip("SpawnManager가 프리팹을 고를 때 사용합니다.")]
-        public AllyUnitType unitType = AllyUnitType.Warrior;
+        public AllyUnitType unitType = AllyUnitType.WA_T1_전사;
         [Min(1)] public int countPerWave = 1;
         [Min(1)] public int maxAlive = 3;
     }

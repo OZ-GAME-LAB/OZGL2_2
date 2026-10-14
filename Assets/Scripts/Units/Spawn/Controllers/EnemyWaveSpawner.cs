@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
@@ -22,6 +22,12 @@ namespace Units
         // ============================================================
         // References
         // ============================================================
+
+        private readonly UnitPoolManager _unitPoolManager;
+
+        internal bool SpawnFailed { get; private set; }
+
+        internal void ResetSpawnResult() => SpawnFailed = false;
 
         private readonly RuntimeUnitManager
             _runtimeUnitManager;
@@ -56,6 +62,7 @@ namespace Units
 
         internal EnemyWaveSpawner(
             RuntimeUnitManager runtimeUnitManager,
+            UnitPoolManager unitPoolManager,
             UnitStatModifierManager unitStatModifierManager,
             IReadOnlyDictionary<EnemyUnitType, EnemySpawnEntry> spawnEntries,
             GameObject groupPrefab,
@@ -65,6 +72,8 @@ namespace Units
         {
             _runtimeUnitManager =
                 runtimeUnitManager;
+
+            _unitPoolManager = unitPoolManager;
 
             _unitStatModifierManager =
                 unitStatModifierManager;
@@ -90,28 +99,106 @@ namespace Units
         // Spawn Wave
         // ============================================================
 
-        internal async UniTask SpawnWaveAsync(
+        private readonly BossSpawner _bossSpawner = new BossSpawner();
+        private readonly List<Unit_GroupAI> _spawnedGroups = new List<Unit_GroupAI>();
+
+        // Per-wave overrides: keys remain appearance IDs; values carry combat identity.
+        private readonly Dictionary<EnemyUnitType, UnitData> _waveData = new();
+
+        private void BuildInfiniteData(IEnumerable<EnemyUnitType> appearances)
+        {
+            var crusaders = new Dictionary<EnemyUnitClass, UnitData>();
+            foreach (var entry in _spawnEntries.Values)
+            {
+                if (entry.Faction != EnemyUnitFaction.Crusaders || entry.Rank == EnemyRank.Boss)
+                    continue;
+                var data = entry.Prefab != null
+                    ? entry.Prefab.GetComponent<Unit_RuntimeStatus>()?.DefaultUnitData : null;
+                if (data == null || data.Team != UnitTeam.Enemy || data.IsBoss ||
+                    data.GetEnemyFaction() != EnemyUnitFaction.Crusaders || data.GetEnemyClass() != entry.UnitClass)
+                    throw new InvalidOperationException("[EnemyWaveSpawner] Invalid Crusaders data: " + entry.UnitClass);
+                if (crusaders.ContainsKey(entry.UnitClass))
+                    throw new InvalidOperationException("[EnemyWaveSpawner] Duplicate Crusaders class: " + entry.UnitClass);
+                crusaders.Add(entry.UnitClass, data);
+            }
+            foreach (var type in appearances)
+            {
+                var entry = _spawnEntries[type];
+                if (entry.Rank == EnemyRank.Boss) continue;
+                if (!crusaders.TryGetValue(entry.UnitClass, out var data))
+                    throw new InvalidOperationException("[EnemyWaveSpawner] Missing Crusaders class for: " + type);
+                _waveData[type] = data;
+            }
+        }
+
+        internal async UniTask<bool> SpawnWaveAsync(int cost, SpawnContext context,
+            CancellationToken cancellationToken, bool isInfiniteWave = false)
+        {
+            _waveData.Clear();
+            _spawnedGroups.Clear();
+            bool succeeded = false;
+            try
+            {
+                succeeded = await SpawnWaveCoreAsync(cost, context, cancellationToken, isInfiniteWave);
+                cancellationToken.ThrowIfCancellationRequested();
+                return succeeded;
+            }
+            finally
+            {
+                if (!succeeded || cancellationToken.IsCancellationRequested)
+                {
+                    foreach (var group in _spawnedGroups)
+                    {
+                        if (group == null) continue;
+                        _runtimeUnitManager.UnregisterGroup(group);
+                        DestroyGroup(group);
+                    }
+                    _rallyGridAllocator.Clear();
+                }
+                _spawnedGroups.Clear();
+                _waveData.Clear();
+            }
+        }
+
+        private async UniTask<bool> SpawnWaveCoreAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, bool isInfiniteWave)
         {
             if (!ValidateWaveRequest(
                 cost,
                 context))
             {
-                return;
+                return false;
             }
 
 
             cancellationToken.ThrowIfCancellationRequested();
 
 
-            List<EnemyGroupSpawnData>
-                groupSpawnDataList =
-                    BuildGroupSpawnData(
-                        cost,
-                        context
-                    );
+            // Validate all bosses before any objects are created. Preserve duplicates.
+            var bossPlan = _bossSpawner.BuildPlan(context.BossIDs, _spawnEntries);
+            var groupSpawnDataList = new List<EnemyGroupSpawnData>();
+            foreach (var boss in bossPlan)
+                groupSpawnDataList.Add(new EnemyGroupSpawnData(boss, 1));
+            if (cost > 0 && context.MonsterIDs != null && context.MonsterIDs.Count > 0)
+                groupSpawnDataList.AddRange(BuildGroupSpawnData(cost, context));
+
+            if (isInfiniteWave)
+            {
+                var appearances = new List<EnemyUnitType>();
+                foreach (var group in groupSpawnDataList) appearances.Add(group.UnitType);
+                BuildInfiniteData(appearances);
+            }
+
+            var zones = new List<RallyZone>();
+            var bosses = new List<bool>();
+            foreach (var group in groupSpawnDataList)
+            {
+                var entry = _spawnEntries[group.UnitType];
+                zones.Add(_waveData.TryGetValue(group.UnitType, out var data) ? data.RallyZone : entry.RallyZone);
+                bosses.Add(entry.Rank == EnemyRank.Boss);
+            }
 
 
             if (groupSpawnDataList.Count == 0)
@@ -121,7 +208,7 @@ namespace Units
                     "생성 가능한 Enemy Group이 없습니다."
                 );
 
-                return;
+                return false;
             }
 
 
@@ -136,15 +223,14 @@ namespace Units
             // 전열부터 후열 방향으로 Sector를 준비한다.
             // ========================================================
 
-            if (!_rallyGridAllocator.PrepareCenteredAllocation(
-                groupSpawnDataList.Count))
+            if (!_rallyGridAllocator.PreparePreferredAllocation(zones, bosses))
             {
                 Debug.LogError(
                     "[EnemyWaveSpawner] " +
                     "Enemy Rally 배치 계획 생성 실패."
                 );
 
-                return;
+                return false;
             }
 
 
@@ -207,7 +293,7 @@ namespace Units
 
                     UniTask<Unit_GroupAI>
                         spawnTask =
-                            SpawnGroupAsync(
+                            SpawnGroupSafelyAsync(
                                 groupSpawnData.UnitType,
                                 groupSpawnData.Count,
                                 spawnPoint.position,
@@ -231,6 +317,8 @@ namespace Units
                     );
 
 
+                cancellationToken.ThrowIfCancellationRequested();
+
                 for (int i = 0;
                      i < spawnedGroups.Length;
                      i++)
@@ -248,6 +336,7 @@ namespace Units
                 $"적 웨이브 생성 완료 : " +
                 $"{spawnedGroupCount}개 그룹"
             );
+            return !SpawnFailed && spawnedGroupCount == groupSpawnDataList.Count;
         }
 
 
@@ -350,6 +439,9 @@ namespace Units
                     continue;
                 }
 
+
+                // Bosses must only come from the explicit boss request list.
+                if (entry.Rank == EnemyRank.Boss) continue;
 
                 EnemyUnitClass unitClass =
                     entry.UnitClass;
@@ -708,6 +800,19 @@ namespace Units
         // Group
         // ============================================================
 
+        private async UniTask<Unit_GroupAI> SpawnGroupSafelyAsync(EnemyUnitType type,
+            int count, Vector2 position, CancellationToken token)
+        {
+            try
+            {
+                var group = await SpawnGroupAsync(type, count, position, token);
+                if (group != null) _spawnedGroups.Add(group);
+                return group;
+            }
+            catch (OperationCanceledException) { SpawnFailed = true; return null; }
+            catch (Exception error) { Debug.LogException(error); SpawnFailed = true; return null; }
+        }
+
         private async UniTask<Unit_GroupAI>
             SpawnGroupAsync(
                 EnemyUnitType unitType,
@@ -759,6 +864,9 @@ namespace Units
                     );
 
 
+                if (spawnedCount != count)
+                    SpawnFailed = true;
+
                 if (spawnedCount <= 0)
                 {
                     DestroyGroup(
@@ -804,7 +912,7 @@ namespace Units
 
                 return group;
             }
-            catch (OperationCanceledException)
+            catch (Exception)
             {
                 DestroyGroup(
                     group
@@ -945,9 +1053,7 @@ namespace Units
                         );
 
 
-                        UnityEngine.Object.Destroy(
-                            unit.gameObject
-                        );
+                        unit.Core.ReturnToPool();
                     }
                     else
                     {
@@ -1016,12 +1122,15 @@ namespace Units
 
 
             GameObject unitObject =
-                UnityEngine.Object.Instantiate(
-                    prefab,
-                    position,
-                    Quaternion.identity,
-                    parent
-                );
+                _unitPoolManager.Rent(prefab, UnitTeam.Enemy);
+
+            // 대여한 유닛의 배치와 활성화는 기존 Spawner에서 처리한다.
+            unitObject.SetActive(false);
+            unitObject.transform.SetParent(parent, false);
+            unitObject.transform.SetPositionAndRotation(position, Quaternion.identity);
+            unitObject.transform.localScale = prefab.transform.localScale;
+            unitObject.GetComponent<UnitPoolMember>().RuntimeManager = _runtimeUnitManager;
+            unitObject.SetActive(true);
 
 
             Unit_Core core =
@@ -1086,7 +1195,8 @@ namespace Units
 
 
             UnitData unitData =
-                runtimeStatus.UnitData;
+                _waveData.TryGetValue(unitType, out var overrideData)
+                    ? overrideData : runtimeStatus.DefaultUnitData;
 
 
             if (unitData == null)
@@ -1118,25 +1228,41 @@ namespace Units
             // Initialize
             // ========================================================
 
-            core.Initialize(
-                finalModifier
-            );
-
-
-            if (!ValidateInitializedUnit(
-                core,
-                gateway,
-                unitObject))
+            try
             {
-                UnityEngine.Object.Destroy(
-                    unitObject
+                core.Initialize(
+                    finalModifier,
+                    _unitStatModifierManager.GetEnemyPassiveSkills(
+                        unitData.GetEnemyClass(),
+                        unitData.GetEnemyType(),
+                        unitData.GetEnemyFaction()
+                    ),
+                    unitData
                 );
 
-                return null;
+
+                if (!ValidateInitializedUnit(
+                    core,
+                    gateway,
+                    unitObject))
+                {
+                    UnityEngine.Object.Destroy(
+                        unitObject
+                    );
+
+                    return null;
+                }
+
+
+                return gateway;
+            }
+            catch
+            {
+                // 초기화에 실패한 상태는 재사용하지 않는다.
+                UnityEngine.Object.Destroy(unitObject);
+                throw;
             }
 
-
-            return gateway;
         }
 
 
@@ -1338,28 +1464,13 @@ namespace Units
             }
 
 
-            if (cost <= 0)
+            bool hasBosses = context.BossIDs != null && context.BossIDs.Count > 0;
+            bool hasNormals = cost > 0 && context.MonsterIDs != null && context.MonsterIDs.Count > 0;
+            if (cost < 0 || (!hasBosses && !hasNormals))
             {
-                Debug.LogWarning(
-                    $"[EnemyWaveSpawner] " +
-                    $"잘못된 Spawn Cost : {cost}"
-                );
-
+                Debug.LogWarning("[EnemyWaveSpawner] 스폰할 일반 적 또는 보스가 없습니다.");
                 return false;
             }
-
-
-            if (context.MonsterIDs == null ||
-                context.MonsterIDs.Count == 0)
-            {
-                Debug.LogWarning(
-                    "[EnemyWaveSpawner] " +
-                    "Spawn 가능한 MonsterID가 없습니다."
-                );
-
-                return false;
-            }
-
 
             return true;
         }
@@ -1376,15 +1487,16 @@ namespace Units
                 return;
 
 
+            _runtimeUnitManager.UnregisterGroup(group);
             IReadOnlyList<Unit_Gateway> members =
                 group.Members;
 
 
             if (members != null)
             {
-                for (int i = 0;
-                     i < members.Count;
-                     i++)
+                for (int i = members.Count - 1;
+                     i >= 0;
+                     i--)
                 {
                     Unit_Gateway member =
                         members[i];
@@ -1394,9 +1506,7 @@ namespace Units
                         continue;
 
 
-                    UnityEngine.Object.Destroy(
-                        member.gameObject
-                    );
+                    member.Core.ReturnToPool();
                 }
             }
 

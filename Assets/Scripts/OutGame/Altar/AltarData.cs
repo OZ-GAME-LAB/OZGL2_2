@@ -10,7 +10,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "AltarData", menuName = "OutGame/Altar Data")]
 public class AltarData : ScriptableObject
 {
-    public string Id => _id;
+    public AltarId Id => _id;
     public string DisplayName => _displayName;
     public string Description => _description;
     public Sprite Icon => _icon;
@@ -18,7 +18,7 @@ public class AltarData : ScriptableObject
     public IReadOnlyList<CurrencyEffectData> CurrencyEffects => _currencyEffects;
     public IReadOnlyList<AltarTriggeredEffect> TriggeredEffects => _triggeredEffects;
 
-    [SerializeField] private string _id;
+    [SerializeField] private AltarId _id;
     [SerializeField] private string _displayName;
     [TextArea]
     [SerializeField] private string _description;
@@ -36,7 +36,7 @@ public class AltarData : ScriptableObject
 
     private void OnValidate()
     {
-        if (string.IsNullOrWhiteSpace(_id))
+        if (_id == AltarId.None)
         {
             Debug.LogError($"[OutGame/AltarData] 제단 ID가 비어 있습니다. Asset: {name}", this);
         }

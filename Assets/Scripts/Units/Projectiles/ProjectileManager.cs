@@ -18,10 +18,8 @@ namespace Units
         [SerializeField]
         private Projectile_Controller _projectilePrefab;
 
-
         [SerializeField, Min(0.01f)]
         private float _collisionRadius = 0.1f;
-
 
         [SerializeField, Min(0.1f)]
         private float _maxLifetime = 5f;
@@ -33,9 +31,7 @@ namespace Units
 
         private Projectile_Controller _fallbackPrefab;
 
-
         private Sprite _fallbackSprite;
-
 
         private Texture2D _fallbackTexture;
 
@@ -74,23 +70,29 @@ namespace Units
             return Instance;
         }
 
-
-        public bool Fire(
-            ProjectileRequest request)
+        public bool Fire(ProjectileRequest request)
         {
-            if (request.Attacker == null
-                || request.Attacker.RuntimeStatus == null
-                || !CombatTargetUtility.IsValid(request.Target)
-                || !(request.ProjectileSpeed > 0f)
-                || float.IsInfinity(request.ProjectileSpeed))
+            if (request.SourceSnapshot == null || !request.SourceSnapshot.Owner.IsTargetable || request.Attacker == null || request.Attacker.RuntimeStatus == null || !CombatTargetUtility.IsValid(request.Target) || !(request.ProjectileSpeed > 0f) || float.IsInfinity(request.ProjectileSpeed))
             {
                 return false;
             }
 
-            var prefab =
-                _projectilePrefab != null
-                    ? _projectilePrefab
-                    : GetFallbackPrefab();
+            bool hasDamageRequest = request.DamageRequest.HasValue;
+
+            bool hasSkillEffectRequest = request.SkillEffectRequest.HasValue;
+
+            // Projectile은 하나의 Impact Request만 가져야 한다.
+            if (hasDamageRequest == hasSkillEffectRequest)
+            {
+                Debug.LogError("[ProjectileManager] ProjectileRequest의 Impact Request가 유효하지 않습니다.");
+
+                return false;
+            }
+
+            // 공격별 전용 프리팹을 우선하고, 미지정이면 기존 공용·기본 투사체를 사용한다.
+            var prefab = request.ProjectilePrefab != null
+                ? request.ProjectilePrefab
+                : _projectilePrefab != null ? _projectilePrefab : GetFallbackPrefab();
 
             var projectile = Instantiate(
                 prefab,
@@ -116,8 +118,18 @@ namespace Units
         // Projectile Return
         // ============================================================
 
-        public void Release(
-            Projectile_Controller projectile)
+        // 전투 초기화에서는 먼저 비행을 종료하여 지연 명중과 부착 FX가 남지 않게 한다.
+        public void Clear()
+        {
+            foreach (var projectile in GetComponentsInChildren<Projectile_Controller>(true))
+            {
+                if (projectile == _fallbackPrefab) continue;
+                projectile.gameObject.SetActive(false);
+                Destroy(projectile.gameObject);
+            }
+        }
+
+        public void Release(Projectile_Controller projectile)
         {
             // 추후 Pooling을 적용할 때는 이 반환 경로에서 처리한다.
             if (projectile == null)
@@ -142,10 +154,7 @@ namespace Units
 
             template.SetActive(false);
 
-            template.transform.SetParent(
-                transform,
-                false
-            );
+            template.transform.SetParent(transform, false);
 
             _fallbackPrefab = template.AddComponent<Projectile_Controller>();
 
@@ -161,10 +170,7 @@ namespace Units
 
             for (int y = 0; y < 16; y++)
                 for (int x = 0; x < 16; x++)
-                    pixels[y * 16 + x] = new Vector2(
-                        x - 7.5f,
-                        y - 7.5f
-                    ).sqrMagnitude <= 56f ? Color.white : Color.clear;
+                    pixels[y * 16 + x] = new Vector2(x - 7.5f, y - 7.5f).sqrMagnitude <= 56f ? Color.white : Color.clear;
 
             _fallbackTexture.SetPixels(pixels);
 
