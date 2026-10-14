@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04dde631118eb324986781da50d2f6e4, type: 3}
+  m_Name: "A_CU_T3_11_\uD608\uC0AC\uC81C_DmgReduce"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Effects.EffectData
+  _skillSchemaVersion: 0
+  _effectId: "A_CU_T3_11_\uD608\uC0AC\uC81C_DmgReduce"
+  _alignment: 0
+  _durationType: 0
+  _duration: 3
+  _stackType: 1
+  _maxStack: 1
+  _actions:
+  - rid: 4617381541496225794
+  _categories: []
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381541496225794
+      type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
+      data:
+        _statType: 20
+        _modifierType: 1
+        _value: -0.25

@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
+  m_Name: "A_WA_T2_1_\uAD11\uC804\uC0AC_PassiveSkill_HealOnDeal"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uD761\uD608"
+    _icon: {fileID: 21300000, guid: 41c53cb60816efb488e1ed2e99b72786, type: 3}
+    _description: "\uD53C\uD574\uB97C \uC904 \uB54C\uB9C8\uB2E4 \uCD5C\uB300 \uCCB4\uB825\uC758
+      2%\uB97C \uD68C\uBCF5\uD569\uB2C8\uB2E4."
+  _skillSchemaVersion: 1
+  _triggerType: 3
+  _tickInterval: 1
+  _conditions:
+  - rid: 4844432377880510549
+  _effectMode: 0
+  _actions:
+  - rid: 4844432377880510553
+  _conditionCheckInterval: 0.2
+  references:
+    version: 2
+    RefIds:
+    - rid: 4844432377880510549
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4844432377880510553
+      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _targetType: 0
+        _targetRelation: 2
+        _maxEffectTargetCount: 1
+        _areaType: 0
+        _areaRadius: 1
+        _areaAngle: 90
+        _effects:
+        - rid: 4844432377880510554
+    - rid: 4844432377880510554
+      type: {class: SkillHealEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _applicationFX:
+        - _key: VFX_OnApply_Heal
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        _scalingStatType: 0
+        _healRatio: 0.02
