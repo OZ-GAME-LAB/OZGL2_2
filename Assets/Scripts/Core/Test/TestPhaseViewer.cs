@@ -24,8 +24,7 @@ public class TestPhaseViewer : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_controller != null)
-            _controller.PhaseChanged -= UpdatePhase;
+        _controller.PhaseChanged -= UpdatePhase;
     }
 
     private void UpdatePhase(GamePhase phase)

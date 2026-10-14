@@ -1,5 +1,6 @@
-using System.Collections.Generic;
 using UnityEngine;
+
+
 
 namespace Units.Skills
 {
@@ -9,19 +10,18 @@ namespace Units.Skills
     )]
     public class ActiveSkillData : ScriptableObject
     {
-        [SerializeField] private SkillDisplayData _display = new();
-        public SkillDisplayData Display => _display;
-
         // ============================================================
         // Basic
         // ============================================================
 
         [Header("Basic")]
         [SerializeField]
-        private float _skillRange = 3f;
+        private float _skillRange =
+            3f;
 
         [SerializeField]
-        private float _skillCooldown = 5f;
+        private float _skillCooldown =
+            5f;
 
 
         // ============================================================
@@ -30,10 +30,12 @@ namespace Units.Skills
 
         [Header("Target")]
         [SerializeField]
-        private SkillTargetRelation _targetSide = SkillTargetRelation.Hostile;
+        private SkillTargetRelation _targetSide =
+            SkillTargetRelation.Hostile;
 
         [SerializeField]
-        private SkillTargetPolicy _targetPolicy = SkillTargetPolicy.Current;
+        private SkillTargetPolicy _targetPolicy =
+            SkillTargetPolicy.Current;
 
 
         // ============================================================
@@ -42,19 +44,22 @@ namespace Units.Skills
 
         [Header("Action")]
         [SerializeField]
-        private ActiveSkillActionType _actionType = ActiveSkillActionType.Instant;
+        private ActiveSkillActionType _actionType =
+            ActiveSkillActionType.Instant;
 
         [SerializeField]
-        private float _castTime = 0f;
+        private float _castTime =
+            0f;
 
 
         // ============================================================
-        // Delivery
+        // Execution
         // ============================================================
 
-        [Header("Delivery")]
+        [Header("Execution")]
         [SerializeField]
-        private ActiveSkillDeliveryType _deliveryType = ActiveSkillDeliveryType.Direct;
+        private ActiveSkillExecutionType _executionType =
+            ActiveSkillExecutionType.Direct;
 
 
         // ============================================================
@@ -64,11 +69,13 @@ namespace Units.Skills
         [Header("Target Count")]
         [SerializeField]
         [Tooltip("Projectile을 발사할 최대 목표 수")]
-        private int _maxTargetCount = 1;
+        private int _maxTargetCount =
+            1;
 
         [SerializeField]
-        [Tooltip("광역 판정 1회에 Effect를 적용할 최대 대상 수")]
-        private int _maxEffectTargetCount = 1;
+        [Tooltip("광역 판정 1회에 피해를 적용할 최대 인원")]
+        private int _maxDamageableCount =
+            1;
 
 
         // ============================================================
@@ -77,22 +84,16 @@ namespace Units.Skills
 
         [Header("Area")]
         [SerializeField]
-        private ActiveSkillAreaType _areaType = ActiveSkillAreaType.Single;
+        private ActiveSkillAreaType _areaType =
+            ActiveSkillAreaType.Single;
 
         [SerializeField]
-        private float _areaRadius = 1f;
+        private float _areaRadius =
+            1f;
 
         [SerializeField]
-        private float _areaAngle = 90f;
-
-
-        // ============================================================
-        // Effects
-        // ============================================================
-
-        [Header("Effects")]
-        [SerializeReference]
-        private List<SkillEffectData> _effects = new();
+        private float _areaAngle =
+            90f;
 
 
         // ============================================================
@@ -101,11 +102,8 @@ namespace Units.Skills
 
         [Header("Projectile")]
         [SerializeField]
-        private float _projectileSpeed = 10f;
-
-        // 비워두면 ProjectileManager의 공용 투사체를 사용한다.
-        [SerializeField, Tooltip("이 공격 전용 투사체 프리팹. 루트의 Projectile_Controller를 지정합니다.")]
-        private Projectile_Controller _projectilePrefab;
+        private float _projectileSpeed =
+            10f;
 
 
         // ============================================================
@@ -114,10 +112,12 @@ namespace Units.Skills
 
         [Header("Dash")]
         [SerializeField]
-        private float _dashDistance = 3f;
+        private float _dashDistance =
+            3f;
 
         [SerializeField]
-        private float _dashSpeed = 10f;
+        private float _dashSpeed =
+            10f;
 
 
         // ============================================================
@@ -126,164 +126,143 @@ namespace Units.Skills
 
         [Header("FX")]
         [SerializeField]
-        private ActiveSkillFXType _skillFXType = ActiveSkillFXType.None;
+        private ActiveSkillFXType _skillFXType =
+            ActiveSkillFXType.None;
 
         [SerializeField]
-        private ActiveSkillFXType _hitFXType = ActiveSkillFXType.None;
+        private ActiveSkillFXType _hitFXType =
+            ActiveSkillFXType.None;
 
 
         // ============================================================
         // Properties
         // ============================================================
 
-        [SerializeReference]
-        private List<SkillActionData> _actions = new();
+        public float SkillRange =>
+            _skillRange;
 
-        public IReadOnlyList<SkillActionData> Actions => _actions;
+        public float SkillCooldown =>
+            _skillCooldown;
 
-        [SerializeField, HideInInspector]
-        private int _skillSchemaVersion;
 
-        [SerializeField, HideInInspector]
-        private bool _usesLegacyTargetSelection;
+        public SkillTargetRelation TargetSide =>
+            _targetSide;
 
-        public int SkillSchemaVersion => _skillSchemaVersion;
+        public SkillTargetPolicy TargetPolicy =>
+            _targetPolicy;
 
-        public bool UsesLegacyTargetSelection => _actions.Count == 0 || _usesLegacyTargetSelection;
 
-#if UNITY_EDITOR
-        public void UpgradeSkillSchema()
-        {
-            if (_skillSchemaVersion >= 1)
-                return;
+        public ActiveSkillActionType ActionType =>
+            _actionType;
 
-            if (_actions.Count == 0)
-            {
-                _actions = new List<SkillActionData>(SkillActionPlan.Create(this));
+        public float CastTime =>
+            _castTime;
 
-                _usesLegacyTargetSelection = true;
-            }
 
-            EnsureEntryIds();
-
-            _skillSchemaVersion = 1;
-        }
-#endif
-
-        // 엔트리 이동은 ID를 유지한다. 같은 정의 내부의 복제 엔트리만 새 ID를 얻는다.
-        public void EnsureEntryIds()
-        {
-            var used = new HashSet<int>();
-
-            int next = 1;
-
-            foreach (var action in _actions)
-            {
-                if (action == null)
-                    continue;
-
-                foreach (var entry in action.BaseEffects)
-                    if (entry != null)
-                        next = Mathf.Max(next, entry.EntryId + 1);
-
-                foreach (var entry in action.ConditionalEffects)
-                    if (entry != null)
-                        next = Mathf.Max(next, entry.EntryId + 1);
-            }
-
-            foreach (var action in _actions)
-            {
-                if (action == null)
-                    continue;
-
-                foreach (var entry in action.BaseEffects)
-                    if (entry != null && (entry.EntryId <= 0 || !used.Add(entry.EntryId)))
-                    {
-                        entry.SetEntryId(next++);
-
-                        used.Add(entry.EntryId);
-                    }
-
-                foreach (var entry in action.ConditionalEffects)
-                    if (entry != null && (entry.EntryId <= 0 || !used.Add(entry.EntryId)))
-                    {
-                        entry.SetEntryId(next++);
-
-                        used.Add(entry.EntryId);
-                    }
-            }
-        }
-
-        public float SkillRange => _skillRange;
-
-        public float SkillCooldown => _skillCooldown;
-
-        public SkillTargetRelation TargetSide => _targetSide;
-
-        public SkillTargetPolicy TargetPolicy => _targetPolicy;
-
-        public ActiveSkillActionType ActionType => _actionType;
-
-        public float CastTime => _castTime;
-
-        public ActiveSkillDeliveryType DeliveryType => _deliveryType;
+        public ActiveSkillExecutionType ExecutionType =>
+            _executionType;
 
 
         // Projectile을 발사할 최대 목표 수이다.
-        public int MaxTargetCount => _maxTargetCount;
+        public int MaxTargetCount =>
+            _maxTargetCount;
 
-        // 광역 판정 1회에 Effect를 적용할 최대 대상 수이다.
-        public int MaxEffectTargetCount => _maxEffectTargetCount;
+        // 광역 판정 1회에 피해를 적용할 최대 인원이다.
+        public int MaxDamageableCount =>
+            _maxDamageableCount;
 
-        public ActiveSkillAreaType AreaType => _areaType;
 
-        public float AreaRadius => _areaRadius;
+        public ActiveSkillAreaType AreaType =>
+            _areaType;
 
-        public float AreaAngle => _areaAngle;
+        public float AreaRadius =>
+            _areaRadius;
 
-        public IReadOnlyList<SkillEffectData> Effects => _effects;
+        public float AreaAngle =>
+            _areaAngle;
 
-        public Projectile_Controller ProjectilePrefab => _projectilePrefab;
 
-        public float ProjectileSpeed => _projectileSpeed;
+        public float ProjectileSpeed =>
+            _projectileSpeed;
 
-        public float DashDistance => _dashDistance;
 
-        public float DashSpeed => _dashSpeed;
+        public float DashDistance =>
+            _dashDistance;
 
-        public ActiveSkillFXType SkillFXType => _skillFXType;
+        public float DashSpeed =>
+            _dashSpeed;
 
-        public ActiveSkillFXType HitFXType => _hitFXType;
+
+        public ActiveSkillFXType SkillFXType =>
+            _skillFXType;
+
+        public ActiveSkillFXType HitFXType =>
+            _hitFXType;
 
 
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            EnsureEntryIds();
+            _skillRange =
+                Mathf.Max(
+                    0f,
+                    _skillRange
+                );
 
-            _skillRange = Mathf.Max(0f, _skillRange);
+            _skillCooldown =
+                Mathf.Max(
+                    0f,
+                    _skillCooldown
+                );
 
-            _skillCooldown = Mathf.Max(0f, _skillCooldown);
+            _castTime =
+                Mathf.Max(
+                    0f,
+                    _castTime
+                );
 
-            _castTime = Mathf.Max(0f, _castTime);
+            _maxTargetCount =
+                Mathf.Max(
+                    1,
+                    _maxTargetCount
+                );
 
-            _maxTargetCount = Mathf.Max(1, _maxTargetCount);
+            _maxDamageableCount =
+                Mathf.Max(
+                    1,
+                    _maxDamageableCount
+                );
 
-            _maxEffectTargetCount = Mathf.Max(1, _maxEffectTargetCount);
+            _areaRadius =
+                Mathf.Max(
+                    0f,
+                    _areaRadius
+                );
 
-            _areaRadius = Mathf.Max(0f, _areaRadius);
+            _areaAngle =
+                Mathf.Clamp(
+                    _areaAngle,
+                    0f,
+                    360f
+                );
 
-            _areaAngle = Mathf.Clamp(
-                _areaAngle,
-                0f,
-                360f
-            );
+            _projectileSpeed =
+                Mathf.Max(
+                    0f,
+                    _projectileSpeed
+                );
 
-            _projectileSpeed = Mathf.Max(0f, _projectileSpeed);
+            _dashDistance =
+                Mathf.Max(
+                    0f,
+                    _dashDistance
+                );
 
-            _dashDistance = Mathf.Max(0f, _dashDistance);
-
-            _dashSpeed = Mathf.Max(0f, _dashSpeed);
+            _dashSpeed =
+                Mathf.Max(
+                    0f,
+                    _dashSpeed
+                );
         }
 #endif
     }

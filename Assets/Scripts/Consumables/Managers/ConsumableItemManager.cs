@@ -18,6 +18,8 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
     public int OverflowCount => _inventory != null ? _inventory.OverflowCount : 0;
     public bool HasOverflow => OverflowCount > 0;
     public bool IsUsing { get; private set; }
+    public bool CanUse => !IsUsing && CanUseInBattle() &&
+        _targetSelector != null && _effectExecutor != null;
 
     public event Action InventoryChanged;
     public event Action<ConsumableItemData, ICombatTarget> TargetEffectApplying;
@@ -25,6 +27,14 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
 
     [SerializeField] private ConsumableItemCatalog _itemCatalog;
     [SerializeField] private ConsumableItemCaster _itemCasterPrefab;
+    [Header("소모성 아이템 획득 테스트")]
+    [Tooltip("플레이 중 F6으로 카탈로그 획득 창을 엽니다. 일반 플레이에서는 꺼두세요.")]
+    [SerializeField] private bool _enableCatalogTest = true;
+    private bool _catalogTestOpen;
+    private Vector2 _catalogTestScroll;
+    private string _catalogTestSearch = "";
+    private string _catalogTestMessage = "목록에서 획득 버튼을 누르세요.";
+    private GUIStyle _catalogTestDescriptionStyle;
     private ConsumableItemCaster _itemCaster;
 
     private ConsumableItemInventory _inventory;
@@ -34,9 +44,93 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
     private ConsumableItemEffectExecutor _effectExecutor;
     private bool _capacityRefreshPending;
 
+    // 별도 패널이나 Canvas 연결 없이 사용하는 획득 테스트입니다.
+    private void Update()
+    {
+        if (!_enableCatalogTest)
+        {
+            _catalogTestOpen = false;
+            return;
+        }
+#if ENABLE_INPUT_SYSTEM
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        bool toggle = keyboard != null && keyboard.f6Key.wasPressedThisFrame;
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        bool toggle = Input.GetKeyDown(KeyCode.F6);
+#else
+        bool toggle = false;
+#endif
+        if (toggle) _catalogTestOpen = !_catalogTestOpen;
+    }
+
+    private void OnGUI()
+    {
+        if (!_enableCatalogTest || !_catalogTestOpen) return;
+        if (_catalogTestDescriptionStyle == null)
+            _catalogTestDescriptionStyle = new GUIStyle(GUI.skin.label) { wordWrap = true };
+
+        float width = Mathf.Min(720f, Screen.width - 20f);
+        float height = Mathf.Min(720f, Screen.height - 20f);
+        GUI.Window(GetInstanceID(), new Rect((Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f, width, height), DrawCatalogTestWindow,
+            "소모성 아이템 획득 테스트 — F6으로 열기 / 닫기");
+    }
+
+    private void DrawCatalogTestWindow(int windowId)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("이름 / ID 검색", GUILayout.Width(100f));
+        string search = GUILayout.TextField(_catalogTestSearch);
+        if (search != _catalogTestSearch)
+        {
+            _catalogTestSearch = search;
+            _catalogTestScroll = Vector2.zero;
+        }
+        if (GUILayout.Button("닫기", GUILayout.Width(60f))) _catalogTestOpen = false;
+        GUILayout.EndHorizontal();
+
+        GUILayout.Label(IsInitialized ? $"보유 {ItemCount} / 수용량 {Capacity}" : "초기화 후 획득할 수 있습니다.");
+        GUILayout.Label(IsInitialized && !HasEmptySlot ? "빈 슬롯이 없습니다. 아이템을 사용하거나 제거해주세요." : _catalogTestMessage,
+            _catalogTestDescriptionStyle);
+        if (_itemCatalog == null)
+        {
+            GUILayout.Label("Consumable Item Catalog가 연결되어 있지 않습니다.");
+            return;
+        }
+
+        _catalogTestScroll = GUILayout.BeginScrollView(_catalogTestScroll);
+        int shown = 0;
+        string filter = _catalogTestSearch.Trim();
+        foreach (var item in _itemCatalog.Items)
+        {
+            if (item == null) continue;
+            if (filter.Length > 0 &&
+                (item.Id ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                (item.DisplayName ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            shown++;
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label($"{item.Id} · {item.DisplayName} · {item.TargetTeam} / {item.TargetMode}");
+            GUILayout.Label(item.Description ?? "", _catalogTestDescriptionStyle);
+            bool enabled = GUI.enabled;
+            GUI.enabled = enabled && IsInitialized && !IsUsing && HasEmptySlot;
+            if (GUILayout.Button("1개 획득", GUILayout.Height(28f)))
+            {
+                _catalogTestMessage = TryAdd(item)
+                    ? $"{item.DisplayName} 1개 획득 완료"
+                    : $"{item.DisplayName} 획득 실패 — 빈 슬롯과 초기화 상태를 확인하세요.";
+            }
+            GUI.enabled = enabled;
+            GUILayout.EndVertical();
+        }
+        if (shown == 0) GUILayout.Label("표시할 아이템이 없습니다.");
+        GUILayout.EndScrollView();
+    }
+
     public bool TryUse(int slotIndex, Vector2? selectedPosition = null)
     {
-        if (IsUsing || !CanUseInBattle() || _targetSelector == null || _effectExecutor == null ||
+        if (!CanUse ||
             !TryGetItem(slotIndex, out ConsumableItemData item) || item.Effects == null || item.Effects.Count == 0)
             return false;
 
@@ -65,6 +159,12 @@ public class ConsumableItemManager : MonoBehaviour, IConsumableItemReader, ICons
                     HandleEffectsChanged();
                 }
             }
+        }
+        if (applied && item.IsAreaItem && selectedPosition.HasValue && item.UseVFX != null)
+        {
+            // 대상별 FX와 별개로, 아이템 사용 위치에 한 번만 재생합니다.
+            var vfx = Instantiate(item.UseVFX);
+            vfx.Play(selectedPosition.Value, item.Radius);
         }
         return applied;
     }

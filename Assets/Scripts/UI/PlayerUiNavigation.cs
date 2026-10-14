@@ -1,4 +1,3 @@
-using System;
 using Game.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -17,24 +16,21 @@ namespace Game.UI
         [SerializeField] private ArtifactInventoryPanel _artifactInventory;
 
         private PlayerPopup _current;
-        private bool _isSubscribed;
 
         private void OnEnable()
         {
-            Bind();
+            foreach (var popup in _popups) popup.Shown += HandleShown;
+            foreach (var button in _catalogButtons) button.onClick.AddListener(HandleCatalog);
+            _flow.PhaseChanged += HandlePhaseChanged;
         }
 
         private void OnDisable()
         {
-            Unbind();
-        }
-
-        public void Initialize(GameFlowController flow)
-        {
-            if (flow == null) throw new ArgumentNullException(nameof(flow));
-            Unbind();
-            _flow = flow;
-            if (isActiveAndEnabled) Bind();
+            foreach (var popup in _popups) popup.Shown -= HandleShown;
+            foreach (var button in _catalogButtons) button.onClick.RemoveListener(HandleCatalog);
+            if (_flow != null) _flow.PhaseChanged -= HandlePhaseChanged;
+            if (_current != null) _current.Hide();
+            _current = null;
         }
 
         private void Update()
@@ -87,28 +83,6 @@ namespace Game.UI
         {
             foreach (var panel in _blockingPanels) if (panel != null && panel.activeInHierarchy) return true;
             return false;
-        }
-
-        private void Bind()
-        {
-            if (_isSubscribed || _flow == null) return;
-            foreach (var popup in _popups) popup.Shown += HandleShown;
-            foreach (var button in _catalogButtons) button.onClick.AddListener(HandleCatalog);
-            _flow.PhaseChanged += HandlePhaseChanged;
-            _isSubscribed = true;
-        }
-
-        private void Unbind()
-        {
-            if (_isSubscribed)
-            {
-                foreach (var popup in _popups) popup.Shown -= HandleShown;
-                foreach (var button in _catalogButtons) button.onClick.RemoveListener(HandleCatalog);
-                if (_flow != null) _flow.PhaseChanged -= HandlePhaseChanged;
-            }
-            _isSubscribed = false;
-            if (_current != null) _current.Hide();
-            _current = null;
         }
     }
 }

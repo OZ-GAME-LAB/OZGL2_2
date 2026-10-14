@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -181,7 +181,7 @@ namespace Units
 
                     float sqrDistance =
                         GetSqrDistance(
-                            unit,
+                            unitPosition,
                             target
                         );
 
@@ -219,7 +219,10 @@ namespace Units
                 unit.transform.position;
 
             float currentTargetDistance =
-                CombatRangeUtility.Distance(unit, currentTarget);
+                Vector2.Distance(
+                    unitPosition,
+                    currentTarget.Transform.position
+                );
 
             for (int i = 0; i < _enemyGroups.Count; i++)
             {
@@ -248,7 +251,10 @@ namespace Units
                     }
 
                     float candidateDistance =
-                        CombatRangeUtility.Distance(unit, target);
+                        Vector2.Distance(
+                            unitPosition,
+                            target.Transform.position
+                        );
 
                     if (!IsSwitchCandidate(
                         currentTargetDistance,
@@ -320,7 +326,10 @@ namespace Units
                 return CurrentTargetState.Weak;
 
             float currentDistance =
-                CombatRangeUtility.Distance(unit, currentTarget);
+                Vector2.Distance(
+                    unit.transform.position,
+                    currentTarget.Transform.position
+                );
 
             if (currentDistance <= preferredCombatRange)
                 return CurrentTargetState.Stable;
@@ -433,10 +442,16 @@ namespace Units
                 unit.transform.position;
 
             float currentDistance =
-                CombatRangeUtility.Distance(unit, currentTarget);
+                Vector2.Distance(
+                    unitPosition,
+                    currentTarget.Transform.position
+                );
 
             float switchDistance =
-                CombatRangeUtility.Distance(unit, switchTarget);
+                Vector2.Distance(
+                    unitPosition,
+                    switchTarget.Transform.position
+                );
 
             switch (currentTargetState)
             {
@@ -517,10 +532,15 @@ namespace Units
         // Utility
         // =========================
 
-        private float GetSqrDistance(Unit_Gateway unit, ICombatTarget target)
+        private float GetSqrDistance(
+            Vector2 origin,
+            ICombatTarget target)
         {
-            float distance = CombatRangeUtility.Distance(unit, target);
-            return distance * distance;
+            Vector2 targetPosition =
+                target.Transform.position;
+
+            return (targetPosition - origin)
+                .sqrMagnitude;
         }
     }
 }
