@@ -153,11 +153,17 @@ namespace OZGL.KDH
         private BuildingInfoData CreateInfo(BuildingData data, string costSummary = null)
         {
             UnitData unit = null;
+            string spawnUnitName = null;
+            int? spawnCount = null;
             string production = BuildingUiQuote.Production(data);
             if (data.HasSpawn)
             {
-                if (_spawnManager != null && _spawnManager.TryGetAllyPrefab(data.Spawn.unitType, out GameObject prefab))
-                    unit = prefab.GetComponent<Unit_RuntimeStatus>().UnitData;
+                if (_spawnManager != null && _spawnManager.TryGetAllyPrefab(data.Spawn.unitType, out GameObject prefab) &&
+                    prefab != null && prefab.TryGetComponent<Unit_RuntimeStatus>(out var runtimeStatus))
+                    unit = runtimeStatus.UnitData;
+                spawnUnitName = unit != null && !string.IsNullOrWhiteSpace(unit.UnitName)
+                    ? unit.UnitName : "알 수 없는 유닛";
+                spawnCount = Mathf.Min(data.Spawn.countPerWave, data.Spawn.maxAlive);
                 if (unit == null) production += "\n유닛 정보 없음";
             }
             if (costSummary == null)
@@ -167,7 +173,8 @@ namespace OZGL.KDH
             }
             return new BuildingInfoData(_selectionId, data.DisplayName,
                 BuildingUiQuote.Category(data.BuildingType), 1, data.Description, production,
-                BuildingUiQuote.Effects(data), data.Icon, unit, costSummary, data.BuildingId);
+                BuildingUiQuote.Effects(data), data.Icon, unit, costSummary, data.BuildingId,
+                spawnUnitName, spawnCount);
         }
 
         private static BuildingActionOffer Offer(BuildingInteractionOffer offer)
