@@ -172,7 +172,7 @@ public class BootStrap : MonoBehaviour
             _runSettlementManager, _cameraController, _shopManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager,
             _totemRunApplier.FlowEffects, _unitStatModifierManager);
-        _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
+        _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _inGameSaveCoordinator,_buildingCensus);
         _gameFlowController.InitializeBuildings(_buildController.Census);
         _artifactManager.Initialize(_waveController, _effectManager, _runCurrencyManager, _uiStartup.ArtifactSelectionUI);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
@@ -185,7 +185,7 @@ public class BootStrap : MonoBehaviour
             return false;
         }
 
-        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI);
+        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI, _inGameSaveCoordinator);
         if (!_shopManager.IsInitialized)
         {
             Debug.LogError("[BootStrap] ShopManager 초기화에 실패했습니다.", this);
