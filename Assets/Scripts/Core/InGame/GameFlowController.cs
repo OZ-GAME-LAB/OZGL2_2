@@ -5,6 +5,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Cameras;
 using Game.UI;
+using OZGL.KDH;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -76,6 +77,11 @@ namespace Game.Core
         public bool IsLastNode => _nodeController != null && _nodeController.IsLastNode;
 
         public event Action<GamePhase> PhaseChanged;
+        public event Action BattleAvailabilityChanged;
+        public bool HasBarracks => _buildingCensus != null &&
+            _buildingCensus.CountType(BuildingType.Barracks) > 0;
+        private BuildingCensus _buildingCensus;
+
         public event Action QuarterDecisionRequested;
         public event Action ArtifactSelectionRequested;
         public GamePhase CurPhase => _curPhase;
@@ -156,6 +162,18 @@ namespace Game.Core
                 throw new InvalidOperationException("기본 런 준비 실패: " + error);
         }
 
+        public void InitializeBuildings(BuildingCensus census)
+        {
+            if (census == null) throw new ArgumentNullException(nameof(census));
+            if (_buildingCensus != null)
+                _buildingCensus.Changed -= HandleBuildingsChanged;
+            _buildingCensus = census;
+            _buildingCensus.Changed += HandleBuildingsChanged;
+            HandleBuildingsChanged();
+        }
+
+        private void HandleBuildingsChanged() => BattleAvailabilityChanged?.Invoke();
+
         public void InitializeSave(IRunCheckpointWriter checkpointWriter)
         {
             _checkpointWriter = checkpointWriter ?? throw new ArgumentNullException(nameof(checkpointWriter));
@@ -185,6 +203,8 @@ namespace Game.Core
 
         private void OnDestroy()
         {
+            if (_buildingCensus != null)
+                _buildingCensus.Changed -= HandleBuildingsChanged;
             _cts?.Cancel();
             _cts?.Dispose();
         }
@@ -343,7 +363,7 @@ namespace Game.Core
         public async UniTask<bool> TrySpawnUnits()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
-            if (_waveController.CurrentPreset == null) return false;
+            if (!HasBarracks || _waveController.CurrentPreset == null) return false;
             _isTransitioning = true;
             var token = _cts.Token;
             var completion = new UniTaskCompletionSource();
