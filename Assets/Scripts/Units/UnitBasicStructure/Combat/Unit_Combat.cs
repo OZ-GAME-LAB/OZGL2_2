@@ -13,24 +13,6 @@ namespace Units
         // ============================================================
 
         private Unit_Core _core;
-        private readonly List<RuntimeActiveSkill> _skills = new();
-        private ActiveSkillSelector _activeSelector;
-        private RuntimeActiveSkill _selectedSkill;
-        private bool HasReadySkill()
-        {
-            foreach (var skill in _skills)
-                if (skill.Cooldown <= 0 && skill.Retry <= 0 && _core.GetSkillPolicy(skill.Entry)?.Enabled == true) return true;
-            return false;
-        }
-        public bool TrySelectActiveSkill(ICombatTarget target, out UnitDecision decision)
-        {
-            decision = default;
-            return CanUseActiveSkill && _activeSelector.Select(_skills, target, out decision);
-        }
-        public void InterruptForPhase() { InterruptBasicAttack(); InterruptActiveSkill(); }
-        public float GetSkillCooldown(string id)
-        { foreach (var skill in _skills) if (skill.Entry.Id == id) return skill.Cooldown; return 0; }
-
 
 
         // ============================================================
@@ -39,23 +21,12 @@ namespace Units
 
         private BasicAttackData _basicAttackData;
 
+        private ActiveSkillData _activeSkillData;
 
 
         // ============================================================
         // Executor
         // ============================================================
-
-        public event Action<SkillFXRequest> FXRequested;
-
-        private void DispatchFX(SkillFXRequest request)
-        {
-            if (FXRequested == null) return;
-            foreach (Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
-            {
-                try { listener(request); }
-                catch (Exception exception) { Debug.LogException(exception); }
-            }
-        }
 
         private BasicAttackExecutor _basicAttackExecutor;
 
@@ -66,7 +37,7 @@ namespace Units
         // Selector
         // ============================================================
 
-
+        private SkillTargetSelector _skillTargetSelector;
 
 
         // ============================================================
@@ -84,47 +55,34 @@ namespace Units
 
         private bool _isBusy;
 
-        private enum ExecutionOwner
-        {
-            None,
-            BasicAttack,
-            ActiveSkill
-        }
-
-        private ExecutionOwner _executionOwner;
-
-        private int _executionVersion;
-
-        public SkillExecutionResult LastSkillResult { get; private set; }
-
         private float _basicAttackDelayRemaining;
 
+        private float _skillCooldownRemaining;
 
         private bool _isPreparingSkill;
-
-
+        private float _skillRetryRemaining;
         private bool _reevaluateAfterSkillMovement;
-
-
-
-        // ============================================================
-        // Restriction Runtime State
-        // ============================================================
-
-        private bool _isBasicAttackBlocked;
-
-        private bool _isActiveSkillBlocked;
+        private readonly List<ICombatTarget> _skillCandidates = new List<ICombatTarget>();
 
 
         // ============================================================
         // Properties & Conditions
         // ============================================================
 
-        public bool IsBusy => _isBusy || _isPreparingSkill;
+        public bool IsBusy
+            => _isBusy;
 
-        public bool IsBasicAttackReady => _core != null && !_isBusy && !_isPreparingSkill && !_core.BlocksNewExecution && _basicAttackDelayRemaining <= 0f;
+        public bool IsBasicAttackReady
+            => !_isBusy
+            && !_isPreparingSkill
+            && _basicAttackDelayRemaining <= 0f;
 
-        public bool IsActiveSkillReady => _core != null && !_isBusy && !_isPreparingSkill && !_core.BlocksNewExecution && HasReadySkill();
+        public bool IsActiveSkillReady
+            => !_isBusy
+            && !_isPreparingSkill
+            && _skillRetryRemaining <= 0f
+            && _skillCooldownRemaining <= 0f;
+
 
         public bool CanUseActiveSkill
         {
@@ -133,20 +91,31 @@ namespace Units
                 if (_isPaused)
                     return false;
 
-                if (_isActiveSkillBlocked)
+                if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
                     return false;
 
-                if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
-                {
+                if (_activeSkillData == null)
                     return false;
-                }
+
+                if (_activeSkillExecutor == null)
+                    return false;
+
+                if (_skillTargetSelector == null)
+                    return false;
 
                 if (!IsActiveSkillReady)
                     return false;
 
+                // TODO:
+                // 상태이상 등으로 인한 Skill 사용 불가 조건 추가
+                //
+                // if (_core.RuntimeStatus.IsSilenced)
+                //     return false;
+
                 return true;
             }
         }
+
 
         public bool CanUseBasicAttack
         {
@@ -155,13 +124,8 @@ namespace Units
                 if (_isPaused)
                     return false;
 
-                if (_isBasicAttackBlocked)
-                    return false;
-
                 if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
-                {
                     return false;
-                }
 
                 if (_basicAttackData == null)
                     return false;
@@ -176,6 +140,7 @@ namespace Units
             }
         }
 
+
         public float PreferredCombatRange
         {
             get
@@ -186,13 +151,13 @@ namespace Units
                 if (_core.RuntimeStatus == null)
                     return 0f;
 
-                float range = _basicAttackData != null ? _basicAttackData.BasicAttackRange : 0;
                 if (CanUseActiveSkill)
-                    foreach (var skill in _skills)
-                        if (skill.Cooldown <= 0 && skill.Retry <= 0 && _core.GetSkillPolicy(skill.Entry)?.Enabled == true &&
-                            skill.Entry.Skill.TargetSide == SkillTargetRelation.Hostile)
-                            range = range > 0 ? Mathf.Min(range, skill.Entry.Skill.SkillRange) : skill.Entry.Skill.SkillRange;
-                return range;
+                    return _activeSkillData.SkillRange;
+
+                if (_basicAttackData == null)
+                    return 0f;
+
+                return _basicAttackData.BasicAttackRange;
             }
         }
 
@@ -206,29 +171,35 @@ namespace Units
             if (_isPaused)
                 return;
 
-            _activeSkillExecutor?.FixedTick(Time.fixedDeltaTime);
+            _activeSkillExecutor?.FixedTick(
+                Time.fixedDeltaTime
+            );
         }
+
 
         private void OnDisable()
         {
             Stop();
         }
 
+
         private void OnDestroy()
         {
             Stop();
         }
+
 
         private void Update()
         {
             if (_isPaused)
                 return;
 
-
+            _skillRetryRemaining = Mathf.Max(0f, _skillRetryRemaining - Time.deltaTime);
             UpdateTimers();
 
-            _basicAttackExecutor?.Tick(Time.deltaTime);
-            _activeSkillExecutor?.Tick(Time.deltaTime);
+            _activeSkillExecutor?.Tick(
+                Time.deltaTime
+            );
         }
 
 
@@ -236,18 +207,24 @@ namespace Units
         // Initialize
         // ============================================================
 
-        public void Initialize(Unit_Core core)
+        public void Initialize(
+            Unit_Core core)
         {
             if (core == null)
             {
-                Debug.LogError($"[Unit_Combat] {name} : Unit_Core가 없습니다.");
+                Debug.LogError(
+                    $"[Unit_Combat] {name} : Unit_Core가 없습니다."
+                );
 
                 return;
             }
 
+
             Stop();
 
-            _core = core;
+            _core =
+                core;
+
 
             InitializeData();
 
@@ -256,58 +233,86 @@ namespace Units
             ResetRuntimeState();
         }
 
+
         private void InitializeData()
         {
             if (_core.RuntimeStatus == null)
             {
-                Debug.LogError($"[Unit_Combat] {name} : RuntimeStatus가 없습니다.");
+                Debug.LogError(
+                    $"[Unit_Combat] {name} : RuntimeStatus가 없습니다."
+                );
 
-                _basicAttackData = null;
+                _basicAttackData =
+                    null;
 
+                _activeSkillData =
+                    null;
 
                 return;
             }
 
-            _basicAttackData = _core.RuntimeStatus.BasicAttackData;
+
+            _basicAttackData =
+                _core.RuntimeStatus.BasicAttackData;
+
+            _activeSkillData =
+                _core.RuntimeStatus.ActiveSkillData;
 
 
             if (_basicAttackData == null)
             {
-                Debug.LogWarning($"[Unit_Combat] {name} : BasicAttackData가 없습니다.");
+                Debug.LogWarning(
+                    $"[Unit_Combat] {name} : BasicAttackData가 없습니다."
+                );
             }
 
+
+            if (_activeSkillData == null)
+            {
+                Debug.LogWarning(
+                    $"[Unit_Combat] {name} : ActiveSkillData가 없습니다."
+                );
+            }
         }
+
 
         private void InitializeCombatModules()
         {
-            _targetResolver = new TargetResolver();
-            if (_basicAttackExecutor != null) _basicAttackExecutor.FXRequested -= DispatchFX;
-            foreach (var skill in _skills) skill.Executor.FXRequested -= DispatchFX;
-            _skills.Clear();
-            _selectedSkill = null;
-            var ids = new HashSet<string>();
-            foreach (var entry in _core.RuntimeStatus.ActiveSkills)
-            {
-                if (entry == null || entry.Skill == null) continue;
-                if (string.IsNullOrWhiteSpace(entry.Id) || !ids.Add(entry.Id))
-                { Debug.LogError("[Unit_Combat] 스킬 ID가 없거나 중복되었습니다.", this); continue; }
-                var runtime = new RuntimeActiveSkill(_core, entry, _targetResolver);
-                runtime.Executor.FXRequested += DispatchFX;
-                _skills.Add(runtime);
-            }
-            _activeSelector = new ActiveSkillSelector(_core, _targetResolver);
+            _targetResolver =
+                new TargetResolver(
+                    _core
+                );
 
 
+            _skillTargetSelector =
+                _activeSkillData != null
+                    ? new SkillTargetSelector(
+                        _core,
+                        _activeSkillData
+                    )
+                    : null;
 
-            _basicAttackExecutor = _basicAttackData != null ? new BasicAttackExecutor(
-                _core,
-                _basicAttackData,
-                _targetResolver
-            ) : null;
-            if (_basicAttackExecutor != null) _basicAttackExecutor.FXRequested += DispatchFX;
 
-            _activeSkillExecutor = null;
+            _basicAttackExecutor =
+                _basicAttackData != null
+                    ? new BasicAttackExecutor(
+                        _core,
+                        _basicAttackData,
+                        _targetResolver
+                    )
+                    : null;
+
+
+            _activeSkillExecutor =
+                _activeSkillData != null
+                    ? new ActiveSkillExecutor(
+                        _core,
+                        _activeSkillData,
+                        _targetResolver
+                    )
+                    : null;
         }
+
 
         private void ResetRuntimeState()
         {
@@ -315,6 +320,7 @@ namespace Units
 
             _isPreparingSkill = false;
 
+            _skillRetryRemaining = 0f;
 
             _reevaluateAfterSkillMovement = false;
 
@@ -322,10 +328,7 @@ namespace Units
 
             _basicAttackDelayRemaining = 0f;
 
-
-            _isBasicAttackBlocked = false;
-
-            _isActiveSkillBlocked = false;
+            _skillCooldownRemaining = 0f;
         }
 
 
@@ -333,37 +336,46 @@ namespace Units
         // Basic Attack
         // ============================================================
 
-        public bool TryBasicAttack(ICombatTarget target)
+        public bool TryBasicAttack(
+            ICombatTarget target)
         {
             if (!CanUseBasicAttack)
                 return false;
 
-            if (!IsValidEnemyTarget(target))
+
+            if (!IsValidEnemyTarget(
+                target
+            ))
             {
                 return false;
             }
 
-            ExecuteBasicAttack(target);
+
+            ExecuteBasicAttack(
+                target
+            );
+
 
             return true;
         }
 
-        private void ExecuteBasicAttack(ICombatTarget target)
+
+        private void ExecuteBasicAttack(
+            ICombatTarget target)
         {
-            _isBusy = true;
+            _isBusy =
+                true;
 
-            _executionOwner = ExecutionOwner.BasicAttack;
-
-            int version = ++_executionVersion;
 
             StartBasicAttackDelay();
 
-            _basicAttackExecutor.Execute(target, () =>
-            {
-                if (version == _executionVersion && _executionOwner == ExecutionOwner.BasicAttack)
-                    CompleteBasicAttack();
-            });
+
+            _basicAttackExecutor.Execute(
+                target,
+                CompleteBasicAttack
+            );
         }
+
 
         private void StartBasicAttackDelay()
         {
@@ -376,22 +388,29 @@ namespace Units
             if (_basicAttackData == null)
                 return;
 
-            float attackSpeed = Mathf.Max(0.01f, _core.RuntimeStatus.AttackSpeed);
 
-            _basicAttackDelayRemaining = _basicAttackData.BasicAttackDelay / attackSpeed;
+            float attackSpeed =
+                Mathf.Max(
+                    0.01f,
+                    _core.RuntimeStatus.AttackSpeed
+                );
+
+
+            _basicAttackDelayRemaining =
+                _basicAttackData.BasicAttackDelay
+                / attackSpeed;
         }
+
 
         private void CompleteBasicAttack()
         {
-            if (_executionOwner != ExecutionOwner.BasicAttack)
-                return;
-
-            _executionOwner = ExecutionOwner.None;
-
             if (!_isBusy)
                 return;
 
-            _isBusy = false;
+
+            _isBusy =
+                false;
+
 
             _core?.NotifyBasicAttackCompleted();
         }
@@ -402,95 +421,74 @@ namespace Units
         // ============================================================
 
         public bool TryActiveSkill(ICombatTarget currentTarget)
-        { return TrySelectActiveSkill(currentTarget, out var decision) && TryActiveSkill(decision); }
-
-        public bool TryActiveSkill(UnitDecision decision, Action onStarting = null)
         {
-            if (!CanUseActiveSkill || decision.Action != UnitAIActionType.ActiveSkill || decision.PhaseVersion != _core.HeroPhaseVersion)
+            if (!CanUseActiveSkill)
                 return false;
-            if (!decision.Owner.IsTargetable || !ReferenceEquals(decision.Owner.Target, _core.CombatTarget)) return false;
-            if (decision.Target.Target != null && !decision.Target.IsTargetable) return false;
-            var runtime = _skills.Find(x => x.Entry.Id == decision.SkillId);
-            if (runtime == null || runtime.Cooldown > 0 || runtime.Retry > 0) return false;
-            if (!_activeSelector.Preview(runtime, decision.Target.Target, out var initial, out _, out _))
-            {
-                // 선택 직후 대상/조건이 바뀐 실패도 기존 행동을 유지하며 재시도를 늦춘다.
-                runtime.Retry = 0.25f;
-                return false;
-            }
-            _selectedSkill = runtime;
-            _activeSkillExecutor = runtime.Executor;
-
 
             _isPreparingSkill = true;
-
-            int preparationVersion = _executionVersion;
-
             bool started = false;
-
             try
             {
-
-
-                var engagement = new SkillEngagementSession(_core.RequestSkillEngagement, _core.CaptureSkillTargetFilter);
-
-                // 이 사용 시도에서 상위 검토 요청은 정확히 한 곳에서만 발생한다.
-                // 최초 Action이 Friendly/None이면 최초 Hostile Action까지 승인을 지연한다.
-                if (!_activeSkillExecutor.TryPrepare(
-                    initial,
-                    engagement,
-                    out var prepared
-                ))
+                CollectSkillCandidates();
+                ICombatTarget target = _skillTargetSelector.SelectTarget(currentTarget, _skillCandidates);
+                if (!IsValidSkillTarget(target) || !_activeSkillExecutor.CanExecute(target))
                     return false;
 
-                // Target 탐색과 Engagement 검토 사이에
-                // Status가 변경될 수 있으므로 실행 직전에 다시 확인한다.
-                // 이미 준비에 들어온 요청이므로 신규 진입 조건은 다시 검사하지 않는다.
-                if (!CanContinueActiveSkillPreparation() || !_isPreparingSkill || preparationVersion != _executionVersion || decision.PhaseVersion != _core.HeroPhaseVersion || _core.GetSkillPolicy(runtime.Entry)?.Enabled != true)
-                    return false;
-                if (!_core.GetSkillPolicy(runtime.Entry).Allows(new SkillConditionContext(_core.CombatTarget,
-                    prepared.PrimaryTarget, _targetResolver, isActiveSkill: true, actionIndex: 0, position: prepared.Origin)))
+                Predicate<ICombatTarget> targetFilter = null;
+                if (_activeSkillData.TargetSide == SkillTargetRelation.Hostile)
+                {
+                    // 이 사용 시도에서 상위 검토 요청은 정확히 한 곳에서만 발생한다.
+                    SkillEngagementResult result = _core.RequestSkillEngagement(target);
+                    if (result == SkillEngagementResult.Invalid)
+                        return false;
+
+                    targetFilter = _core.CaptureSkillTargetFilter();
+                    if (result == SkillEngagementResult.Denied)
+                    {
+                        _skillCandidates.RemoveAll(candidate => !targetFilter(candidate));
+                        target = _skillTargetSelector.SelectTarget(currentTarget, _skillCandidates);
+                        // 거절 후에는 내부 후보만 사용하고 두 번째 확대 요청을 하지 않는다.
+                    }
+
+                    if (!IsValidSkillTarget(target) || !targetFilter(target))
+                        return false;
+                }
+
+                if (!_core.IsAlive || !isActiveAndEnabled || !_activeSkillExecutor.CanExecute(target))
                     return false;
 
                 _isBusy = true;
-
-                _executionOwner = ExecutionOwner.ActiveSkill;
-
-                int version = ++_executionVersion;
-
-                _reevaluateAfterSkillMovement = false;
-
+                _reevaluateAfterSkillMovement = _activeSkillData.ActionType == ActiveSkillActionType.Dash;
                 StartSkillCooldown();
-
                 started = true;
-
-                // AI는 준비 성공 이후, 실제 Action/동기 완료 이벤트 이전에 전환한다.
-                // 돌진이 시작된 뒤 Move.Exit이 속도를 지우는 순서도 방지한다.
-                onStarting?.Invoke();
-
-                _activeSkillExecutor.Execute(initial, result =>
-                {
-                    if (version != _executionVersion || _executionOwner != ExecutionOwner.ActiveSkill)
-                        return;
-
-                    LastSkillResult = result;
-
-                    _reevaluateAfterSkillMovement = result.Moved;
-
-                    CompleteActiveSkill();
-                }, engagement, prepared);
-
+                _activeSkillExecutor.Execute(target, CompleteActiveSkill, targetFilter);
                 return true;
             }
             finally
             {
-                if (ReferenceEquals(_selectedSkill, runtime)) _isPreparingSkill = false;
-
+                _isPreparingSkill = false;
                 // 쿨타임은 소비하지 않는다. 실패 반복이 평타/이동 판단을 굶기지 않게 잠시 양보한다.
                 if (!started)
-                    runtime.Retry = 0.25f;
+                    _skillRetryRemaining = 0.25f;
             }
         }
+
+        private void CollectSkillCandidates()
+        {
+            _skillCandidates.Clear();
+            if (_activeSkillData.TargetSide == SkillTargetRelation.Self)
+                return;
+
+            UnitTeam team = _activeSkillData.TargetSide == SkillTargetRelation.Friendly
+                ? _core.Team
+                : (_core.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally);
+            IReadOnlyList<ICombatTarget> candidates = _targetResolver.ResolveCandidates(
+                new TargetCandidateRequest(_core.transform.position, _activeSkillData.SkillRange, team));
+            // Resolver의 재사용 버퍼를 실행/재선택 과정에서 보관하지 않는다.
+            for (int i = 0; i < candidates.Count; i++)
+                _skillCandidates.Add(candidates[i]);
+        }
+
 
         private void StartSkillCooldown()
         {
@@ -500,31 +498,35 @@ namespace Units
             if (_core.RuntimeStatus == null)
                 return;
 
-            if (_selectedSkill == null)
+            if (_activeSkillData == null)
                 return;
 
-            float cooldownReduction = Mathf.Clamp01(_core.RuntimeStatus.CooldownReduction);
 
-            _selectedSkill.Cooldown = Mathf.Max(0, _selectedSkill.Entry.Skill.SkillCooldown * (1f - cooldownReduction));
+            float cooldownReduction =
+                Mathf.Clamp01(
+                    _core.RuntimeStatus.CooldownReduction
+                );
+
+
+            _skillCooldownRemaining =
+                _activeSkillData.SkillCooldown
+                * (1f - cooldownReduction);
         }
+
 
         private void CompleteActiveSkill()
         {
-            if (_executionOwner != ExecutionOwner.ActiveSkill)
-                return;
-
-            _executionOwner = ExecutionOwner.None;
-
             if (!_isBusy)
                 return;
 
-            _isBusy = false;
+
+            _isBusy =
+                false;
+
 
             bool reevaluate = _reevaluateAfterSkillMovement;
-
             _reevaluateAfterSkillMovement = false;
-
-            _core?.NotifySkillExecutionEnded(LastSkillResult, reevaluate);
+            _core?.NotifyActiveSkillCompleted(reevaluate);
         }
 
 
@@ -539,81 +541,34 @@ namespace Units
             UpdateSkillCooldown();
         }
 
+
         private void UpdateBasicAttackDelay()
         {
             if (_basicAttackDelayRemaining <= 0f)
                 return;
 
-            _basicAttackDelayRemaining = Mathf.Max(0f, _basicAttackDelayRemaining - Time.deltaTime);
+
+            _basicAttackDelayRemaining =
+                Mathf.Max(
+                    0f,
+                    _basicAttackDelayRemaining
+                    - Time.deltaTime
+                );
         }
+
 
         private void UpdateSkillCooldown()
         {
-            foreach (var skill in _skills)
-            {
-                skill.Cooldown = Mathf.Max(0, skill.Cooldown - Time.deltaTime);
-                skill.Retry = Mathf.Max(0, skill.Retry - Time.deltaTime);
-            }
-        }
-
-
-        // ============================================================
-        // Combat Restriction
-        // ============================================================
-
-        public void SetBasicAttackBlocked(bool isBlocked)
-        {
-            if (_isBasicAttackBlocked == isBlocked)
-            {
-                return;
-            }
-
-            _isBasicAttackBlocked = isBlocked;
-
-            if (!isBlocked)
+            if (_skillCooldownRemaining <= 0f)
                 return;
 
-            InterruptBasicAttack();
-        }
 
-        public void SetActiveSkillBlocked(bool isBlocked)
-        {
-            if (_isActiveSkillBlocked == isBlocked)
-            {
-                return;
-            }
-
-            _isActiveSkillBlocked = isBlocked;
-
-            if (!isBlocked)
-                return;
-
-            InterruptActiveSkill();
-        }
-
-        private void InterruptBasicAttack()
-        {
-            if (_executionOwner != ExecutionOwner.BasicAttack)
-                return;
-
-            _basicAttackExecutor?.Cancel();
-
-            // 현재 BasicAttack이 소유한 Busy만 정리한다. 액티브 실행과 종료를 혼동하지 않는다.
-            _executionVersion++;
-
-            CompleteBasicAttack();
-        }
-
-        private void InterruptActiveSkill()
-        {
-            _isPreparingSkill = false;
-
-            if (_executionOwner != ExecutionOwner.ActiveSkill)
-                return;
-
-            // 진행 중인 Cast / Dash를 중단한다.
-            // 이미 발사된 투사체는 ProjectileManager의 생명주기를 따른다.
-            _activeSkillExecutor?.Cancel();
+            _skillCooldownRemaining =
+                Mathf.Max(
+                    0f,
+                    _skillCooldownRemaining
+                    - Time.deltaTime
+                );
         }
 
 
@@ -626,43 +581,46 @@ namespace Units
             if (_isPaused)
                 return;
 
-            _isPaused = true;
+
+            _isPaused =
+                true;
         }
+
 
         public void Resume()
         {
             if (!_isPaused)
                 return;
 
-            _isPaused = false;
+
+            _isPaused =
+                false;
         }
+
 
         public void Stop()
         {
-            _isPreparingSkill = false;
+            _isPaused =
+                false;
 
-            _isPaused = true; // 종료 알림에서 새 실행에 재진입하지 못한다.
-            if (_executionOwner == ExecutionOwner.ActiveSkill)
-                _activeSkillExecutor?.Cancel();
+            _isPreparingSkill =
+                false;
 
-            else if (_executionOwner == ExecutionOwner.BasicAttack)
-                InterruptBasicAttack();
+            _reevaluateAfterSkillMovement =
+                false;
+
+            _skillRetryRemaining =
+                0f;
+
 
             _basicAttackExecutor?.Cancel();
 
             _activeSkillExecutor?.Cancel();
 
+
             // 진행 중인 Cast / Dash만 취소하고, 이미 발사된 투사체는 Manager에서 유지한다.
-            _executionVersion++;
-
-            _executionOwner = ExecutionOwner.None;
-
-            _isBusy = false;
-
-            _reevaluateAfterSkillMovement = false;
-
-
-            _isPaused = false;
+            _isBusy =
+                false;
         }
 
 
@@ -670,39 +628,51 @@ namespace Units
         // Validation
         // ============================================================
 
-        private bool IsValidEnemyTarget(ICombatTarget target)
+        private bool IsValidEnemyTarget(
+            ICombatTarget target)
         {
-            if (!IsValidTarget(target))
+            if (!IsValidTarget(
+                target
+            ))
             {
                 return false;
             }
 
-            if (_core != null && target.Team == _core.Team)
+
+            if (_core != null
+                && target.Team == _core.Team)
             {
                 return false;
             }
+
 
             return true;
         }
 
-        private bool IsValidSkillTarget(ICombatTarget target)
+
+        private bool IsValidSkillTarget(
+            ICombatTarget target)
         {
-            if (!IsValidTarget(target))
+            if (!IsValidTarget(
+                target
+            ))
             {
                 return false;
             }
+
 
             // SkillTargetSelector가 TargetSide에 맞는 대상을 선정한다.
             // Unit_Combat은 선정된 대상 자체의 유효성만 검증한다.
+
             return true;
         }
 
-        private bool IsValidTarget(ICombatTarget target)
+
+        private bool IsValidTarget(
+            ICombatTarget target)
         {
             if (!CombatTargetUtility.IsValid(target))
-            {
                 return false;
-            }
 
             if (!target.IsTargetable)
                 return false;
@@ -710,30 +680,8 @@ namespace Units
             if (target.Transform == null)
                 return false;
 
-            return true;
-        }
-
-        private bool CanContinueActiveSkillPreparation()
-        {
-            if (_isPaused)
-                return false;
-
-            if (_isActiveSkillBlocked)
-                return false;
-
-            if (_core == null || !_core.IsAlive || !isActiveAndEnabled)
-            {
-                return false;
-            }
-
-            if (_selectedSkill == null)
-                return false;
-
-            if (_activeSkillExecutor == null)
-                return false;
 
             return true;
         }
-
     }
 }

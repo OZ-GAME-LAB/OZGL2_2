@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using Units.Effects;
 using Units.UnitDatas;
 
 
@@ -24,10 +23,8 @@ namespace Units.Editor
 
         private SerializedProperty _stats;
 
-        private SerializedProperty _statusImmunities;
-
         private SerializedProperty _basicAttackData;
-        private SerializedProperty _passiveSkillDatas;
+        private SerializedProperty _activeSkillData;
 
 
         // ============================================================
@@ -37,7 +34,6 @@ namespace Units.Editor
         private bool _basicFoldout = true;
         private bool _identityFoldout = true;
         private bool _statsFoldout = true;
-        private bool _statusImmunityFoldout = true;
         private bool _combatFoldout = true;
 
 
@@ -77,19 +73,14 @@ namespace Units.Editor
                     "_stats"
                 );
 
-            _statusImmunities =
-                serializedObject.FindProperty(
-                    "_statusImmunities"
-                );
-
             _basicAttackData =
                 serializedObject.FindProperty(
                     "_basicAttackData"
                 );
 
-            _passiveSkillDatas =
+            _activeSkillData =
                 serializedObject.FindProperty(
-                    "_passiveSkillDatas"
+                    "_activeSkillData"
                 );
 
 
@@ -122,10 +113,6 @@ namespace Units.Editor
             EditorGUILayout.Space();
 
             DrawStatsSection();
-
-            EditorGUILayout.Space();
-
-            DrawStatusImmunitySection();
 
             EditorGUILayout.Space();
 
@@ -173,8 +160,6 @@ namespace Units.Editor
                     _team
                 );
 
-                EditorGUILayout.PropertyField(serializedObject.FindProperty("_rallyZone"));
-
 
                 EditorGUI.indentLevel--;
             }
@@ -183,10 +168,6 @@ namespace Units.Editor
             EditorGUILayout.EndVertical();
         }
 
-
-        // ============================================================
-        // Identity
-        // ============================================================
 
         // ============================================================
         // Identity
@@ -221,14 +202,20 @@ namespace Units.Editor
                 {
                     case UnitTeam.Ally:
 
-                        DrawAllyIdentity();
+                        EditorGUILayout.PropertyField(
+                            _allyIdentity,
+                            true
+                        );
 
                         break;
 
 
                     case UnitTeam.Enemy:
 
-                        DrawEnemyIdentity();
+                        EditorGUILayout.PropertyField(
+                            _enemyIdentity,
+                            true
+                        );
 
                         break;
                 }
@@ -239,545 +226,6 @@ namespace Units.Editor
 
 
             EditorGUILayout.EndVertical();
-        }
-
-
-        // ============================================================
-        // Ally Identity
-        // ============================================================
-
-        private void DrawAllyIdentity()
-        {
-            SerializedProperty unitClass =
-                _allyIdentity.FindPropertyRelative(
-                    "_unitClass"
-                );
-
-            SerializedProperty unitTier =
-                _allyIdentity.FindPropertyRelative(
-                    "_unitTier"
-                );
-
-            SerializedProperty unitType =
-                _allyIdentity.FindPropertyRelative(
-                    "_unitType"
-                );
-
-
-            EditorGUI.BeginChangeCheck();
-
-
-            EditorGUILayout.PropertyField(
-                unitClass
-            );
-
-
-            bool classChanged =
-                EditorGUI.EndChangeCheck();
-
-
-            EditorGUILayout.PropertyField(
-                unitTier
-            );
-
-
-            AllyUnitClass allyClass =
-                (AllyUnitClass)unitClass.intValue;
-
-
-            if (classChanged)
-            {
-                ValidateAllyUnitType(
-                    allyClass,
-                    unitType
-                );
-            }
-
-
-            DrawAllyUnitType(
-                allyClass,
-                unitType
-            );
-        }
-
-
-        private void DrawAllyUnitType(
-            AllyUnitClass allyClass,
-            SerializedProperty unitType)
-        {
-            List<AllyUnitType> availableTypes =
-                GetAvailableAllyUnitTypes(
-                    allyClass
-                );
-
-
-            if (availableTypes.Count == 0)
-            {
-                unitType.intValue =
-                    (int)AllyUnitType.Default;
-
-                EditorGUI.BeginDisabledGroup(
-                    true
-                );
-
-                EditorGUILayout.EnumPopup(
-                    "Unit Type",
-                    AllyUnitType.Default
-                );
-
-                EditorGUI.EndDisabledGroup();
-
-                return;
-            }
-
-
-            AllyUnitType currentType =
-                (AllyUnitType)unitType.intValue;
-
-
-            int selectedIndex =
-                availableTypes.IndexOf(
-                    currentType
-                );
-
-
-            if (selectedIndex < 0)
-            {
-                selectedIndex = 0;
-
-                unitType.intValue =
-                    (int)availableTypes[0];
-            }
-
-
-            string[] displayNames =
-                new string[availableTypes.Count];
-
-
-            for (int i = 0;
-                 i < availableTypes.Count;
-                 i++)
-            {
-                displayNames[i] =
-                    ObjectNames.NicifyVariableName(
-                        availableTypes[i].ToString()
-                    );
-            }
-
-
-            int nextIndex =
-                EditorGUILayout.Popup(
-                    "Unit Type",
-                    selectedIndex,
-                    displayNames
-                );
-
-
-            unitType.intValue =
-                (int)availableTypes[nextIndex];
-        }
-
-
-        private List<AllyUnitType> GetAvailableAllyUnitTypes(
-            AllyUnitClass allyClass)
-        {
-            List<AllyUnitType> result =
-                new();
-
-
-            GetAllyUnitTypeRange(
-                allyClass,
-                out int minValue,
-                out int maxValue
-            );
-
-
-            if (minValue < 0)
-            {
-                return result;
-            }
-
-
-            AllyUnitType[] unitTypes =
-                (AllyUnitType[])Enum.GetValues(
-                    typeof(AllyUnitType)
-                );
-
-
-            for (int i = 0;
-                 i < unitTypes.Length;
-                 i++)
-            {
-                AllyUnitType unitType =
-                    unitTypes[i];
-
-                int value =
-                    (int)unitType;
-
-
-                if (value < minValue ||
-                    value > maxValue)
-                {
-                    continue;
-                }
-
-
-                result.Add(
-                    unitType
-                );
-            }
-
-
-            return result;
-        }
-
-
-        private void ValidateAllyUnitType(
-            AllyUnitClass allyClass,
-            SerializedProperty unitType)
-        {
-            GetAllyUnitTypeRange(
-                allyClass,
-                out int minValue,
-                out int maxValue
-            );
-
-
-            int currentValue =
-                unitType.intValue;
-
-
-            if (minValue < 0 ||
-                currentValue < minValue ||
-                currentValue > maxValue)
-            {
-                unitType.intValue =
-                    (int)AllyUnitType.Default;
-            }
-        }
-
-
-        private void GetAllyUnitTypeRange(
-            AllyUnitClass allyClass,
-            out int minValue,
-            out int maxValue)
-        {
-            switch (allyClass)
-            {
-                case AllyUnitClass.Warrior:
-
-                    minValue = 1;
-                    maxValue = 10;
-
-                    break;
-
-
-                case AllyUnitClass.Swordsman:
-
-                    minValue = 11;
-                    maxValue = 20;
-
-                    break;
-
-
-                case AllyUnitClass.Archer:
-
-                    minValue = 21;
-                    maxValue = 30;
-
-                    break;
-
-
-                case AllyUnitClass.Mage:
-
-                    minValue = 31;
-                    maxValue = 40;
-
-                    break;
-
-
-                case AllyUnitClass.Cultist:
-
-                    minValue = 41;
-                    maxValue = 50;
-
-                    break;
-
-
-                default:
-
-                    minValue = -1;
-                    maxValue = -1;
-
-                    break;
-            }
-        }
-
-
-        // ============================================================
-        // Enemy Identity
-        // ============================================================
-
-        private void DrawEnemyIdentity()
-        {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("_enemyRank"));
-
-            SerializedProperty unitClass =
-                _enemyIdentity.FindPropertyRelative(
-                    "_unitClass"
-                );
-
-            SerializedProperty unitFaction =
-                _enemyIdentity.FindPropertyRelative(
-                    "_unitFaction"
-                );
-
-            SerializedProperty unitType =
-                _enemyIdentity.FindPropertyRelative(
-                    "_unitType"
-                );
-
-
-            EditorGUILayout.PropertyField(
-                unitClass
-            );
-
-
-            EditorGUI.BeginChangeCheck();
-
-
-            EditorGUILayout.PropertyField(
-                unitFaction
-            );
-
-
-            bool factionChanged =
-                EditorGUI.EndChangeCheck();
-
-
-            EnemyUnitFaction faction =
-                (EnemyUnitFaction)unitFaction.intValue;
-
-
-            if ((EnemyRank)serializedObject.FindProperty("_enemyRank").intValue == EnemyRank.Boss)
-            {
-                // Boss identity and faction are independent; do not coerce a boss
-                // ID into the ordinary faction's numeric range.
-                EditorGUILayout.PropertyField(unitType);
-                return;
-            }
-
-            if (factionChanged)
-            {
-                ValidateEnemyUnitType(
-                    faction,
-                    unitType
-                );
-            }
-
-
-            DrawEnemyUnitType(
-                faction,
-                unitType
-            );
-        }
-
-
-        private void DrawEnemyUnitType(
-            EnemyUnitFaction faction,
-            SerializedProperty unitType)
-        {
-            List<EnemyUnitType> availableTypes =
-                GetAvailableEnemyUnitTypes(
-                    faction
-                );
-
-
-            if (availableTypes.Count == 0)
-            {
-                unitType.intValue =
-                    (int)EnemyUnitType.Default;
-
-                EditorGUI.BeginDisabledGroup(
-                    true
-                );
-
-                EditorGUILayout.EnumPopup(
-                    "Unit Type",
-                    EnemyUnitType.Default
-                );
-
-                EditorGUI.EndDisabledGroup();
-
-                return;
-            }
-
-
-            EnemyUnitType currentType =
-                (EnemyUnitType)unitType.intValue;
-
-
-            int selectedIndex =
-                availableTypes.IndexOf(
-                    currentType
-                );
-
-
-            if (selectedIndex < 0)
-            {
-                selectedIndex = 0;
-
-                unitType.intValue =
-                    (int)availableTypes[0];
-            }
-
-
-            string[] displayNames =
-                new string[availableTypes.Count];
-
-
-            for (int i = 0;
-                 i < availableTypes.Count;
-                 i++)
-            {
-                displayNames[i] =
-                    ObjectNames.NicifyVariableName(
-                        availableTypes[i].ToString()
-                    );
-            }
-
-
-            int nextIndex =
-                EditorGUILayout.Popup(
-                    "Unit Type",
-                    selectedIndex,
-                    displayNames
-                );
-
-
-            unitType.intValue =
-                (int)availableTypes[nextIndex];
-        }
-
-
-        private List<EnemyUnitType> GetAvailableEnemyUnitTypes(
-            EnemyUnitFaction faction)
-        {
-            List<EnemyUnitType> result =
-                new();
-
-
-            GetEnemyUnitTypeRange(
-                faction,
-                out int minValue,
-                out int maxValue
-            );
-
-
-            EnemyUnitType[] unitTypes =
-                (EnemyUnitType[])Enum.GetValues(
-                    typeof(EnemyUnitType)
-                );
-
-
-            for (int i = 0;
-                 i < unitTypes.Length;
-                 i++)
-            {
-                EnemyUnitType unitType =
-                    unitTypes[i];
-
-                int value =
-                    (int)unitType;
-
-
-                if (value < minValue ||
-                    value > maxValue)
-                {
-                    continue;
-                }
-
-
-                result.Add(
-                    unitType
-                );
-            }
-
-
-            return result;
-        }
-
-
-        private void ValidateEnemyUnitType(
-            EnemyUnitFaction faction,
-            SerializedProperty unitType)
-        {
-            GetEnemyUnitTypeRange(
-                faction,
-                out int minValue,
-                out int maxValue
-            );
-
-
-            int currentValue =
-                unitType.intValue;
-
-
-            if (currentValue < minValue ||
-                currentValue > maxValue)
-            {
-                unitType.intValue =
-                    (int)EnemyUnitType.Default;
-            }
-        }
-
-
-        private void GetEnemyUnitTypeRange(
-            EnemyUnitFaction faction,
-            out int minValue,
-            out int maxValue)
-        {
-            switch (faction)
-            {
-                case EnemyUnitFaction.Irregulars:
-
-                    minValue = 1;
-                    maxValue = 20;
-
-                    break;
-
-
-                case EnemyUnitFaction.RegularArmy:
-
-                    minValue = 21;
-                    maxValue = 40;
-
-                    break;
-
-
-                case EnemyUnitFaction.EliteArmy:
-
-                    minValue = 41;
-                    maxValue = 60;
-
-                    break;
-
-
-                case EnemyUnitFaction.Crusaders:
-
-                    minValue = 61;
-                    maxValue = 80;
-
-                    break;
-
-
-                default:
-
-                    minValue = 1;
-                    maxValue = 20;
-
-                    break;
-            }
         }
 
 
@@ -874,12 +322,6 @@ namespace Units.Editor
                 (UnitStatType)statType.intValue;
 
 
-            UnitStatDefinition definition =
-                UnitStatDefinitions.Get(
-                    type
-                );
-
-
             EditorGUILayout.BeginHorizontal();
 
 
@@ -890,120 +332,14 @@ namespace Units.Editor
             );
 
 
-            float displayValue =
-                GetDisplayValue(
-                    value.floatValue,
-                    definition
-                );
-
-
-            EditorGUI.BeginChangeCheck();
-
-
-            float nextDisplayValue =
-                DrawStatValueField(
-                    displayValue,
-                    definition
-                );
-
-
-            if (EditorGUI.EndChangeCheck())
-            {
-                float nextValue =
-                    GetStoredValue(
-                        nextDisplayValue,
-                        definition
-                    );
-
-
-                value.floatValue =
-                    Mathf.Clamp(
-                        nextValue,
-                        definition.MinValue,
-                        definition.MaxValue
-                    );
-            }
+            EditorGUILayout.PropertyField(
+                value,
+                GUIContent.none,
+                GUILayout.Width(120f)
+            );
 
 
             EditorGUILayout.EndHorizontal();
-        }
-
-
-        private float DrawStatValueField(
-            float displayValue,
-            UnitStatDefinition definition)
-        {
-            if (definition.DisplayType ==
-                UnitStatDisplayType.Percentage)
-            {
-                EditorGUILayout.BeginHorizontal(
-                    GUILayout.Width(120f)
-                );
-
-
-                float nextValue =
-                    EditorGUILayout.FloatField(
-                        displayValue
-                    );
-
-
-                GUILayout.Label(
-                    "%",
-                    GUILayout.Width(15f)
-                );
-
-
-                EditorGUILayout.EndHorizontal();
-
-
-                return nextValue;
-            }
-
-
-            return EditorGUILayout.FloatField(
-                displayValue,
-                GUILayout.Width(120f)
-            );
-        }
-
-
-        private float GetDisplayValue(
-            float storedValue,
-            UnitStatDefinition definition)
-        {
-            switch (definition.DisplayType)
-            {
-                case UnitStatDisplayType.Percentage:
-
-                    return storedValue * 100f;
-
-
-                case UnitStatDisplayType.Value:
-                case UnitStatDisplayType.Multiplier:
-                default:
-
-                    return storedValue;
-            }
-        }
-
-
-        private float GetStoredValue(
-            float displayValue,
-            UnitStatDefinition definition)
-        {
-            switch (definition.DisplayType)
-            {
-                case UnitStatDisplayType.Percentage:
-
-                    return displayValue / 100f;
-
-
-                case UnitStatDisplayType.Value:
-                case UnitStatDisplayType.Multiplier:
-                default:
-
-                    return displayValue;
-            }
         }
 
 
@@ -1078,9 +414,7 @@ namespace Units.Editor
                 else
                 {
                     valueProperty.floatValue =
-                        UnitData.GetDefaultStatValue(
-                            statType
-                        );
+                        0f;
                 }
             }
         }
@@ -1175,169 +509,6 @@ namespace Units.Editor
 
 
         // ============================================================
-        // Status Immunity
-        // ============================================================
-
-        private void DrawStatusImmunitySection()
-        {
-            EditorGUILayout.BeginVertical(
-                EditorStyles.helpBox
-            );
-
-
-            _statusImmunityFoldout =
-                EditorGUILayout.Foldout(
-                    _statusImmunityFoldout,
-                    "Status Immunity",
-                    true,
-                    EditorStyles.foldoutHeader
-                );
-
-
-            if (_statusImmunityFoldout)
-            {
-                EditorGUI.indentLevel++;
-
-
-                UnitStatusEffectType[] statusTypes =
-                    (UnitStatusEffectType[])Enum.GetValues(
-                        typeof(UnitStatusEffectType)
-                    );
-
-
-                for (int i = 0;
-                     i < statusTypes.Length;
-                     i++)
-                {
-                    UnitStatusEffectType statusType =
-                        statusTypes[i];
-
-
-                    bool isImmune =
-                        ContainsStatusImmunity(
-                            statusType
-                        );
-
-
-                    bool nextValue =
-                        EditorGUILayout.Toggle(
-                            ObjectNames.NicifyVariableName(
-                                statusType.ToString()
-                            ),
-                            isImmune
-                        );
-
-
-                    if (nextValue == isImmune)
-                        continue;
-
-
-                    if (nextValue)
-                    {
-                        AddStatusImmunity(
-                            statusType
-                        );
-                    }
-                    else
-                    {
-                        RemoveStatusImmunity(
-                            statusType
-                        );
-                    }
-                }
-
-
-                EditorGUI.indentLevel--;
-            }
-
-
-            EditorGUILayout.EndVertical();
-        }
-
-
-        private bool ContainsStatusImmunity(
-            UnitStatusEffectType statusType)
-        {
-            for (int i = 0;
-                 i < _statusImmunities.arraySize;
-                 i++)
-            {
-                SerializedProperty element =
-                    _statusImmunities.GetArrayElementAtIndex(
-                        i
-                    );
-
-
-                if (element.intValue ==
-                    (int)statusType)
-                {
-                    return true;
-                }
-            }
-
-
-            return false;
-        }
-
-
-        private void AddStatusImmunity(
-            UnitStatusEffectType statusType)
-        {
-            if (ContainsStatusImmunity(
-                    statusType))
-            {
-                return;
-            }
-
-
-            int index =
-                _statusImmunities.arraySize;
-
-
-            _statusImmunities.InsertArrayElementAtIndex(
-                index
-            );
-
-
-            SerializedProperty element =
-                _statusImmunities.GetArrayElementAtIndex(
-                    index
-                );
-
-
-            element.intValue =
-                (int)statusType;
-        }
-
-
-        private void RemoveStatusImmunity(
-            UnitStatusEffectType statusType)
-        {
-            for (int i = _statusImmunities.arraySize - 1;
-                 i >= 0;
-                 i--)
-            {
-                SerializedProperty element =
-                    _statusImmunities.GetArrayElementAtIndex(
-                        i
-                    );
-
-
-                if (element.intValue !=
-                    (int)statusType)
-                {
-                    continue;
-                }
-
-
-                _statusImmunities.DeleteArrayElementAtIndex(
-                    i
-                );
-            }
-        }
-
-
-        // ============================================================
         // Combat Data
         // ============================================================
 
@@ -1366,15 +537,8 @@ namespace Units.Editor
                     _basicAttackData
                 );
 
-                SkillAuthoringGUI.Draw(serializedObject.FindProperty("_activeSkills"));
-                var ids = new HashSet<string>();
-                foreach (var entry in ((UnitData)target).ActiveSkills)
-                    if (entry == null || entry.Skill == null || string.IsNullOrWhiteSpace(entry.Id) || !ids.Add(entry.Id))
-                        EditorGUILayout.HelpBox("스킬과 고유 ID를 확인하세요. 페이즈는 이 ID를 참조합니다.", MessageType.Warning);
-
                 EditorGUILayout.PropertyField(
-                    _passiveSkillDatas,
-                    true
+                    _activeSkillData
                 );
 
 

@@ -1,5 +1,4 @@
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -55,8 +54,6 @@ namespace Units
             GroupAIState.Idle;
 
         private bool _isPaused;
-        private bool _eliminated;
-        private readonly List<CombatTargetSnapshot> _dyingMembers = new();
 
 
         // =========================
@@ -64,8 +61,6 @@ namespace Units
         // =========================
 
         private bool _isSpawnCompleted;
-
-        private readonly HashSet<Unit_Gateway> _rallyFailedMembers = new();
 
         private readonly HashSet<Unit_Gateway>
             _rallyCompletedMembers =
@@ -206,7 +201,7 @@ namespace Units
 
         private void Update()
         {
-            if (_isPaused || _eliminated)
+            if (_isPaused)
                 return;
 
             if (_state != GroupAIState.Advancing &&
@@ -263,8 +258,6 @@ namespace Units
                 false;
 
             _rallyCompletedMembers.Clear();
-
-            _rallyFailedMembers.Clear();
 
 
             SetState(
@@ -343,8 +336,6 @@ namespace Units
         public bool AddMember(
             Unit_Gateway unit)
         {
-            if (_eliminated)
-                return false;
             if (!_memberController.Add(
                 unit))
             {
@@ -371,8 +362,6 @@ namespace Units
 
             unit.RallyCompleted +=
                 HandleRallyCompleted;
-
-            unit.RallyFailed += HandleRallyFailed;
 
 
             if (_state == GroupAIState.Engaged)
@@ -414,10 +403,6 @@ namespace Units
             unit.RallyCompleted -=
                 HandleRallyCompleted;
 
-            unit.RallyFailed -= HandleRallyFailed;
-
-            _rallyFailedMembers.Remove(unit);
-
 
             _rallyCompletedMembers.Remove(
                 unit
@@ -443,11 +428,6 @@ namespace Units
         private void HandleMemberDied(
             Unit_Gateway unit)
         {
-            // 생존 목록에서는 즉시 제외하고, 사망 연출 중인 수명만 별도로 추적한다.
-            _dyingMembers.RemoveAll(snapshot => !IsDeathPresentationPending(snapshot));
-            _dyingMembers.Add(new CombatTargetSnapshot(unit));
-            if (unit != null && unit.transform.IsChildOf(transform))
-                unit.transform.SetParent(transform.parent, true);
             RemoveMember(
                 unit
             );
@@ -456,49 +436,22 @@ namespace Units
 
         private void CheckEliminated()
         {
-            if (_eliminated || _members.Count > 0
-                || (_state == GroupAIState.Spawning && !_isSpawnCompleted))
+            if (_members.Count > 0)
                 return;
-
-            _eliminated = true;
-            _isPaused = true;
-            _advanceController?.StopAdvance();
 
             Debug.Log(
                 $"[GroupAI] {name} → 그룹이 전멸했습니다."
             );
 
-            try
-            {
-                Eliminated?.Invoke(this);
-            }
-            finally
-            {
-                if (this != null && gameObject.activeInHierarchy)
-                    StartCoroutine(DestroyAfterDeathPresentations());
-            }
+            Eliminated?.Invoke(
+                this
+            );
         }
 
 
         // =========================
         // Spawn
         // =========================
-
-        private static bool IsDeathPresentationPending(CombatTargetSnapshot snapshot)
-        {
-            return snapshot.MatchesLifetime && snapshot.Target is Unit_Gateway unit
-                && unit != null && unit.gameObject.activeInHierarchy && !unit.IsAlive;
-        }
-
-        private IEnumerator DestroyAfterDeathPresentations()
-        {
-            // 재사용된 유닛의 새 수명은 기다리거나 제거하지 않는다.
-            while (_dyingMembers.Exists(IsDeathPresentationPending))
-                yield return null;
-
-            _dyingMembers.Clear();
-            Destroy(gameObject);
-        }
 
         public void NotifySpawnCompleted()
         {
@@ -513,9 +466,8 @@ namespace Units
             _isSpawnCompleted =
                 true;
 
-            CheckEliminated();
-            if (!_eliminated)
-                TryCompleteSpawning();
+
+            TryCompleteSpawning();
         }
 
 
@@ -537,8 +489,6 @@ namespace Units
             }
 
 
-            _rallyFailedMembers.Remove(unit);
-
             if (!_rallyCompletedMembers.Add(
                 unit))
             {
@@ -549,21 +499,6 @@ namespace Units
             TryCompleteSpawning();
         }
 
-
-        private void HandleRallyFailed(Unit_Gateway unit)
-        {
-            if (_state != GroupAIState.Spawning || unit == null
-                || !_memberController.Contains(unit))
-                return;
-
-            _rallyCompletedMembers.Remove(unit);
-
-            if (!_rallyFailedMembers.Add(unit))
-                return;
-
-            // 실패를 성공으로 집계하지 않되 그룹 전체의 준비 대기는 종료할 수 있다.
-            TryCompleteSpawning();
-        }
 
         private void TryCompleteSpawning()
         {
@@ -579,7 +514,7 @@ namespace Units
                 return;
 
 
-            if (_rallyCompletedMembers.Count + _rallyFailedMembers.Count <
+            if (_rallyCompletedMembers.Count <
                 _members.Count)
             {
                 return;
@@ -736,8 +671,6 @@ namespace Units
 
         private void EnterAdvancing()
         {
-            if (_eliminated)
-                return;
             if (_state == GroupAIState.Advancing)
                 return;
 
@@ -764,8 +697,6 @@ namespace Units
 
         private void EnterEngaged()
         {
-            if (_eliminated)
-                return;
             if (_state == GroupAIState.Engaged)
                 return;
 
@@ -1262,7 +1193,7 @@ namespace Units
 
         public void Pause()
         {
-            if (_isPaused || _eliminated)
+            if (_isPaused)
                 return;
 
 

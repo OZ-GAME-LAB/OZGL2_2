@@ -2,7 +2,6 @@
 public interface IShopTrader
 {
     bool TryPurchase(ShopArtifactSlot slot);
-    bool TryPurchaseConsumable(ShopConsumableSlot slot);
     bool TrySell(ArtifactData artifact);
 
     bool TryExchange(ShopArtifactExchangeSlot slot, ArtifactData ownedArtifact);

@@ -7,8 +7,15 @@ namespace Units
 {
     public class TargetResolver
     {
+        private const int DefaultBufferSize =
+            32;
 
-        private const int DefaultBufferSize = 32;
+
+        // ============================================================
+        // Reference
+        // ============================================================
+
+        private readonly Unit_Core _core;
 
 
         // ============================================================
@@ -31,13 +38,32 @@ namespace Units
         // Constructor
         // ============================================================
 
-        public TargetResolver(int bufferSize = DefaultBufferSize)
+        public TargetResolver(
+            Unit_Core core,
+            int bufferSize = DefaultBufferSize)
         {
-            int finalBufferSize = Mathf.Max(1, bufferSize);
+            _core =
+                core;
 
-            _colliderBuffer = new Collider2D[finalBufferSize];
 
-            _targets = new List<ICombatTarget>(finalBufferSize);
+            int finalBufferSize =
+                Mathf.Max(
+                    1,
+                    bufferSize
+                );
+
+
+            _colliderBuffer =
+                new Collider2D[
+                    finalBufferSize
+                ];
+
+
+            _targets =
+                new List<ICombatTarget>(
+                    finalBufferSize
+                );
+
 
             _contactFilter = ContactFilter2D.noFilter;
         }
@@ -47,96 +73,57 @@ namespace Units
         // Resolve
         // ============================================================
 
-        public SkillTargetResult ResolveSkillTargets(SkillTargetRequest request)
-        {
-            if (request.Settings == null || !request.CanSelect)
-                return new SkillTargetResult(
-                    null,
-                    request.Origin,
-                    request.Direction,
-                    false,
-                    "Invalid owner/settings"
-                );
-
-            var settings = request.Settings;
-
-            var candidates = new List<ICombatTarget>();
-
-            if (settings.Source == Units.Skills.SkillTargetSource.None)
-                return new SkillTargetResult(
-                    candidates,
-                    request.Origin,
-                    request.Direction,
-                    true
-                );
-
-            if (settings.Source == Units.Skills.SkillTargetSource.Search)
-            {
-                UnitTeam team = settings.Relation == SkillTargetRelation.Hostile ? (request.Owner.Team == UnitTeam.Ally ? UnitTeam.Enemy : UnitTeam.Ally) : request.Owner.Team;
-
-                candidates.AddRange(ResolveCandidates(new TargetCandidateRequest(request.Origin, settings.Range, team,
-                    sourceBodyRadius: request.UseBodyRange ? request.Owner.BodyRadius : (float?)null)));
-            }
-            else
-            {
-                CombatTargetSnapshot target = settings.Source switch
-                {
-                    Units.Skills.SkillTargetSource.Self => request.Owner,
-                    Units.Skills.SkillTargetSource.InitialTarget => request.InitialTarget,
-                    Units.Skills.SkillTargetSource.CurrentTarget => request.CurrentTarget,
-                    Units.Skills.SkillTargetSource.PreviousTarget => request.PreviousTarget,
-                    Units.Skills.SkillTargetSource.TriggerTarget => request.TriggerTarget,
-                    _ => default
-                };
-
-                if (target.IsTargetable)
-                    candidates.Add(target.Target);
-            }
-
-            return SkillTargetSelector.SelectTargets(request, candidates);
-        }
-
-        public IReadOnlyList<ICombatTarget> ResolveHitTargets(TargetHitRequest request)
+        public IReadOnlyList<ICombatTarget> ResolveHitTargets(
+            TargetHitRequest request)
         {
             _targets.Clear();
 
+
+            if (_core == null)
+                return _targets;
+
             if (request.MaxTargetCount <= 0)
-                return _targets.ToArray();
+                return _targets;
 
             if (request.Radius <= 0f)
-                return _targets.ToArray();
+                return _targets;
+
 
             switch (request.AreaType)
             {
                 case HitAreaType.Circle:
-                    ResolveCircle(request);
+
+                    ResolveCircle(
+                        request
+                    );
 
                     break;
 
+
                 case HitAreaType.Cone:
-                    ResolveCone(request);
+
+                    ResolveCone(
+                        request
+                    );
 
                     break;
             }
 
-            // 외부 필터가 같은 Resolver를 재진입해도 이번 조회의 목록은 독립적이다.
-            var resolved = new List<ICombatTarget>(_targets);
-
-            var lifetimes = new Dictionary<ICombatTarget, CombatTargetSnapshot>();
-
-            foreach (var target in resolved)
-                lifetimes[target] = new CombatTargetSnapshot(target);
 
             if (request.TargetFilter != null)
-                resolved.RemoveAll(target => !request.TargetFilter(target));
+                _targets.RemoveAll(target => !request.TargetFilter(target));
 
-            resolved.RemoveAll(target => !lifetimes[target].IsTargetable || !IsValidTarget(target, request.TargetTeam));
+            SortByDistance(
+                request.Origin
+            );
 
-            SortByDistance(resolved, request.Origin);
 
-            TrimTargetCount(resolved, request.MaxTargetCount);
+            TrimTargetCount(
+                request.MaxTargetCount
+            );
 
-            return resolved.ToArray();
+
+            return _targets;
         }
 
 
@@ -144,49 +131,69 @@ namespace Units
         // Candidate Resolve
         // ============================================================
 
-        public IReadOnlyList<ICombatTarget> ResolveCandidates(TargetCandidateRequest request)
+        public IReadOnlyList<ICombatTarget> ResolveCandidates(
+            TargetCandidateRequest request)
         {
             _targets.Clear();
 
+
+            if (_core == null)
+                return _targets;
+
             if (request.Range <= 0f)
-                return _targets.ToArray();
+                return _targets;
 
-            // 대상의 증가분은 해당 몸 Collider와의 겹침으로 넓은 단계에서 포함된다.
-            // Core의 몸 반지름과 Collider는 일치해야 한다.
-            float searchRange = request.Range + (request.SourceBodyRadius.HasValue
-                ? CombatRangeUtility.Expansion(request.SourceBodyRadius.Value) : 0f);
-            int hitCount = CollectColliders(request.Origin, searchRange);
 
-            for (int i = 0; i < hitCount; i++)
+            int hitCount =
+                CollectColliders(
+                    request.Origin,
+                    request.Range
+                );
+
+
+            for (int i = 0;
+                i < hitCount;
+                i++)
             {
-                Collider2D hit = _colliderBuffer[i];
+                Collider2D hit =
+                    _colliderBuffer[i];
 
-                TryAddTarget(hit, request.TargetTeam);
+
+                TryAddTarget(
+                    hit,
+                    request.TargetTeam
+                );
             }
 
+
             // Collider 일부만 사거리에 걸친 대상은 위치 기준으로 다시 검사한다.
-            float rangeSquared = request.Range * request.Range;
+            float rangeSquared =
+                request.Range
+                * request.Range;
 
-            _targets.RemoveAll(target => !IsValidTarget(target, request.TargetTeam) || (request.SourceBodyRadius.HasValue
-                ? CombatRangeUtility.Distance(request.Origin, request.SourceBodyRadius.Value, target) > request.Range
-                : ((Vector2)target.Transform.position - request.Origin).sqrMagnitude > rangeSquared));
 
-            // 외부 필터가 같은 Resolver를 재진입해도 이번 조회의 목록은 독립적이다.
-            var resolved = new List<ICombatTarget>(_targets);
+            _targets.RemoveAll(
+                target =>
+                    !IsValidTarget(
+                        target,
+                        request.TargetTeam
+                    )
+                    || (
+                        (Vector2)target.Transform.position
+                        - request.Origin
+                    ).sqrMagnitude > rangeSquared
+            );
 
-            var lifetimes = new Dictionary<ICombatTarget, CombatTargetSnapshot>();
-
-            foreach (var target in resolved)
-                lifetimes[target] = new CombatTargetSnapshot(target);
 
             if (request.TargetFilter != null)
-                resolved.RemoveAll(target => !request.TargetFilter(target));
+                _targets.RemoveAll(target => !request.TargetFilter(target));
 
-            resolved.RemoveAll(target => !lifetimes[target].IsTargetable || !IsValidTarget(target, request.TargetTeam));
+            SortByDistance(
+                request.Origin
+            );
 
-            SortByDistance(resolved, request.Origin, request.SourceBodyRadius);
 
-            return resolved.ToArray();
+            return _targets;
         }
 
 
@@ -211,7 +218,10 @@ namespace Units
                     return count;
 
                 // 밀집된 전장에서도 고정 버퍼 크기로 후보가 누락되지 않도록 확장한다.
-                System.Array.Resize(ref _colliderBuffer, _colliderBuffer.Length * 2);
+                System.Array.Resize(
+                    ref _colliderBuffer,
+                    _colliderBuffer.Length * 2
+                );
             }
         }
 
@@ -220,15 +230,28 @@ namespace Units
         // Circle
         // ============================================================
 
-        private void ResolveCircle(TargetHitRequest request)
+        private void ResolveCircle(
+            TargetHitRequest request)
         {
-            int hitCount = CollectColliders(request.Origin, request.Radius);
+            int hitCount =
+                CollectColliders(
+                    request.Origin,
+                    request.Radius
+                );
 
-            for (int i = 0; i < hitCount; i++)
+
+            for (int i = 0;
+                i < hitCount;
+                i++)
             {
-                Collider2D hit = _colliderBuffer[i];
+                Collider2D hit =
+                    _colliderBuffer[i];
 
-                TryAddTarget(hit, request.TargetTeam);
+
+                TryAddTarget(
+                    hit,
+                    request.TargetTeam
+                );
             }
         }
 
@@ -237,42 +260,78 @@ namespace Units
         // Cone
         // ============================================================
 
-        private void ResolveCone(TargetHitRequest request)
+        private void ResolveCone(
+            TargetHitRequest request)
         {
             if (request.Direction.sqrMagnitude <= 0f)
                 return;
 
-            int hitCount = CollectColliders(request.Origin, request.Radius);
 
-            Vector2 direction = request.Direction.normalized;
+            int hitCount =
+                CollectColliders(
+                    request.Origin,
+                    request.Radius
+                );
 
-            float halfAngle = request.Angle * 0.5f;
 
-            for (int i = 0; i < hitCount; i++)
+            Vector2 direction =
+                request.Direction.normalized;
+
+
+            float halfAngle =
+                request.Angle
+                * 0.5f;
+
+
+            for (int i = 0;
+                i < hitCount;
+                i++)
             {
-                Collider2D hit = _colliderBuffer[i];
+                Collider2D hit =
+                    _colliderBuffer[i];
+
 
                 if (hit == null)
                     continue;
 
-                ICombatTarget target = GetCombatTarget(hit);
 
-                if (!IsValidTarget(target, request.TargetTeam))
+                ICombatTarget target =
+                    GetCombatTarget(
+                        hit
+                    );
+
+
+                if (!IsValidTarget(
+                    target,
+                    request.TargetTeam))
                 {
                     continue;
                 }
 
-                Vector2 targetDirection = (Vector2)target.Transform.position - request.Origin;
+
+                Vector2 targetDirection =
+                    (Vector2)target.Transform.position
+                    - request.Origin;
+
 
                 if (targetDirection.sqrMagnitude <= 0f)
                     continue;
 
-                float angle = Vector2.Angle(direction, targetDirection.normalized);
+
+                float angle =
+                    Vector2.Angle(
+                        direction,
+                        targetDirection.normalized
+                    );
+
 
                 if (angle > halfAngle)
                     continue;
 
-                AddTarget(target);
+
+                AddTarget(
+                    target
+                );
             }
         }
 
@@ -288,20 +347,33 @@ namespace Units
             if (hit == null)
                 return;
 
-            ICombatTarget target = GetCombatTarget(hit);
 
-            if (!IsValidTarget(target, targetTeam))
+            ICombatTarget target =
+                GetCombatTarget(
+                    hit
+                );
+
+
+            if (!IsValidTarget(
+                target,
+                targetTeam))
             {
                 return;
             }
 
-            AddTarget(target);
+
+            AddTarget(
+                target
+            );
         }
 
-        private ICombatTarget GetCombatTarget(Collider2D hit)
+
+        private ICombatTarget GetCombatTarget(
+            Collider2D hit)
         {
             if (hit == null)
                 return null;
+
 
             return hit.GetComponentInParent<ICombatTarget>();
         }
@@ -318,14 +390,18 @@ namespace Units
             if (!CombatTargetUtility.IsValid(target))
                 return false;
 
+
             if (!target.IsTargetable)
                 return false;
+
 
             if (target.Transform == null)
                 return false;
 
+
             if (target.Team != targetTeam)
                 return false;
+
 
             return true;
         }
@@ -335,44 +411,62 @@ namespace Units
         // Target List
         // ============================================================
 
-        private void AddTarget(ICombatTarget target)
+        private void AddTarget(
+            ICombatTarget target)
         {
-            if (_targets.Contains(target))
+            if (_targets.Contains(
+                target))
             {
                 return;
             }
 
-            _targets.Add(target);
+
+            _targets.Add(
+                target
+            );
         }
+
 
         private void SortByDistance(
-            List<ICombatTarget> targets,
-            Vector2 origin, float? sourceBodyRadius = null)
+            Vector2 origin)
         {
-            targets.Sort((
-                a,
-                b) =>
-            {
-                float distanceA = sourceBodyRadius.HasValue
-                    ? CombatRangeUtility.Distance(origin, sourceBodyRadius.Value, a)
-                    : Vector2.Distance(a.Transform.position, origin);
+            _targets.Sort(
+                (a, b) =>
+                {
+                    float distanceA =
+                        (
+                            (Vector2)a.Transform.position
+                            - origin
+                        ).sqrMagnitude;
 
-                float distanceB = sourceBodyRadius.HasValue
-                    ? CombatRangeUtility.Distance(origin, sourceBodyRadius.Value, b)
-                    : Vector2.Distance(b.Transform.position, origin);
 
-                return distanceA.CompareTo(distanceB);
-            });
+                    float distanceB =
+                        (
+                            (Vector2)b.Transform.position
+                            - origin
+                        ).sqrMagnitude;
+
+
+                    return distanceA.CompareTo(
+                        distanceB
+                    );
+                }
+            );
         }
 
+
         private void TrimTargetCount(
-            List<ICombatTarget> targets,
             int maxTargetCount)
         {
-            if (targets.Count <= maxTargetCount)
+            if (_targets.Count <= maxTargetCount)
                 return;
 
-            targets.RemoveRange(maxTargetCount, targets.Count - maxTargetCount);
+
+            _targets.RemoveRange(
+                maxTargetCount,
+                _targets.Count
+                - maxTargetCount
+            );
         }
     }
 }
