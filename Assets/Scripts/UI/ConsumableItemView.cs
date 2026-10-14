@@ -8,6 +8,17 @@ using UnityEngine.UI;
 
 public class ConsumableItemView : MonoBehaviour
 {
+    // 슬롯 순서: 1~9, 0(10번째 슬롯).
+    private static readonly Key[] SlotDigitKeys =
+    {
+        Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5,
+        Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9, Key.Digit0
+    };
+    private static readonly Key[] SlotNumpadKeys =
+    {
+        Key.Numpad1, Key.Numpad2, Key.Numpad3, Key.Numpad4, Key.Numpad5,
+        Key.Numpad6, Key.Numpad7, Key.Numpad8, Key.Numpad9, Key.Numpad0
+    };
     [SerializeField] private UIItemSlot _slotPrefab; // 풀링용 오브젝트
     [SerializeField] private ItemAreaIndicator _areaIndicatorPrefab;
     private ItemAreaIndicator _areaIndicator;
@@ -240,13 +251,15 @@ public class ConsumableItemView : MonoBehaviour
         if (selected != null && (selected.GetComponentInParent<TMP_InputField>() != null ||
             selected.GetComponentInParent<InputField>() != null)) return;
 
-        // 여러 키가 동시에 눌려도 한 프레임에 한 슬롯만 처리합니다.
-        if (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame)
-            UseSlot(0);
-        else if (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame)
-            UseSlot(1);
-        else if (keyboard.digit3Key.wasPressedThisFrame || keyboard.numpad3Key.wasPressedThisFrame)
-            UseSlot(2);
+        // 현재 존재하는 슬롯에만 대응하며 한 프레임에 한 슬롯만 처리합니다.
+        int count = Mathf.Min(_reader.SlotCount, SlotDigitKeys.Length);
+        for (int i = 0; i < count; i++)
+        {
+            if (!keyboard[SlotDigitKeys[i]].wasPressedThisFrame &&
+                !keyboard[SlotNumpadKeys[i]].wasPressedThisFrame) continue;
+            UseSlot(i);
+            break;
+        }
     }
 
     private bool IsPointerOverAreaUI(Vector2 pointer)

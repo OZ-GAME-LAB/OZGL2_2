@@ -232,6 +232,9 @@ public sealed class ArtifactSkillExcelImport : IDisposable
             foreach (var pair in drafts.OrderBy(x => x.Value is EffectData ? 0 : 1))
             {
                 var target = targets[pair.Key];
+                // 새 draft의 managed-reference ID는 매번 달라집니다. 실제 직렬화 값이
+                // 같으면 기존 객체를 유지해 불필요한 rid 변경과 Git 충돌을 막습니다.
+                if (target != pair.Value && HasSameSerializedContent(pair.Value, target)) continue;
                 if (target == pair.Value) { AssetDatabase.CreateAsset(target, pair.Key); created.Add(pair.Key); }
                 else { backups.Add(target, UnityEngine.Object.Instantiate(target)); EditorUtility.CopySerialized(pair.Value, target); }
                 EditorUtility.SetDirty(target); AssetDatabase.SaveAssetIfDirty(target);
@@ -248,6 +251,56 @@ public sealed class ArtifactSkillExcelImport : IDisposable
     public void Dispose()
     {
         foreach (var draft in drafts.Values) if (draft != null && !EditorUtility.IsPersistent(draft)) UnityEngine.Object.DestroyImmediate(draft);
+    }
+
+    private static bool HasSameSerializedContent(ScriptableObject draft, ScriptableObject target)
+    {
+        if (draft.GetType() != target.GetType() || draft.name != target.name) return false;
+        var compared = new List<(object Left, object Right)>();
+        return SameFields(draft, target, compared);
+    }
+
+    private static bool SameFields(object left, object right, List<(object Left, object Right)> compared)
+    {
+        for (Type type = left.GetType(); type != null && type != typeof(UnityEngine.Object); type = type.BaseType)
+        {
+            foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public |
+                                                BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            {
+                if (field.IsStatic || field.IsInitOnly || field.IsNotSerialized) continue;
+                if (!field.IsPublic && !field.IsDefined(typeof(SerializeField), true) &&
+                    !field.IsDefined(typeof(SerializeReference), true)) continue;
+                if (!SameValue(field.GetValue(left), field.GetValue(right), compared)) return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool SameValue(object left, object right, List<(object Left, object Right)> compared)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left == null || right == null || left.GetType() != right.GetType()) return false;
+        // S.O, Prefab, FX 등 외부 에셋은 참조가 같은지 비교합니다.
+        if (left is UnityEngine.Object leftObject) return leftObject == (UnityEngine.Object)right;
+        Type type = left.GetType();
+        if (type.IsPrimitive || type.IsEnum || left is string || left is decimal) return left.Equals(right);
+        if (!type.IsValueType)
+        {
+            // 循環参照と、同じ managed reference を共有する構造も扱います。
+            foreach (var pair in compared)
+                if (ReferenceEquals(pair.Left, left) || ReferenceEquals(pair.Right, right))
+                    return ReferenceEquals(pair.Left, left) && ReferenceEquals(pair.Right, right);
+            compared.Add((left, right));
+        }
+        if (left is System.Collections.IList leftList)
+        {
+            var rightList = (System.Collections.IList)right;
+            if (leftList.Count != rightList.Count) return false;
+            for (int i = 0; i < leftList.Count; i++)
+                if (!SameValue(leftList[i], rightList[i], compared)) return false;
+            return true;
+        }
+        return SameFields(left, right, compared);
     }
 
     // 에디터 전용: 공개 setter가 없는 데이터 클래스의 직렬화 필드만 지정합니다.
