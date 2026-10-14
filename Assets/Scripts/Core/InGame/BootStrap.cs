@@ -173,6 +173,7 @@ public class BootStrap : MonoBehaviour
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager,
             _totemRunApplier.FlowEffects, _unitStatModifierManager);
         _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
+        _gameFlowController.InitializeBuildings(_buildController.Census);
         _artifactManager.Initialize(_waveController, _effectManager, _runCurrencyManager, _uiStartup.ArtifactSelectionUI);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
         _uiStartup.InitializeArtifactInventory(_artifactManager);

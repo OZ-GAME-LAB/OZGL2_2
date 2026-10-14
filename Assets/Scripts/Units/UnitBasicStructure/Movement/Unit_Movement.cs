@@ -48,9 +48,13 @@ namespace Units
         [SerializeField, Min(0.1f)]
         private float _rallyFailureDelay = 8f;
 
-        // 경유점은 통과 판정만 넓히고 최종 집결 자리의 도착 정밀도는 유지한다.
+        // 경유점은 통과 판정에 별도의 반경을 사용한다.
         [SerializeField, Min(0.01f)]
         private float _rallyViaArrivalDistance = 1f;
+
+        // 최종 반경에 진입하면 준비 완료를 알린다. 자리 정렬은 전투 전 Hold가 담당한다.
+        [SerializeField, Min(0.01f)]
+        private float _rallyArrivalDistance = 1f;
 
 
         // ============================================================
@@ -488,7 +492,7 @@ namespace Units
                     0.01f,
                     _isRallyViaMovement
                         ? Mathf.Max(_arrivalDistance, _rallyViaArrivalDistance)
-                        : _arrivalDistance
+                        : _isRallyMovement ? _rallyArrivalDistance : _arrivalDistance
                 ))
             {
                 Stop();

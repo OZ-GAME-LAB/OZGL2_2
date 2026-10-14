@@ -67,12 +67,12 @@ namespace Game.UI.InGame
             else
                 _ui.ClearWaveProgress();
 
-            SetText(_hint, _flow.CurPhase == GamePhase.Preparation ? "건설할 위치를 선택하세요" :
+            SetText(_hint, _flow.CurPhase == GamePhase.Preparation ? (_flow.HasBarracks ? "건설할 위치를 선택하세요" : "병영을 먼저 건설해주세요") :
                 _flow.CurPhase == GamePhase.Battle || _flow.CurPhase == GamePhase.BattlePreparing
                     ? "전투 중에는 건설할 수 없습니다" : string.Empty);
             // PhaseChanged는 전환 잠금 해제 전에 발생한다. 실행 조건은 Core가 다시 확인한다.
             _ui.SetWaveStartInteractable(_isSubscribed && !_isStartPending &&
-                _flow.CurPhase == GamePhase.Preparation && _waves.CurrentPreset != null);
+                _flow.CurPhase == GamePhase.Preparation && _waves.CurrentPreset != null && _flow.HasBarracks);
         }
 
         private void RefreshCurrency()
@@ -131,7 +131,7 @@ namespace Game.UI.InGame
             {
                 bool started = await _flow.TrySpawnUnits().AttachExternalCancellation(token);
                 if (IsCurrentRequest(requestVersion) && !started)
-                    _messages?.Show("웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요.");
+                    _messages?.Show(_flow.HasBarracks ? "웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요." : "병영을 먼저 건설해주세요.");
             }
             catch (OperationCanceledException)
             {
@@ -164,6 +164,7 @@ namespace Game.UI.InGame
             _bindingLifetime = new CancellationTokenSource();
             _wallet.BalanceChanged += HandleBalanceChanged;
             _flow.PhaseChanged += HandlePhaseChanged;
+            _flow.BattleAvailabilityChanged += Refresh;
             _waves.WaveChanged += HandleWaveChanged;
             _ui.WaveStartRequested += HandleWaveStartRequested;
             _isSubscribed = true;
@@ -177,7 +178,11 @@ namespace Game.UI.InGame
             if (_isSubscribed)
             {
                 if (_wallet != null) _wallet.BalanceChanged -= HandleBalanceChanged;
-                if (_flow != null) _flow.PhaseChanged -= HandlePhaseChanged;
+                if (_flow != null)
+                {
+                    _flow.PhaseChanged -= HandlePhaseChanged;
+                    _flow.BattleAvailabilityChanged -= Refresh;
+                }
                 if (_waves != null) _waves.WaveChanged -= HandleWaveChanged;
                 if (_ui != null)
                 {

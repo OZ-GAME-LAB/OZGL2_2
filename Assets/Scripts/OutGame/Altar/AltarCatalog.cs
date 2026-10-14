@@ -36,7 +36,14 @@ public class AltarCatalog : ScriptableObject
             && registered == altar;
     }
 
-    // Inspector 변경 시에만 조회 캐시를 다시 만듭니다. 런타임 Update에서는 호출하지 않습니다.
+    // 에셋 재임포트나 도메인 리로드 생략 후에도 실제 데이터로 캐시를 복원합니다.
+    // 소비자의 초기화 시 한 번 호출하며, 매 프레임 갱신하지 않습니다.
+    public void RefreshLookup()
+    {
+        BuildLookup();
+    }
+
+    // 에셋 로드·Inspector 변경 및 소비자 초기화 시 조회 캐시를 다시 만듭니다.
     private void BuildLookup()
     {
         _altarById.Clear();

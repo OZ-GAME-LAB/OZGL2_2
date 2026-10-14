@@ -14,9 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemData
   _id: consumable_007
   _displayName: "\uC218\uD638\uC758 \uB450\uB8E8\uB9C8\uB9AC"
-  _description: "\uBC94\uC704 \uB0B4 \uC544\uAD70\uC5D0\uAC8C \uAC01\uAC01 \uBCF4\uD638\uB9C9
-    80\uC744 \uBD80\uC5EC\uD569\uB2C8\uB2E4."
+  _description: "\ubc94\uc704 \ub0b4 \uc544\uad70\uc5d0\uac8c \uac01\uac01 \ubcf4\ud638\ub9c9 250 \ubd80\uc5ec"
   _icon: {fileID: 21300000, guid: ddd40c182aa6143febcd06b48c78458c, type: 3}
+  _targetVFX: {fileID: 1002, guid: 2bb3a8224329451a8e26c34fa6382519, type: 3}
+  _useVFX: {fileID: 1002, guid: a15c3ab42f7a4be78a90ad350166b00a, type: 3}
   _targetTeam: 0
   _targetMode: 1
   _radius: 3
@@ -29,4 +30,4 @@ MonoBehaviour:
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _scalingStatType: 1
-        _shieldRatio: 80
+        _shieldRatio: 250

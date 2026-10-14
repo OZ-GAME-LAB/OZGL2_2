@@ -74,6 +74,7 @@ public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
                 this);
         }
 
+        _catalog.RefreshLookup();
         _effectManager = effectManager;
         _runCurrency = runCurrency;
         // 공통 스폰 수집은 ArtifactInstance만 읽으므로 제단 스탯은 직접 전달합니다.
