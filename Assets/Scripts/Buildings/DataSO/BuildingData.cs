@@ -382,19 +382,56 @@ namespace OZGL.KDH
                 Debug.LogWarning($"[BuildingData] countPerWave가 maxAlive보다 큽니다. 에셋: {name}", this);
             }
 
-            // Current date KDH 2026-10-08
-            // 지원 강화는 클래스와 유한한 수치가 있어야 소환 보정치로 들어갑니다.
-            if (HasSupport && support.targetClass == AllyUnitClass.Default)
+            // Current date KDH 2026-10-14
+            // 계열 수치 버프와 전용 패시브 중 하나는 있어야 합니다. T2는 계열만, T3는 패시브도 채웁니다.
+            if (HasSupport && support.targetClass == AllyUnitClass.Default && support.uniquePassive == null)
             {
                 Debug.LogWarning($"[BuildingData] Support.targetClass가 Default라 강화할 계열이 없습니다. 에셋: {name}", this);
             }
 
-            if (HasSupport && (float.IsNaN(support.value) || float.IsInfinity(support.value) || support.value == 0f))
+            if (HasSupport && !HasListedEffects(support.effects) && support.uniquePassive == null)
             {
-                Debug.LogWarning($"[BuildingData] Support.value가 0이거나 유한하지 않습니다. 에셋: {name}", this);
+                Debug.LogWarning($"[BuildingData] Support.effects와 uniquePassive가 모두 비어 있습니다. 에셋: {name}", this);
+            }
+
+            if (HasSupport)
+            {
+                WarnSupportEffects(support.effects, "effects");
+            }
+
+            if (HasSupport && support.uniquePassive != null && support.targetUnitType == AllyUnitType.Default)
+            {
+                Debug.LogWarning($"[BuildingData] Support.targetUnitType이 Default라 전용 패시브를 받을 유닛이 없습니다. 에셋: {name}", this);
+            }
+
+            if (HasSupport && support.targetUnitType != AllyUnitType.Default && support.uniquePassive == null)
+            {
+                Debug.LogWarning($"[BuildingData] Support.uniquePassive가 비어 있습니다. 에셋: {name}", this);
             }
 
             WarnUpgrades();
+        }
+
+        // Current date KDH 2026-10-14
+        // 효과 칸이 하나라도 있는지 봅니다. 수치 0은 WarnSupportEffects가 따로 경고합니다.
+        private static bool HasListedEffects(BuildingSupportEffect[] effects)
+        {
+            return effects != null && effects.Length > 0;
+        }
+
+        private void WarnSupportEffects(BuildingSupportEffect[] effects, string label)
+        {
+            if (effects == null)
+                return;
+
+            for (int i = 0; i < effects.Length; i++)
+            {
+                float effectValue = effects[i].value;
+                if (float.IsNaN(effectValue) || float.IsInfinity(effectValue) || effectValue == 0f)
+                {
+                    Debug.LogWarning($"[BuildingData] Support.{label}[{i}] 수치가 0이거나 유한하지 않습니다. 에셋: {name}", this);
+                }
+            }
         }
 
         // Current date KDH 2026-09-16

@@ -1,5 +1,6 @@
 using OZGL.KDH;
 using Units;
+using Units.Skills;
 using UnityEngine;
 
 namespace Game.UI
@@ -70,41 +71,105 @@ namespace Game.UI
             if (!data.HasSupport) return null;
 
             BuildingSupportSettings support = data.Support;
-            string target;
-            switch (support.targetClass)
+            string className = ClassLabel(support.targetClass);
+            string unitName = UnitLabel(support.targetUnitType);
+
+            // Current date KDH 2026-10-14
+            // 정보 창을 열 때 한 번만 문자열을 만듭니다. Update에서 호출하지 않습니다.
+            // 계열 수치 줄과 그 T3 유닛 전용 패시브 이름을 나눠 보여 줍니다.
+            string summary = AppendEffects(null, support.effects, className == null ? null : className + " 계열");
+            summary = AppendPassive(summary, support.uniquePassive, unitName);
+            if (summary == null)
+                return className == null && unitName == null ? "적용 대상 없음" : "적용할 효과가 없습니다.";
+            return summary + "\n건물이 있는 동안 적용";
+        }
+
+        private static string AppendEffects(string summary, BuildingSupportEffect[] effects, string target)
+        {
+            if (target == null || effects == null)
+                return summary;
+
+            for (int i = 0; i < effects.Length; i++)
             {
-                case AllyUnitClass.Warrior: target = "전사"; break;
-                case AllyUnitClass.Swordsman: target = "검사"; break;
-                case AllyUnitClass.Archer: target = "궁수"; break;
-                case AllyUnitClass.Mage: target = "마법사"; break;
-                case AllyUnitClass.Cultist: target = "광신도"; break;
-                default: return "적용 대상 없음";
+                BuildingSupportEffect effect = effects[i];
+                string stat = StatLabel(effect.statType);
+                float value = effect.modifierType == UnitStatModifierType.Percent ? effect.value * 100f : effect.value;
+                string suffix = effect.modifierType == UnitStatModifierType.Percent ? "%" : "";
+                string line = $"{target} {stat} {value:+0.##;-0.##;0}{suffix}";
+                summary = summary == null ? line : summary + "\n" + line;
             }
-            string stat;
-            switch (support.statType)
+
+            return summary;
+        }
+
+        private static string AppendPassive(string summary, PassiveSkillData passive, string unitName)
+        {
+            if (passive == null || unitName == null)
+                return summary;
+
+            string passiveName = passive.Display != null ? passive.Display.GetName(passive.name) : passive.name;
+            string line = $"{unitName} 패시브: {passiveName}";
+            return summary == null ? line : summary + "\n" + line;
+        }
+
+        private static string ClassLabel(AllyUnitClass targetClass)
+        {
+            switch (targetClass)
             {
-                case UnitStatType.MaxHp: stat = "최대 체력"; break;
-                case UnitStatType.Defense: stat = "방어력"; break;
-                case UnitStatType.DamageTakenMultiplier: stat = "받는 피해 배율"; break;
-                case UnitStatType.HealingTakenMultiplier: stat = "받는 회복 배율"; break;
-                case UnitStatType.AttackPower: stat = "공격력"; break;
-                case UnitStatType.DamageMultiplier: stat = "피해 배율"; break;
-                case UnitStatType.BasicAttackMultiplier: stat = "기본 공격 배율"; break;
-                case UnitStatType.SkillDamageMultiplier: stat = "스킬 피해 배율"; break;
-                case UnitStatType.DefenseIgnore: stat = "방어 무시"; break;
-                case UnitStatType.LifeSteal: stat = "흡혈"; break;
-                case UnitStatType.HealingMultiplier: stat = "회복 배율"; break;
-                case UnitStatType.AttackSpeed: stat = "공격 속도"; break;
-                case UnitStatType.CooldownReduction: stat = "재사용 대기시간 감소"; break;
-                case UnitStatType.CriticalChance: stat = "치명타 확률"; break;
-                case UnitStatType.CriticalDamage: stat = "치명타 피해"; break;
-                case UnitStatType.MoveSpeed: stat = "이동 속도"; break;
-                case UnitStatType.DetectionRange: stat = "탐지 거리"; break;
-                default: stat = support.statType.ToString(); break;
+                case AllyUnitClass.Warrior: return "전사";
+                case AllyUnitClass.Swordsman: return "검사";
+                case AllyUnitClass.Archer: return "궁수";
+                case AllyUnitClass.Mage: return "마법사";
+                case AllyUnitClass.Cultist: return "광신도";
+                default: return null;
             }
-            float value = support.modifierType == UnitStatModifierType.Percent ? support.value * 100f : support.value;
-            string suffix = support.modifierType == UnitStatModifierType.Percent ? "%" : "";
-            return $"{target} 계열 {stat} {value:+0.##;-0.##;0}{suffix}\n건물이 있는 동안 적용";
+        }
+
+        private static string UnitLabel(AllyUnitType unitType)
+        {
+            switch (unitType)
+            {
+                case AllyUnitType.WA_T3_11_폭주전사: return "폭주전사";
+                case AllyUnitType.WA_T3_21_철갑전사: return "철갑전사";
+                case AllyUnitType.WA_T3_22_마갑전사: return "마갑전사";
+                case AllyUnitType.SW_T3_11_환영검사: return "환영검사";
+                case AllyUnitType.SW_T3_21_그림자검: return "그림자검";
+                case AllyUnitType.AR_T3_11_명사수: return "명사수";
+                case AllyUnitType.AR_T3_12_속사수: return "속사수";
+                case AllyUnitType.AR_T3_21_일격사수: return "일격사수";
+                case AllyUnitType.MG_T3_11_폭렬마도사: return "폭렬마도사";
+                case AllyUnitType.MG_T3_21_혹한마도사: return "혹한마도사";
+                case AllyUnitType.MG_T3_31_천공마도사: return "천공마도사";
+                case AllyUnitType.CU_T3_11_혈사제: return "혈사제";
+                case AllyUnitType.CU_T3_21_임프: return "임프";
+                case AllyUnitType.CU_T3_22_몽마: return "몽마";
+                default: return null;
+            }
+        }
+
+        private static string StatLabel(UnitStatType statType)
+        {
+            switch (statType)
+            {
+                case UnitStatType.MaxHp: return "최대 체력";
+                case UnitStatType.Defense: return "방어력";
+                case UnitStatType.DamageTakenMultiplier: return "받는 피해 배율";
+                case UnitStatType.HealingTakenMultiplier: return "받는 회복 배율";
+                case UnitStatType.AttackPower: return "공격력";
+                case UnitStatType.DamageMultiplier: return "피해 배율";
+                case UnitStatType.BasicAttackMultiplier: return "기본 공격 배율";
+                case UnitStatType.SkillDamageMultiplier: return "스킬 피해 배율";
+                case UnitStatType.DefenseIgnore: return "방어 무시";
+                case UnitStatType.LifeSteal: return "흡혈";
+                case UnitStatType.HealingMultiplier: return "회복 배율";
+                case UnitStatType.AttackSpeed: return "공격 속도";
+                case UnitStatType.CooldownReduction: return "재사용 대기시간 감소";
+                case UnitStatType.CriticalChance: return "치명타 확률";
+                case UnitStatType.CriticalDamage: return "치명타 피해";
+                case UnitStatType.MoveSpeed: return "이동 속도";
+                case UnitStatType.DetectionRange: return "탐지 거리";
+                default: return statType.ToString();
+            }
         }
         private static bool TryReadCosts(BuildingData data, float refundRate, out int gold, out int gems,
             out int refundGold, out int refundGems)
