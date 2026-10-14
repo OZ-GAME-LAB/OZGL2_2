@@ -1,4 +1,5 @@
 using System;
+using Units.Skills;
 using UnityEngine;
 
 namespace Units
@@ -6,11 +7,10 @@ namespace Units
     public enum ProjectileImpactType
     {
         Single,
-
         Circle,
-
         Cone
     }
+
 
     public readonly struct ProjectileRequest
     {
@@ -18,41 +18,40 @@ namespace Units
         // Properties
         // ============================================================
 
-        public Unit_Core Attacker { get; }
+        public ICombatTarget Attacker { get; }
 
+        public CombatSourceSnapshot SourceSnapshot { get; }
+
+        public ProjectileFlightState Flight { get; }
 
         public ICombatTarget Target { get; }
 
-
         public UnitTeam TargetTeam { get; }
-
 
         public Vector2 Origin { get; }
 
-
         public float ProjectileSpeed { get; }
 
+        public Projectile_Controller ProjectilePrefab { get; }
 
         public ProjectileImpactType ImpactType { get; }
 
-
         public float AreaRadius { get; }
-
 
         public float AreaAngle { get; }
 
-
-        public int MaxDamageableCount { get; }
-
-
-        public DamageSourceType DamageSourceType { get; }
-
-
-        public float DamageMultiplier { get; }
+        public int MaxImpactTargetCount { get; }
 
         public Predicate<ICombatTarget> TargetFilter { get; }
 
         public int AttackerLifetimeVersion { get; }
+
+
+        // 실제 명중 대상은 Projectile 충돌 시점에 확정한다.
+        // 발사 시점에는 Target이 비어 있는 Request를 저장한다.
+        public DamageRequest? DamageRequest { get; }
+
+        public SkillEffectRequest? SkillEffectRequest { get; }
 
 
         // ============================================================
@@ -60,37 +59,38 @@ namespace Units
         // ============================================================
 
         public ProjectileRequest(
-            Unit_Core attacker,
+            ICombatTarget attacker,
             ICombatTarget target,
             Vector2 origin,
             float projectileSpeed,
             ProjectileImpactType impactType,
             float areaRadius,
             float areaAngle,
-            int maxDamageableCount,
-            DamageSourceType damageSourceType,
-            float damageMultiplier,
-            Predicate<ICombatTarget> targetFilter = null)
+            int maxImpactTargetCount,
+            DamageRequest damageRequest,
+            Predicate<ICombatTarget> targetFilter = null,
+            ProjectileFlightState flight = null,
+            Projectile_Controller projectilePrefab = null)
         {
+            SourceSnapshot = new CombatSourceSnapshot(attacker);
+
+            Flight = flight ?? new ProjectileFlightState();
+
             Attacker = attacker;
 
             Target = target;
 
-            TargetTeam =
-                target != null
-                    ? target.Team
-                    : default;
+            TargetTeam = target != null ? target.Team : default;
 
             Origin = origin;
 
             ProjectileSpeed = projectileSpeed;
 
+            ProjectilePrefab = projectilePrefab;
+
             ImpactType = impactType;
 
-            AreaRadius = Mathf.Max(
-                0f,
-                areaRadius
-            );
+            AreaRadius = Mathf.Max(0f, areaRadius);
 
             AreaAngle = Mathf.Clamp(
                 areaAngle,
@@ -98,17 +98,95 @@ namespace Units
                 360f
             );
 
-            MaxDamageableCount = Mathf.Max(
-                1,
-                maxDamageableCount
+            MaxImpactTargetCount = Mathf.Max(1, maxImpactTargetCount);
+
+            TargetFilter = targetFilter;
+
+            DamageRequest = new DamageRequest(
+                attacker,
+                damageRequest.Targets,
+                damageRequest.SourceType,
+                damageRequest.DamageType,
+                damageRequest.DamageMultiplier,
+                damageRequest.Metadata,
+                SourceSnapshot
             );
 
-            DamageSourceType = damageSourceType;
+            SkillEffectRequest = null;
 
-            DamageMultiplier = damageMultiplier;
+            AttackerLifetimeVersion = attacker != null ? attacker.LifetimeVersion : 0;
+        }
+
+        public ProjectileRequest(
+            ICombatTarget attacker,
+            ICombatTarget target,
+            Vector2 origin,
+            float projectileSpeed,
+            ProjectileImpactType impactType,
+            float areaRadius,
+            float areaAngle,
+            int maxImpactTargetCount,
+            SkillEffectRequest skillEffectRequest,
+            Predicate<ICombatTarget> targetFilter = null,
+            ProjectileFlightState flight = null,
+            Projectile_Controller projectilePrefab = null)
+        {
+            SourceSnapshot = new CombatSourceSnapshot(attacker);
+
+            Flight = flight ?? new ProjectileFlightState();
+
+            Attacker = attacker;
+
+            Target = target;
+
+            TargetTeam = target != null ? target.Team : default;
+
+            Origin = origin;
+
+            ProjectileSpeed = projectileSpeed;
+
+            ProjectilePrefab = projectilePrefab;
+
+            ImpactType = impactType;
+
+            AreaRadius = Mathf.Max(0f, areaRadius);
+
+            AreaAngle = Mathf.Clamp(
+                areaAngle,
+                0f,
+                360f
+            );
+
+            MaxImpactTargetCount = Mathf.Max(1, maxImpactTargetCount);
+
             TargetFilter = targetFilter;
-            Unit_Gateway gateway = attacker != null ? attacker.GetComponent<Unit_Gateway>() : null;
-            AttackerLifetimeVersion = gateway != null ? gateway.LifetimeVersion : 0;
+
+            DamageRequest = null;
+
+            var context = new SkillConditionContext(
+                attacker,
+                new CombatTargetSnapshot(target),
+                new TargetResolver(),
+                skillEffectRequest.Metadata,
+                skillEffectRequest.Batch?.IsActiveSkill ?? false,
+                skillEffectRequest.Metadata.ActionIndex,
+                skillEffectRequest.Batch?.PreviousResult,
+                origin
+            );
+
+            SkillEffectRequest = new SkillEffectRequest(
+                attacker,
+                null,
+                SkillDefinitionCopy.Copy(new System.Collections.Generic.List<SkillEffectData>(skillEffectRequest.Effects)),
+                skillEffectRequest.Metadata,
+                skillEffectRequest.Batch?.Freeze(context, SourceSnapshot),
+                sourceSnapshot: SourceSnapshot
+            );
+
+            Flight.Configure(SkillEffectRequest.Value.Batch, skillEffectRequest.Metadata);
+            Flight.SetFXRadius(impactType == ProjectileImpactType.Single ? 0f : AreaRadius);
+
+            AttackerLifetimeVersion = attacker != null ? attacker.LifetimeVersion : 0;
         }
     }
 }

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Core;
+using Game.UI;
 using OZGL.KDH;
 using UnityEngine;
 
@@ -15,10 +17,13 @@ public class CurrencyTestPanel : MonoBehaviour
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private ArtifactTestPanel _artifactTestPanel;
+    [SerializeField] private ConsumableItemTestPanel _consumableTestPanel;
     [SerializeField] private PersistentCurrencyManager _persistent;
+    [SerializeField] private RunSettlementManager _settlement;
     [SerializeField] private CurrencyData _gold;
     [SerializeField] private CurrencyData _gem;
     [SerializeField] private CurrencyData _bloodstone;
+    [SerializeField] private TotemRunApplier _totemRunApplier;
 
     private bool _subscribed;
     [SerializeField] private ShopTestPanel _shopTestPanel;
@@ -67,11 +72,11 @@ public class CurrencyTestPanel : MonoBehaviour
 
     private bool Ready()
     {
-        if (!Application.isPlaying || !isActiveAndEnabled || _run == null || _persistent == null ||
+        if (!Application.isPlaying || !isActiveAndEnabled || _run == null || _persistent == null || _settlement == null ||
             _gold == null || _gem == null || _bloodstone == null ||
             _waveController == null || _buildingCoreProgress == null)
         {
-            _result = "Play 모드에서 매니저·재화·BuildingCoreProgress 연결을 확인하세요.";
+            _result = "Play 모드에서 매니저(지갑·정산 포함)·재화·BuildingCoreProgress 연결을 확인하세요.";
             return false;
         }
 
@@ -103,7 +108,7 @@ public class CurrencyTestPanel : MonoBehaviour
         if (_waitingForContent) return;
         bool newRun = !_run.IsInitialized;
         if (newRun && _shopTestPanel != null) { _shopTestPanel.ResetPanel(); }
-        _persistent.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
+        InitializePersistentManagers();
         _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager, buildingCoreProgress: _buildingCoreProgress);
         if (_run.IsInitialized)
         {
@@ -111,7 +116,7 @@ public class CurrencyTestPanel : MonoBehaviour
             {
                 if (_testFlow != null)
                 {
-                    _testFlow.ResetRun();
+                    _testFlow.QuitRun();
                 }
                 else
                 {
@@ -124,9 +129,14 @@ public class CurrencyTestPanel : MonoBehaviour
                 Report("웨이브 시작 — 외부 초기화 또는 Wave Catalog 설정 확인", false);
                 return;
             }
+            if (_consumableTestPanel != null)
+            {
+                _consumableTestPanel.Initialize(_effectManager,
+                    _artifactTestPanel != null ? _artifactTestPanel.Artifacts : null, newRun);
+            }
             if (_artifactTestPanel != null)
             {
-                _artifactTestPanel.Initialize(_waveController, _effectManager);
+                _artifactTestPanel.Initialize(_waveController, _effectManager, _run);
             }
         }
         Report("Run 시작", _run.IsInitialized);
@@ -144,6 +154,10 @@ public class CurrencyTestPanel : MonoBehaviour
             _artifactTestPanel.EndRun();
         }
         _waitingForContent = false;
+        if (_consumableTestPanel != null)
+        {
+            _consumableTestPanel.ResetPanel();
+        }
         if (_shopTestPanel != null) { _shopTestPanel.ResetPanel(); }
         Report("Run 종료", _run.TryEndRun());
     }
@@ -157,7 +171,7 @@ public class CurrencyTestPanel : MonoBehaviour
     // 세 패널을 한 화면에서 배치. 작은 화면은 전체 UI를 같은 비율로 축소
     private void OnGUI()
     {
-        float scale = Mathf.Min(1f, Screen.width / 1200f);
+        float scale = Mathf.Min(1f, Screen.width / (_consumableTestPanel != null ? 1600f : 1200f));
         Matrix4x4 previousMatrix = GUI.matrix;
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
         float height = Mathf.Max(150, Screen.height / scale - 24);
@@ -176,6 +190,12 @@ public class CurrencyTestPanel : MonoBehaviour
             _shopTestPanel.DrawPanel();
         }
         GUILayout.EndArea();
+        if (_consumableTestPanel != null)
+        {
+            GUILayout.BeginArea(new Rect(1200, 12, 388, height), GUI.skin.box);
+            _consumableTestPanel.DrawPanel(_run != null && _run.IsInitialized);
+            GUILayout.EndArea();
+        }
         GUI.matrix = previousMatrix;
     }
 
@@ -316,17 +336,18 @@ public class CurrencyTestPanel : MonoBehaviour
         }
         _passed = 0;
         _failed = 0;
+        InitializePersistentManagers();
         int savedBloodstone = _persistent.GetBalance(_bloodstone.Type);
 
         try
         {
             if (_run.IsInitialized) _run.TryEndRun();
-            _persistent.TrySpend(_bloodstone.Type, savedBloodstone);
+            if (!_persistent.TrySpend(_bloodstone.Type, savedBloodstone))
+                throw new InvalidOperationException("검사용 혈석 잔액 초기화 실패");
             int events = _eventCount;
             Check(_run.Balances == null && _run.GetBalance(CurrencyType.Gold) == 0 &&
                 _run.GetBalance(CurrencyType.Gem) == 0, "초기화 전 Balances null 및 Type 조회 0");
             Check(!_run.CanSpend(_gold.Type, 0), "Run 시작 전 소비 불가");
-            _persistent.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager);
             _run.Initialize(waveController: _waveController, gameFlowController: null, effectManager: _effectManager, buildingCoreProgress: _buildingCoreProgress);
             Check(_run.IsInitialized, "Run 초기화");
             if (!_run.IsInitialized)
@@ -471,6 +492,21 @@ public class CurrencyTestPanel : MonoBehaviour
     }
 
     private bool _settlementPending;
+    private readonly TestSettlementUI _settlementTestUI = new TestSettlementUI();
+    private TestSettlementSaveWriter _settlementTestWriter;
+
+    private void InitializePersistentManagers()
+    {
+        // 이미 초기화된 지갑의 잔액은 Run 재시작이나 테스트 진입 시 유지합니다.
+        if (!_persistent.IsInitialized)
+            _persistent.Initialize();
+
+        // 경제 단독 검사는 버튼 입력과 실제 플레이어 저장 파일을 사용하지 않습니다.
+        if (_settlementTestWriter == null)
+            _settlementTestWriter = new TestSettlementSaveWriter(_persistent);
+        _settlement.Initialize(_waveController, _effectManager, _persistent, _totemRunApplier,
+            _settlementTestUI, _settlementTestWriter);
+    }
 
     private async UniTask ApplySettlementAsync()
     {
@@ -479,26 +515,94 @@ public class CurrencyTestPanel : MonoBehaviour
             return;
         }
         _settlementPending = true;
-        int before = _persistent.GetBalance(_bloodstone.Type);
-        await _persistent.TryApplyReward();
-        int after = _persistent.GetBalance(_bloodstone.Type);
-        _result = $"정산 호출 완료: 혈석 {before} → {after} (실패 여부는 Console 확인)";
-        _settlementPending = false;
+        try
+        {
+            InitializePersistentManagers();
+            int before = _persistent.GetBalance(_bloodstone.Type);
+            bool applied = await _settlement.TryApplyReward(CreateTestRunSummary());
+            int after = _persistent.GetBalance(_bloodstone.Type);
+            _result = $"정산 검사 {(applied ? "완료" : "실패")}: 혈석 {before} → {after} (검사용 메모리 저장·자동 확인)";
+        }
+        finally
+        {
+            _settlementPending = false;
+        }
     }
 
     private async UniTask CheckSettlementReward()
     {
         int before = _persistent.GetBalance(_bloodstone.Type);
-        int clearedWaves = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE + _waveController.CurWave;
-        int expectedReward = clearedWaves * (1 + clearedWaves / WaveController.MAX_WAVE);
-        await _persistent.TryApplyReward();
+        RunSummary summary = CreateTestRunSummary();
+        int expectedReward = summary.ClearWaveCount * (1 + summary.ClearBossCount);
+        if (_totemRunApplier != null) expectedReward += _totemRunApplier.CalculateBonusBloodstone(expectedReward);
+        bool applied = await _settlement.TryApplyReward(summary);
         int balance = _persistent.GetBalance(_bloodstone.Type);
-        Check(balance == before + expectedReward, "현재 웨이브 포함 임시 정산 수량 확인");
+        Check(applied && balance == before + expectedReward && _settlementTestUI.ShownBloodstones == expectedReward &&
+            _settlementTestWriter.Saved.Wallet.Amount == balance, "정산 금액·저장·UI 전달값 일치 확인");
         if (balance < before || !_persistent.TrySpend(_bloodstone.Type, balance - before))
         {
             throw new InvalidOperationException("혈석 정산 검사 후 잔액 복원 실패");
         }
     }
+    // 테스트 패널에서는 현재 웨이브까지 클리어했다고 가정한 기록을 전달합니다.
+    private RunSummary CreateTestRunSummary()
+    {
+        int clearedWaves = (_waveController.CurQuarter - 1) * WaveController.MAX_WAVE + _waveController.CurWave;
+        return new RunSummary(new RunStats
+        {
+            ClearWaveCount = clearedWaves,
+            ClearBossCount = clearedWaves / WaveController.MAX_WAVE,
+            MaxQuarter = _waveController.CurQuarter,
+            MaxWave = _waveController.CurWave
+        });
+    }
+
+    // 게임용 정산 매니저의 계약을 사용하는 EconomyTestScene 전용 대체 구현입니다.
+    private sealed class TestSettlementUI : IRunSettlementUI
+    {
+        public int ShownBloodstones { get; private set; }
+
+        public UniTask ShowAndWaitAsync(RunSummary summary, int bloodstones, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            ShownBloodstones = bloodstones;
+            return UniTask.CompletedTask;
+        }
+    }
+
+    private sealed class TestSettlementSaveWriter : IPersistentSaveWriter
+    {
+        private readonly PersistentCurrencyManager _wallet;
+        public bool IsReady => _wallet.IsInitialized;
+        public PersistentSaveData Saved { get; private set; }
+
+        public TestSettlementSaveWriter(PersistentCurrencyManager wallet)
+        {
+            _wallet = wallet;
+            Saved = new PersistentSaveData
+            {
+                Traits = new TraitSaveData(new List<TraitLevelEntry>
+                {
+                    new TraitLevelEntry { Id = TraitId.StartingGold, Level = 0 }
+                }),
+                Wallet = wallet.CaptureSaveData()
+            };
+        }
+
+        public PersistentSaveData CaptureSaveData() => new PersistentSaveData
+        {
+            Traits = new TraitSaveData(Saved.Traits._levels),
+            Wallet = _wallet.CaptureSaveData()
+        };
+
+        public bool TrySave(PersistentSaveData data, out string error)
+        {
+            if (!_wallet.TryValidateSaveData(data.Wallet, out error)) return false;
+            Saved = data;
+            return true;
+        }
+    }
+
     private void CheckBalanceAccess(CurrencyData currency, CurrencyType expectedType)
     {
         var balances = currency.Lifetime == CurrencyLifetime.Run ? _run.Balances : _persistent.Balances;

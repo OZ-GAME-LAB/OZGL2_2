@@ -1,6 +1,5 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
-
 
 
 namespace Units
@@ -63,6 +62,9 @@ namespace Units
 
         private float _nextTargetReevaluationTime;
 
+        private float _nextAssignmentRetryTime;
+        private const float AssignmentRetryInterval = 0.5f;
+
 
         // ============================================================
         // Properties
@@ -87,7 +89,9 @@ namespace Units
         public void Initialize(
             Unit_Core core)
         {
-            _core = core;
+            UnbindEvents();
+            _core =
+                core;
 
 
             InitializeSelector();
@@ -109,7 +113,8 @@ namespace Units
             _movementCompleted =
                 false;
 
-            _pendingSkillTargetReevaluation = false;
+            _pendingSkillTargetReevaluation =
+                false;
 
             _isRunning =
                 false;
@@ -241,6 +246,20 @@ namespace Units
         public void SetUnitAssignment(
             UnitAssignment assignment)
         {
+            // 같은 대상의 위치 재평가는 이동을 정지/재진입시키지 않는다.
+            if (_isRunning && !_currentActionEnded && !_movementCompleted
+                && IsCurrentAction(UnitAIActionType.Move) && _currentAssignment.HasValue
+                && ReferenceEquals(_currentAssignment.Value.Target, assignment.Target))
+            {
+                bool destinationChanged = Vector2.Distance(
+                    _currentAssignment.Value.PreferredPosition, assignment.PreferredPosition) > 0.01f;
+                _currentAssignment = assignment;
+                if (destinationChanged && !_core.IsCombatBusy)
+                    _core.UpdateMovementDestination(assignment.PreferredPosition);
+                EvaluateAction();
+                return;
+            }
+
             _currentAssignment =
                 assignment;
 
@@ -295,15 +314,22 @@ namespace Units
 
             if (_pendingSkillTargetReevaluation)
             {
-                _pendingSkillTargetReevaluation = false;
+                _pendingSkillTargetReevaluation =
+                    false;
+
                 if (!ValidateCurrentAssignment())
                     return;
+
                 RequestTargetReevaluation();
+
                 return;
             }
 
-            if (!ValidateCurrentAssignment())
-                return;
+
+            if (_core.IsCombatBusy) return;
+            if (_core.TrySelectActiveSkill(CurrentTarget, out _))
+            { ChangeAction(UnitAIActionType.ActiveSkill); return; }
+            if (!ValidateCurrentAssignment()) return;
 
 
             if (_currentActionEnded)
@@ -336,6 +362,9 @@ namespace Units
 
         private void EvaluateAction()
         {
+            if (_core == null || !_isRunning || _core.IsCombatBusy) return;
+            if (_isRunning && _core.TrySelectActiveSkill(CurrentTarget, out _))
+            { ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!HasAssignment)
             {
                 ChangeAction(
@@ -361,7 +390,7 @@ namespace Units
 
             UnitAIActionType nextAction =
                 _actionSelector.SelectAction(
-                    assignment
+                    assignment, approaching: IsCurrentAction(UnitAIActionType.Move) && !_movementCompleted && !_currentActionEnded
                 );
 
 
@@ -389,8 +418,16 @@ namespace Units
         // ============================================================
 
         private void ChangeAction(
-            UnitAIActionType actionType)
+            UnitAIActionType actionType, bool skillPrepared = false)
         {
+            // 승인 실패는 행동 전환이 아니다. Move.Exit/Stop 전에 실행 준비를 마친다.
+            if (actionType == UnitAIActionType.ActiveSkill && !skillPrepared)
+            {
+                _core.TryActiveSkill(_core.SelectedSkillDecision,
+                    () => ChangeAction(UnitAIActionType.ActiveSkill, skillPrepared: true));
+                return;
+            }
+
             if (!_actions.TryGetValue(
                 actionType,
                 out IUnitAIAction nextAction))
@@ -446,6 +483,7 @@ namespace Units
                 true;
         }
 
+
         private void OnMovementFailed()
         {
             if (!_isRunning)
@@ -454,8 +492,44 @@ namespace Units
             if (!IsCurrentAction(UnitAIActionType.Move))
                 return;
 
-            Debug.LogWarning($"Unit {name} failed to reach its destination. Requesting a new assignment.");
+            if (!_currentAssignment.HasValue)
+            {
+                RequestFullAssignment();
 
+                return;
+            }
+
+            UnitAssignment assignment =
+                _currentAssignment.Value;
+
+            if (!IsTargetValid(assignment.Target))
+            {
+                RequestFullAssignment();
+
+                return;
+            }
+
+            UnitAIActionType nextAction =
+                _actionSelector.SelectAction(
+                    assignment
+                );
+
+            // 이동에 실패했더라도 현재 타겟에 대해
+            // 공격/스킬 사용 또는 대기가 가능하다면
+            // 기존 Assignment를 유지하고 행동을 다시 판단한다.
+            if (nextAction != UnitAIActionType.Move)
+            {
+                _currentActionEnded =
+                    true;
+
+                _movementCompleted =
+                    false;
+
+                return;
+            }
+
+            // 여전히 이동이 필요한 상태라면 현재 위치 배정으로는
+            // 전투를 진행할 수 없으므로 전체 Assignment를 다시 요청한다.
             RequestFullAssignment();
         }
 
@@ -495,7 +569,11 @@ namespace Units
         private bool ValidateCurrentAssignment()
         {
             if (!HasAssignment)
-                return true;
+            {
+                if (Time.time >= _nextAssignmentRetryTime)
+                    RequestFullAssignment();
+                return false;
+            }
 
 
             UnitAssignment assignment =
@@ -533,6 +611,8 @@ namespace Units
 
         private void RequestFullAssignment()
         {
+            // 요청은 동기적으로 실패할 수 있다. 다음 Think에서 무제한 재귀/재시도하지 않는다.
+            _nextAssignmentRetryTime = Time.time + AssignmentRetryInterval;
             ClearUnitAssignment();
 
             _core.RequestFullAssignment();
@@ -554,8 +634,8 @@ namespace Units
                 false;
 
 
-            _core.StopMovement();
-
+            ClearUnitAssignment();
+            _nextAssignmentRetryTime = Time.time + AssignmentRetryInterval;
             _core.RequestPositionAssignment();
         }
 
@@ -563,7 +643,10 @@ namespace Units
         public void QueueTargetReevaluation()
         {
             if (_isRunning)
-                _pendingSkillTargetReevaluation = true;
+            {
+                _pendingSkillTargetReevaluation =
+                    true;
+            }
         }
 
 
@@ -598,9 +681,15 @@ namespace Units
             if (_isRunning)
                 return;
 
-            _isRunning = true;
 
-            _nextThinkTime = 0f;
+            _isRunning =
+                true;
+
+            _nextAssignmentRetryTime = 0f;
+
+            _nextThinkTime =
+                0f;
+
 
             EvaluateAction();
         }
@@ -616,7 +705,8 @@ namespace Units
                 return;
 
 
-            _pendingSkillTargetReevaluation = false;
+            _pendingSkillTargetReevaluation =
+                false;
 
             _isRunning =
                 false;
@@ -641,7 +731,8 @@ namespace Units
 
         public void PauseAI()
         {
-            _pendingSkillTargetReevaluation = false;
+            _pendingSkillTargetReevaluation =
+                false;
 
             _isRunning =
                 false;

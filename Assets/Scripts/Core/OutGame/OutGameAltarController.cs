@@ -24,6 +24,8 @@ public class OutGameAltarController : MonoBehaviour, IAltarSelection, ISaveDataP
             return;
         }
 
+        _catalog.RefreshLookup();
+
         for (int i = 0; i < _catalog.Altars.Count; i++)
         {
             _data.Add(_catalog.Altars[i]);

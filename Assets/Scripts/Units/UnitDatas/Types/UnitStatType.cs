@@ -1,26 +1,35 @@
-﻿namespace Units
+﻿
+
+
+namespace Units
 {
     public enum UnitStatType
     {
         // Life
-        MaxHp,
+        MaxHp = 0,
+        Defense = 10,
+        DamageTakenMultiplier = 20,
+        HealingTakenMultiplier = 30,
 
         // Combat
-        AttackPower,
-        BasicAttackMultiplier,
-        SkillDamageMultiplier,
-        Defense,
-        AttackSpeed,
-        CooldownReduction,
+        AttackPower = 100,
+        DamageMultiplier = 110,
+        BasicAttackMultiplier = 120,
+        SkillDamageMultiplier = 130,
+        DefenseIgnore = 140,
+        LifeSteal = 150,
+        HealingMultiplier = 160,
+        AttackSpeed = 170,
+        CooldownReduction = 180,
 
         // Critical
-        CriticalChance,
-        CriticalDamage,
+        CriticalChance = 200,
+        CriticalDamage = 210,
 
         // Movement
-        MoveSpeed,
+        MoveSpeed = 300,
 
         // Detection
-        DetectionRange
+        DetectionRange = 400
     }
 }

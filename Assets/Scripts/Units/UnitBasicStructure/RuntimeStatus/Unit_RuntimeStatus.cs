@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using Units.Effects;
 using Units.Skills;
 using Units.UnitDatas;
 using UnityEngine;
@@ -7,7 +8,7 @@ using UnityEngine;
 
 namespace Units
 {
-    public partial class Unit_RuntimeStatus : MonoBehaviour
+    public class Unit_RuntimeStatus : MonoBehaviour
     {
         // ============================================================
         // Data
@@ -16,64 +17,165 @@ namespace Units
         [SerializeField]
         private UnitData _unitData;
 
+        private UnitData _runtimeUnitData;
+        public UnitData DefaultUnitData => _unitData;
+
+        private IReadOnlyList<PassiveSkillData> _spawnPassiveSkills = Array.Empty<PassiveSkillData>();
+
         private AdjustedStatus _adjustedStatus;
+
         private FinalStatus _finalStatus;
+
+        private EffectStatus _effectStatus;
+
+        private int _effectTransactionDepth;
+
+        private int _statusGeneration;
+
+        private readonly Dictionary<UnitStatType, float> _deferredStats = new();
+
+        private readonly Dictionary<UnitStatusEffectType, bool> _beforeStatuses = new();
+
+        public event Action EffectsChanged;
+
+        internal void BeginEffectTransaction()
+        {
+            if (_effectTransactionDepth++ != 0)
+                return;
+
+            _deferredStats.Clear();
+
+            _beforeStatuses.Clear();
+
+            foreach (UnitStatusEffectType type in Enum.GetValues(typeof(UnitStatusEffectType)))
+                _beforeStatuses[type] = HasStatus(type);
+        }
+
+        internal void EndEffectTransaction(bool changed)
+        {
+            if (--_effectTransactionDepth != 0)
+                return;
+
+            int generation = _statusGeneration;
+
+            var stats = new Dictionary<UnitStatType, float>(_deferredStats);
+
+            var statuses = new Dictionary<UnitStatusEffectType, bool>(_beforeStatuses);
+
+            _deferredStats.Clear();
+
+            _beforeStatuses.Clear();
+
+            foreach (var pair in stats)
+            {
+                if (generation != _statusGeneration)
+                    return;
+
+                NotifyStatChanged(pair.Key, pair.Value);
+            }
+
+            foreach (var pair in statuses)
+            {
+                if (generation != _statusGeneration)
+                    return;
+
+                if (HasStatus(pair.Key) != pair.Value)
+                    StatusChanged?.Invoke(pair.Key, HasStatus(pair.Key));
+            }
+
+            if (changed && generation == _statusGeneration)
+                EffectsChanged?.Invoke();
+        }
+
+        public int GetEffectStackCount(EffectStackQuery query)
+        {
+            if (query == null || !query.IsValid)
+                return 0;
+
+            int count = 0;
+
+            foreach (var instance in ActiveEffects)
+                if (query.Matches(instance.Definition))
+                    count += instance.StackCount;
+
+            return count;
+        }
+
+        private readonly List<CombatStatModifier> _effectModifierBuffer = new();
 
 
         // ============================================================
         // Data Properties
         // ============================================================
 
-        public UnitData UnitData =>
-            _unitData;
+        public UnitData UnitData => _runtimeUnitData != null ? _runtimeUnitData : _unitData;
 
-        public BasicAttackData BasicAttackData =>
-            _unitData != null
-                ? _unitData.BasicAttackData
-                : null;
+        public BasicAttackData BasicAttackData => UnitData != null ? UnitData.BasicAttackData : null;
 
-        public ActiveSkillData ActiveSkillData =>
-            _unitData != null
-                ? _unitData.ActiveSkillData
-                : null;
+        public IReadOnlyList<UnitActiveSkillEntry> ActiveSkills => UnitData != null ? UnitData.ActiveSkills : Array.Empty<UnitActiveSkillEntry>();
+
+
+        public IReadOnlyList<PassiveSkillData> PassiveSkillDatas => _spawnPassiveSkills;
 
 
         // ============================================================
         // Stat Properties
         // ============================================================
 
-        public float MaxHp =>
-            GetStat(UnitStatType.MaxHp);
+        // Life
 
-        public float AttackPower =>
-            GetStat(UnitStatType.AttackPower);
+        public float MaxHp => GetStat(UnitStatType.MaxHp);
 
-        public float BasicAttackMultiplier =>
-            GetStat(UnitStatType.BasicAttackMultiplier);
+        public float Defense => GetStat(UnitStatType.Defense);
 
-        public float SkillDamageMultiplier =>
-            GetStat(UnitStatType.SkillDamageMultiplier);
+        public float DamageTakenMultiplier => GetStat(UnitStatType.DamageTakenMultiplier);
 
-        public float Defense =>
-            GetStat(UnitStatType.Defense);
+        public float HealingTakenMultiplier => GetStat(UnitStatType.HealingTakenMultiplier);
 
-        public float AttackSpeed =>
-            GetStat(UnitStatType.AttackSpeed);
 
-        public float CooldownReduction =>
-            GetStat(UnitStatType.CooldownReduction);
+        // Combat
 
-        public float CriticalChance =>
-            GetStat(UnitStatType.CriticalChance);
+        public float AttackPower => GetStat(UnitStatType.AttackPower);
 
-        public float CriticalDamage =>
-            GetStat(UnitStatType.CriticalDamage);
+        public float DamageMultiplier => GetStat(UnitStatType.DamageMultiplier);
 
-        public float MoveSpeed =>
-            GetStat(UnitStatType.MoveSpeed);
+        public float BasicAttackMultiplier => GetStat(UnitStatType.BasicAttackMultiplier);
 
-        public float DetectionRange =>
-            GetStat(UnitStatType.DetectionRange);
+        public float SkillDamageMultiplier => GetStat(UnitStatType.SkillDamageMultiplier);
+
+        public float DefenseIgnore => GetStat(UnitStatType.DefenseIgnore);
+
+        public float LifeSteal => GetStat(UnitStatType.LifeSteal);
+
+        public float HealingMultiplier => GetStat(UnitStatType.HealingMultiplier);
+
+        public float AttackSpeed => GetStat(UnitStatType.AttackSpeed);
+
+        public float CooldownReduction => GetStat(UnitStatType.CooldownReduction);
+
+
+        // Critical
+
+        public float CriticalChance => GetStat(UnitStatType.CriticalChance);
+
+        public float CriticalDamage => GetStat(UnitStatType.CriticalDamage);
+
+
+        // Movement
+
+        public float MoveSpeed => GetStat(UnitStatType.MoveSpeed);
+
+
+        // Detection
+
+        public float DetectionRange => GetStat(UnitStatType.DetectionRange);
+
+
+        // ============================================================
+        // Effect Properties
+        // ============================================================
+
+        public IReadOnlyList<RuntimeEffectInstance> ActiveEffects => _effectStatus != null ? _effectStatus.ActiveEffects : Array.Empty<RuntimeEffectInstance>();
 
 
         // ============================================================
@@ -84,142 +186,360 @@ namespace Units
 
         public event Action<float, float> MaxHpChanged;
 
+        public event Action<UnitStatusEffectType, bool> StatusChanged;
+
 
         // ============================================================
         // Initialize
         // ============================================================
 
-        public void Initialize(
-            FinalStatModifier spawnModifier)
+        public void Initialize(FinalStatModifier spawnModifier)
         {
-            if (_unitData == null)
+            Initialize(spawnModifier, null);
+        }
+
+
+        // 외부 패시브는 이 수명의 초기화 시점에만 받는다.
+        public void Initialize(
+            FinalStatModifier spawnModifier,
+            IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
+        {
+            Initialize(spawnModifier, spawnPassiveSkills, null);
+        }
+
+        public void Initialize(FinalStatModifier spawnModifier,
+            IReadOnlyList<PassiveSkillData> spawnPassiveSkills, UnitData overrideData)
+        {
+            _runtimeUnitData = overrideData != null ? overrideData : _unitData;
+            _spawnPassiveSkills = Array.Empty<PassiveSkillData>();
+
+            if (UnitData == null)
             {
-                Debug.LogError(
-                    $"[Unit_RuntimeStatus] {name} : UnitData가 없습니다."
-                );
+                Debug.LogError($"[Unit_RuntimeStatus] {name} : UnitData가 없습니다.");
 
                 return;
             }
 
-            _adjustedStatus =
-                new AdjustedStatus(
-                    _unitData,
-                    spawnModifier
-                );
+            _statusGeneration++;
 
-            _finalStatus =
-                new FinalStatus(
-                    _adjustedStatus
-                );
+            _effectTransactionDepth = 0;
+
+            _deferredStats.Clear();
+
+            _beforeStatuses.Clear();
+
+            InitializePassiveSkills(spawnPassiveSkills);
+
+            _adjustedStatus = new AdjustedStatus(UnitData, spawnModifier);
+
+            _finalStatus = new FinalStatus(_adjustedStatus);
+
+            _effectStatus = new EffectStatus(IsImmuneToStatus);
+
+            _effectStatus.StatusChanged += OnStatusChanged;
+        }
+
+
+        private void InitializePassiveSkills(IReadOnlyList<PassiveSkillData> spawnPassiveSkills)
+        {
+            List<PassiveSkillData> result = new();
+
+            HashSet<PassiveSkillData> included = new();
+
+            // 기본 목록의 기존 실행 순서와 중복 설정은 보존한다.
+            if (UnitData.PassiveSkillDatas != null)
+            {
+                foreach (PassiveSkillData passiveSkill in UnitData.PassiveSkillDatas)
+                {
+                    if (passiveSkill == null)
+                        continue;
+
+                    result.Add(passiveSkill);
+
+                    included.Add(passiveSkill);
+                }
+            }
+
+            if (spawnPassiveSkills != null)
+            {
+                foreach (PassiveSkillData passiveSkill in spawnPassiveSkills)
+                {
+                    if (passiveSkill != null && included.Add(passiveSkill))
+                    {
+                        result.Add(passiveSkill);
+                    }
+                }
+            }
+
+            _spawnPassiveSkills = result.AsReadOnly();
         }
 
 
         // ============================================================
-        // Public Methods
+        // Stat Methods
         // ============================================================
 
-        public float GetStat(
-            UnitStatType statType)
+        public float GetStat(UnitStatType statType)
         {
             if (_finalStatus == null)
                 return 0f;
 
-            return _finalStatus.Get(
-                statType
-            );
+            return _finalStatus.Get(statType);
         }
 
-
-        public void AddCombatModifier(
-            CombatStatModifier modifier)
+        public void AddCombatModifier(CombatStatModifier modifier)
         {
             if (_finalStatus == null)
                 return;
 
-            float previousValue =
-                _finalStatus.Get(
-                    modifier.StatType
-                );
+            float previousValue = _finalStatus.Get(modifier.StatType);
 
-            _finalStatus.AddModifier(
-                modifier
-            );
+            _finalStatus.AddModifier(modifier);
 
-            NotifyStatChanged(
-                modifier.StatType,
-                previousValue
-            );
+            NotifyStatChanged(modifier.StatType, previousValue);
         }
 
-
-        public void RemoveCombatModifiers(
-            object source)
+        public void RemoveCombatModifiers(object source)
         {
             if (_finalStatus == null || source == null)
+            {
                 return;
+            }
 
-            Dictionary<UnitStatType, float> previousValues =
-                _finalStatus.GetAffectedValues(
-                    source
-                );
+            Dictionary<UnitStatType, float> previousValues = _finalStatus.GetAffectedValues(source);
 
             if (previousValues.Count == 0)
                 return;
 
-            _finalStatus.RemoveModifiers(
-                source
-            );
+            _finalStatus.RemoveModifiers(source);
 
-            foreach (
-                KeyValuePair<UnitStatType, float> pair
-                in previousValues)
+            foreach (KeyValuePair<UnitStatType, float> pair in previousValues)
             {
-                NotifyStatChanged(
-                    pair.Key,
-                    pair.Value
-                );
+                NotifyStatChanged(pair.Key, pair.Value);
             }
         }
 
+        public void ReplaceCombatModifiers(object source, IReadOnlyList<CombatStatModifier> modifiers)
+        {
+            if (_finalStatus == null || source == null) return;
+            var before = _finalStatus.GetAffectedValues(source);
+            if (modifiers != null)
+                foreach (var modifier in modifiers)
+                    if (!before.ContainsKey(modifier.StatType))
+                        before.Add(modifier.StatType, GetStat(modifier.StatType));
+            _finalStatus.ReplaceModifiers(source, modifiers);
+            foreach (var pair in before) NotifyStatChanged(pair.Key, pair.Value);
+        }
 
         public void ClearCombatModifiers()
         {
             if (_finalStatus == null)
                 return;
 
-            Dictionary<UnitStatType, float> previousValues =
-                _finalStatus.GetCurrentValues();
+            Dictionary<UnitStatType, float> previousValues = _finalStatus.GetCurrentValues();
 
             _finalStatus.ClearModifiers();
 
-            foreach (
-                KeyValuePair<UnitStatType, float> pair
-                in previousValues)
+            foreach (KeyValuePair<UnitStatType, float> pair in previousValues)
             {
-                NotifyStatChanged(
-                    pair.Key,
-                    pair.Value
-                );
+                NotifyStatChanged(pair.Key, pair.Value);
             }
         }
 
 
         // ============================================================
-        // Private Methods
+        // Effect Methods
+        // ============================================================
+
+        public bool HasEffect(string effectId)
+        {
+            if (_effectStatus == null)
+                return false;
+
+            return _effectStatus.HasEffect(effectId);
+        }
+
+        public RuntimeEffectInstance GetEffect(string effectId)
+        {
+            if (_effectStatus == null)
+                return null;
+
+            return _effectStatus.GetEffect(effectId);
+        }
+
+        public bool HasStatus(UnitStatusEffectType statusType)
+        {
+            if (_effectStatus == null)
+                return false;
+
+            return _effectStatus.HasStatus(statusType);
+        }
+
+        public bool AddRuntimeEffect(RuntimeEffectInstance instance)
+        {
+            if (_effectStatus == null || instance == null || IsImmuneToEffect(instance.Definition))
+            {
+                return false;
+            }
+
+            if (!_effectStatus.AddEffect(instance))
+            {
+                return false;
+            }
+
+            ApplyEffectActions(instance);
+
+            return true;
+        }
+
+        public bool RemoveRuntimeEffect(RuntimeEffectInstance instance)
+        {
+            if (_effectStatus == null || instance == null)
+            {
+                return false;
+            }
+
+            if (!_effectStatus.RemoveEffect(instance))
+            {
+                return false;
+            }
+
+            RemoveEffectActions(instance);
+
+            return true;
+        }
+
+        public void RefreshRuntimeEffect(RuntimeEffectInstance instance)
+        {
+            if (_effectStatus == null || _finalStatus == null || instance == null)
+            {
+                return;
+            }
+
+            Dictionary<UnitStatType, float> previousValues = _finalStatus.GetAffectedValues(instance);
+
+            BuildEffectModifiers(instance, _effectModifierBuffer);
+
+            _finalStatus.ReplaceModifiers(instance, _effectModifierBuffer);
+
+            foreach (KeyValuePair<UnitStatType, float> pair in previousValues)
+            {
+                NotifyStatChanged(pair.Key, pair.Value);
+            }
+        }
+
+
+        // ============================================================
+        // Effect Action
+        // ============================================================
+
+        private void ApplyEffectActions(RuntimeEffectInstance instance)
+        {
+            BuildEffectModifiers(instance, _effectModifierBuffer);
+
+            for (int i = 0; i < _effectModifierBuffer.Count; i++)
+            {
+                AddCombatModifier(_effectModifierBuffer[i]);
+            }
+        }
+
+        private void BuildEffectModifiers(
+            RuntimeEffectInstance instance,
+            List<CombatStatModifier> modifiers)
+        {
+            modifiers.Clear();
+
+            IReadOnlyList<EffectActionData> actions = instance.Definition.Actions;
+
+            float stackMultiplier = GetEffectStackMultiplier(instance);
+
+            for (int i = 0; i < actions.Count; i++)
+            {
+                if (actions[i] is not StatEffectActionData statAction)
+                {
+                    continue;
+                }
+
+                float value = statAction.Value * stackMultiplier;
+
+                modifiers.Add(new CombatStatModifier(instance, statAction.StatType, statAction.ModifierType, value));
+            }
+        }
+
+        private void RemoveEffectActions(RuntimeEffectInstance instance)
+        {
+            RemoveCombatModifiers(instance);
+        }
+
+        private float GetEffectStackMultiplier(RuntimeEffectInstance instance)
+        {
+            if (instance.Definition.StackType != EffectStackType.Stack)
+            {
+                return 1f;
+            }
+
+            return instance.StackCount;
+        }
+
+
+        // ============================================================
+        // Status Methods
+        // ============================================================
+
+        // 하나의 EffectData는 함께 적용/제거되는 단위다. 상태 면역이면 주기 피해와 보정도 적용하지 않는다.
+        public bool IsImmuneToEffect(EffectDefinitionSnapshot definition)
+        {
+            if (definition == null)
+                return false;
+
+            foreach (var action in definition.Actions)
+                if (action is StatusEffectActionData status && IsImmuneToStatus(status.StatusType))
+                    return true;
+
+            return false;
+        }
+
+        public bool IsImmuneToStatus(UnitStatusEffectType statusType)
+        {
+            if (UnitData == null)
+                return false;
+
+            return UnitData.IsImmuneToStatus(statusType);
+        }
+
+        private void OnStatusChanged(
+            UnitStatusEffectType statusType,
+            bool isActive)
+        {
+            if (_effectTransactionDepth > 0)
+                return;
+
+            StatusChanged?.Invoke(statusType, isActive);
+        }
+
+
+        // ============================================================
+        // Event Methods
         // ============================================================
 
         private void NotifyStatChanged(
             UnitStatType statType,
             float previousValue)
         {
-            float currentValue =
-                _finalStatus.Get(
-                    statType
-                );
+            if (_finalStatus == null)
+                return;
 
-            if (Mathf.Approximately(
-                    previousValue,
-                    currentValue))
+            if (_effectTransactionDepth > 0)
+            {
+                if (!_deferredStats.ContainsKey(statType))
+                    _deferredStats[statType] = previousValue;
+
+                return;
+            }
+
+            float currentValue = _finalStatus.Get(statType);
+
+            if (Mathf.Approximately(previousValue, currentValue))
             {
                 return;
             }
@@ -232,10 +552,7 @@ namespace Units
 
             if (statType == UnitStatType.MaxHp)
             {
-                MaxHpChanged?.Invoke(
-                    previousValue,
-                    currentValue
-                );
+                MaxHpChanged?.Invoke(previousValue, currentValue);
             }
         }
     }
