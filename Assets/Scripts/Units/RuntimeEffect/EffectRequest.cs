@@ -1,52 +1,24 @@
+﻿
 
 
-
-namespace Units.Effects
+namespace Units
 {
     public readonly struct EffectRequest
     {
-
-        public CombatEventMetadata Metadata { get; }
-
-        // ============================================================
-        // Properties
-        // ============================================================
-
         public EffectData EffectData { get; }
 
-        public EffectDefinitionSnapshot Definition { get; }
+        public Unit_Gateway Source { get; }
 
-        public object OwnershipKey { get; }
+        public Unit_Gateway Target { get; }
 
-        public ICombatTarget Source { get; }
-
-        public ICombatTarget Target { get; }
-
-        public CombatTargetSnapshot TargetSnapshot { get; }
-
-
-        // ============================================================
-        // Constructor
-        // ============================================================
 
         public EffectRequest(
             EffectData effectData,
-            ICombatTarget source,
-            ICombatTarget target,
-            CombatEventMetadata metadata = default,
-            EffectDefinitionSnapshot definition = null, object ownershipKey = null)
+            Unit_Gateway source,
+            Unit_Gateway target)
         {
-            OwnershipKey = ownershipKey;
-            Definition = definition ?? (effectData != null ? new EffectDefinitionSnapshot(effectData) : null);
-
-            TargetSnapshot = new CombatTargetSnapshot(target);
-
-            Metadata = metadata.EventId != 0 ? metadata : CombatEventMetadata.Create(source);
-
             EffectData = effectData;
-
             Source = source;
-
             Target = target;
         }
     }

@@ -16,16 +16,6 @@ namespace Units
         // ============================================================
 
         [SerializeField]
-        private UnitPoolManager _unitPoolManager;
-
-        private long _allySpawnGeneration;
-        private bool _allySpawnFailed;
-        private bool _enemySpawning;
-        private const double SpawnRequestDelaySeconds = 0.2;
-        private double _allySpawnStartsAt;
-        private CancellationTokenSource _allySpawnCancellation;
-
-        [SerializeField]
         private RuntimeUnitManager _runtimeUnitManager;
 
         [SerializeField]
@@ -39,14 +29,6 @@ namespace Units
 
         [SerializeField]
         private GameObject _groupPrefab;
-
-
-        // ============================================================
-        // Test Access
-        // ============================================================
-
-        // 테스트 등록도 실제 스폰에 사용하는 매니저로 전달한다.
-        internal UnitStatModifierManager StatModifierManager => _unitStatModifierManager;
 
 
         // ============================================================
@@ -73,7 +55,7 @@ namespace Units
         private Vector2 _rallySectorSize =
             new Vector2(
                 5f,
-                5f
+                10f
             );
 
         [SerializeField]
@@ -95,10 +77,6 @@ namespace Units
 
         [SerializeField]
         private Transform _allyRallySectorRoot;
-
-        [Tooltip("아군이 최종 Rally 자리로 이동하기 전에 통과할 좌표. 미지정 시 직접 이동합니다.")]
-        [SerializeField]
-        private Transform _allyRallyViaPoint;
 
 
         // ============================================================
@@ -192,13 +170,6 @@ namespace Units
                 return;
 
 
-            if (_unitPoolManager == null)
-            {
-                var poolObject = new GameObject("UnitPoolManager");
-                poolObject.transform.SetParent(transform, false);
-                _unitPoolManager = poolObject.AddComponent<UnitPoolManager>();
-            }
-
             InitializePrefabMapper();
             InitializeRallyGridAllocators();
             InitializeSpawners();
@@ -253,20 +224,17 @@ namespace Units
             _allyGroupSpawner =
                 new AllyGroupSpawner(
                     _runtimeUnitManager,
-                    _unitPoolManager,
                     _unitStatModifierManager,
                     _allySpawnEntries,
                     _groupPrefab,
                     _allyRallyGridAllocator,
-                    _groupSpawnDuration,
-                    _allyRallyViaPoint
+                    _groupSpawnDuration
                 );
 
 
             _enemyWaveSpawner =
                 new EnemyWaveSpawner(
                     _runtimeUnitManager,
-                    _unitPoolManager,
                     _unitStatModifierManager,
                     _enemySpawnEntries,
                     _groupPrefab,
@@ -369,25 +337,9 @@ namespace Units
             // 첫 번째 요청에서만 초기화한다.
             // ========================================================
 
-            if (_activeAllySpawnCount > 0 && _allySpawnCancellation.IsCancellationRequested)
-            {
-                Debug.LogWarning("[SpawnManager] 이전 아군 스폰 취소를 정리 중입니다.");
-                return;
-            }
-
             if (_activeAllySpawnCount == 0)
             {
-                _allySpawnStartsAt = Time.realtimeSinceStartupAsDouble + SpawnRequestDelaySeconds;
-                // 첫 요청에서만 아군 아티펙트 스탯·패시브를 최신화한다.
-                // 참조가 없는 독립 테스트 씬은 기존 등록을 보존한 채 스폰한다.
-                _unitStatModifierManager.RefreshAllyArtifactEffects();
-
-                _allySpawnGeneration = _unitPoolManager.BeginSpawn(UnitTeam.Ally);
-                _allySpawnFailed = false;
-                _allyGroupSpawner.ResetSpawnResult();
                 _allyRallyGridAllocator.Clear();
-                _allySpawnCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                    this.GetCancellationTokenOnDestroy(), _runtimeUnitManager.PreparationToken);
             }
 
 
@@ -398,54 +350,26 @@ namespace Units
                 unitType,
                 spawnPosition,
                 count,
-                rallyPoint,
-                _allySpawnCancellation.Token
+                rallyPoint
             ).Forget();
         }
 
-
-        private static async UniTask WaitForSpawnStartAsync(double startsAt,
-            CancellationToken cancellationToken)
-        {
-            // 절대 시각을 검사하여 요청 프레임의 deltaTime 때문에 일찍 시작하지 않는다.
-            while (Time.realtimeSinceStartupAsDouble < startsAt)
-                await UniTask.NextFrame(cancellationToken: cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-        }
 
         private async UniTaskVoid SpawnAllyGroupAsync(
             AllyUnitType unitType,
             Vector2 spawnPosition,
             int count,
-            Vector2 rallyPoint,
-            CancellationToken cancellationToken)
+            Vector2 rallyPoint)
         {
             try
             {
-                // 첫 요청의 마감 시간을 공유한다. 후속 요청으로 0.2초를 다시 시작하지 않는다.
-                // 대기 중인 요청도 카운트에 포함하므로 즉시 끝나는 1인 그룹도 조기 완료되지 않는다.
-                await WaitForSpawnStartAsync(_allySpawnStartsAt, cancellationToken);
-
-                var group = await _allyGroupSpawner.SpawnGroupAsync(
+                await _allyGroupSpawner.SpawnGroupAsync(
                     unitType,
                     spawnPosition,
                     count,
                     rallyPoint,
-                    cancellationToken
+                    this.GetCancellationTokenOnDestroy()
                 );
-                cancellationToken.ThrowIfCancellationRequested();
-                if (group == null)
-                    _allySpawnFailed = true;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                // 리셋/파괴는 정상 취소다. 완료 이벤트를 보내지 않는다.
-                _allySpawnFailed = true;
-            }
-            catch
-            {
-                _allySpawnFailed = true;
-                throw;
             }
             finally
             {
@@ -453,23 +377,14 @@ namespace Units
 
                 if (_activeAllySpawnCount == 0)
                 {
-                    bool succeeded = !_allySpawnFailed && !_allyGroupSpawner.SpawnFailed &&
-                        !cancellationToken.IsCancellationRequested;
-                    _allySpawnCancellation.Dispose();
-                    _allySpawnCancellation = null;
-                    if (_unitPoolManager != null)
-                        _unitPoolManager.EndSpawn(UnitTeam.Ally, _allySpawnGeneration, succeeded);
-                    if (succeeded)
-                    {
-                        Debug.Log(
-                            "[SpawnManager] " +
-                            "모든 Ally Spawn 완료."
-                        );
+                    Debug.Log(
+                        "[SpawnManager] " +
+                        "모든 Ally Spawn 완료."
+                    );
 
-                        _runtimeUnitManager.NotifyAllySpawnCompleted();
+                    _runtimeUnitManager.NotifyAllySpawnCompleted();
 
-                        AllySpawnCompleted?.Invoke();
-                    }
+                    AllySpawnCompleted?.Invoke();
                 }
             }
         }
@@ -482,8 +397,7 @@ namespace Units
         public async UniTask SpawnEnemyWaveAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken,
-            bool isInfiniteWave = false)
+            CancellationToken cancellationToken)
         {
             if (_enemyWaveSpawner == null)
             {
@@ -496,10 +410,6 @@ namespace Units
             }
 
 
-            using var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken, _runtimeUnitManager.PreparationToken,
-                this.GetCancellationTokenOnDestroy());
-            cancellationToken = linkedCancellation.Token;
             cancellationToken.ThrowIfCancellationRequested();
 
 
@@ -514,46 +424,28 @@ namespace Units
             // Sector 객체 자체는 유지된다.
             // ========================================================
 
-            if (_enemySpawning)
-                throw new InvalidOperationException("[SpawnManager] 적 스폰이 이미 진행 중입니다.");
+            _enemyRallyGridAllocator.Clear();
 
-            double enemySpawnStartsAt = Time.realtimeSinceStartupAsDouble + SpawnRequestDelaySeconds;
-            _runtimeUnitManager.BeginEnemySpawnCycle();
 
-            // 적 웨이브 시작 시 적 아티펙트 스탯·패시브만 한 번 최신화한다.
-            _unitStatModifierManager.RefreshEnemyArtifactEffects();
+            await _enemyWaveSpawner.SpawnWaveAsync(
+                cost,
+                context,
+                cancellationToken
+            );
 
-            long generation = _unitPoolManager.BeginSpawn(UnitTeam.Enemy);
-            _enemySpawning = true;
-            bool succeeded = false;
-            try
-            {
-                await WaitForSpawnStartAsync(enemySpawnStartsAt, cancellationToken);
-                _enemyRallyGridAllocator.Clear();
-                _enemyWaveSpawner.ResetSpawnResult();
-                succeeded = await _enemyWaveSpawner.SpawnWaveAsync(cost, context, cancellationToken, isInfiniteWave);
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-            catch
-            {
-                succeeded = false;
-                throw;
-            }
-            finally
-            {
-                _enemySpawning = false;
-                if (_unitPoolManager != null)
-                    _unitPoolManager.EndSpawn(UnitTeam.Enemy, generation, succeeded);
-            }
 
-            if (!succeeded)
-                throw new InvalidOperationException("[SpawnManager] 적 스폰 실패. 생성한 그룹과 집결 배정을 정리했습니다.");
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (succeeded)
-            {
-                _runtimeUnitManager.NotifyEnemySpawnCompleted();
-                EnemySpawnCompleted?.Invoke();
-            }
+
+            Debug.Log(
+                "[SpawnManager] " +
+                "모든 Enemy Spawn 완료."
+            );
+
+
+            _runtimeUnitManager.NotifyEnemySpawnCompleted();
+
+            EnemySpawnCompleted?.Invoke();
         }
 
 
