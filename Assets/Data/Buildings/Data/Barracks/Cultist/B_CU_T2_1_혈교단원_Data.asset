@@ -17,8 +17,8 @@ MonoBehaviour:
   displayName: "\uD608\uAD50\uB2E8\uC6D0"
   description: "\uD608\uAD50\uB2E8\uC6D0 \uC18C\uD658 \uBCD1\uC601"
   buildingType: 2
-  icon: {fileID: 21300000, guid: 4c1cbaf2889d45abba987bda1e667e75, type: 3}
-  worldSprite: {fileID: 21300000, guid: 4c1cbaf2889d45abba987bda1e667e75, type: 3}
+  icon: {fileID: 21300000, guid: f0ee74bc1bd40c849ac0c637702c7b8a, type: 3}
+  worldSprite: {fileID: 21300000, guid: f0ee74bc1bd40c849ac0c637702c7b8a, type: 3}
   prefab: {fileID: 3150728921005204436, guid: 7bddb73e024b42a2b1bfa37e4f27a2ec, type: 3}
   buildCost:
   - type: 0
@@ -38,6 +38,12 @@ MonoBehaviour:
     unitType: 42
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: ad2e64c341c94046a413e79f81c471c1, type: 2}
     cost:
