@@ -44,6 +44,9 @@ namespace Game.Core
         private const int SpawnCostPerWave = 2;
         private const float InfinityBonusPerWave = 0.02f;
         private const float InfinityBonusPerQuarter = 0.15f;
+        private const float EliteBonus = 0.20f;
+        private readonly object _eliteModifierSource = new();
+        
         [SerializeField] private WaveSODictionary _waveCatalog;
         public WaveSODictionary WaveCatalog => _waveCatalog;
         public WaveSO CurrentPreset => _controller?.CurrentNode?.Preset;
@@ -71,6 +74,7 @@ namespace Game.Core
         {
             _isWaitingForPreparation = false;
             _unitStatModifiers?.RemoveModifiersBySource(_infinityModifierSource);
+            _unitStatModifiers?.RemoveModifiersBySource(_eliteModifierSource);
             if (_runtimeUnitManager != null)
             {
                 _runtimeUnitManager.UnitDied -= HandleMonsterDead;
@@ -89,6 +93,7 @@ namespace Game.Core
             if (unitStatModifiers == null) throw new ArgumentNullException(nameof(unitStatModifiers));
             _isWaitingForPreparation = false;
             _unitStatModifiers?.RemoveModifiersBySource(_infinityModifierSource);
+            _unitStatModifiers?.RemoveModifiersBySource(_eliteModifierSource);
             if (_runtimeUnitManager != null)
             {
                 _runtimeUnitManager.UnitDied -= HandleMonsterDead;
@@ -112,8 +117,10 @@ namespace Game.Core
             _isWaitingForPreparation = true;
             SpawnContext context = new(
                 weights:CurrentPreset.Weights, 
-                monsterIDs:CurrentPreset.MonsterIDs);
+                monsterIDs:CurrentPreset.MonsterIDs,
+                bossIDs:CurrentPreset.BattleType == WaveBattleType.Boss ? CurrentPreset.BossIDs : null);
             RefreshInfinityModifiers();
+            RefreshEliteModifiers();
             int cost = CalculateSpawnCost(CurQuarter, CurWave);
             int enemyCount = _totemFlowEffects.CalculateEnemyCount(cost);
             return _spawner.SpawnEnemyWaveAsync(enemyCount, context, spawnToken);
@@ -127,7 +134,12 @@ namespace Game.Core
                 : (quarter - 1) * MAX_WAVE + wave - 1;
             return InitialSpawnCost + waveIndex * SpawnCostPerWave;
         }
-
+        
+        private void RefreshInfinityModifiers()
+        {
+            RefreshCombatModifiers(_infinityModifierSource,
+                CalculateInfinityBonus(CurQuarter, CurWave));
+        }
         private static float CalculateInfinityBonus(int quarter, int wave)
         {
             int infinityQuarter = quarter - MAIN_QUARTERS;
@@ -139,22 +151,29 @@ namespace Game.Core
                 : (infinityQuarter - 1) * InfinityBonusPerQuarter;
             return quarterStartBonus + (wave - 1) * InfinityBonusPerWave;
         }
-
-        private void RefreshInfinityModifiers()
+        /// <summary> 현재 전투가 엘리트전투면 배율 적용, 아니면 미적용</summary>
+        private void RefreshEliteModifiers()
         {
-            // 재준비·불러오기에도 중복되지 않도록 현재 위치의 총 강화율로 교체한다.
-            _unitStatModifiers.RemoveModifiersBySource(_infinityModifierSource);
-            float bonus = CalculateInfinityBonus(CurQuarter, CurWave);
+            float bonus = _controller.CurrentNode.IsElite
+                ? EliteBonus
+                : 0f;
+
+            RefreshCombatModifiers(_eliteModifierSource, bonus);
+        }
+        
+        private void RefreshCombatModifiers(object source, float bonus)
+        {
+            _unitStatModifiers.RemoveModifiersBySource(source);
             if (bonus <= 0f) return;
 
-            AddInfinityModifier(UnitStatType.MaxHp, bonus);
-            AddInfinityModifier(UnitStatType.AttackPower, bonus);
+            AddCombatModifier(source, UnitStatType.MaxHp, bonus);
+            AddCombatModifier(source, UnitStatType.AttackPower, bonus);
         }
 
-        private void AddInfinityModifier(UnitStatType statType, float bonus)
+        private void AddCombatModifier(object source, UnitStatType statType, float bonus)
         {
             _unitStatModifiers.AddEnemyModifier(new EnemyStatModifier(
-                source: _infinityModifierSource,
+                source: source,
                 applyType: UnitModifierApplyType.All,
                 targetClass: default,
                 targetUnitType: default,

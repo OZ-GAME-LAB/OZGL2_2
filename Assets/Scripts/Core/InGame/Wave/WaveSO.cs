@@ -4,9 +4,8 @@ using UnityEngine;
 
 public enum WaveBattleType
 {
-    Normal,
-    Elite,
-    Boss
+    Normal = 0,
+    Boss = 2
 }
 
 [System.Serializable]
@@ -39,6 +38,7 @@ public class WaveSO : ScriptableObject
     public WaveBattleType BattleType;
     public ClassWeights Weights;
     public List<EnemyUnitType> MonsterIDs = new(); //몬스터 id 리스트
+    public List<EnemyUnitType> BossIDs = new();
 
     //MonsterIDs를 뭘로할까? enum?
 }

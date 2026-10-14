@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c28fa7d3bb55276459659966e75a20a0, type: 3}
+  m_Name: 106_Boss_Balanced
+  m_EditorClassIdentifier: Assembly-CSharp::WaveSO
+  WaveID: 106
+  WaveName: "\uC6A9\uBCD1\uB2E8\uC7A5"
+  Faction: 0
+  BattleType: 2
+  Weights:
+    Tanker: 1
+    Bruiser: 1
+    Assassin: 1
+    RangedPhysical: 1
+    RangedMagic: 1
+    Supporter: 1
+  MonsterIDs: 01000000020000000300000004000000050000000600000007000000
+  BossIDs: 65000000
