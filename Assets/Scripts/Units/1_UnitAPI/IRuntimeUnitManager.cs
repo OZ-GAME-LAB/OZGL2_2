@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 
 namespace Units
@@ -14,6 +15,14 @@ namespace Units
         event Action<Unit_Gateway> UnitDied;
 
         event Action<UnitTeam> TeamWiped;
+
+        event Action<Unit_Gateway> BossSpawned;
+
+        event Action<Unit_Gateway> BossDied;
+
+        event Action<Unit_Gateway> BossRemoved;
+
+        event Action AllBossesDefeated;
 
 
         // =========================
@@ -34,6 +43,13 @@ namespace Units
             out int enemy,
             out int allies
         );
+
+        int BossUnitCount
+        {
+            get;
+        }
+
+        IReadOnlyList<Unit_Gateway> BossUnits { get; }
 
 
         // =========================

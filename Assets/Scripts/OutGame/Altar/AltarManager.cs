@@ -8,8 +8,9 @@ using UnityEngine;
 /// <summary>
 /// 게임 시작 전 제단 1개를 선택하고, Run 동안 효과를 적용합니다.
 /// Update에서 효과를 계산하지 않고 PhaseChanged 이벤트만 구독합니다.
+/// 저장 파일 입출력은 하지 않습니다. 세이브 담당이 CaptureSaveData와 RestoreSaveData만 호출합니다.
 /// </summary>
-public class AltarManager : MonoBehaviour
+public class AltarManager : MonoBehaviour, ISaveDataProvider<AltarRunSaveData>
 {
     public bool IsInitialized => _catalog != null && _effectManager != null;
     public bool IsApplied => _instance != null;
@@ -21,7 +22,7 @@ public class AltarManager : MonoBehaviour
     public event Action<AltarData> SelectionChanged;
     public event Action<AltarInstance> Applied;
     public event Action Cleared;
-
+    
     [SerializeField] private AltarCatalog _catalog;
 
     private EffectManager _effectManager;
@@ -32,6 +33,7 @@ public class AltarManager : MonoBehaviour
     private AltarData _selected;
     private AltarInstance _instance;
     private bool _isApplying;
+    private bool _startEffectApplied;
 
     // 참조는 한 번만 캐시합니다. 이후 PhaseChanged에서 Find를 다시 하지 않습니다.
     public void Initialize(
@@ -65,13 +67,6 @@ public class AltarManager : MonoBehaviour
                 this);
         }
 
-        if (unitStatModifierManager == null)
-        {
-            Debug.LogWarning(
-                "[OutGame/AltarManager] UnitStatModifierManager 참조가 없습니다. 유닛 스탯 효과를 실제 유닛에 넣을 수 없습니다.",
-                this);
-        }
-
         if (gameFlow == null)
         {
             Debug.LogWarning(
@@ -79,8 +74,10 @@ public class AltarManager : MonoBehaviour
                 this);
         }
 
+        _catalog.RefreshLookup();
         _effectManager = effectManager;
         _runCurrency = runCurrency;
+        // 공통 스폰 수집은 ArtifactInstance만 읽으므로 제단 스탯은 직접 전달합니다.
         _unitStatModifierManager = unitStatModifierManager;
         _gameFlow = gameFlow;
 
@@ -135,6 +132,85 @@ public class AltarManager : MonoBehaviour
         return true;
     }
 
+    // Current date KDH 2026-09-29
+    // 아웃게임 시작 정보(OutGameStartContext)는 SO 참조 대신 ID만 담으므로, 카탈로그에서 찾아 선택합니다.
+    public bool TrySelectById(AltarId id)
+    {
+        if (!IsInitialized)
+        {
+            Debug.LogWarning("[OutGame/AltarManager] 초기화 후 제단을 선택할 수 있습니다.", this);
+            return false;
+        }
+        if (id == AltarId.None)
+        {
+            return false;
+        }
+        if (!_catalog.TryGetById(id, out AltarData altar))
+        {
+            Debug.LogWarning($"[OutGame/AltarManager] Catalog에 없는 제단 ID입니다. ID: {id}", this);
+            return false;
+        }
+        return TrySelect(altar);
+    }
+
+    // Current date KDH 2026-10-02
+    // 저장 시점에만 객체를 만듭니다. Update에서는 호출하지 않습니다.
+    // 파일에는 선택 ID와 시작 효과 처리 여부를 담습니다. 에셋 참조는 저장하지 않습니다.
+    // 10.9 / 문규성 / 제단정보와 시작 효과 처리 여부를 함께 저장하도록 변경
+    public AltarRunSaveData CaptureSaveData()
+    {
+        return new AltarRunSaveData
+        {
+            SelectedAltar = _selected != null ? _selected.Id : AltarId.None,
+            isApplied = _startEffectApplied
+        };
+    }
+
+    // Current date KDH 2026-10-02
+    // ID로 카탈로그의 AltarData와 지속 효과를 복원합니다. 시작 지급은 저장된 처리 여부를 따릅니다.
+    // 세이브 담당은 GameFlowController.Continue()보다 먼저 호출해야 합니다.
+    // 10.9 / 문규성 / bool 오버로드를 제거하고 저장 데이터의 isApplied로 단발성 효과 지급을 처리
+    // 기존 효과를 해제한 뒤 선택과 지속 효과를 복원하고 아직 처리하지 않은 시작 효과만 지급
+    public void RestoreSaveData(AltarRunSaveData data)
+    {
+        if (data == null)
+        {
+            throw new ArgumentNullException(nameof(data));
+        }
+
+        if (!IsInitialized)
+        {
+            throw new InvalidOperationException("제단 저장 데이터를 복원하려면 초기화가 필요합니다.");
+        }
+
+        if (IsApplied && !TryClearApplied())
+        {
+            throw new InvalidOperationException("기존 제단 효과를 해제하지 못했습니다.");
+        }
+
+        _startEffectApplied = data.isApplied;
+
+        if (data.SelectedAltar == AltarId.None)
+        {
+            if (!TryClearSelection())
+            {
+                throw new InvalidOperationException("제단 선택을 복원하지 못했습니다.");
+            }
+            return;
+        }
+        if (!TrySelectById(data.SelectedAltar))
+        {
+            throw new InvalidOperationException($"저장된 제단을 선택하지 못했습니다. ID: {data.SelectedAltar}");
+        }
+
+        if (!TryApplySelected())
+        {
+            throw new InvalidOperationException($"제단 지속 효과를 복원하지 못했습니다. ID: {data.SelectedAltar}");
+        }
+
+        ApplyStartEffect(); //단발성 효과를 적용
+    }
+
     public bool TryClearSelection()
     {
         if (!IsInitialized)
@@ -163,9 +239,37 @@ public class AltarManager : MonoBehaviour
         return true;
     }
 
-    // 선택분을 EffectManager·유닛 보정에 등록하고 OnRunStart 지급을 한 번 실행합니다.
+    // 선택한 제단의 지속 효과를 EffectManager와 유닛 스탯 매니저에 등록합니다.
+    // 10.9 / 문규성 / 지속효과 적용은 유지하고 시작 재화 지급을 ApplyStartEffect로 분리
+    // Applied 이벤트는 지속 효과 등록을 마친 뒤 발생
     public bool TryApplySelected()
     {
+        if (!TryRegisterSelectedEffects(out AltarInstance instance)) return false;
+        // 시작 지급은 저장된 처리 여부를 확인하는 ApplyStartEffect로 일원화해 중복을 막습니다.
+        // ApplyTriggered(AltarTriggerMoment.OnRunStart);
+        Applied?.Invoke(instance);
+        Debug.Log($"[OutGame/AltarManager] 제단을 적용했습니다. ID: {_selected.Id}", this);
+        return true;
+    }
+
+    // Current date KDH 2026-10-08
+    // 이어하기는 시작 재화가 세이브 잔액에 이미 있으므로 효과만 등록합니다.
+    // 등록은 로드 때 한 번이고, Update에서 매 프레임 다시 계산하지 않습니다.
+    // RestoreSaveData가 지속 효과를 즉시 복원하므로 별도 복원 경로는 주석으로 보존합니다.
+    /*
+    public bool TryApplyOngoingEffects()
+    {
+        if (!TryRegisterSelectedEffects(out AltarInstance instance)) return false;
+        Applied?.Invoke(instance);
+        Debug.Log($"[OutGame/AltarManager] 제단 효과를 복원했습니다. ID: {_selected.Id}", this);
+        return true;
+    }
+    */
+
+    // 효과 변환이 성공한 뒤에만 적용 상태로 바꿉니다. 실패하면 기존 선택을 유지합니다.
+    private bool TryRegisterSelectedEffects(out AltarInstance instance)
+    {
+        instance = null;
         if (!IsInitialized)
         {
             Debug.LogWarning("[OutGame/AltarManager] 초기화 후 제단을 적용할 수 있습니다.", this);
@@ -192,7 +296,7 @@ public class AltarManager : MonoBehaviour
             return false;
         }
 
-        AltarInstance instance = new AltarInstance(_selected);
+        instance = new AltarInstance(_selected);
         if (instance.Data == null)
         {
             Debug.LogError("[OutGame/AltarManager] 제단 인스턴스에 AltarData가 없습니다.", this);
@@ -201,8 +305,11 @@ public class AltarManager : MonoBehaviour
 
         if (!_effectManager.TryConvertEffects(
             instance,
-            _selected.UnitStatEffects,
-            _selected.CurrencyEffects,
+            new EffectDataGroup
+            {
+                StatEffects = _selected.UnitStatEffects,
+                CurrencyEffects = _selected.CurrencyEffects
+            },
             1,
             out ConvertedEffects converted))
         {
@@ -212,17 +319,39 @@ public class AltarManager : MonoBehaviour
             return false;
         }
 
-        // 변환이 끝난 뒤에만 보유 상태를 바꿉니다. 실패하면 기존 선택을 유지합니다.
+        bool hasUnitModifiers = (converted.AllyModifiers != null && converted.AllyModifiers.Count > 0)
+            || (converted.EnemyModifiers != null && converted.EnemyModifiers.Count > 0);
+        if (hasUnitModifiers && _unitStatModifierManager == null)
+        {
+            Debug.LogError("[OutGame/AltarManager] UnitStatModifierManager가 없어 제단 스탯을 적용할 수 없습니다.", this);
+            return false;
+        }
+
         _isApplying = true;
         _instance = instance;
-        _effectManager.RegisterEffects(instance, converted);
-        AddUnitModifiers(converted);
-        ApplyTriggered(AltarTriggerMoment.OnRunStart);
-        _isApplying = false;
-
-        Applied?.Invoke(instance);
-        Debug.Log($"[OutGame/AltarManager] 제단을 적용했습니다. ID: {_selected.Id}", this);
+        try
+        {
+            _effectManager.RegisterEffects(instance, converted);
+            AddUnitModifiers(converted);
+        }
+        finally
+        {
+            _isApplying = false;
+        }
         return true;
+    }
+
+    // 10.9 / 문규성 / 등록된 제단의 시작 효과를 아직 처리하지 않았을 때만 지급하는 메서드
+    // 기존 트리거 지급 메서드를 재사용하고 이번판의 시작 효과 처리 여부를 갱신
+    private void ApplyStartEffect()
+    {
+        if (!IsApplied || _startEffectApplied)
+        {
+            return;
+        }
+
+        ApplyTriggered(AltarTriggerMoment.OnRunStart);
+        _startEffectApplied = true;
     }
 
     // Run 종료·리셋 시 호출합니다. 선택은 남겨 다음 판에서 다시 적용할 수 있습니다.
@@ -258,11 +387,29 @@ public class AltarManager : MonoBehaviour
         return true;
     }
 
+    // 10.9 / 문규성 / Preparation에서 지속 효과 등록과 시작 지급을 각각 처리하고, 런 종료 시 시작 지급 상태를 초기화하도록 변경했습니다.
+    // Reward 재개 중에는 기존 IsResumingStep 확인으로 웨이브 효과를 다시 지급하지 않습니다.
     private void HandlePhaseChanged(GamePhase phase)
     {
+        // Current date KDH 2026-09-29
+        // 첫 Preparation(스폰 전)에 1회 적용합니다. ResetRun으로 None에서 해제된 뒤에도 여기서 다시 적용됩니다.
+        // 웨이브마다 Preparation이 다시 오지만, IsApplied 확인으로 중복 적용을 막습니다.
+        if (phase == GamePhase.Preparation)
+        {
+            if (_selected != null && !IsApplied)
+            {
+                TryApplySelected();
+            }
+            ApplyStartEffect();
+            return;
+        }
+
         // Reward = 웨이브 승리 후입니다. 패배 경로에는 Reward가 없습니다.
         if (phase == GamePhase.Reward)
         {
+            // Current date KDH 2026-10-08
+            // 보상 화면에서 이어하면 Reward가 다시 옵니다. 이자는 세이브 잔액에 이미 있으므로 건너뜁니다.
+            if (_gameFlow != null && _gameFlow.IsResumingStep) return;
             ApplyTriggered(AltarTriggerMoment.OnWaveCleared);
             return;
         }
@@ -271,6 +418,7 @@ public class AltarManager : MonoBehaviour
         if (phase == GamePhase.None || phase == GamePhase.Finished)
         {
             TryClearApplied();
+            _startEffectApplied = false;
         }
     }
 
@@ -401,6 +549,7 @@ public class AltarManager : MonoBehaviour
         return 0;
     }
 
+    // 공통 스폰 수집은 ArtifactInstance만 읽으므로 제단 스탯은 직접 전달합니다.
     private void AddUnitModifiers(ConvertedEffects converted)
     {
         // EffectManager는 보정치만 보관하므로, 실제 유닛 합산은 공개 API로 직접 넣습니다.
@@ -460,7 +609,7 @@ public class AltarManager : MonoBehaviour
             return "(없음)";
         }
 
-        return string.IsNullOrWhiteSpace(instance.Data.Id) ? instance.Data.name : instance.Data.Id;
+        return instance.Data.Id == AltarId.None ? instance.Data.name : instance.Data.Id.ToString();
     }
 
     private void OnDestroy()
@@ -472,4 +621,14 @@ public class AltarManager : MonoBehaviour
 
         TryClearApplied();
     }
+}
+
+// Current date KDH 2026-10-02
+// 인게임 저장에 실을 이번 판 제단입니다. AltarData 참조는 담지 않습니다.
+[Serializable]
+public class AltarRunSaveData
+{
+    public AltarId SelectedAltar;
+    // 이번 게임에서 시작 효과 처리를 마쳤는지 저장
+    public bool isApplied;
 }

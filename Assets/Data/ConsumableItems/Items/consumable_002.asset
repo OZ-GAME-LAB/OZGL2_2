@@ -16,7 +16,9 @@ MonoBehaviour:
   _displayName: "\uD3ED\uBC1C \uD50C\uB77C\uC2A4\uD06C"
   _description: "\uBC94\uC704 \uB0B4 \uC801\uC5D0\uAC8C \uAE30\uBCF8 \uBB3C\uB9AC
     \uD53C\uD574 100\uC744 \uC90D\uB2C8\uB2E4."
-  _icon: {fileID: 21300000, guid: f20bc093e55fc4fbd9861a8915b5c7c2, type: 3}
+  _icon: {fileID: 21300000, guid: 691954f38a6e4bbaa5676f5625385728, type: 3}
+  _targetVFX: {fileID: 1002, guid: 5547a589a44d4abeaa8a81bd911d08e1, type: 3}
+  _useVFX: {fileID: 1002, guid: c9570634106f4939a8158293ccba4947, type: 3}
   _targetTeam: 1
   _targetMode: 1
   _radius: 3
@@ -28,5 +30,6 @@ MonoBehaviour:
     - rid: 1967714645891350691
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 100
+        _damageMultiplier: 100000

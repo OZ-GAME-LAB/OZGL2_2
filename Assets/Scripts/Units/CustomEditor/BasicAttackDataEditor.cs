@@ -1,4 +1,4 @@
-﻿using UnityEditor;
+using UnityEditor;
 using Units.Skills;
 
 
@@ -13,6 +13,7 @@ namespace Units.Editor
 
         private SerializedProperty _basicAttackRange;
         private SerializedProperty _basicAttackDelay;
+        private SerializedProperty _damageType;
 
         private SerializedProperty _executionType;
 
@@ -24,9 +25,9 @@ namespace Units.Editor
         private SerializedProperty _areaAngle;
 
         private SerializedProperty _projectileSpeed;
+        private SerializedProperty _projectilePrefab;
 
-        private SerializedProperty _attackFXType;
-        private SerializedProperty _hitFXType;
+
 
 
         // ============================================================
@@ -47,6 +48,8 @@ namespace Units.Editor
 
         private void OnEnable()
         {
+            _projectilePrefab = serializedObject.FindProperty("_projectilePrefab");
+
             _basicAttackRange =
                 serializedObject.FindProperty(
                     "_basicAttackRange"
@@ -55,6 +58,11 @@ namespace Units.Editor
             _basicAttackDelay =
                 serializedObject.FindProperty(
                     "_basicAttackDelay"
+                );
+
+            _damageType =
+                serializedObject.FindProperty(
+                    "_damageType"
                 );
 
 
@@ -97,15 +105,7 @@ namespace Units.Editor
                 );
 
 
-            _attackFXType =
-                serializedObject.FindProperty(
-                    "_attackFXType"
-                );
 
-            _hitFXType =
-                serializedObject.FindProperty(
-                    "_hitFXType"
-                );
         }
 
 
@@ -187,6 +187,10 @@ namespace Units.Editor
                     _basicAttackDelay
                 );
 
+                EditorGUILayout.PropertyField(
+                    _damageType
+                );
+
 
                 EditorGUI.indentLevel--;
             }
@@ -224,6 +228,7 @@ namespace Units.Editor
                 EditorGUILayout.PropertyField(
                     _executionType
                 );
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("_impactTiming"), new UnityEngine.GUIContent("효과 실행 시점"));
 
 
                 EditorGUI.indentLevel--;
@@ -383,6 +388,8 @@ namespace Units.Editor
                     _projectileSpeed
                 );
 
+                EditorGUILayout.PropertyField(_projectilePrefab);
+
 
                 EditorGUI.indentLevel--;
             }
@@ -417,13 +424,7 @@ namespace Units.Editor
                 EditorGUI.indentLevel++;
 
 
-                EditorGUILayout.PropertyField(
-                    _attackFXType
-                );
-
-                EditorGUILayout.PropertyField(
-                    _hitFXType
-                );
+                SkillAuthoringGUI.Draw(serializedObject.FindProperty("_fxEntries"));
 
 
                 EditorGUI.indentLevel--;

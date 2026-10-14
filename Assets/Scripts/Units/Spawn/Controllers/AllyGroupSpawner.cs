@@ -14,6 +14,14 @@ namespace Units
         // References
         // ============================================================
 
+        private readonly UnitPoolManager _unitPoolManager;
+
+        private readonly Transform _rallyViaPoint;
+
+        internal bool SpawnFailed { get; private set; }
+
+        internal void ResetSpawnResult() => SpawnFailed = false;
+
         private readonly RuntimeUnitManager
             _runtimeUnitManager;
 
@@ -44,14 +52,20 @@ namespace Units
 
         internal AllyGroupSpawner(
             RuntimeUnitManager runtimeUnitManager,
+            UnitPoolManager unitPoolManager,
             UnitStatModifierManager unitStatModifierManager,
             IReadOnlyDictionary<AllyUnitType, AllySpawnEntry> spawnEntries,
             GameObject groupPrefab,
             RallyGridAllocator rallyGridAllocator,
-            float groupSpawnDuration)
+            float groupSpawnDuration,
+            Transform rallyViaPoint = null)
         {
             _runtimeUnitManager =
                 runtimeUnitManager;
+
+            _unitPoolManager = unitPoolManager;
+
+            _rallyViaPoint = rallyViaPoint;
 
             _unitStatModifierManager =
                 unitStatModifierManager;
@@ -106,7 +120,7 @@ namespace Units
             IReadOnlyList<Vector2> rallyPositions =
                 AllocateRallyPositions(
                     count,
-                    rallyPoint,
+                    _spawnEntries[unitType].RallyZone,
                     group
                 );
 
@@ -133,6 +147,9 @@ namespace Units
                         cancellationToken
                     );
 
+
+                if (spawnedCount != count)
+                    SpawnFailed = true;
 
                 if (spawnedCount <= 0)
                 {
@@ -194,7 +211,7 @@ namespace Units
 
                 return group;
             }
-            catch (OperationCanceledException)
+            catch (Exception)
             {
                 DestroyGroup(
                     group
@@ -339,9 +356,7 @@ namespace Units
                         );
 
 
-                        UnityEngine.Object.Destroy(
-                            unit.gameObject
-                        );
+                        unit.Core.ReturnToPool();
                     }
                     else
                     {
@@ -351,9 +366,14 @@ namespace Units
                         // Group 등록 후 Rally 이동을 시작한다.
                         // AddMember 시점에 RallyCompleted 이벤트가
                         // 먼저 구독되어 있어야 완료 이벤트를 놓치지 않는다.
-                        unit.MoveToRally(
-                            rallyPositions[i]
-                        );
+                        if (_rallyViaPoint != null)
+                        {
+                            unit.MoveToRally(_rallyViaPoint.position, rallyPositions[i]);
+                        }
+                        else
+                        {
+                            unit.MoveToRally(rallyPositions[i]);
+                        }
                     }
                 }
 
@@ -413,12 +433,15 @@ namespace Units
 
 
             GameObject unitObject =
-                UnityEngine.Object.Instantiate(
-                    prefab,
-                    position,
-                    Quaternion.identity,
-                    parent
-                );
+                _unitPoolManager.Rent(prefab, UnitTeam.Ally);
+
+            // 대여한 유닛의 배치와 활성화는 기존 Spawner에서 처리한다.
+            unitObject.SetActive(false);
+            unitObject.transform.SetParent(parent, false);
+            unitObject.transform.SetPositionAndRotation(position, Quaternion.identity);
+            unitObject.transform.localScale = prefab.transform.localScale;
+            unitObject.GetComponent<UnitPoolMember>().RuntimeManager = _runtimeUnitManager;
+            unitObject.SetActive(true);
 
 
             Unit_Core core =
@@ -515,25 +538,40 @@ namespace Units
             // Initialize
             // ========================================================
 
-            core.Initialize(
-                finalModifier
-            );
-
-
-            if (!ValidateInitializedUnit(
-                core,
-                gateway,
-                unitObject))
+            try
             {
-                UnityEngine.Object.Destroy(
-                    unitObject
+                core.Initialize(
+                    finalModifier,
+                    _unitStatModifierManager.GetAllyPassiveSkills(
+                        unitData.GetAllyClass(),
+                        unitData.GetAllyType(),
+                        unitData.GetAllyTier()
+                    )
                 );
 
-                return null;
+
+                if (!ValidateInitializedUnit(
+                    core,
+                    gateway,
+                    unitObject))
+                {
+                    UnityEngine.Object.Destroy(
+                        unitObject
+                    );
+
+                    return null;
+                }
+
+
+                return gateway;
+            }
+            catch
+            {
+                // 초기화에 실패한 상태는 재사용하지 않는다.
+                UnityEngine.Object.Destroy(unitObject);
+                throw;
             }
 
-
-            return gateway;
         }
 
 
@@ -726,13 +764,15 @@ namespace Units
 
         private IReadOnlyList<Vector2> AllocateRallyPositions(
             int count,
-            Vector2 rallyPoint,
+            RallyZone zone,
             Unit_GroupAI group)
         {
             IReadOnlyList<Vector2> rallyPositions =
-                _rallyGridAllocator.Allocate(
+                // 기존 rallyPoint 인자는 API 호환용으로만 받으며 배치는 중앙/전후열 기준이다.
+                _rallyGridAllocator.AllocateCentered(
                     count,
-                    rallyPoint,
+                    zone,
+                    true,
                     group
                 );
 
@@ -771,9 +811,9 @@ namespace Units
 
             if (members != null)
             {
-                for (int i = 0;
-                     i < members.Count;
-                     i++)
+                for (int i = members.Count - 1;
+                     i >= 0;
+                     i--)
                 {
                     Unit_Gateway member =
                         members[i];
@@ -783,9 +823,7 @@ namespace Units
                         continue;
 
 
-                    UnityEngine.Object.Destroy(
-                        member.gameObject
-                    );
+                    member.Core.ReturnToPool();
                 }
             }
 

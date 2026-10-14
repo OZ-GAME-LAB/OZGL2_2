@@ -37,7 +37,8 @@ namespace Units
         UniTask SpawnEnemyWaveAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            bool isInfiniteWave = false
         );
 
 

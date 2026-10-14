@@ -17,17 +17,17 @@ MonoBehaviour:
     _icon: {fileID: 0}
     _description: 
   _skillSchemaVersion: 1
-  _triggerType: 0
+  _triggerType: 4
   _tickInterval: 1
   _conditions: []
   _effectMode: 2
   _actions:
-  - rid: 2552732030160339096
+  - rid: 4617381810361335935
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 2552732030160339096
+    - rid: 4617381810361335935
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 0
@@ -37,8 +37,8 @@ MonoBehaviour:
         _areaRadius: 1
         _areaAngle: 360
         _effects:
-        - rid: 2552732030160339097
-    - rid: 2552732030160339097
+        - rid: 4617381810361335936
+    - rid: 4617381810361335936
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
