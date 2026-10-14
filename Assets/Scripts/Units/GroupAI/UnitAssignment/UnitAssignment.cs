@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 
 
@@ -12,14 +12,17 @@ namespace Units
 
         public float PositionTolerance { get; }
 
+        public bool WaitingForPosition { get; }
+
         public bool HasTarget =>
             Target != null && Target.IsTargetable;
 
         public UnitAssignment(
             ICombatTarget target,
             Vector2 preferredPosition,
-            float positionTolerance)
+            float positionTolerance, bool waitingForPosition = false)
         {
+            WaitingForPosition = waitingForPosition;
             Target = target;
             PreferredPosition = preferredPosition;
             PositionTolerance = Mathf.Max(0f, positionTolerance);
