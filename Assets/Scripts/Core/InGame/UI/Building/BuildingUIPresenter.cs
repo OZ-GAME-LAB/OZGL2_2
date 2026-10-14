@@ -103,6 +103,13 @@ namespace Game.UI.InGame
         public void ShowManagement(BuildingInfoData info, BuildingActionViewData actions,
             IReadOnlyList<BuildingCatalogItem> upgrades, BuildingInfoData comparison, bool allowed, string reason)
         {
+            ShowManagement(info, actions, upgrades, comparison, allowed, reason, null);
+        }
+
+        public void ShowManagement(BuildingInfoData info, BuildingActionViewData actions,
+            IReadOnlyList<BuildingCatalogItem> upgrades, BuildingInfoData comparison, bool allowed, string reason,
+            int? requiredUpgradeCoreLevel)
+        {
             _selectionId = info.SelectionId;
             _titleText.text = "건물 관리";
             _catalogRoot.SetActive(false);
@@ -111,7 +118,12 @@ namespace Game.UI.InGame
             _currentBuildingId = info.BuildingId;
             _comparisonRoot.SetActive(comparison != null);
             if (comparison != null) _comparison.ShowBuildingInfo(comparison);
-            _upgradeHint.text = upgrades.Count == 0 ? "현재 가능한 업그레이드가 없습니다." : "업그레이드할 건물을 선택하세요.";
+            bool hasUnlockedUpgrade = false;
+            foreach (BuildingCatalogItem item in upgrades)
+                if (!item.RequiredCoreLevel.HasValue) { hasUnlockedUpgrade = true; break; }
+            _upgradeHint.text = hasUnlockedUpgrade ? "업그레이드할 건물을 선택하세요." :
+                requiredUpgradeCoreLevel.HasValue ? $"코어 {requiredUpgradeCoreLevel.Value}레벨 필요" :
+                "현재 가능한 업그레이드가 없습니다.";
             RenderCards(_upgradeCards, _upgradeTemplate, _upgradeContent, upgrades,
                 actions.Upgrade?.OptionId, HandleCandidate);
             _actions.SetActionsAllowed(allowed, reason);

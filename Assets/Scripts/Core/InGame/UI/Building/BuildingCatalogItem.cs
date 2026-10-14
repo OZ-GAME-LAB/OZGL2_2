@@ -15,11 +15,16 @@ namespace Game.UI
         public BuildingType Category { get; }
         public Sprite Icon { get; }
         public BuildingActionOffer Offer { get; }
+        public int? RequiredCoreLevel { get; }
         public BuildingCatalogItem(string id, string name, string summary, int? goldCost)
             : this(id, name, summary, goldCost, goldCost.HasValue ? 0 : (int?)null) { }
 
         public BuildingCatalogItem(string id, string name, string summary, int? goldCost, int? gemCost,
             BuildingType category = BuildingType.Barracks, Sprite icon = null, BuildingActionOffer offer = null)
+            : this(id, name, summary, goldCost, gemCost, category, icon, offer, null) { }
+
+        public BuildingCatalogItem(string id, string name, string summary, int? goldCost, int? gemCost,
+            BuildingType category, Sprite icon, BuildingActionOffer offer, int? requiredCoreLevel)
         {
             if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Catalog ID and name are required.");
@@ -35,6 +40,7 @@ namespace Game.UI
             Category = category;
             Icon = icon;
             Offer = offer;
+            RequiredCoreLevel = requiredCoreLevel;
         }
     }
 
