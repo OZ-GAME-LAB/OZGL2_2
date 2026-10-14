@@ -10,6 +10,8 @@ public class ConsumableItemData : ScriptableObject
     public string DisplayName => _displayName;
     public string Description => _description;
     public Sprite Icon => _icon;
+    public ConsumableUseVFX UseVFX => _useVFX;
+    public ConsumableUseVFX TargetVFX => _targetVFX;
     public ConsumableTargetTeam TargetTeam => _targetTeam;
     public ConsumableTargetMode TargetMode => _targetMode;
     // UI에서 사용 위치와 범위 표시가 필요한 아이템인지 확인합니다.
@@ -22,6 +24,10 @@ public class ConsumableItemData : ScriptableObject
     [TextArea]
     [SerializeField] private string _description;
     [SerializeField] private Sprite _icon;
+    [Tooltip("범위 아이템 사용 성공 시 선택 위치에서 한 번 재생합니다. 크기는 Radius를 사용합니다.")]
+    [SerializeField] private ConsumableUseVFX _useVFX;
+    [Tooltip("효과가 적용된 각 대상에게 한 번 재생합니다. 크기와 재생 시간은 프리팹에서 설정합니다.")]
+    [SerializeField] private ConsumableUseVFX _targetVFX;
 
     [Header("사용 대상")]
     [Tooltip("플레이어 기준 적용 대상 팀")]

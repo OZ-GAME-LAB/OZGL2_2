@@ -35,15 +35,27 @@ public class ConsumableItemEffectExecutor
             if (!CombatTargetUtility.IsValid(target) || !target.IsAlive || !seen.Add(target)) continue;
 
             var request = new SkillEffectRequest(_caster, target, effects, canContinue: canContinue);
+            // 처치로 대상이 풀에 반환되어도 피격 위치에 연출을 남깁니다.
+            UnityEngine.Vector2 targetPosition = target.Transform.position;
             TargetEffectApplying?.Invoke(item, target);
             IReadOnlyList<CombatApplicationResult> results = Array.Empty<CombatApplicationResult>();
             try
             {
                 results = _resolver.ResolveWithResults(request);
+                bool targetApplied = false;
                 foreach (CombatApplicationResult result in results)
                 {
                     if (result != null && result.WasApplied)
+                    {
                         applied = true;
+                        targetApplied = true;
+                    }
+                }
+                if (targetApplied && item.TargetVFX != null)
+                {
+                    var vfx = UnityEngine.Object.Instantiate(item.TargetVFX);
+                    vfx.PlayTarget(targetPosition,
+                        CombatTargetUtility.IsValid(target) && target.IsAlive ? target.Transform : null);
                 }
             }
             finally
