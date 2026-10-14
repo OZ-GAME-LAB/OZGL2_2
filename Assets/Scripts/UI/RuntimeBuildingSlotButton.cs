@@ -1,4 +1,3 @@
-using System;
 using Game.Core;
 using OZGL.KDH;
 using TMPro;
@@ -21,13 +20,6 @@ namespace Game.UI
 
         private void OnEnable() => _button.onClick.AddListener(HandleClick);
         private void OnDisable() => _button.onClick.RemoveListener(HandleClick);
-
-        public void Initialize(GameFlowController flow)
-        {
-            if (flow == null) throw new ArgumentNullException(nameof(flow));
-            _flow = flow;
-        }
-
         private void LateUpdate()
         {
             bool available = (_selectFirstEmptySlot || (_slot != null && _slot.isActiveAndEnabled)) &&

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 
 
@@ -29,24 +29,30 @@ namespace Units
         // ============================================================
 
         public UnitAIActionType SelectAction(
-            UnitAssignment assignment, bool approaching = false)
+            UnitAssignment assignment)
         {
             if (_core == null)
                 return UnitAIActionType.Idle;
 
+            if (!IsTargetValid(
+                assignment.Target))
+            {
+                return UnitAIActionType.Idle;
+            }
 
-            if (_core.TrySelectActiveSkill(assignment.Target, out _))
+
+            float distance =
+                GetDistanceToTarget(
+                    assignment.Target
+                );
+
+
+            if (CanUseActiveSkill(
+                distance))
+            {
                 return UnitAIActionType.ActiveSkill;
-            if (!IsTargetValid(assignment.Target)) return UnitAIActionType.Idle;
-            float distance = GetDistanceToTarget(assignment.Target);
+            }
 
-            // 접근을 시작했으면 사거리 안쪽까지 이동하여 경계에서의 반복 정지를 막는다.
-            // 공격 판정 자체의 사거리는 변경하지 않는다.
-            if (approaching && _core.CanMove
-                && Vector2.Distance(_core.transform.position, assignment.Target.Transform.position)
-                    > CombatRangeUtility.PreferredCenterDistance(_core.CombatTarget,
-                        assignment.Target, _core.PreferredCombatRange) + 0.001f)
-                return UnitAIActionType.Move;
 
             if (CanUseBasicAttack(
                 distance))
@@ -70,24 +76,43 @@ namespace Units
         // Active Skill
         // ============================================================
 
+        private bool CanUseActiveSkill(
+            float distance)
+        {
+            if (!_core.CanUseActiveSkill)
+                return false;
+
+            if (_core.RuntimeStatus == null)
+                return false;
+
+            if (_core.RuntimeStatus.ActiveSkillData == null)
+                return false;
+
+            return distance <=
+                _core.RuntimeStatus.ActiveSkillData.SkillRange;
+        }
+
+
+        // ============================================================
+        // Basic Attack
+        // ============================================================
+
         private bool CanUseBasicAttack(
             float distance)
         {
             if (!_core.CanUseBasicAttack)
                 return false;
 
-
             if (_core.RuntimeStatus == null)
                 return false;
-
 
             if (_core.RuntimeStatus.BasicAttackData == null)
                 return false;
 
-
             return distance <=
                 _core.RuntimeStatus.BasicAttackData.BasicAttackRange;
         }
+
 
 
         // ============================================================
@@ -97,10 +122,6 @@ namespace Units
         private bool ShouldMove(
             float distance)
         {
-            if (!_core.CanMove)
-                return false;
-
-
             return distance >
                 _core.PreferredCombatRange;
         }
@@ -116,12 +137,12 @@ namespace Units
             Vector2 unitPosition =
                 _core.transform.position;
 
-
             Vector2 targetPosition =
                 target.Transform.position;
 
-
-            return CombatRangeUtility.Distance(_core.CombatTarget, target);
+            return Vector2.Distance(
+                unitPosition,
+                targetPosition);
         }
 
 

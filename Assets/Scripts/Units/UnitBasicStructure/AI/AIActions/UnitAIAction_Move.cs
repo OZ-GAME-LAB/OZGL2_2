@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 
 
@@ -13,24 +13,6 @@ namespace Units
         private readonly Unit_Core _core;
 
         private readonly UnitAIActionSelector _actionSelector;
-
-        private Vector2 _lastTargetPosition;
-        private float _lastCombatRange;
-        private float _lastSizeCorrection;
-        private float _nextPositionRefreshTime;
-        private const float PositionRefreshInterval = 0.1f;
-        private const float TargetMovementThreshold = 0.05f;
-
-        private void RefreshPosition(ICombatTarget target)
-        {
-            _lastTargetPosition = target.Transform.position;
-            _lastCombatRange = _core.PreferredCombatRange;
-            _lastSizeCorrection = CombatRangeUtility.Correction(_core.CombatTarget, target);
-            _nextPositionRefreshTime = Time.time + PositionRefreshInterval;
-            // GroupAI가 현재 대상과 장애물 배치를 기준으로 목적지를 다시 선택한다.
-            // 이동 중 갱신은 Unit_AI에서 Stop/Enter 없이 반영한다.
-            _core.RequestPositionAssignment();
-        }
 
 
         // ============================================================
@@ -67,20 +49,9 @@ namespace Units
                 return;
 
 
-            if (_core == null
-                || !_core.CanMove)
-            {
-                return;
-            }
-
-
             _core.MoveTo(
                 assignment.Value.PreferredPosition
             );
-
-            // 공격/대기 중 대상이 이동했을 수 있으므로 이전 목적지를 재사용하지 않는다.
-            if (IsTargetValid(assignment.Value.Target))
-                RefreshPosition(assignment.Value.Target);
         }
 
 
@@ -88,13 +59,6 @@ namespace Units
             UnitAssignment? assignment)
         {
             if (!assignment.HasValue)
-            {
-                return UnitAIActionType.Idle;
-            }
-
-
-            if (_core == null
-                || !_core.CanMove)
             {
                 return UnitAIActionType.Idle;
             }
@@ -113,7 +77,7 @@ namespace Units
 
             UnitAIActionType nextAction =
                 _actionSelector.SelectAction(
-                    currentAssignment, approaching: true
+                    currentAssignment
                 );
 
 
@@ -124,20 +88,32 @@ namespace Units
             }
 
 
-            if (Time.time >= _nextPositionRefreshTime
-                && (Vector2.Distance(_lastTargetPosition, currentAssignment.Target.Transform.position)
-                        >= TargetMovementThreshold
-                    || Mathf.Abs(_lastCombatRange - _core.PreferredCombatRange) > 0.01f
-                    || Mathf.Abs(_lastSizeCorrection - CombatRangeUtility.Correction(_core.CombatTarget, currentAssignment.Target)) > 0.01f))
-                RefreshPosition(currentAssignment.Target);
-
             return null;
         }
 
 
         public void Exit()
         {
-            _core?.StopMovement();
+            _core.StopMovement();
+        }
+
+
+        // ============================================================
+        // Position
+        // ============================================================
+
+        private bool IsPreferredPositionReached(
+            UnitAssignment assignment)
+        {
+            float distance =
+                Vector2.Distance(
+                    _core.transform.position,
+                    assignment.PreferredPosition
+                );
+
+
+            return distance
+                <= assignment.PositionTolerance;
         }
 
 

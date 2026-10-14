@@ -17,8 +17,6 @@ namespace Units
 
         public GameObject Prefab { get; }
 
-        public RallyZone RallyZone { get; }
-
 
         // ============================================================
         // Constructor
@@ -27,16 +25,13 @@ namespace Units
         public AllySpawnEntry(
             AllyUnitTier tier,
             AllyUnitClass unitClass,
-            GameObject prefab,
-            RallyZone rallyZone = RallyZone.Front)
+            GameObject prefab)
         {
             Tier = tier;
 
             UnitClass = unitClass;
 
             Prefab = prefab;
-
-            RallyZone = rallyZone;
         }
     }
 }
