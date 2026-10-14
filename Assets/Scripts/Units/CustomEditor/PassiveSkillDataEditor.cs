@@ -780,6 +780,8 @@ namespace Units.Editor
                 0f,
                 10f
             );
+
+            SkillAuthoringGUI.Draw(effect.FindPropertyRelative("_applicationFX"));
         }
 
         private void DrawSkillShieldEffect(SerializedProperty effect)
@@ -796,6 +798,8 @@ namespace Units.Editor
                 0f,
                 10f
             );
+
+            SkillAuthoringGUI.Draw(effect.FindPropertyRelative("_applicationFX"));
         }
 
         private void DrawSkillEffectPercentageValueField(

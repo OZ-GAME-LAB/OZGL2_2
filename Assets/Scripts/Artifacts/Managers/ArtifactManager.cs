@@ -33,12 +33,107 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
 
     [SerializeField] private ArtifactCatalog _artifactCatalog;
     [SerializeField] private ArtifactRewardTable _rewardTable;
+    
+    [Header("아티팩트 획득 테스트")]
+    [Tooltip("플레이 중 F5로 카탈로그 획득 창을 엽니다. 일반 플레이에서는 꺼두세요.")]
+    [SerializeField] private bool _enableCatalogTest = true;
+    private bool _catalogTestOpen;
+    private Vector2 _catalogTestScroll;
+    private string _catalogTestSearch = "";
+    private string _catalogTestMessage = "목록에서 획득 버튼을 누르세요.";
+    private GUIStyle _catalogTestDescriptionStyle;
+    private RunCurrencyManager _runCurrencyManager;
 
     private ArtifactInventory _inventory;
     private WaveController _waveController;
     private ArtifactCandidateSelector _candidateSelector;
     private EffectManager _effectManager;
     private bool _isChanging;
+
+    // 별도 테스트 컴포넌트나 Canvas 없이 사용하는 카탈로그 획득 창입니다.
+    private void Update()
+    {
+        if (!_enableCatalogTest)
+        {
+            _catalogTestOpen = false;
+            return;
+        }
+#if ENABLE_INPUT_SYSTEM
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        bool toggle = keyboard != null && keyboard.f5Key.wasPressedThisFrame;
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        bool toggle = Input.GetKeyDown(KeyCode.F5);
+#else
+        bool toggle = false;
+#endif
+        if (toggle) _catalogTestOpen = !_catalogTestOpen;
+    }
+
+    private void OnGUI()
+    {
+        if (!_enableCatalogTest || !_catalogTestOpen) return;
+
+        if (_catalogTestDescriptionStyle == null)
+            _catalogTestDescriptionStyle = new GUIStyle(GUI.skin.label) { wordWrap = true };
+
+        float width = Mathf.Min(720f, Screen.width - 20f);
+        float height = Mathf.Min(720f, Screen.height - 20f);
+        GUI.Window(GetInstanceID(), new Rect((Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f, width, height), DrawCatalogTestWindow,
+            "아티팩트 획득 테스트 — F5로 열기 / 닫기");
+    }
+
+    private void DrawCatalogTestWindow(int windowId)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("이름 / ID 검색", GUILayout.Width(100f));
+        string search = GUILayout.TextField(_catalogTestSearch);
+        if (search != _catalogTestSearch)
+        {
+            _catalogTestSearch = search;
+            _catalogTestScroll = Vector2.zero;
+        }
+        if (GUILayout.Button("닫기", GUILayout.Width(60f))) _catalogTestOpen = false;
+        GUILayout.EndHorizontal();
+
+        GUILayout.Label(IsInitialized ? _catalogTestMessage : "초기화 대기 중입니다. 목록은 볼 수 있지만 획득은 초기화 후 가능합니다.",
+            _catalogTestDescriptionStyle);
+        if (_artifactCatalog == null)
+        {
+            GUILayout.Label("Artifact Catalog가 연결되어 있지 않습니다.");
+            return;
+        }
+
+        _catalogTestScroll = GUILayout.BeginScrollView(_catalogTestScroll);
+        int shown = 0;
+        string filter = _catalogTestSearch.Trim();
+        foreach (var artifact in _artifactCatalog.Artifacts)
+        {
+            if (artifact == null) continue;
+            if (filter.Length > 0 &&
+                (artifact.Id ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                (artifact.DisplayName ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            shown++;
+            int stacks = TryGetById(artifact.Id, out var instance) ? instance.StackCount : 0;
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label($"{artifact.Id} · {artifact.DisplayName} · {artifact.Rarity} · {stacks}/{artifact.MaxStacks}");
+            GUILayout.Label(artifact.Description ?? "", _catalogTestDescriptionStyle);
+            bool enabled = GUI.enabled;
+            GUI.enabled = enabled && IsInitialized && !_isChanging && stacks < artifact.MaxStacks;
+            if (GUILayout.Button(stacks >= artifact.MaxStacks ? "최대 중첩" : "획득", GUILayout.Height(28f)))
+            {
+                _catalogTestMessage = TryAdd(artifact)
+                    ? $"{artifact.DisplayName} 획득 완료"
+                    : $"{artifact.DisplayName} 획득 실패 — Console을 확인하세요.";
+            }
+            GUI.enabled = enabled;
+            GUILayout.EndVertical();
+        }
+        if (shown == 0) GUILayout.Label("표시할 아티팩트가 없습니다.");
+        GUILayout.EndScrollView();
+    }
 
    
 
