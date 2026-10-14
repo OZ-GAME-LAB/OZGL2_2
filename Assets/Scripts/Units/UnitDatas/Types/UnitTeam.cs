@@ -8,5 +8,4 @@ namespace Units
         Ally,
         Enemy
     }
-
 }

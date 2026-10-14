@@ -1,5 +1,4 @@
 using System;
-using Units.UnitDatas;
 using UnityEngine;
 
 namespace Game.UI
@@ -11,7 +10,6 @@ namespace Game.UI
     public sealed class BuildingInfoData
     {
         public string SelectionId { get; }
-        public string BuildingId { get; }
         public string DisplayName { get; }
         public string CategoryLabel { get; }
         public int Level { get; }
@@ -19,13 +17,10 @@ namespace Game.UI
         public string ProductionSummary { get; }
         public string EffectSummary { get; }
         public Sprite Icon { get; }
-        public UnitData Unit { get; }
-        public string CostSummary { get; }
 
         public BuildingInfoData(string selectionId, string displayName, string categoryLabel,
             int level, string description = null, string productionSummary = null,
-            string effectSummary = null, Sprite icon = null, UnitData unit = null, string costSummary = null,
-            string buildingId = null)
+            string effectSummary = null, Sprite icon = null)
         {
             if (string.IsNullOrWhiteSpace(selectionId))
                 throw new ArgumentException("A selection instance/slot ID is required.", nameof(selectionId));
@@ -36,7 +31,6 @@ namespace Game.UI
             if (level < 1) throw new ArgumentOutOfRangeException(nameof(level));
 
             SelectionId = selectionId;
-            BuildingId = buildingId;
             DisplayName = displayName;
             CategoryLabel = categoryLabel;
             Level = level;
@@ -44,8 +38,6 @@ namespace Game.UI
             ProductionSummary = productionSummary;
             EffectSummary = effectSummary;
             Icon = icon;
-            Unit = unit;
-            CostSummary = costSummary;
         }
     }
 }

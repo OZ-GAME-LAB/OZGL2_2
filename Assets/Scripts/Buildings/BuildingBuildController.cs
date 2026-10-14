@@ -10,9 +10,7 @@ using UnityEngine.InputSystem;
 
 namespace OZGL.KDH
 {
-    // Current date KDH 2026-10-01
-    // 건설 상태 저장/복원을 위해 ISaveDataProvider를 구현합니다. 파일 입출력은 SaveManager 쪽이 합니다.
-    public partial class BuildingBuildController : MonoBehaviour, ISaveDataProvider<BuildingSaveData>
+    public class BuildingBuildController : MonoBehaviour
     {
         private const int HitBufferSize = 8;
 
@@ -23,47 +21,16 @@ namespace OZGL.KDH
         [SerializeField] private LayerMask slotMask = ~0;
         [Range(0f, 1f)]
         [SerializeField] private float refundRate = 1f;
-        // Current date KDH 2026-10-01
-        [Tooltip("코어가 아직 등록되지 않았을 때 쓰는 건설 한도입니다. 0이면 제한 없음. 평소에는 코어 BuildingData의 buildLimit을 씁니다.")]
-        [Min(0)] [SerializeField] private int fallbackBuildLimit = 0;
 
         private BuildingBuildMenu _menu;
         private Camera _camera;
         private BuildingSlot _focusedSlot;
         private BuildingCoreProgress _coreProgress;
-        private BuildingCensus _census;
         private readonly List<BuildingData> _candidates = new List<BuildingData>(16);
         private readonly Collider2D[] _hits = new Collider2D[HitBufferSize];
         private ContactFilter2D _filter;
 
-        // Current date KDH 2026-10-01
-        // CaptureSaveData를 부를 때마다 new List가 생기지 않도록 재사용합니다.
-        private readonly List<BuildingSlot> _saveBuffer = new List<BuildingSlot>(16);
-
         public float RefundRate => refundRate;
-        public BuildingCensus Census => _census;
-
-        // Current date KDH 2026-10-01
-        // 건설 한도. 코어를 뺀 일반 건물 수가 현재 코어의 buildLimit보다 작아야 빈 칸에 지을 수 있습니다.
-        public int BuiltCount => _census != null ? _census.BuiltCount : 0;
-
-        public int BuildLimit
-        {
-            get
-            {
-                Building core = _coreProgress != null ? _coreProgress.CurrentCore : null;
-                if (core == null || core.Data == null)
-                    return fallbackBuildLimit;
-
-                return core.Data.BuildLimit;
-            }
-        }
-
-        // 한도 0은 "제한 없음"입니다. 값을 넣지 않은 기존 코어/테스트 씬이 갑자기 건설 불가가 되지 않게 합니다.
-        public bool HasBuildCapacity => BuildLimit <= 0 || BuiltCount < BuildLimit;
-
-        // (현재 개수, 한도). 건물 수나 코어가 바뀔 때만 울립니다. HUD는 Update에서 폴링하지 말고 이걸 구독하세요.
-        public event Action<int, int> BuildCapacityChanged;
 
         // Current date KDH 2026-09-16
         // 카메라가 슬롯으로 확대/복귀할 수 있게, 칸 선택만 알려 줍니다. 확대 자체는 하지 않습니다.
@@ -76,10 +43,10 @@ namespace OZGL.KDH
             CacheRefs();
             SetupFilter();
 
-            // if (_menu == null)
-            //     _menu = gameObject.AddComponent<BuildingBuildMenu>();
+            if (_menu == null)
+                _menu = gameObject.AddComponent<BuildingBuildMenu>();
 
-            //_menu.Bind(this);
+            _menu.Bind(this);
         }
 
         private void OnDestroy()
@@ -89,8 +56,6 @@ namespace OZGL.KDH
 
             if (gameFlow != null)
                 gameFlow.PhaseChanged -= OnPhaseChanged;
-
-            UnsubscribeCapacitySources();
         }
 
         private void Update()
@@ -104,11 +69,7 @@ namespace OZGL.KDH
 
         // Current date KDH 2026-09-18
         // 지갑과 게임 진행은 Find하지 않고 BootStrap.Initialize로만 받습니다.
-        public void Initialize(
-            RunCurrencyManager runCurrencyManager,
-            GameFlowController gameFlowController,
-            BuildingCoreProgress buildingCoreProgress,
-            BuildingCensus buildingCensus = null)
+        public void Initialize(RunCurrencyManager runCurrencyManager, GameFlowController gameFlowController, BuildingCoreProgress buildingCoreProgress)
         {
             if (wallet != null)
                 wallet.BalanceChanged -= OnWalletChanged;
@@ -116,14 +77,9 @@ namespace OZGL.KDH
             if (gameFlow != null)
                 gameFlow.PhaseChanged -= OnPhaseChanged;
 
-            // Current date KDH 2026-10-01
-            // 재초기화 시 중복 구독을 막습니다.
-            UnsubscribeCapacitySources();
-
             wallet = runCurrencyManager;
             gameFlow = gameFlowController;
             _coreProgress = buildingCoreProgress;
-            _census = buildingCensus;
 
             if (wallet == null)
             {
@@ -145,137 +101,6 @@ namespace OZGL.KDH
 
             if (_coreProgress == null)
                 Debug.LogWarning("[BuildingBuildController] Initialize에 BuildingCoreProgress가 null입니다.", this);
-
-            // Current date KDH 2026-09-22
-            // 씬에 Census가 없어도 같은 오브젝트에 붙여 슬롯을 모읍니다.
-            if (_census == null)
-                _census = GetComponent<BuildingCensus>();
-
-            if (_census == null)
-                _census = gameObject.AddComponent<BuildingCensus>();
-
-            _census.Initialize();
-
-            // Current date KDH 2026-10-01
-            // 건설 한도는 건물 수(Census)와 코어(CoreProgress)가 바뀔 때만 다시 알립니다.
-            if (_coreProgress != null)
-                _coreProgress.Changed += OnCapacitySourceChanged;
-
-            _census.Changed += OnCapacitySourceChanged;
-            OnCapacitySourceChanged();
-        }
-
-        // Current date KDH 2026-10-01
-        private void OnCapacitySourceChanged()
-        {
-            BuildCapacityChanged?.Invoke(BuiltCount, BuildLimit);
-        }
-
-        private void UnsubscribeCapacitySources()
-        {
-            if (_coreProgress != null)
-                _coreProgress.Changed -= OnCapacitySourceChanged;
-
-            if (_census != null)
-                _census.Changed -= OnCapacitySourceChanged;
-        }
-
-        // Current date KDH 2026-10-01
-        // 현재 칸에 지어진 건물 → BuildingSaveData. 매번 새 객체를 반환해 런타임 상태와 참조를 공유하지 않습니다.
-        public BuildingSaveData CaptureSaveData()
-        {
-            BuildingSaveData data = new BuildingSaveData();
-            if (_census == null)
-                return data;
-
-            _census.CollectOccupied(_saveBuffer);
-            for (int i = 0; i < _saveBuffer.Count; i++)
-            {
-                Building building = _saveBuffer[i].CurrentBuilding;
-                if (building == null || building.Data == null)
-                    continue;
-
-                data.buildings.Add(new BuildingSaveEntry
-                {
-                    buildingId = building.Data.BuildingId,
-                    position = _saveBuffer[i].BuildPosition
-                });
-            }
-
-            return data;
-        }
-
-        // Current date KDH 2026-10-01
-        // BuildingSaveData → 실제 건물 복원. 이미 지불한 건물이므로 재화는 차감하지 않습니다.
-        // 미리 배치된 코어는 BuildingSlot.Start에서 칸에 연결되므로, 그 이후에 호출해야 합니다.
-        // 로드 때 한 번만 실행되므로 FindObjectsByType과 배열 생성 비용은 문제가 되지 않습니다.
-        public void RestoreSaveData(BuildingSaveData data)
-        {
-            if (data == null || data.buildings == null)
-                throw new ArgumentNullException(nameof(data));
-
-            if (database == null)
-                throw new InvalidOperationException("BuildingDatabase가 없어 건물을 복원할 수 없습니다.");
-
-            BuildingSlot[] slots = FindObjectsByType<BuildingSlot>(FindObjectsSortMode.None);
-            int count = data.buildings.Count;
-            BuildingSlot[] targetSlots = new BuildingSlot[count];
-            BuildingData[] targetDatas = new BuildingData[count];
-
-            // 1) 먼저 확인만 합니다. 하나라도 틀리면 아무것도 바꾸지 않고 예외를 던집니다.
-            for (int i = 0; i < count; i++)
-            {
-                BuildingSaveEntry entry = data.buildings[i];
-                targetDatas[i] = entry != null ? database.GetById(entry.buildingId) : null;
-                targetSlots[i] = entry != null ? FindSlotAt(slots, entry.position) : null;
-
-                if (targetDatas[i] == null || targetSlots[i] == null || !CanCreateVisual(targetDatas[i]))
-                    throw new ArgumentException($"복원할 수 없는 건물 정보입니다: buildings[{i}]", nameof(data));
-            }
-
-            // 2) 모든 칸을 기본 상태(미리 배치된 코어 / 빈 칸)로 돌립니다. 리셋 로직을 재사용합니다.
-            for (int i = 0; i < slots.Length; i++)
-            {
-                if (slots[i] != null)
-                    slots[i].RestorePreplacedState();
-            }
-
-            // 3) 저장된 건물을 세웁니다. 같은 건물이 이미 있으면(1단계 코어 등) 다시 만들지 않습니다.
-            for (int i = 0; i < count; i++)
-            {
-                BuildingSlot slot = targetSlots[i];
-                if (IsSameAsCurrent(slot, targetDatas[i]))
-                    continue;
-
-                Building spawned = SpawnBuilding(targetDatas[i], slot.BuildPosition);
-                if (slot.IsOccupied)
-                {
-                    Building old = slot.ReleaseCurrent();
-                    if (old != null)
-                        Destroy(old.gameObject);
-                }
-
-                if (!slot.TryOccupy(spawned))
-                {
-                    Debug.LogWarning($"[BuildingBuildController] 저장된 건물을 칸에 복원하지 못했습니다: {targetDatas[i].DisplayName}", slot);
-                    Destroy(spawned.gameObject);
-                }
-            }
-
-            HideMenu();
-        }
-
-        // Current date KDH 2026-10-01
-        // 저장된 위치와 같은 칸을 찾습니다. float 오차를 감안해 거리 제곱으로 비교합니다(제곱근 계산 생략).
-        private static BuildingSlot FindSlotAt(BuildingSlot[] slots, Vector3 position)
-        {
-            for (int i = 0; i < slots.Length; i++)
-            {
-                if (slots[i] != null && (slots[i].BuildPosition - position).sqrMagnitude < 0.0001f)
-                    return slots[i];
-            }
-
-            return null;
         }
 
         public bool TryBuild(BuildingSlot slot, BuildingData data)
@@ -312,16 +137,7 @@ namespace OZGL.KDH
                 return false;
             }
 
-            // Current date KDH 2026-10-01
-            // 빈 칸에 새로 짓는 경우만 한도를 봅니다. 교체/업그레이드는 건물 수가 그대로라 위에서 이미 빠졌습니다.
-            // 재화를 차감하기 전에 막아야 돈만 빠지는 일이 없습니다.
-            if (!HasBuildCapacity)
-            {
-                Debug.LogWarning($"[BuildingBuildController] 건설 한도에 도달했습니다. ({BuiltCount}/{BuildLimit}) 코어를 업그레이드하세요.", this);
-                return false;
-            }
-
-            if (!data.CanBuildFromEmptySlot(GetCurrentCoreLevel(), _census))
+            if (!data.CanBuildFromEmptySlot(GetCurrentCoreLevel()))
             {
                 Debug.LogWarning($"[BuildingBuildController] 아직 해금되지 않았거나 빈 칸에서 지을 수 없는 건물입니다: {data.DisplayName}", this);
                 return false;
@@ -451,14 +267,6 @@ namespace OZGL.KDH
                 return false;
             }
 
-            // Current date KDH 2026-10-08
-            // 재화를 차감하기 전에 막습니다. 같은 지원 T2가 이미 있으면 돈만 빠지는 일을 막습니다.
-            if (IsSupportAlreadyBuilt(next))
-            {
-                Debug.LogWarning($"[BuildingBuildController] 같은 지원 건물이 이미 있어 업그레이드할 수 없습니다: {next.DisplayName}", this);
-                return false;
-            }
-
             if (!CanCreateVisual(next))
                 return false;
 
@@ -510,12 +318,8 @@ namespace OZGL.KDH
             if (!HasWallet() || data == null)
                 return false;
 
-            // Current date KDH 2026-10-01
-            // 빈 칸이면 건설 한도도 함께 봅니다. 두 건설 UI의 버튼이 이 값으로 꺼집니다.
             if (slot == null || !slot.IsOccupied)
-                return HasBuildCapacity
-                    && data.CanBuildFromEmptySlot(GetCurrentCoreLevel(), _census)
-                    && CanAffordCosts(data.BuildCost);
+                return data.CanBuildFromEmptySlot(GetCurrentCoreLevel()) && CanAffordCosts(data.BuildCost);
 
             if (IsSameAsCurrent(slot, data))
                 return false;
@@ -534,11 +338,6 @@ namespace OZGL.KDH
                 return false;
 
             if (!current.Data.TryGetUpgradeCost(next, GetCurrentCoreLevel(), out BuildingResourceCost[] cost))
-                return false;
-
-            // Current date KDH 2026-10-08
-            // 이미 서 있는 지원 T2는 버튼도 켜지 않습니다. 목록에서 빠진 뒤의 안전망입니다.
-            if (IsSupportAlreadyBuilt(next))
                 return false;
 
             return CanAffordCosts(cost);
@@ -578,12 +377,6 @@ namespace OZGL.KDH
             if (IsSameAsCurrent(slot, data))
             {
                 Debug.LogWarning("[BuildingBuildController] 같은 건물로는 교체하지 않습니다.", this);
-                return false;
-            }
-
-            if (!data.MeetsFamilyRequirements(_census))
-            {
-                Debug.LogWarning($"[BuildingBuildController] 선행 건물 가문이 없어 교체할 수 없습니다: {data.DisplayName}", this);
                 return false;
             }
 
@@ -692,7 +485,7 @@ namespace OZGL.KDH
             if (slot.IsOccupied)
             {
                 CollectOccupiedMenuRows(slot);
-                //_menu.Show(slot, _candidates, wallet);
+                _menu.Show(slot, _candidates, wallet);
                 NotifySlotSelected(slot);
                 return;
             }
@@ -703,14 +496,14 @@ namespace OZGL.KDH
                 return;
             }
 
-            slot.CollectCandidates(_candidates, database, GetCurrentCoreLevel(), _census);
+            slot.CollectCandidates(_candidates, database, GetCurrentCoreLevel());
             if (_candidates.Count == 0)
             {
                 Debug.LogWarning("[BuildingBuildController] 이 칸에 건설 가능한 건물이 없습니다.", this);
                 return;
             }
 
-            //_menu.Show(slot, _candidates, wallet);
+            _menu.Show(slot, _candidates, wallet);
             NotifySlotSelected(slot);
         }
 
@@ -724,50 +517,6 @@ namespace OZGL.KDH
             }
 
             slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
-            RemoveBuiltSupports(_candidates);
-        }
-
-        // Current date KDH 2026-10-08
-        // 지원 T2는 필드에 같은 buildingId가 있으면 다시 고를 수 없습니다.
-        // Census는 칸이 바뀔 때만 세므로, 여기서 슬롯을 다시 찾지 않습니다.
-        public bool IsSupportAlreadyBuilt(BuildingData data)
-        {
-            if (data == null || data.BuildingType != BuildingType.Support)
-                return false;
-
-            if (_census == null || string.IsNullOrWhiteSpace(data.BuildingId))
-                return false;
-
-            return _census.Has(data.BuildingId);
-        }
-
-        // 호출하는 쪽이 가진 List를 재사용합니다. 업그레이드 메뉴를 열 때마다 new List를 만들지 않습니다.
-        public void CollectAvailableUpgrades(BuildingSlot slot, List<BuildingData> results)
-        {
-            if (results == null)
-            {
-                Debug.LogWarning("[BuildingBuildController] CollectAvailableUpgrades에 results List가 null입니다.", this);
-                return;
-            }
-
-            results.Clear();
-            if (slot == null || slot.CurrentBuilding == null || slot.CurrentBuilding.Data == null)
-                return;
-
-            slot.CurrentBuilding.Data.CollectUpgrades(results, GetCurrentCoreLevel());
-            RemoveBuiltSupports(results);
-        }
-
-        private void RemoveBuiltSupports(List<BuildingData> results)
-        {
-            if (results == null)
-                return;
-
-            for (int i = results.Count - 1; i >= 0; i--)
-            {
-                if (IsSupportAlreadyBuilt(results[i]))
-                    results.RemoveAt(i);
-            }
         }
 
         private int GetCurrentCoreLevel()
@@ -918,8 +667,8 @@ namespace OZGL.KDH
             else
                 _camera = Camera.main;
 
-            // if (_menu == null)
-            //     _menu = GetComponent<BuildingBuildMenu>();
+            if (_menu == null)
+                _menu = GetComponent<BuildingBuildMenu>();
 
             //if (_coreProgress == null)
             //    _coreProgress = GetComponent<BuildingCoreProgress>();

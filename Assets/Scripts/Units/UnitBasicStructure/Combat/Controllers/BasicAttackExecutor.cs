@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Units.Skills;
-using Units.Effects;
 using UnityEngine;
 using System;
 
@@ -30,30 +29,6 @@ namespace Units
         // ============================================================
 
         private int _executionId;
-        private bool _waitingForAnimation;
-        private float _animationRemaining;
-        private CombatTargetSnapshot _pendingOwner, _pendingTarget;
-        private Action _pendingCompleted;
-        private CombatEventMetadata _fxMetadata;
-        private SkillFXEntry[] _fxEntries = Array.Empty<SkillFXEntry>();
-        private Vector2 _fxDirection;
-        public event Action<SkillFXRequest> FXRequested;
-
-        private void EmitFX(SkillFXHook hook, Vector2 position, CombatTargetSnapshot target = default, bool cleanup = false)
-        {
-            foreach (var entry in _fxEntries)
-                if (entry != null && (cleanup || entry.Hook == hook))
-                {
-                    var request = new SkillFXRequest(entry, _fxMetadata, position, cleanup, _fxDirection, target);
-                    if (FXRequested == null) continue;
-                    foreach (Action<SkillFXRequest> listener in FXRequested.GetInvocationList())
-                    {
-                        // 연출 수신자의 오류가 실제 공격 판정을 중단하지 않게 한다.
-                        try { listener(request); }
-                        catch (Exception exception) { Debug.LogException(exception); }
-                    }
-                }
-        }
 
 
         // ============================================================
@@ -99,115 +74,37 @@ namespace Units
         // Execute
         // ============================================================
 
-        public void Execute(ICombatTarget target, Action onCompleted)
-        {
-            if (_data == null || _core == null || _core.RuntimeStatus == null || !CombatTargetUtility.IsValid(target))
-            { onCompleted?.Invoke(); return; }
-            _core.SetFacingDirection((Vector2)target.Transform.position - (Vector2)_core.transform.position);
-            if (_data.ImpactTiming == AnimationImpactTiming.AnimationStart)
-            {
-                _core.PlayAnimation_Attack();
-                ExecuteImpact(target, onCompleted);
-                return;
-            }
-            ++_executionId;
-            _pendingOwner = new CombatTargetSnapshot(_core.CombatTarget);
-            _pendingTarget = new CombatTargetSnapshot(target);
-            _pendingCompleted = onCompleted;
-            _animationRemaining = _core.PlayBasicAttackForExecution();
-            _waitingForAnimation = true;
-        }
-
-        public void Tick(float deltaTime)
-        {
-            if (!_waitingForAnimation || deltaTime <= 0f) return;
-            bool ownerValid = _pendingOwner.IsTargetable && _core.isActiveAndEnabled
-                && !_core.RuntimeStatus.HasStatus(UnitStatusEffectType.Stun);
-            _animationRemaining -= Mathf.Max(0f, deltaTime);
-            if (ownerValid && _pendingTarget.IsTargetable && _animationRemaining > 0f) return;
-            var target = _pendingTarget;
-            var completed = _pendingCompleted;
-            _waitingForAnimation = false;
-            _pendingCompleted = null;
-            if (_pendingOwner.MatchesLifetime) _core.StopAnimation_SkillMotion();
-            if (!ownerValid || !target.IsTargetable) { completed?.Invoke(); return; }
-            ExecuteImpact(target.Target, completed);
-        }
-
-        private void ExecuteImpact(
+        public void Execute(
             ICombatTarget target,
             Action onCompleted)
         {
             int executionId = ++_executionId;
-            bool fxStarted = false;
-
             try
             {
-                if (_core == null ||
-                    _core.RuntimeStatus == null ||
-                    _data == null ||
-                    !CombatTargetUtility.IsValid(target))
-                {
-                    return;
-                }
-
-                _core.SetFacingDirection((Vector2)target.Transform.position - (Vector2)_core.transform.position);
-
-                var root = CombatEventMetadata.Create(_core.CombatTarget);
-                _fxMetadata = CombatEventMetadata.Create(_core.CombatTarget, root, executionId: root.EventId, actionIndex: 0);
-                _fxDirection = (Vector2)target.Transform.position - (Vector2)_core.transform.position;
-                _fxEntries = SkillDefinitionCopy.Copy(new List<SkillFXEntry>(_data.FXEntries)).ToArray();
-                fxStarted = true;
-                EmitFX(SkillFXHook.OnStart, _core.transform.position, new CombatTargetSnapshot(target));
-                if (_data.ExecutionType == BasicAttackExecutionType.Direct)
-                    EmitFX(SkillFXHook.Fire, _core.transform.position, new CombatTargetSnapshot(target));
+                if (_core == null || _core.RuntimeStatus == null || _data == null
+                    || !CombatTargetUtility.IsValid(target)) return;
 
                 switch (_data.ExecutionType)
                 {
                     case BasicAttackExecutionType.Direct:
-
-                        ExecuteDirect(
-                            target
-                        );
-
+                        ExecuteDirect(target);
                         break;
-
-
                     case BasicAttackExecutionType.Projectile:
-
-                        ExecuteProjectile(
-                            target
-                        );
-
+                        ExecuteProjectile(target);
                         break;
                 }
             }
             finally
             {
-                if (fxStarted && executionId == _executionId && _core != null)
-                {
-                    EmitFX(SkillFXHook.OnComplete, _core.transform.position);
-                    EmitFX(SkillFXHook.OnComplete, _core.transform.position, cleanup: true);
-                }
                 // 공격 행동은 투사체 명중을 기다리지 않고 발사 직후 완료한다.
-                if (executionId == _executionId)
-                {
-                    onCompleted?.Invoke();
-                }
+                if (executionId == _executionId) onCompleted?.Invoke();
             }
         }
-
 
         public void Cancel()
         {
             _executionId++;
-            if (_waitingForAnimation && _pendingOwner.MatchesLifetime) _core.StopAnimation_SkillMotion();
-            _waitingForAnimation = false;
-            _pendingCompleted = null;
-            _pendingOwner = _pendingTarget = default;
-            _animationRemaining = 0f;
         }
-
 
         // ============================================================
         // Direct
@@ -276,11 +173,9 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
-            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
-            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -324,11 +219,9 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
-            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
-            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -371,11 +264,9 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
-            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
-            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -426,11 +317,9 @@ namespace Units
 
             // TODO:
             // Attack FX 실행
-            // 공통 EmitFX 경로에서 처리한다.
 
             // TODO:
             // Hit FX 실행
-            // 실제 피해 결과 또는 투사체 명중 경로에서 처리한다.
         }
 
 
@@ -473,8 +362,7 @@ namespace Units
                     new TargetCandidateRequest(
                         origin,
                         _data.BasicAttackRange,
-                        GetEnemyTeam(),
-                        sourceBodyRadius: _core.BodyRadius
+                        GetEnemyTeam()
                     );
 
 
@@ -485,9 +373,9 @@ namespace Units
 
 
                 for (int i = 0;
-                     i < candidates.Count
-                     && _projectileTargetBuffer.Count < _data.MaxTargetCount;
-                     i++)
+                    i < candidates.Count
+                    && _projectileTargetBuffer.Count < _data.MaxTargetCount;
+                    i++)
                 {
                     ICombatTarget candidate =
                         candidates[i];
@@ -504,75 +392,46 @@ namespace Units
             }
 
 
-            DamageRequest damageRequest =
-                new DamageRequest(
-                    _core.CombatTarget,
-                    null,
-                    DamageSourceType.BasicAttack,
-                    _data.DamageType,
-                    1f,
-                    _fxMetadata
-                );
-
-
             // 목표마다 1발씩 발사하고, 각 투사체의 광역 피해 인원은 별도로 제한한다.
-            for (int i = 0;
-                 i < _projectileTargetBuffer.Count;
-                 i++)
+            for (int i = 0; i < _projectileTargetBuffer.Count; i++)
             {
                 ProjectileRequest request =
                     new ProjectileRequest(
-                        _core.CombatTarget,
+                        _core,
                         _projectileTargetBuffer[i],
                         origin,
                         _data.ProjectileSpeed,
                         impactType,
                         _data.AreaRadius,
                         _data.AreaAngle,
-                        impactType == ProjectileImpactType.Single
-                            ? 1
-                            : _data.MaxDamageableCount,
-                        damageRequest,
-                        flight: CreateFlight(),
-                        projectilePrefab: _data.ProjectilePrefab
+                        impactType == ProjectileImpactType.Single ? 1 : _data.MaxDamageableCount,
+                        DamageSourceType.BasicAttack,
+                        _core.RuntimeStatus.BasicAttackMultiplier
                     );
 
-
-                if (ProjectileManager.GetOrCreate().Fire(request))
-                {
-                    _fxDirection = (Vector2)_projectileTargetBuffer[i].Transform.position - origin;
-                    EmitFX(SkillFXHook.Fire, origin, new CombatTargetSnapshot(_projectileTargetBuffer[i]));
-                }
+                ProjectileManager.GetOrCreate().Fire(
+                    request
+                );
             }
 
-
             // 목표마다 생성된 ProjectileRequest를 ProjectileManager에 전달한다.
-            // DamageRequest는 발사 시점의 공격 정보를 보관하고,
-            // 실제 피해 대상은 Projectile 충돌 시 ImpactType에 따라 확정된다.
+            // 실제 피해 처리는 Projectile 충돌 시 ImpactType에 따라 처리된다.
             //
             // Single
-            // → 충돌 대상을 DamageRequest의 대상으로 사용
+            // → 충돌 대상에게 피해 적용
             //
             // Circle / Cone
-            // → 충돌 위치 기준 범위 판정 후 DamageRequest의 대상으로 사용
+            // → 충돌 위치 기준 범위 판정 후 피해 적용
 
 
             // TODO:
             // Attack FX 실행
-            // 공통 EmitFX 경로에서 처리한다.
         }
 
 
         // ============================================================
         // Target Team
         // ============================================================
-
-        private ProjectileFlightState CreateFlight()
-        {
-            var flight = new ProjectileFlightState();
-            flight.ConfigureFX(_fxEntries, _fxMetadata);
-            return flight;
-        }
 
         private UnitTeam GetEnemyTeam()
         {
@@ -607,18 +466,16 @@ namespace Units
 
             DamageRequest request =
                 new DamageRequest(
-                    _core.CombatTarget,
+                    _core,
                     targets,
                     DamageSourceType.BasicAttack,
-                    _data.DamageType,
-                    1f,
-                    _fxMetadata
+                    _core.RuntimeStatus.BasicAttackMultiplier
                 );
 
 
-            foreach (var result in DamageResolver.Instance.ResolveWithResults(request))
-                if (result.Status != CombatApplicationStatus.Invalid)
-                    EmitFX(SkillFXHook.OnHit, result.Target.Position, result.Target);
+            DamageResolver.Instance.Resolve(
+                request
+            );
         }
     }
 }

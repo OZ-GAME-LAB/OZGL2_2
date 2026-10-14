@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+
+
 
 namespace Units
 {
@@ -32,46 +33,13 @@ namespace Units
         // Public Methods
         // ============================================================
 
-        public void AddAllyModifiers(
-            IReadOnlyList<AllyStatModifier> modifiers)
-        {
-            if (modifiers == null)
-                return;
-
-            foreach (AllyStatModifier modifier in modifiers)
-            {
-                AddAllyModifier(
-                    modifier
-                );
-            }
-        }
-
-
-        public void AddEnemyModifiers(
-            IReadOnlyList<EnemyStatModifier> modifiers)
-        {
-            if (modifiers == null)
-                return;
-
-            foreach (EnemyStatModifier modifier in modifiers)
-            {
-                AddEnemyModifier(
-                    modifier
-                );
-            }
-        }
-
-
         public void AddAllyModifier(
             AllyStatModifier modifier)
         {
             switch (modifier.ApplyType)
             {
                 case UnitModifierApplyType.Tier:
-                    _allyContainer.AddToTier(
-                        modifier.TargetTier,
-                        modifier
-                    );
+                    _allyContainer.AddToTier(modifier.TargetTier, modifier);
                     break;
 
                 case UnitModifierApplyType.All:
@@ -103,10 +71,7 @@ namespace Units
             switch (modifier.ApplyType)
             {
                 case UnitModifierApplyType.Faction:
-                    _enemyContainer.AddToFaction(
-                        modifier.TargetFaction,
-                        modifier
-                    );
+                    _enemyContainer.AddToFaction(modifier.TargetFaction, modifier);
                     break;
 
                 case UnitModifierApplyType.All:
@@ -129,18 +94,6 @@ namespace Units
                     );
                     break;
             }
-        }
-
-
-        public void RemoveAllyArtifactModifiers()
-        {
-            _allyContainer.RemoveArtifactModifiers();
-        }
-
-
-        public void RemoveEnemyArtifactModifiers()
-        {
-            _enemyContainer.RemoveArtifactModifiers();
         }
 
 

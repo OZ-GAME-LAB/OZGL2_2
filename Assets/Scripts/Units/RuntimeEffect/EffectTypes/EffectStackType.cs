@@ -1,7 +1,7 @@
 ﻿
 
 
-namespace Units.Effects
+namespace Units
 {
     public enum EffectStackType
     {

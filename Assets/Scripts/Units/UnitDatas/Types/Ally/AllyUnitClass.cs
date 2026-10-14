@@ -10,7 +10,6 @@ namespace Units
         Warrior,
         Swordsman,
         Archer,
-        Mage,
-        Cultist
+        Mage
     }
 }
