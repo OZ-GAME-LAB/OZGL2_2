@@ -41,7 +41,28 @@ MonoBehaviour:
   support:
     enabled: 1
     targetClass: 1
-    statType: 100
-    modifierType: 1
-    value: 0.2
-  upgrades: []
+    effects:
+    - statType: 100
+      modifierType: 1
+      value: 0.2
+    - statType: 0
+      modifierType: 1
+      value: 0.2
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
+  upgrades:
+  - nextBuilding: {fileID: 11400000, guid: 628d4f8b649f471083169253a813838e, type: 2}
+    cost:
+    - type: 0
+      amount: 100
+    requiredCoreLevel: 3
+  - nextBuilding: {fileID: 11400000, guid: 72e5c3745ffd47aba5711acdb1b34b22, type: 2}
+    cost:
+    - type: 0
+      amount: 100
+    requiredCoreLevel: 3
+  - nextBuilding: {fileID: 11400000, guid: 013f2bc4e88944f0a2ac149e8375e7b4, type: 2}
+    cost:
+    - type: 0
+      amount: 100
+    requiredCoreLevel: 3
