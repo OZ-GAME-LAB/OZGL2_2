@@ -176,6 +176,36 @@ namespace Units
             }
         }
 
+        // 교전 참여는 가능한 스킬의 개시 거리까지 허용한다.
+        // 쿨타임/일시적 행동 제한은 합류를 막지 않고 실제 시전 시 판단한다.
+        public float EngagementEntryRange
+        {
+            get
+            {
+                float range = _basicAttackData != null ? _basicAttackData.BasicAttackRange : 0f;
+
+                if (_core == null)
+                    return range;
+
+                for (int i = 0; i < _skills.Count; i++)
+                {
+                    var entry = _skills[i].Entry;
+
+                    if (entry.Skill == null
+                        || entry.Skill.TargetSide != SkillTargetRelation.Hostile
+                        || _core.GetSkillPolicy(entry)?.Enabled != true)
+                    {
+                        continue;
+                    }
+
+                    range = Mathf.Max(range, entry.Skill.SkillRange);
+                }
+
+                return range;
+            }
+        }
+
+
         public float PreferredCombatRange
         {
             get

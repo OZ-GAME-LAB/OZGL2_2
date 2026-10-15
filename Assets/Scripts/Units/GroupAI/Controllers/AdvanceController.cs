@@ -43,6 +43,10 @@ namespace Units
         private float _nextProgressCheckTime;
         private readonly Dictionary<Unit_Gateway, Vector2> _progressPositions = new();
 
+        private readonly Dictionary<Unit_Gateway, float> _advanceRows = new();
+
+        private readonly Dictionary<Unit_Gateway, Vector2> _moveDestinations = new();
+
 
         // =========================
         // Events
@@ -109,9 +113,15 @@ namespace Units
             }
 
 
+            // 목표 그룹이 바뀌어도 전진 중의 위아래 기준은 유지한다.
+            // 새 전진을 시작할 때만 현재 배치를 기준으로 다시 잡는다.
+            if (!_isAdvancing)
+                _advanceRows.Clear();
+
             _isAdvancing =
                 true;
             _progressPositions.Clear();
+            _moveDestinations.Clear();
             _nextProgressCheckTime = Time.time + ProgressCheckInterval;
 
 
@@ -157,7 +167,7 @@ namespace Units
 
             if (movedDistance <
                 _advanceDistance
-                - _advanceThreshold)
+                - _advanceThreshold && !ReachedAssignedStep())
             {
                 return;
             }
@@ -176,6 +186,8 @@ namespace Units
             _isAdvancing =
                 false;
             _progressPositions.Clear();
+            _advanceRows.Clear();
+            _moveDestinations.Clear();
 
 
             for (int i = 0;
@@ -240,6 +252,8 @@ namespace Units
             _stepStartPosition =
                 centerPosition;
 
+            _moveDestinations.Clear();
+
 
             for (int i = 0;
                  i < _members.Count;
@@ -253,20 +267,9 @@ namespace Units
                     continue;
 
 
-                Vector2 currentPosition =
-                    unit.Transform.position;
+                MoveMemberTowardFront(unit);
 
-
-                Vector2 destination =
-                    currentPosition
-                    + _advanceDirection
-                    * _advanceDistance;
-
-
-                unit.MoveTo(
-                    destination
-                );
-                _progressPositions[unit] = currentPosition;
+                _progressPositions[unit] = unit.Transform.position;
             }
         }
 
@@ -289,13 +292,159 @@ namespace Units
                 if (!_progressPositions.TryGetValue(unit, out var previous)
                     || Vector2.Distance(position, previous) < 0.1f)
                 {
-                    Vector2 direction = _advanceReference.CenterPosition - position;
-                    if (direction.sqrMagnitude > Mathf.Epsilon)
-                        unit.MoveTo(position + direction.normalized * _advanceDistance);
+                    MoveMemberTowardFront(unit);
                 }
                 _progressPositions[unit] = position;
             }
         }
+
+        // =========================
+        // Front Approach
+        // =========================
+
+        private bool ReachedAssignedStep()
+        {
+            if (_moveDestinations.Count == 0)
+                return false;
+
+            float tolerance = Mathf.Max(0.01f, Mathf.Min(0.1f, _advanceThreshold));
+
+            foreach (var pair in _moveDestinations)
+            {
+                if (pair.Key == null || !pair.Key.IsTargetable)
+                    continue;
+
+                if (((Vector2)pair.Key.Transform.position - pair.Value).sqrMagnitude
+                    > tolerance * tolerance)
+                {
+                    return false;
+                }
+            }
+
+            // Y 보정으로 짧아진 이동도 도착 즉시 이어간다. 정체 복구 주기를 기다리지 않는다.
+            return true;
+        }
+
+
+        private void MoveMemberTowardFront(Unit_Gateway unit)
+        {
+            if (unit == null || !unit.IsTargetable || _advanceReference == null)
+                return;
+
+            Vector2 origin = unit.Transform.position;
+
+            if (!_advanceRows.TryGetValue(unit, out float row))
+            {
+                row = origin.y;
+                _advanceRows.Add(unit, row);
+            }
+
+            float sourceRadius = unit.BodyRadius;
+
+            float basicRange =
+                unit.RuntimeStatus?.BasicAttackData?.BasicAttackRange ?? 0f;
+
+            float stopRange = Mathf.Max(
+                sourceRadius,
+                basicRange > 0f ? basicRange : unit.PreferredCombatRange
+            );
+
+            float nearestDistance = float.PositiveInfinity;
+
+            float bestCost = float.PositiveInfinity;
+
+            Vector2 targetPosition = origin;
+
+            float targetRadius = 0f;
+
+            for (int i = 0; i < _advanceReference.Members.Count; i++)
+            {
+                Unit_Gateway target = _advanceReference.Members[i];
+
+                if (target == null || !target.IsTargetable)
+                    continue;
+
+                Vector2 position = target.Transform.position;
+
+                float radius = target.BodyRadius;
+
+                float distance = Mathf.Max(0f, Vector2.Distance(origin, position)
+                    - CombatRangeUtility.Correction(sourceRadius, radius));
+
+                nearestDistance = Mathf.Min(nearestDistance, distance);
+
+                // 같은 적 그룹 안에서도 처음 배치된 높이의 상대를 우선한다.
+                float cost = distance + Mathf.Abs(position.y - row) * 1.5f;
+
+                if (cost >= bestCost)
+                    continue;
+
+                bestCost = cost;
+                targetPosition = position;
+                targetRadius = radius;
+            }
+
+            // 합류가 늦어도 사거리 안의 적을 지나쳐 더 깊이 전진하지 않는다.
+            if (float.IsPositiveInfinity(bestCost) || nearestDistance <= stopRange + 0.01f)
+            {
+                _moveDestinations.Remove(unit);
+                unit.StopMovement();
+
+                return;
+            }
+
+            float centerRange = stopRange
+                + CombatRangeUtility.Correction(sourceRadius, targetRadius);
+
+            // 적에게 닿을 수 있는 범위 안에서 기존 Y 위치를 최대한 보존한다.
+            // 담당 높이에 적이 없을 때만 인접 전선 쪽으로 이동한다.
+            float destinationY = Mathf.Clamp(
+                row,
+                targetPosition.y - centerRange * 0.75f,
+                targetPosition.y + centerRange * 0.75f
+            );
+
+            float vertical = destinationY - targetPosition.y;
+
+            float horizontal = Mathf.Sqrt(Mathf.Max(0f,
+                centerRange * centerRange - vertical * vertical));
+
+            float offsetX = targetPosition.x - origin.x;
+
+            float destinationX = Mathf.Abs(offsetX) <= horizontal
+                ? origin.x
+                : targetPosition.x - Mathf.Sign(offsetX) * horizontal;
+
+            Vector2 offset = new Vector2(destinationX, destinationY) - origin;
+
+            // 먼 전선을 지원할 때도 한 번에 대각선으로 중앙을 가로지르지 않는다.
+            float verticalStep = Mathf.Max(0.5f, Mathf.Abs(offset.x) * 0.35f);
+
+            offset.y = Mathf.Clamp(offset.y, -verticalStep, verticalStep);
+
+            float distanceToMove = Mathf.Min(
+                _advanceDistance,
+                Mathf.Min(offset.magnitude, nearestDistance - stopRange)
+            );
+
+            if (distanceToMove <= 0.01f)
+            {
+                _moveDestinations.Remove(unit);
+                unit.StopMovement();
+
+                return;
+            }
+
+            Vector2 destination = origin + offset.normalized * distanceToMove;
+
+            _moveDestinations[unit] = destination;
+            unit.MoveTo(destination);
+        }
+
+
+        // =========================
+        // Reference Validation
+        // =========================
 
         private bool IsAdvanceReferenceValid()
         {
@@ -303,14 +452,21 @@ namespace Units
                 return false;
 
 
-            return _advanceReference.Members.Count > 0;
+            for (int i = 0; i < _advanceReference.Members.Count; i++)
+            {
+                Unit_Gateway member = _advanceReference.Members[i];
+
+                if (member != null && member.IsTargetable)
+                    return true;
+            }
+
+            return false;
         }
 
 
         private void HandleInvalidAdvanceReference()
         {
-            _isAdvancing =
-                false;
+            StopAdvance();
 
 
             _advanceReference =

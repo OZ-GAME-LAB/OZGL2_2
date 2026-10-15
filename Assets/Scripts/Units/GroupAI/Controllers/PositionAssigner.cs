@@ -52,6 +52,10 @@ namespace Units
         // References
         // =========================
 
+        private CombatQueryContext _combatQueries;
+
+
+
         private readonly Dictionary<Unit_Gateway, UnitAssignmentContext>
             _assignmentContexts;
 
@@ -93,6 +97,17 @@ namespace Units
 
             _contactFilter.useTriggers = false;
         }
+
+
+        // =========================
+        // Shared Combat Queries
+        // =========================
+
+        public void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+        }
+
 
 
         // =========================
@@ -139,7 +154,8 @@ namespace Units
                 return true;
             }
 
-            GatherReservations(unit);
+            if (_combatQueries == null)
+                GatherReservations(unit);
 
             GatherPositions(unit, target, range);
 
@@ -325,7 +341,10 @@ namespace Units
             Unit_Gateway requester,
             Vector2 position)
         {
-            for (int i = 0; i < _reservations.Count; i++)
+            if (_combatQueries != null && _combatQueries.IsReserved(requester, position))
+                return false;
+
+            for (int i = 0; _combatQueries == null && i < _reservations.Count; i++)
             {
                 PositionReservation reservation = _reservations[i];
 

@@ -91,6 +91,8 @@ namespace Units
 
         public float PreferredCombatRange => _core != null ? _core.PreferredCombatRange : 0f;
 
+        public float EngagementEntryRange => _core != null ? _core.EngagementEntryRange : 0f;
+
         public float CurrentHp => _core != null ? _core.CurrentHp : 0f;
 
         public float CurrentShield => _core != null ? _core.CurrentShield : 0f;

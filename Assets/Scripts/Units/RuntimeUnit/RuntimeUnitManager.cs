@@ -98,6 +98,8 @@ namespace Units
         // Controllers
         // =========================
 
+        private readonly CombatQueryContext _combatQueries = new();
+
         private RuntimeUnitRegistrator _unitRegistrator;
 
         private EngagementController _engagementController;
@@ -188,8 +190,22 @@ namespace Units
         }
 
 
+        private void Update()
+        {
+            if (_battleStarted && !_battlePaused && !_battleEnded)
+                _combatQueries.RefreshSpatial();
+        }
+
+
         private void OnDestroy()
         {
+            for (int i = 0; i < _allyGroups.Count; i++)
+                UnsubscribeGroupEvents(_allyGroups[i]);
+
+            for (int i = 0; i < _enemyGroups.Count; i++)
+                UnsubscribeGroupEvents(_enemyGroups[i]);
+
+            _combatQueries.Clear();
             _preparationLifetime.Cancel();
             _preparationLifetime.Dispose();
         }
@@ -241,6 +257,8 @@ namespace Units
             }
 
 
+            _combatQueries.Register(unit);
+
             SubscribeUnitEvents(
                 unit
             );
@@ -278,6 +296,8 @@ namespace Units
                 return false;
             }
 
+
+            _combatQueries.Unregister(unit);
 
             UnsubscribeUnitEvents(
                 unit
@@ -545,6 +565,20 @@ namespace Units
                 return;
 
 
+            group.AssignmentChanged += HandleAssignmentChanged;
+            group.MemberAdded += HandleQueryMemberAdded;
+            group.MemberRemoved += HandleQueryMemberRemoved;
+
+            foreach (Unit_Gateway unit in group.Members)
+            {
+                _combatQueries.Register(unit);
+
+                if (group.AssignmentContexts.TryGetValue(unit, out UnitAssignmentContext context))
+                    _combatQueries.UpdateAssignment(unit, context);
+            }
+
+            group.SetCombatQueries(_combatQueries);
+
             group.SetSkillEngagementHandler(
                 HandleSkillEngagementRequested
             );
@@ -570,6 +604,14 @@ namespace Units
                 return;
 
 
+            group.AssignmentChanged -= HandleAssignmentChanged;
+            group.MemberAdded -= HandleQueryMemberAdded;
+            group.MemberRemoved -= HandleQueryMemberRemoved;
+            group.SetCombatQueries(null);
+
+            foreach (Unit_Gateway unit in group.Members)
+                _combatQueries.Unregister(unit);
+
             group.SetSkillEngagementHandler(
                 null
             );
@@ -591,6 +633,27 @@ namespace Units
         // =========================
         // Event Handlers
         // =========================
+
+        private void HandleAssignmentChanged(Unit_Gateway unit, UnitAssignmentContext context)
+        {
+            _combatQueries.UpdateAssignment(unit, context);
+        }
+
+
+        private void HandleQueryMemberAdded(Unit_Gateway unit)
+        {
+            if (!_allyUnits.Contains(unit) && !_enemyUnits.Contains(unit))
+                RegisterUnit(unit);
+
+            _combatQueries.Register(unit);
+        }
+
+
+        private void HandleQueryMemberRemoved(Unit_Gateway unit)
+        {
+            _combatQueries.Unregister(unit);
+        }
+
 
         private void HandleUnitDied(
             Unit_Gateway unit)
@@ -1251,6 +1314,8 @@ namespace Units
             );
 
             Units.FX.SFXManager.Instance?.Clear();
+
+            _combatQueries.Clear();
 
             RuntimeCleared?.Invoke();
         }
