@@ -228,6 +228,7 @@ public class BootStrap : MonoBehaviour
             return false;
         }
         _uiStartup.UIManager.gameObject.SetActive(true);
+        _uiStartup.InitializeRunInfo(_altarManager, _traitRunApplier, _totemRunApplier, _traitCatalog, _totemCatalog);
         return true;
     }
 

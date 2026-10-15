@@ -28,6 +28,7 @@ namespace Game.UI.InGame
         [SerializeField] private ArchiveView _archiveView;
         [SerializeField] private PausePopupView _pausePopupView;
         [SerializeField] private ConfirmPopupView _confirmPopupView;
+        [SerializeField] private RunInfoPresenter _runInfo;
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
@@ -39,6 +40,13 @@ namespace Game.UI.InGame
         public bool IsReady { get; private set; }
 
         public void InitializeArchive(ArchiveController archive) => _archiveView.Initialize(archive);
+
+        public void InitializeRunInfo(AltarManager altars, TraitRunApplier traits, TotemRunApplier totems,
+            TraitCatalog traitCatalog, TotemEffectCatalog totemCatalog)
+        {
+            // 이전 독립 테스트 UI도 유지한다. 실제 Test 프리팹에는 반드시 연결한다.
+            if (_runInfo != null) _runInfo.Initialize(_uiManager, altars, traits, totems, traitCatalog, totemCatalog);
+        }
 
         public void InitializeArtifactInventory(IArtifactReader artifactReader)
         {
