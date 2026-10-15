@@ -32,7 +32,7 @@ namespace Game.UI.InGame.Editor
             EditPrefab("RunResult.prefab", root => ConfigureSettlement(root.GetComponent<UIScreen>()));
             EditPrefab("InGameHUD.prefab", root =>
             {
-                foreach (SettlementView old in root.GetComponentsInChildren<SettlementView>(true)) Object.DestroyImmediate(old);
+                foreach (RunResultView old in root.GetComponentsInChildren<RunResultView>(true)) Object.DestroyImmediate(old);
             });
             EditPrefab("InGameUIRoot.prefab", ConfigureRoot);
 
@@ -65,8 +65,8 @@ namespace Game.UI.InGame.Editor
             UIScreen[] screens = root.GetComponentsInChildren<UIScreen>(true);
             ConfigureContinue(screens.Single(screen => screen.Id == UIId.WaveReward));
             MessageView message = ConfigureMessage(screens.Single(screen => screen.Id == UIId.Message));
-            SettlementView settlement = ConfigureSettlement(screens.Single(screen => screen.Id == UIId.RunResult));
-            foreach (SettlementView old in root.GetComponentsInChildren<SettlementView>(true))
+            RunResultView settlement = ConfigureSettlement(screens.Single(screen => screen.Id == UIId.RunResult));
+            foreach (RunResultView old in root.GetComponentsInChildren<RunResultView>(true))
                 if (old != settlement) Object.DestroyImmediate(old);
             foreach (MonoBehaviour old in root.GetComponents<MonoBehaviour>())
                 if (old != null && old.GetType().Name == "RunFlowPresenter") Object.DestroyImmediate(old);
@@ -91,7 +91,7 @@ namespace Game.UI.InGame.Editor
             return view;
         }
 
-        private static SettlementView ConfigureSettlement(UIScreen screen)
+        private static RunResultView ConfigureSettlement(UIScreen screen)
         {
             if (screen == null) throw new InvalidOperationException("RunResult 화면이 없습니다.");
             GameObject frame = screen.transform.Find(SettlementFrameName)?.gameObject;
@@ -131,13 +131,15 @@ namespace Game.UI.InGame.Editor
             SetBool(screen, "_canCloseByUser", false);
             SetBool(screen, "_blocksHudInput", true);
 
-            SettlementView view = GetOrAdd<SettlementView>(screen.gameObject);
+            RunResultView view = GetOrAdd<RunResultView>(screen.gameObject);
             view.enabled = true;
             Set(view, "_screen", screen);
             Set(view, "_progress", At<TMP_Text>(screen, SettlementFrameName + "/Window/SummaryBox/ProgressColumn/ProgressValue"));
             Set(view, "_artifacts", ConfigureArtifactCounts(frame));
             Set(view, "_bloodstone", At<TMP_Text>(screen, SettlementFrameName + "/Window/SummaryBox/BloodstoneReward/Value"));
             Set(view, "_mainButton", At<UnityEngine.UI.Button>(screen, SettlementFrameName + "/Window/SummaryBox/Footer/MainMenuButton"));
+            TotemRowSetup.Configure(view, frame);
+            RunSettlementSetup.Configure(view, frame);
             RecordOverride(screen.gameObject);
             RecordOverride(frame);
             RecordOverride(input);
@@ -192,7 +194,7 @@ namespace Game.UI.InGame.Editor
             Set(startup, "_artifactSelectionUI", root.GetComponent<ArtifactRewardPresenter>());
             Set(startup, "_continueUI", root.GetComponentInChildren<ContinueView>(true));
             Set(startup, "_runDecisionUI", root.GetComponentInChildren<RunDecisionView>(true));
-            Set(startup, "_settlementUI", root.GetComponentInChildren<SettlementView>(true));
+            Set(startup, "_settlementUI", root.GetComponentInChildren<RunResultView>(true));
             Set(startup, "_shopView", root.GetComponentInChildren<ShopView>(true));
             Set(startup, "_buildingUI", root.GetComponent<BuildingUIPresenter>());
             Set(startup, "_buildingUIConnection", GetOrAdd<BuildingUIConnection>(bootstrap.gameObject));
@@ -222,8 +224,8 @@ namespace Game.UI.InGame.Editor
             if (settlement.Root.name != SettlementFrameName || !settlement.gameObject.activeSelf ||
                 settlement.CanCloseByUser || !settlement.BlocksHudInput)
                 throw new InvalidOperationException("결산 프레임 또는 필수 확인 화면 설정이 올바르지 않습니다.");
-            var settlementData = new SerializedObject(settlement.GetComponent<SettlementView>());
-            foreach (string field in new[] { "_screen", "_progress", "_artifacts", "_bloodstone", "_mainButton" })
+            var settlementData = new SerializedObject(settlement.GetComponent<RunResultView>());
+            foreach (string field in new[] { "_screen", "_progress", "_artifacts", "_bloodstone", "_mainButton", "_totemRowPrefab", "_totemContent", "_emptyTotems", "_progressScore", "_artifactScore", "_totemMultiplier", "_totalScore" })
                 if (settlementData.FindProperty(field)?.objectReferenceValue == null)
                     throw new InvalidOperationException("결산 표시 참조가 없습니다: " + field);
         }

@@ -39,7 +39,7 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private ShopManager _shopManager;
     [SerializeField] private EventManager _eventManager;
     [SerializeField] private ConsumableItemManager _consumableItemManager;
-    [SerializeField] private RunSettlementManager _runSettlementManager;
+    [SerializeField] private RunRewardManager _runSettlementManager;
     [SerializeField] private PersistentCurrencyManager _persistentCurrencyManager;
     [SerializeField] private InGameCameraController _cameraController;
     [SerializeField] private BuildingBuildController _buildController;

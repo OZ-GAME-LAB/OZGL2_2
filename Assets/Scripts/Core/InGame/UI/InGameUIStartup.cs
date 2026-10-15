@@ -18,7 +18,7 @@ namespace Game.UI.InGame
         [SerializeField] private EventPopupView _eventUI;
         [SerializeField] private ContinueView _continueUI;
         [SerializeField] private RunDecisionView _runDecisionUI;
-        [SerializeField] private SettlementView _settlementUI;
+        [SerializeField] private RunResultView _settlementUI;
         [SerializeField] private ShopView _shopView;
         [SerializeField] private ArtifactInventoryPopupView _artifactInventoryView;
         [SerializeField] private ConsumableItemView _consumableItemView;
