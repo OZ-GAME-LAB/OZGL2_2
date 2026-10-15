@@ -554,7 +554,7 @@ public class CurrencyTestPanel : MonoBehaviour
             ClearBossCount = clearedWaves / WaveController.MAX_WAVE,
             MaxQuarter = _waveController.CurQuarter,
             MaxWave = _waveController.CurWave
-        });
+        }, _totemRunApplier != null ? _totemRunApplier.ActiveTotems : null);
     }
 
     // 게임용 정산 매니저의 계약을 사용하는 EconomyTestScene 전용 대체 구현입니다.

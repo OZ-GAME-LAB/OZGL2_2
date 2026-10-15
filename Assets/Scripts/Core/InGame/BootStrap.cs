@@ -106,7 +106,8 @@ public class BootStrap : MonoBehaviour
             _testScript.Initialize(_gameFlowController, _waveController);
             _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
                 _artifactManager, _shopManager, _consumableItemManager, _buildController, _archiveManager, _eventManager,
-                () => _archiveManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController));
+                () => _archiveManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController,
+                    _totemRunApplier, _altarManager, _traitRunApplier));
             _gameFlowController.InitializeSave(_inGameSaveCoordinator);
             _eventManager.InitializeSave(_inGameSaveCoordinator);
 
