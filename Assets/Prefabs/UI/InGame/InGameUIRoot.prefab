@@ -376,8 +376,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: X1
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: a1b3b76b1fa23264b818151d6cc344cc, type: 2}
+  m_sharedMaterial: {fileID: -1422171293267618120, guid: a1b3b76b1fa23264b818151d6cc344cc, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -666,6 +666,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.BuildingUIPresenter
   _panel: {fileID: 6489683502449852981}
+  _panelWindow: {fileID: 7186652671017378556}
   _catalogRoot: {fileID: 1791521586423905046}
   _managementRoot: {fileID: 1316836002584221153}
   _titleText: {fileID: 2411078042778359447}
@@ -6149,6 +6150,10 @@ PrefabInstance:
       propertyPath: _dismantle._rowRoot
       value: 
       objectReference: {fileID: 6253926896331026884}
+    - target: {fileID: 5679382573790350964, guid: bbc5f0f7f04867c498fb347d27664f05, type: 3}
+      propertyPath: _fixedManagementActions
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5818718625856311561, guid: bbc5f0f7f04867c498fb347d27664f05, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -6645,6 +6650,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+--- !u!224 &7186652671017378556 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 2235912419743933999, guid: 69cdd6dc53e53394398068158170e712, type: 3}
+  m_PrefabInstance: {fileID: 8987936879590687955}
+  m_PrefabAsset: {fileID: 0}
 --- !u!114 &7562072895700275988 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1462106113019336647, guid: 69cdd6dc53e53394398068158170e712, type: 3}

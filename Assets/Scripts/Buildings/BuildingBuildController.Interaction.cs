@@ -16,8 +16,10 @@ namespace OZGL.KDH
             var target = new BuildingInteractionTarget(slot);
             var failure = ValidateInteractionTarget(target);
             var candidates = new List<BuildingInteractionCandidate>();
+            List<BuildingInteractionCandidate> displayCandidates = null;
             BuildingInteractionOffer build = null, upgrade = null, demolish = null;
             BuildingData displayed = null;
+            int? requiredUpgradeCoreLevel = null;
             if (IsLiveInteractionSlot(slot))
             {
                 foreach (BuildingData data in CollectInteractionCandidates(slot))
@@ -31,6 +33,9 @@ namespace OZGL.KDH
                 displayed = slot.IsOccupied ? target.ExpectedData : selectedOption;
                 if (slot.IsOccupied)
                 {
+                    displayCandidates = CollectUpgradeDisplayCandidates(target.ExpectedData, candidates);
+                    if (candidates.Count == 0)
+                        requiredUpgradeCoreLevel = GetRequiredUpgradeCoreLevel(target.ExpectedData);
                     if (selectedOption != null)
                         upgrade = CreateInteractionOffer(target, BuildingInteractionAction.Upgrade, selectedOption);
                     if (!IsCoreSlot(slot))
@@ -39,7 +44,56 @@ namespace OZGL.KDH
                 else if (selectedOption != null)
                     build = CreateInteractionOffer(target, BuildingInteractionAction.Build, selectedOption);
             }
-            return new BuildingInteractionState(target, failure, displayed, candidates, build, upgrade, demolish);
+            return new BuildingInteractionState(target, failure, displayed, candidates, build, upgrade, demolish,
+                requiredUpgradeCoreLevel, displayCandidates);
+        }
+
+        private List<BuildingInteractionCandidate> CollectUpgradeDisplayCandidates(BuildingData current,
+            List<BuildingInteractionCandidate> availableCandidates)
+        {
+            var byId = new Dictionary<string, BuildingInteractionCandidate>();
+            var availableById = new Dictionary<string, BuildingInteractionCandidate>();
+            foreach (BuildingInteractionCandidate candidate in availableCandidates)
+                availableById[candidate.Data.BuildingId] = candidate;
+            int coreLevel = GetCurrentCoreLevel();
+            foreach (BuildingUpgradeOption option in current?.Upgrades ?? Array.Empty<BuildingUpgradeOption>())
+            {
+                if (!current.IsUpgradeAvailable(option, int.MaxValue)) continue;
+                BuildingData next = option.nextBuilding;
+                if (string.IsNullOrWhiteSpace(next.BuildingId) || string.IsNullOrWhiteSpace(next.DisplayName) ||
+                    IsSupportAlreadyBuilt(next)) continue;
+                bool coreLevelMet = current.IsUpgradeAvailable(option, coreLevel);
+                if (byId.TryGetValue(next.BuildingId, out BuildingInteractionCandidate existing) &&
+                    (existing.IsCoreLevelMet || (!coreLevelMet && existing.RequiredCoreLevel <= option.requiredCoreLevel)))
+                    continue;
+                bool validCost = TryReadInteractionCosts(option.cost, out BuildingInteractionCost cost);
+                if (coreLevelMet && availableById.TryGetValue(next.BuildingId, out BuildingInteractionCandidate available))
+                {
+                    next = available.Data;
+                    cost = available.Cost;
+                    validCost = available.HasValidCost;
+                }
+                byId[next.BuildingId] = new BuildingInteractionCandidate(next, cost, validCost,
+                    option.requiredCoreLevel, coreLevelMet);
+            }
+            return new List<BuildingInteractionCandidate>(byId.Values);
+        }
+
+        private int? GetRequiredUpgradeCoreLevel(BuildingData current)
+        {
+            if (current == null || current.Upgrades == null) return null;
+            int coreLevel = GetCurrentCoreLevel();
+            int? requiredLevel = null;
+            foreach (BuildingUpgradeOption option in current.Upgrades)
+            {
+                if (!current.IsUpgradeAvailable(option, int.MaxValue)) continue;
+                BuildingData next = option.nextBuilding;
+                if (string.IsNullOrWhiteSpace(next.BuildingId) || string.IsNullOrWhiteSpace(next.DisplayName) ||
+                    IsSupportAlreadyBuilt(next) || option.requiredCoreLevel <= coreLevel) continue;
+                if (!requiredLevel.HasValue || option.requiredCoreLevel < requiredLevel.Value)
+                    requiredLevel = option.requiredCoreLevel;
+            }
+            return requiredLevel;
         }
 
         /// <summary>Build는 빈 슬롯 전용이다. 기존 TryBuild의 점유 슬롯 교체 계약은 그대로 유지한다.</summary>

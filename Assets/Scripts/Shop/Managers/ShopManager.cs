@@ -26,6 +26,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
     private ShopArtifactSelector _selector;
     private ConsumableItemManager _consumables;
     private ShopConsumableSelector _consumableSelector;
+    private IRunCheckpointWriter _checkpointWriter;
     private List<ShopConsumableSlot> _consumableSlots = new List<ShopConsumableSlot>();
     private bool HasConsumableSales => _shopTable != null && _shopTable.ShopConsumableTable != null &&
         _shopTable.ShopConsumableTable.SlotCount > 0;
@@ -39,7 +40,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
 
     // 판매에 사용하는 매니저 초기화 후 호출. 소모성 판매 설정이 있으면 소모성 매니저도 필요
     public void Initialize(ArtifactManager artifactManager, RunCurrencyManager runCurrencyManager,
-        GameFlowController gameFlowController, ConsumableItemManager consumableItemManager = null, IShopUI shopUI = null)
+        GameFlowController gameFlowController, ConsumableItemManager consumableItemManager = null, IShopUI shopUI = null, IRunCheckpointWriter checkpointWriter = null)
     {
         if (_isTrading || IsInitialized)
         {
@@ -67,6 +68,7 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             _consumables != null ? _consumables.Catalog : null, _shopTable);
         _runCurrencyManager = runCurrencyManager;
         _shopUI = shopUI;
+        _checkpointWriter = checkpointWriter;
         _selector = new ShopArtifactSelector(artifactManager.ArtifactCatalog, artifactManager, _shopTable);
         _purchaseSlots.Clear();
         _exchangeSlots.Clear();
@@ -174,6 +176,10 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             ShopChanged?.Invoke();
         }
         _isTrading = false;
+        if (!TrySave(out string error))
+        {
+            Debug.LogWarning(error);
+        }
         return succeeded;
     }
 
@@ -202,6 +208,10 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             ShopChanged?.Invoke();
         }
         _isTrading = false;
+        if (!TrySave(out string error))
+        {
+            Debug.LogWarning(error);
+        }
         return succeeded;
     }
 
@@ -254,6 +264,10 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             ShopChanged?.Invoke();
         }
         _isTrading = false;
+        if (!TrySave(out string error))
+        {
+            Debug.LogWarning(error);
+        }
         return succeeded;
     }
 
@@ -283,6 +297,10 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
             ShopChanged?.Invoke();
         }
         _isTrading = false;
+        if (!TrySave(out string error))
+        {
+            Debug.LogWarning(error);
+        }
         return succeeded;
     }
 
@@ -385,5 +403,22 @@ public class ShopManager : MonoBehaviour, IShopFlow, IShopReader, IShopTrader, I
         if (entry == null || string.IsNullOrWhiteSpace(entry.ItemId) || !seen.Add(entry.ItemId) || entry.Price < 0 ||
             (entry.Currency != CurrencyType.Gold && entry.Currency != CurrencyType.Gem) || !_runCurrencyManager.CanSpend(entry.Currency, 0))
             throw new ArgumentException("저장 상품의 ID·가격·재화·중복을 확인하세요.");
+    }
+
+    public bool TrySave(out string error)
+    {
+        if (_checkpointWriter == null)
+        {
+            error = "[ShopManager] 저장 인터페이스가 초기화되지 않았습니다. ";
+            return false;
+        }
+
+        if (!_checkpointWriter.TrySave(out string saveError))
+        {
+            error = saveError;
+            return false;
+        }
+        error = "";
+        return true;
     }
 }
