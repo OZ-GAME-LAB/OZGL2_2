@@ -40,5 +40,15 @@ namespace Units.FX
             definition = null;
             return !string.IsNullOrWhiteSpace(key) && _lookup.TryGetValue(key, out definition);
         }
+
+        internal void CollectPrewarmPrefabs(List<GameObject> prefabs)
+        {
+            if (!_built) Rebuild();
+            prefabs.Clear();
+            var unique = new HashSet<GameObject>();
+            foreach (var entry in _lookup.Values)
+                if (entry.Prefab != null && unique.Add(entry.Prefab))
+                    prefabs.Add(entry.Prefab);
+        }
     }
 }
