@@ -15,7 +15,6 @@ namespace Game.UI.InGame
         [SerializeField] private GameHudView _ui;
         [SerializeField] private TMP_Text _quarterText;
         [SerializeField] private TMP_Text _gemText;
-        [SerializeField] private TMP_Text _hint;
         [SerializeField] private MessageView _messages;
 
         private RunCurrencyManager _wallet;
@@ -50,15 +49,12 @@ namespace Game.UI.InGame
             RefreshCurrency();
             if (_flow == null || _waves == null)
             {
-                _ui.SetPhaseLabel("연결 대기");
                 _ui.ClearWaveProgress();
                 SetText(_quarterText, "분기 -- · 웨이브");
-                SetText(_hint, string.Empty);
                 _ui.SetWaveStartInteractable(false);
                 return;
             }
 
-            _ui.SetPhaseLabel(GetPhaseLabel(_flow.CurPhase));
             SetText(_quarterText, _flow.CurPhase != GamePhase.None && _waves.CurQuarter >= 1
                 ? $"분기 {_waves.CurQuarter} · 웨이브" : "분기 -- · 웨이브");
             if (_flow.CurPhase != GamePhase.None && _waves.CurWave >= 1 &&
@@ -67,9 +63,6 @@ namespace Game.UI.InGame
             else
                 _ui.ClearWaveProgress();
 
-            SetText(_hint, _flow.CurPhase == GamePhase.Preparation ? (_flow.HasBarracks ? "건설할 위치를 선택하세요" : "병영을 먼저 건설해주세요") :
-                _flow.CurPhase == GamePhase.Battle || _flow.CurPhase == GamePhase.BattlePreparing
-                    ? "전투 중에는 건설할 수 없습니다" : string.Empty);
             // PhaseChanged는 전환 잠금 해제 전에 발생한다. 실행 조건은 Core가 다시 확인한다.
             _ui.SetWaveStartInteractable(_isSubscribed && !_isStartPending &&
                 _flow.CurPhase == GamePhase.Preparation && _waves.CurrentPreset != null && _flow.HasBarracks);
@@ -194,23 +187,6 @@ namespace Game.UI.InGame
             _bindingLifetime?.Cancel();
             _bindingLifetime?.Dispose();
             _bindingLifetime = null;
-        }
-
-        private static string GetPhaseLabel(GamePhase phase)
-        {
-            switch (phase)
-            {
-                case GamePhase.Preparation: return "건설";
-                case GamePhase.BattlePreparing: return "전투 준비";
-                case GamePhase.Battle: return "전투";
-                case GamePhase.BattleResolving: return "전투 정산";
-                case GamePhase.QuarterComplete: return "분기 완료";
-                case GamePhase.Reward: return "보상";
-                case GamePhase.Event: return "이벤트";
-                case GamePhase.Store: return "상점";
-                case GamePhase.Finished: return "결과";
-                default: return "연결 대기";
-            }
         }
 
         private static void SetText(TMP_Text target, string value)

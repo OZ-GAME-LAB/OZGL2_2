@@ -936,7 +936,6 @@ MonoBehaviour:
   _ui: {fileID: 8365367597049422001}
   _quarterText: {fileID: 5105098888176500293}
   _gemText: {fileID: 805038586873131842}
-  _hint: {fileID: 8237931016183832172}
   _messages: {fileID: 1346442805470421663}
 --- !u!114 &7328902414849776078
 MonoBehaviour:
@@ -3174,7 +3173,9 @@ PrefabInstance:
       value: 882
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 5872463466051492956, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
+    - {fileID: 4107287243317707458, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 2716934894657300531, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
       insertIndex: 0
@@ -3266,17 +3267,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 416cb14476665fa43bb41659f52be7fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.RunDecisionView
---- !u!114 &8237931016183832172 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 7481071860237608239, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
-  m_PrefabInstance: {fileID: 1549547941900680003}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
 --- !u!114 &8365367597049422001 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7032045528772566002, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
