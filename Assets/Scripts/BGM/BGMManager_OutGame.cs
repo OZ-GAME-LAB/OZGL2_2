@@ -6,7 +6,7 @@ namespace Game.Audio
     public sealed class BGMManager_OutGame : BGMManagerBase
     {
         [SerializeField] private BGMContext _music = new();
-        private bool _started;
+        private bool _outGameStarted;
 
         // ============================================================
         // Scene Playback
@@ -14,14 +14,14 @@ namespace Game.Audio
         protected override void Start()
         {
             base.Start();
-            _started = true;
+            _outGameStarted = true;
             Play(_music);
         }
 
         protected override void OnEnable()
         {
             base.OnEnable();
-            if (_started) Play(_music);
+            if (_outGameStarted) Play(_music);
         }
     }
 }

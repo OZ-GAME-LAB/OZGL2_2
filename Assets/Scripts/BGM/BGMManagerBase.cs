@@ -30,6 +30,9 @@ namespace Game.Audio
             internal bool PausedByApplication;
         }
 
+        protected AudioMixerGroup MixerGroup => _mixerGroup;
+        protected bool IsApplicationSuspended => _suspended || _resumePending;
+
         public BGMContext CurrentContext => _requested;
         // 일시정지는 재생 완료가 아니다. 씬 전환 대기는 모든 채널이 정리된 뒤 완료한다.
         public bool IsSilent => _pending == null &&

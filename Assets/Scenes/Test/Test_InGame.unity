@@ -1921,103 +1921,56 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e2cf66ac42a6aef48b6bb0e8581fe580, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.Audio.BGMManager_InGame
-  _mixerGroup: {fileID: 0}
-  _phaseMusic:
-  - _phase: 1
-    _action: 1
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 2
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 3
-    _action: 1
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 4
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 5
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 6
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 7
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 8
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
-  - _phase: 9
-    _action: 0
-    _music:
-      _clip: {fileID: 0}
-      _volume: 1
-      _pitch: 1
-      _loop: 1
-      _fadeInDuration: 1
-      _fadeOutDuration: 1
+  _mixerGroup: {fileID: -894986256073658780, guid: 9f09f4f764d14954cb6d42e0b6c893f0, type: 2}
+  _construction:
+    _clip: {fileID: 8300000, guid: c39a07b898e1db441bcc21c2e3d8326c, type: 3}
+    _volume: 0.15
+    _pitch: 1
+    _loop: 1
+    _fadeInDuration: 1
+    _fadeOutDuration: 0.5
+  _battle:
+    _clip: {fileID: 8300000, guid: d4d82bc184aab7e4fbb195ee55b27100, type: 3}
+    _volume: 0.15
+    _pitch: 1
+    _loop: 1
+    _fadeInDuration: 1
+    _fadeOutDuration: 0.5
+  _boss:
+    _clip: {fileID: 8300000, guid: aa44e1b137f97fe4180d090d9e5b0b4a, type: 3}
+    _volume: 0.15
+    _pitch: 1
+    _loop: 1
+    _fadeInDuration: 1
+    _fadeOutDuration: 0.5
+  _event:
+    _clip: {fileID: 8300000, guid: 52d7f50e99082344bbf81b980ac45da8, type: 3}
+    _volume: 0.15
+    _pitch: 1
+    _loop: 1
+    _fadeInDuration: 1
+    _fadeOutDuration: 0.5
+  _waveStart:
+    _clip: {fileID: 8300000, guid: 13f67bc4c49fe8c47a0a2e066b26b500, type: 3}
+    _volume: 0.15
+    _pitch: 1
+    _loop: 0
+    _fadeInDuration: 0
+    _fadeOutDuration: 0.5
   _victory:
-    _clip: {fileID: 0}
-    _volume: 1
+    _clip: {fileID: 8300000, guid: a3e90bd170654384abdcc0175ec39a1c, type: 3}
+    _volume: 0.15
     _pitch: 1
     _loop: 0
-    _fadeInDuration: 1
-    _fadeOutDuration: 1
+    _fadeInDuration: 0
+    _fadeOutDuration: 0.5
   _defeat:
-    _clip: {fileID: 0}
-    _volume: 1
+    _clip: {fileID: 8300000, guid: 963501cd4394d734b837358fa4e9763c, type: 3}
+    _volume: 0.15
     _pitch: 1
     _loop: 0
-    _fadeInDuration: 1
-    _fadeOutDuration: 1
+    _fadeInDuration: 0
+    _fadeOutDuration: 0.5
 --- !u!4 &881992497
 Transform:
   m_ObjectHideFlags: 0
