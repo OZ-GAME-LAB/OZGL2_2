@@ -14,31 +14,30 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
   _id: artifact_031
   _displayName: "\uCCA0\uBCBD\uC758 \uC2EC\uC7A5"
-  _description: "\uC544\uAD70 \uC804\uC0AC(1\uD2F0\uC5B4)\uC758 \uBC29\uC5B4\uB825\uC774
-    50% \uC99D\uAC00\uD558\uACE0 \uBC1B\uB294 \uD53C\uD574 \uBC30\uC728\uC774 20%
-    \uAC10\uC18C"
+  _description: "\uC804\uC0AC \uACC4\uC5F4 \uC544\uAD70\uC758 \uBC29\uC5B4\uB825\uC774
+    25% \uC99D\uAC00\uD558\uACE0 \uBC1B\uB294 \uD53C\uD574\uAC00 10% \uAC10\uC18C"
   _icon: {fileID: 21300000, guid: 832ad33853ef04361acaf10b1333f783, type: 3}
   _rarity: 2
-  _maxStacks: 2
+  _maxStacks: 1
   _unitStatEffects:
   - _targetTeam: 0
-    _applyType: 2
-    _allyClass: 0
-    _allyType: 1
+    _applyType: 1
+    _allyClass: 1
+    _allyType: 0
     _enemyClass: 0
     _enemyType: 0
     _statType: 10
     _modifierType: 1
-    _value: 0.5
+    _value: 0.25
   - _targetTeam: 0
-    _applyType: 2
-    _allyClass: 0
-    _allyType: 1
+    _applyType: 1
+    _allyClass: 1
+    _allyType: 0
     _enemyClass: 0
     _enemyType: 0
     _statType: 20
     _modifierType: 1
-    _value: -0.2
+    _value: -0.1
   _currencyEffects: []
   _consumableSlotEffects: []
   _passiveSkillEffects: []

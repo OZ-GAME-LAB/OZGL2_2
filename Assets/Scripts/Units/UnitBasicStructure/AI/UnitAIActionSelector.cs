@@ -32,13 +32,13 @@ namespace Units
         // ============================================================
 
         public UnitAIActionType SelectAction(
-            UnitAssignment assignment, bool approaching = false)
+            UnitAssignment assignment, bool approaching = false, bool allowActiveSkill = true)
         {
             if (_core == null)
                 return UnitAIActionType.Idle;
 
 
-            if (_core.TrySelectActiveSkill(assignment.Target, out _))
+            if (allowActiveSkill && _core.TrySelectActiveSkill(assignment.Target, out _))
                 return UnitAIActionType.ActiveSkill;
             if (!IsTargetValid(assignment.Target)) return UnitAIActionType.Idle;
             float distance = GetDistanceToTarget(assignment.Target);
@@ -66,7 +66,17 @@ namespace Units
                 && distance <= basicAttack.BasicAttackRange + 0.1f)
                 return UnitAIActionType.Idle;
             if (assignment.WaitingForPosition)
-                return UnitAIActionType.Idle;
+            {
+                // 공격 자리 확보 대기와 접근 지점까지의 이동은 구분한다.
+                float tolerance = Mathf.Max(0.05f, assignment.PositionTolerance);
+
+                bool reached = ((Vector2)_core.transform.position - assignment.PreferredPosition)
+                    .sqrMagnitude <= tolerance * tolerance;
+
+                return !reached && _core.CanMove
+                    ? UnitAIActionType.Move
+                    : UnitAIActionType.Idle;
+            }
 
             if (ShouldMove(
                 distance))

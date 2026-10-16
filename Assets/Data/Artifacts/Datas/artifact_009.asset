@@ -14,30 +14,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
   _id: artifact_009
   _displayName: "\uCD94\uACA9\uC790\uC758 \uB098\uCE68\uBC18"
-  _description: "\uAC80\uC0AC \uACC4\uC5F4 \uC544\uAD70\uC758 \uC774\uB3D9\uC18D\uB3C4\uC640
-    \uD0D0\uC9C0 \uBC94\uC704\uAC00 15% \uC99D\uAC00"
+  _description: "\uAC80\uC0AC \uACC4\uC5F4 \uC544\uAD70\uC774 \uCCB4\uB825\uC774
+    50% \uC774\uD558\uC778 \uC801\uC5D0\uAC8C \uC8FC\uB294 \uD53C\uD574\uAC00 20%
+    \uC99D\uAC00"
   _icon: {fileID: 21300000, guid: 32d5a7fab9d34cc08b40b664e9f57226, type: 3}
   _rarity: 1
-  _maxStacks: 3
-  _unitStatEffects:
-  - _targetTeam: 0
-    _applyType: 1
-    _allyClass: 2
-    _allyType: 0
-    _enemyClass: 0
-    _enemyType: 0
-    _statType: 300
-    _modifierType: 1
-    _value: 0.15
-  - _targetTeam: 0
-    _applyType: 1
-    _allyClass: 2
-    _allyType: 0
-    _enemyClass: 0
-    _enemyType: 0
-    _statType: 400
-    _modifierType: 1
-    _value: 0.15
+  _maxStacks: 1
+  _unitStatEffects: []
   _currencyEffects: []
   _consumableSlotEffects: []
-  _passiveSkillEffects: []
+  _passiveSkillEffects:
+  - _passiveSkill: {fileID: 11400000, guid: 03c0a66deed64e65983c1f11e9c30113, type: 2}
+    _targetTeam: 0
+    _applyType: 1
+    _allyClass: 2
+    _allyType: 0
+    _allyTier: 0
+    _enemyClass: 0
+    _enemyType: 0
+    _enemyFaction: 0

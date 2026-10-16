@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using UnityEngine;
+using UnityEngine.Audio;
 using Units.Skills;
 
 namespace Units.FX
@@ -14,7 +15,7 @@ namespace Units.FX
         internal SkillFXRequest Request => _playback.Request;
         internal string Key => _definition.Key;
 
-        internal void Play(SFXDefinition definition, SkillFXRequest request)
+        internal void Play(SFXDefinition definition, SkillFXRequest request, AudioMixerGroup defaultMixerGroup = null)
         {
             _source = GetComponent<AudioSource>();
             _definition = definition;
@@ -26,7 +27,8 @@ namespace Units.FX
             _source.volume = definition.Volume;
             _source.pitch = definition.Pitch;
             _source.loop = definition.Loop;
-            _source.outputAudioMixerGroup = definition.MixerGroup;
+            // 개별 음원 그룹은 유지하고, 미지정 음원에만 매니저의 공통 SFX 그룹을 적용한다.
+            _source.outputAudioMixerGroup = definition.MixerGroup != null ? definition.MixerGroup : defaultMixerGroup;
             _source.spatialBlend = definition.SpatialBlend;
             _source.minDistance = definition.MinDistance;
             _source.maxDistance = definition.MaxDistance;
