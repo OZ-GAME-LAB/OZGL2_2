@@ -106,8 +106,13 @@ namespace Units
             }
 
 
-            // 가까운 실제 접촉은 중심 거리 제한만 완화한다. 전체 범위/그룹 상한은 유지한다.
-            if (!_expansionPolicy.Allows(
+            // 기존 교전끼리의 병합과 신규 그룹의 전투 참여를 구분한다.
+            // 이미 공격 가능한 상대가 있으면 교전 전체의 크기 때문에
+            // 신규 그룹을 Advancing 상태에 남겨 두지 않는다.
+            bool hasCombatContact =
+                _expansionPolicy.HasCombatContact(allyGroup, enemyGroup);
+
+            if (!hasCombatContact && !_expansionPolicy.Allows(
                 GetParticipants(allyContext, allyGroup),
                 GetParticipants(enemyContext, enemyGroup),
                 _expansionPolicy.HasCloseContact(allyGroup, enemyGroup)))

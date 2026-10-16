@@ -102,6 +102,8 @@ namespace Units
 
         private EnemyGroupController _enemyGroupController;
 
+        private CombatQueryContext _combatQueries;
+
         private TargetSelector _targetSelector;
 
         private PositionAssigner _positionAssigner;
@@ -116,6 +118,12 @@ namespace Units
         // =========================
         // Events
         // =========================
+
+        internal event Action<Unit_Gateway, UnitAssignmentContext> AssignmentChanged;
+
+        internal event Action<Unit_Gateway> MemberAdded;
+
+        internal event Action<Unit_Gateway> MemberRemoved;
 
         public event Action<
             Unit_GroupAI,
@@ -242,14 +250,15 @@ namespace Units
                 0f;
 
 
+            _groupDetector?.Detect();
+
+
+            // 같은 갱신에서 합류가 승인되면 추가 전진 명령을 내리지 않는다.
             if (_state == GroupAIState.Advancing)
             {
                 _advanceController
                     .UpdateAdvance();
             }
-
-
-            _groupDetector?.Detect();
         }
 
 
@@ -333,11 +342,33 @@ namespace Units
                 );
 
 
+            _memberController.AssignmentChanged += HandleAssignmentChanged;
+
+            SetCombatQueries(_combatQueries);
+
             _groupDetector.NewEnemyGroupDetected +=
                 HandleNewEnemyGroupDetected;
 
             _advanceController.AdvanceReferenceRequired +=
                 HandleAdvanceReferenceRequired;
+        }
+
+
+        // =========================
+        // Shared Combat Queries
+        // =========================
+
+        internal void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+            _targetSelector?.SetCombatQueries(queries);
+            _positionAssigner?.SetCombatQueries(queries);
+            _groupDetector?.SetCombatQueries(queries);
+        }
+
+        private void HandleAssignmentChanged(Unit_Gateway unit, UnitAssignmentContext context)
+        {
+            AssignmentChanged?.Invoke(unit, context);
         }
 
 
@@ -379,6 +410,8 @@ namespace Units
 
             unit.RallyFailed += HandleRallyFailed;
 
+
+            MemberAdded?.Invoke(unit);
 
             if (_state == GroupAIState.Engaged)
             {
@@ -428,6 +461,8 @@ namespace Units
                 unit
             );
 
+
+            MemberRemoved?.Invoke(unit);
 
             unit.ClearGroupAI();
 
@@ -695,6 +730,8 @@ namespace Units
                 enemyGroups
             );
 
+            _targetSelector.RefreshEnemyGroups();
+
 
             if (updateState)
                 UpdateEngagementState();
@@ -710,6 +747,7 @@ namespace Units
         {
             _engagementAllies = null;
             _enemyGroupController.Clear();
+            _targetSelector.RefreshEnemyGroups();
 
 
             UpdateEngagementState();
@@ -1125,21 +1163,17 @@ namespace Units
 
         private void UpdateAdvanceReferenceRequest()
         {
-            if (_advanceReference != null)
-            {
-                _advanceReferenceRequestTimer =
-                    0f;
-
-                return;
-            }
-
-
             _advanceReferenceRequestTimer +=
                 Time.deltaTime;
 
 
-            if (_advanceReferenceRequestTimer <
-                _advanceReferenceRequestInterval)
+            // 기존 목표가 있으면 느리게 재평가하여 배정 변화에 대응한다.
+            float interval = _advanceReference == null
+                ? _advanceReferenceRequestInterval
+                : Mathf.Max(2f, _advanceReferenceRequestInterval)
+                    + (GetInstanceID() & 15) * 0.05f;
+
+            if (_advanceReferenceRequestTimer < interval)
             {
                 return;
             }
@@ -1182,6 +1216,9 @@ namespace Units
             if (reference.Team == _team)
                 return;
 
+
+            if (_advanceReference == reference)
+                return;
 
             _advanceReference =
                 reference;

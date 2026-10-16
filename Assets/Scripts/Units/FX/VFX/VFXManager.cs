@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
 
@@ -49,6 +49,13 @@ namespace Units.FX
 
         private VFXPool _pool;
 
+        private const int PrewarmCount = 3;
+        private const float PrewarmDuration = 5f;
+        private readonly List<GameObject> _prewarmPrefabs = new();
+        private float _prewarmStartedAt;
+        private int _prewarmIndex;
+        private bool _prewarmPending;
+
         public static VFXManager Instance { get; private set; }
 
         public int ActiveCount =>
@@ -83,6 +90,61 @@ namespace Units.FX
             {
                 InitializePool();
             }
+
+            BeginPrewarm();
+        }
+
+        private void Update()
+        {
+            if (!_prewarmPending)
+                return;
+
+            if (_prewarmPrefabs.Count == 0)
+            {
+                if (_catalog == null)
+                    return;
+
+                _catalog.CollectPrewarmPrefabs(_prewarmPrefabs);
+                if (_prewarmPrefabs.Count == 0)
+                {
+                    _prewarmPending = false;
+                    return;
+                }
+            }
+
+            int total = _prewarmPrefabs.Count * PrewarmCount;
+            float progress = Mathf.Clamp01(
+                (Time.unscaledTime - _prewarmStartedAt) / PrewarmDuration);
+            int due = Mathf.FloorToInt(total * progress);
+
+            // 전체 프리팹을 1개씩 먼저 준비한 뒤 2개, 3개로 늘린다.
+            // 일시정지 중에도 실제 경과 시간에 맞춰 생성량을 분산한다.
+            while (_prewarmIndex < due)
+            {
+                var prefab = _prewarmPrefabs[_prewarmIndex % _prewarmPrefabs.Count];
+                int targetCount = _prewarmIndex / _prewarmPrefabs.Count + 1;
+                int activeCount = 0;
+                foreach (var instance in _active.Values)
+                    if (instance != null && instance.Prefab == prefab)
+                        activeCount++;
+
+                _pool.PrewarmOne(prefab, targetCount, activeCount);
+                _prewarmIndex++;
+            }
+
+            if (_prewarmIndex == total)
+            {
+                _prewarmPending = false;
+                _prewarmPrefabs.Clear();
+            }
+        }
+
+        private void BeginPrewarm()
+        {
+            _prewarmPrefabs.Clear();
+            _prewarmIndex = 0;
+            _prewarmStartedAt = Time.unscaledTime;
+            _prewarmPending = true;
         }
 
         private void LateUpdate()
@@ -438,6 +500,11 @@ namespace Units.FX
             if (clearPool)
             {
                 _pool?.Clear();
+                _prewarmPending = false;
+                _prewarmPrefabs.Clear();
+
+                if (isActiveAndEnabled)
+                    BeginPrewarm();
             }
         }
     }

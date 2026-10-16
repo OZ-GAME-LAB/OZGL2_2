@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 
@@ -9,6 +10,10 @@ namespace Units
         // =========================
         // Assignment State
         // =========================
+
+        internal event Action<UnitAssignmentContext> Changed;
+
+        internal Unit_Gateway Owner { get; }
 
         public ICombatTarget AssignedTarget { get; private set; }
 
@@ -36,6 +41,16 @@ namespace Units
 
 
         // =========================
+        // Constructor
+        // =========================
+
+        public UnitAssignmentContext(Unit_Gateway owner = null)
+        {
+            Owner = owner;
+        }
+
+
+        // =========================
         // Assignment Management
         // =========================
 
@@ -50,6 +65,8 @@ namespace Units
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void SetPosition(
@@ -61,6 +78,8 @@ namespace Units
             PositionTolerance = Mathf.Max(0f, positionTolerance);
 
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void SetAssignment(UnitAssignment assignment)
@@ -75,6 +94,8 @@ namespace Units
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void ClearPosition()
@@ -83,6 +104,8 @@ namespace Units
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void ClearAssignment()
@@ -97,6 +120,8 @@ namespace Units
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
     }
 }
