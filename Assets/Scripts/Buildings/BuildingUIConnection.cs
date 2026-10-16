@@ -104,22 +104,33 @@ namespace OZGL.KDH
             _presenter.SetWallet(_wallet.GetBalance(CurrencyType.Gold), _wallet.GetBalance(CurrencyType.Gem));
             _presenter.SetActionsAllowed(state.CanInteract, Reason(state.Failure));
             _byId.Clear(); _items.Clear();
-            foreach (BuildingInteractionCandidate candidate in state.Candidates)
+            foreach (BuildingInteractionCandidate candidate in state.DisplayCandidates)
             {
                 BuildingData data = candidate.Data;
-                BuildingInteractionState option = _controller.QueryInteraction(_target.Slot, data);
-                BuildingActionOffer offer = Offer(_target.Slot.IsOccupied ? option.Upgrade : option.Build);
+                BuildingActionOffer offer = null;
+                if (candidate.IsCoreLevelMet)
+                {
+                    BuildingInteractionState option = _controller.QueryInteraction(_target.Slot, data);
+                    offer = Offer(_target.Slot.IsOccupied ? option.Upgrade : option.Build);
+                }
                 _byId.Add(data.BuildingId, data);
                 _items.Add(new BuildingCatalogItem(data.BuildingId, data.DisplayName,
                     BuildingUiQuote.Category(data.BuildingType), candidate.HasValidCost ? candidate.Cost.Gold : (int?)null,
-                    candidate.HasValidCost ? candidate.Cost.Gems : (int?)null, data.BuildingType, data.Icon, offer));
+                    candidate.HasValidCost ? candidate.Cost.Gems : (int?)null, data.BuildingType, data.Icon, offer,
+                    candidate.IsCoreLevelMet ? (int?)null : candidate.RequiredCoreLevel));
             }
             if (!_target.Slot.IsOccupied)
             {
                 _presenter.ShowCatalog(_selectionId, _items);
                 return;
             }
-            if (_candidate != null && !_byId.ContainsKey(_candidate.BuildingId)) _candidate = null;
+            if (_candidate != null)
+            {
+                bool available = false;
+                foreach (BuildingInteractionCandidate candidate in state.Candidates)
+                    if (candidate.Data.BuildingId == _candidate.BuildingId) { available = true; break; }
+                if (!available) _candidate = null;
+            }
             state = _controller.QueryInteraction(_target.Slot, _candidate);
             BuildingData displayed = state.DisplayData;
             if (displayed == null) return;
@@ -136,17 +147,23 @@ namespace OZGL.KDH
             _presenter.ShowManagement(CreateInfo(displayed),
                 new BuildingActionViewData(_selectionId, displayed.DisplayName,
                     Offer(state.Build), Offer(state.Upgrade), Offer(state.Demolish)),
-                _items, comparison, state.CanInteract, Reason(state.Failure));
+                _items, comparison, state.CanInteract, Reason(state.Failure), state.RequiredUpgradeCoreLevel);
         }
 
         private BuildingInfoData CreateInfo(BuildingData data, string costSummary = null)
         {
             UnitData unit = null;
+            string spawnUnitName = null;
+            int? spawnCount = null;
             string production = BuildingUiQuote.Production(data);
             if (data.HasSpawn)
             {
-                if (_spawnManager != null && _spawnManager.TryGetAllyPrefab(data.Spawn.unitType, out GameObject prefab))
-                    unit = prefab.GetComponent<Unit_RuntimeStatus>().UnitData;
+                if (_spawnManager != null && _spawnManager.TryGetAllyPrefab(data.Spawn.unitType, out GameObject prefab) &&
+                    prefab != null && prefab.TryGetComponent<Unit_RuntimeStatus>(out var runtimeStatus))
+                    unit = runtimeStatus.UnitData;
+                spawnUnitName = unit != null && !string.IsNullOrWhiteSpace(unit.UnitName)
+                    ? unit.UnitName : "알 수 없는 유닛";
+                spawnCount = Mathf.Min(data.Spawn.countPerWave, data.Spawn.maxAlive);
                 if (unit == null) production += "\n유닛 정보 없음";
             }
             if (costSummary == null)
@@ -156,7 +173,8 @@ namespace OZGL.KDH
             }
             return new BuildingInfoData(_selectionId, data.DisplayName,
                 BuildingUiQuote.Category(data.BuildingType), 1, data.Description, production,
-                BuildingUiQuote.Effects(data), data.Icon, unit, costSummary, data.BuildingId);
+                BuildingUiQuote.Effects(data), data.Icon, unit, costSummary, data.BuildingId,
+                spawnUnitName, spawnCount);
         }
 
         private static BuildingActionOffer Offer(BuildingInteractionOffer offer)
@@ -242,10 +260,14 @@ namespace OZGL.KDH
             }
             else if (_target.Slot.IsOccupied && _byId.ContainsKey(data.BuildingId))
             {
-                BuildingInteractionOffer offer = _controller.QueryInteraction(_target.Slot, data).Upgrade;
-                costSummary = offer.Failure == BuildingInteractionFailure.InvalidCost
-                    ? "업그레이드 비용 설정 오류"
-                    : "업그레이드 비용: " + BuildingCurrencyText.Format(offer.Cost.Gold, offer.Cost.Gems);
+                foreach (BuildingInteractionCandidate candidate in _controller.QueryInteraction(_target.Slot).DisplayCandidates)
+                    if (candidate.Data.BuildingId == data.BuildingId)
+                    {
+                        costSummary = candidate.HasValidCost
+                            ? "업그레이드 비용: " + BuildingCurrencyText.Format(candidate.Cost.Gold, candidate.Cost.Gems)
+                            : "업그레이드 비용 설정 오류";
+                        break;
+                    }
             }
             _presenter.ShowBuildingPreview(CreateInfo(data, costSummary), upgrades, _previewPath.Count > 1);
         }

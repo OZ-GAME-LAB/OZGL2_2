@@ -716,6 +716,10 @@ MonoBehaviour:
   _continueButton: {fileID: 1775315301}
   _lastWaveButton: {fileID: 1200429044}
   _lastQuarterButton: {fileID: 245649217}
+  _artifactConfirmButton: {fileID: 0}
+  _contentContinueButton: {fileID: 0}
+  _runFinishButton: {fileID: 0}
+  _runContinueButton: {fileID: 0}
 --- !u!114 &288519120
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1081,6 +1085,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e7836e550e5e19f469e6f7cf9f750a13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.SpawnManager
+  _unitPoolManager: {fileID: 0}
   _runtimeUnitManager: {fileID: 1790501616}
   _unitStatModifierManager: {fileID: 686695081}
   _allyUnitDatabase: {fileID: 11400000, guid: bf32c1661d95ca04d8a0288104680661, type: 2}
@@ -1093,6 +1098,7 @@ MonoBehaviour:
   _allyRallyAreaPointA: {fileID: 0}
   _allyRallyAreaPointB: {fileID: 0}
   _allyRallySectorRoot: {fileID: 0}
+  _allyRallyViaPoint: {fileID: 0}
   _enemySpawnPoints:
   - {fileID: 1770587178}
   _enemyRallyAreaPointA: {fileID: 0}
@@ -1143,6 +1149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PersistentCurrencyManager
   _currencyCatalog: {fileID: 11400000, guid: a4cd32c0eff3a644bb7f2801150031f2, type: 2}
+  _settings: {fileID: 11400000, guid: ab1d01ea9cda718449d128bf85cc69fb, type: 2}
 --- !u!4 &386840906
 Transform:
   m_ObjectHideFlags: 0
@@ -1195,6 +1202,20 @@ MonoBehaviour:
   _gameFlowController: {fileID: 0}
   _buildController: {fileID: 0}
   _focusTarget: {fileID: 0}
+  _baseArea: {fileID: 0}
+  _battlefieldArea: {fileID: 0}
+  _moveSpeed: 12
+  _edgeWidth: 20
+  _edgeScreenRatio: 0.05
+  _edgeScrollEnabled: 1
+  _zoomSensitivity: 0.15
+  _zoomResponse: 12
+  _battlePrepareDelay: 1
+  _battleOverviewMoveDuration: 2
+  _battleOverviewHoldDuration: 1
+  _battleReturnDuration: 1
+  _maxOverviewOrthographicSize: 12
+  _buildingFocusSize: 2
 --- !u!4 &420801791
 Transform:
   m_ObjectHideFlags: 0
@@ -1975,6 +1996,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 33f4abdb2523791438a101fd37b8ede0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.UnitStatModifierManager
+  _effectManager: {fileID: 0}
 --- !u!4 &686695082
 Transform:
   m_ObjectHideFlags: 0
@@ -2736,6 +2758,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArtifactManager
   _artifactCatalog: {fileID: 11400000, guid: 3ebed6d65185cb64589cccdad17e9086, type: 2}
   _rewardTable: {fileID: 11400000, guid: 8db60b0e4b20fc949a7e5bbdf4ca0dc3, type: 2}
+  _enableCatalogTest: 1
 --- !u!4 &1037219422
 Transform:
   m_ObjectHideFlags: 0
@@ -2783,15 +2806,33 @@ MonoBehaviour:
   _testScript: {fileID: 288519119}
   _gameFlowController: {fileID: 1692919390}
   _waveController: {fileID: 1347968429}
+  _archiveManager: {fileID: 0}
   _artifactManager: {fileID: 1037219421}
   _effectManager: {fileID: 1501298036}
   _spawnManager: {fileID: 379906311}
   _runtimeUnitManager: {fileID: 1790501616}
   _runCurrencyManager: {fileID: 1835863131}
+  _shopManager: {fileID: 0}
+  _eventManager: {fileID: 0}
+  _consumableItemManager: {fileID: 0}
+  _runSettlementManager: {fileID: 0}
+  _persistentCurrencyManager: {fileID: 0}
   _cameraController: {fileID: 420801790}
   _buildController: {fileID: 1125819695}
   _buildingCoreProgress: {fileID: 1125819697}
   _buildingCensus: {fileID: 1091848052}
+  _inGameSaveCoordinator: {fileID: 0}
+  _outGameSaveCoordinator: {fileID: 0}
+  _saveManager: {fileID: 0}
+  _uiStartup: {fileID: 0}
+  _archiveController: {fileID: 0}
+  _persistentTraits: {fileID: 0}
+  _unitStatModifierManager: {fileID: 0}
+  _traitRunApplier: {fileID: 0}
+  _traitCatalog: {fileID: 0}
+  _totemRunApplier: {fileID: 0}
+  _totemCatalog: {fileID: 0}
+  _altarManager: {fileID: 0}
 --- !u!4 &1039593222
 Transform:
   m_ObjectHideFlags: 0
@@ -5082,6 +5123,7 @@ MonoBehaviour:
     _maxJoinDistance: 6
     _maxCombinedExtent: 15
     _maxCombinedGroups: 10
+    _closeContactGap: 1
 --- !u!4 &1790501617
 Transform:
   m_ObjectHideFlags: 0
@@ -5526,10 +5568,13 @@ MonoBehaviour:
   _buildingCoreProgress: {fileID: 1125819697}
   _effectManager: {fileID: 1501298036}
   _artifactTestPanel: {fileID: 0}
-  _persistent: {fileID: 386840905}
+  _consumableTestPanel: {fileID: 0}
+  _persistent: {fileID: 0}
+  _settlement: {fileID: 0}
   _gold: {fileID: 11400000, guid: 98b14e85a47180f4aaef28830f492355, type: 2}
   _gem: {fileID: 11400000, guid: ba91d5a429c5b244db782935e39a16a2, type: 2}
   _bloodstone: {fileID: 11400000, guid: 652b535a23e144b42a29a04a1d3c4409, type: 2}
+  _totemRunApplier: {fileID: 0}
   _shopTestPanel: {fileID: 0}
 --- !u!4 &1979951859
 Transform:

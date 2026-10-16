@@ -77,6 +77,8 @@ namespace Game.Core
         public bool IsLastNode => _nodeController != null && _nodeController.IsLastNode;
 
         public event Action<GamePhase> PhaseChanged;
+        public event Action<ResultType> BattleResultConfirmed;
+        public ResultType? LastBattleResult { get; private set; }
         public event Action BattleAvailabilityChanged;
         public bool HasBarracks => _buildingCensus != null &&
             _buildingCensus.CountType(BuildingType.Barracks) > 0;
@@ -279,7 +281,9 @@ namespace Game.Core
             _waveController.BattlePause();
             ClearToken();
             var token = _cts.Token;
+            LastBattleResult = ResultType.Defeat;
             ChangePhase(GamePhase.BattleResolving);
+            BattleResultConfirmed?.Invoke(ResultType.Defeat);
 
             // 취소된 UI의 finally와 스폰 정리가 끝난 뒤 정산 UI를 연다.
             await pendingFlow;
@@ -427,7 +431,9 @@ namespace Game.Core
         private async UniTask ResolveBattleCoreAsync(ResultType result, CancellationToken token)
         {
             Node completedNode = CurrentNode;
+            LastBattleResult = result;
             ChangePhase(GamePhase.BattleResolving);
+            BattleResultConfirmed?.Invoke(result);
             // 실제 유닛 파트는 이 페이즈 진입 시 공격·이동·피해 처리를 중단해야 한다.
             await PlayBattleResultAsync(result, token);
             token.ThrowIfCancellationRequested(); //token이 들어간 작업이 중단되면 취소 예외 발생
@@ -698,6 +704,7 @@ namespace Game.Core
 
         private void ChangePhase(GamePhase phase)
         {
+            if (phase == GamePhase.None || phase == GamePhase.Preparation) LastBattleResult = null;
             _curPhase = phase;
             PhaseChanged?.Invoke(phase);
         }

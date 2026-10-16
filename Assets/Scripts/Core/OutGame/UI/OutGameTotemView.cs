@@ -77,6 +77,9 @@ public class OutGameTotemView : MonoBehaviour
 
 
     private ITotemSelection selection;
+    private bool _readOnly;
+    private IReadOnlyList<TotemData> _data;
+    private readonly List<ActiveTotem> _totems = new List<ActiveTotem>();
 
     private TotemButtonUI hoveredTotem;
 
@@ -197,19 +200,26 @@ public class OutGameTotemView : MonoBehaviour
     // =====================================================
 
     public void Initialize(
-        ITotemSelection selection)
+        ITotemSelection selection, bool readOnly = false,
+        IReadOnlyList<TotemData> catalogData = null, IReadOnlyList<ActiveTotem> totems = null)
     {
         Shutdown();
 
 
-        if (!ValidateReferences() ||
-            selection == null)
+        if (!ValidateReferences())
         {
             return;
         }
 
 
         this.selection = selection;
+        if (readOnly ? catalogData == null || totems == null : selection == null)
+            throw new ArgumentException("토템 표시 데이터 또는 선택 연결이 필요합니다.");
+        _readOnly = readOnly;
+        _data = readOnly ? catalogData : selection.Data;
+        if (readOnly) _totems.AddRange(totems);
+        backButton.gameObject.SetActive(!readOnly);
+        startButton.gameObject.SetActive(!readOnly);
 
 
         rootCanvas =
@@ -289,7 +299,7 @@ public class OutGameTotemView : MonoBehaviour
 
             button.Initialize(
                 data,
-                selection.GetLevel(data.Id)
+                GetLevel(data.Id)
             );
 
 
@@ -302,16 +312,15 @@ public class OutGameTotemView : MonoBehaviour
             button.PointerExited +=
                 OnPointerExited;
 
-            button.Clicked +=
-                OnTotemClicked;
+            if (!readOnly) button.Clicked += OnTotemClicked;
         }
 
 
-        backButton.onClick
-            .AddListener(OnBackClicked);
-
-        startButton.onClick
-            .AddListener(OnStartClicked);
+        if (!readOnly)
+        {
+            backButton.onClick.AddListener(OnBackClicked);
+            startButton.onClick.AddListener(OnStartClicked);
+        }
 
 
         Refresh();
@@ -324,7 +333,7 @@ public class OutGameTotemView : MonoBehaviour
 
     public void Refresh()
     {
-        if (selection == null)
+        if (_data == null)
             return;
 
 
@@ -358,7 +367,7 @@ public class OutGameTotemView : MonoBehaviour
 
 
             button.SetLevel(
-                selection.GetLevel(data.Id)
+                GetLevel(data.Id)
             );
         }
 
@@ -379,7 +388,7 @@ public class OutGameTotemView : MonoBehaviour
         TotemButtonUI button,
         PointerEventData.InputButton mouseButton)
     {
-        if (selection == null ||
+        if (_readOnly || _data == null ||
             button == null)
         {
             return;
@@ -396,7 +405,7 @@ public class OutGameTotemView : MonoBehaviour
 
 
         int currentLevel =
-            selection.GetLevel(data.Id);
+            GetLevel(data.Id);
 
 
         int delta = 0;
@@ -478,7 +487,7 @@ public class OutGameTotemView : MonoBehaviour
 
     private void RefreshActiveEffects()
     {
-        if (selection == null ||
+        if (_data == null ||
             activeEffectsText == null)
         {
             return;
@@ -503,11 +512,11 @@ public class OutGameTotemView : MonoBehaviour
 
 
         for (int i = 0;
-            i < selection.Data.Count;
+            i < _data.Count;
             i++)
         {
             TotemData data =
-                selection.Data[i];
+                _data[i];
 
 
             if (data == null ||
@@ -516,7 +525,7 @@ public class OutGameTotemView : MonoBehaviour
 
 
             int level =
-                selection.GetLevel(
+                GetLevel(
                     data.Id
                 );
 
@@ -682,13 +691,12 @@ public class OutGameTotemView : MonoBehaviour
 
     private void RefreshBonus()
     {
-        if (selection == null)
+        if (_data == null)
             return;
 
 
         int currentPercent =
-            selection
-                .GetRewardBonusPercent();
+            GetRewardBonusPercent();
 
 
         int maxPercent =
@@ -710,7 +718,7 @@ public class OutGameTotemView : MonoBehaviour
         if (bonusPercentText != null)
         {
             bonusPercentText.text =
-                currentPercent +
+                (_readOnly ? 100L + currentPercent : currentPercent) +
                 "%";
         }
     }
@@ -718,7 +726,7 @@ public class OutGameTotemView : MonoBehaviour
 
     private int GetMaximumRewardBonusPercent()
     {
-        if (selection == null)
+        if (_data == null)
             return 0;
 
 
@@ -727,11 +735,11 @@ public class OutGameTotemView : MonoBehaviour
 
 
         for (int i = 0;
-            i < selection.Data.Count;
+            i < _data.Count;
             i++)
         {
             TotemData data =
-                selection.Data[i];
+                _data[i];
 
 
             if (data == null ||
@@ -832,7 +840,7 @@ public class OutGameTotemView : MonoBehaviour
         TotemButtonUI button,
         Vector2 mousePosition)
     {
-        if (selection == null ||
+        if (_data == null ||
             button == null ||
             hoverInfoPanel == null ||
             hoverTitleText == null ||
@@ -857,7 +865,7 @@ public class OutGameTotemView : MonoBehaviour
 
 
         int level =
-            selection.GetLevel(data.Id);
+            GetLevel(data.Id);
 
 
         hoverTitleText.text =
@@ -1042,18 +1050,18 @@ public class OutGameTotemView : MonoBehaviour
     private TotemData FindData(
         TotemId id)
     {
-        if (selection == null)
+        if (_data == null)
             return null;
 
 
         for (int i = 0;
-            i < selection.Data.Count;
+            i < _data.Count;
             i++)
         {
-            if (selection.Data[i].Id ==
+            if (_data[i].Id ==
                 id)
             {
-                return selection.Data[i];
+                return _data[i];
             }
         }
 
@@ -1068,13 +1076,30 @@ public class OutGameTotemView : MonoBehaviour
 
     private void OnBackClicked()
     {
-        BackRequested?.Invoke();
+        if (!_readOnly) BackRequested?.Invoke();
     }
 
 
     private void OnStartClicked()
     {
-        StartRequested?.Invoke();
+        if (!_readOnly) StartRequested?.Invoke();
+    }
+
+    private int GetLevel(TotemId id)
+    {
+        if (!_readOnly) return selection.GetLevel(id);
+        foreach (ActiveTotem totem in _totems)
+            if (totem.Data != null && totem.Data.Id == id) return totem.Level;
+        return 0;
+    }
+
+    private int GetRewardBonusPercent()
+    {
+        if (!_readOnly) return selection.GetRewardBonusPercent();
+        int bonus = 0;
+        foreach (ActiveTotem totem in _totems)
+            bonus += totem.Data.GetRewardBonusPercent(totem.Level);
+        return bonus;
     }
 
 
@@ -1132,6 +1157,8 @@ public class OutGameTotemView : MonoBehaviour
 
 
         selection = null;
+        _data = null;
+        _totems.Clear();
 
         hoveredTotem = null;
 

@@ -63,7 +63,7 @@ namespace Game.Core
             return _underlying.TrySave(data, out error);
         }
 
-        public async UniTask ShowAndWaitAsync(RunSummary summary, int bloodstones, CancellationToken token)
+        public async UniTask ShowAndWaitAsync(RunSummary summary, RunResult result, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
             string currentRunId = _runId();
@@ -74,7 +74,7 @@ namespace Game.Core
 
             await _beforeShow(token);
             token.ThrowIfCancellationRequested();
-            await _view.ShowAndWaitAsync(summary, bloodstones, token);
+            await _view.ShowAndWaitAsync(summary, result, token);
         }
     }
 }

@@ -32,6 +32,7 @@ namespace OZGL.KDH
         private BuildingSlot _focusedSlot;
         private BuildingCoreProgress _coreProgress;
         private BuildingCensus _census;
+        private IRunCheckpointWriter _checkpointWriter;
         private readonly List<BuildingData> _candidates = new List<BuildingData>(16);
         private readonly Collider2D[] _hits = new Collider2D[HitBufferSize];
         private ContactFilter2D _filter;
@@ -108,6 +109,7 @@ namespace OZGL.KDH
             RunCurrencyManager runCurrencyManager,
             GameFlowController gameFlowController,
             BuildingCoreProgress buildingCoreProgress,
+            IRunCheckpointWriter checkpointWriter,
             BuildingCensus buildingCensus = null)
         {
             if (wallet != null)
@@ -124,6 +126,7 @@ namespace OZGL.KDH
             gameFlow = gameFlowController;
             _coreProgress = buildingCoreProgress;
             _census = buildingCensus;
+            _checkpointWriter = checkpointWriter;
 
             if (wallet == null)
             {
@@ -354,6 +357,7 @@ namespace OZGL.KDH
             }
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -404,6 +408,7 @@ namespace OZGL.KDH
             Destroy(oldBuilding.gameObject);
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -490,6 +495,7 @@ namespace OZGL.KDH
             }
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -623,6 +629,7 @@ namespace OZGL.KDH
             }
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -1111,6 +1118,13 @@ namespace OZGL.KDH
             return eventSystem != null && eventSystem.IsPointerOverGameObject();
         }
 
+        private void TrySave()
+        {
+            if (!_checkpointWriter.TrySave(out string error))
+            {
+                Debug.LogWarning(error);
+            }
+        }
 #if UNITY_EDITOR
         private void OnValidate()
         {

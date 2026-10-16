@@ -15,6 +15,10 @@ namespace Units
 
         private const int MaxPathQueries = 4;
 
+        private const int MaxAttackPositionQueries = 24;
+
+        private const int MaxApproachPositionQueries = 3;
+
         private const int PhysicsBufferSize = 32;
 
         private static readonly float[] SearchAngles =
@@ -51,6 +55,10 @@ namespace Units
         // =========================
         // References
         // =========================
+
+        private CombatQueryContext _combatQueries;
+
+
 
         private readonly Dictionary<Unit_Gateway, UnitAssignmentContext>
             _assignmentContexts;
@@ -93,6 +101,17 @@ namespace Units
 
             _contactFilter.useTriggers = false;
         }
+
+
+        // =========================
+        // Shared Combat Queries
+        // =========================
+
+        public void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+        }
+
 
 
         // =========================
@@ -139,7 +158,8 @@ namespace Units
                 return true;
             }
 
-            GatherReservations(unit);
+            if (_combatQueries == null)
+                GatherReservations(unit);
 
             GatherPositions(unit, target, range);
 
@@ -149,8 +169,20 @@ namespace Units
 
             int pathQueries = 0;
 
+            int skippedTailStart = _positionCount - MaxApproachPositionQueries;
+
+            if (((int)(Time.time * 4f) & 1) != 0)
+                skippedTailStart -= MaxApproachPositionQueries;
+
             for (int i = 0; i < _positionCount; i++)
             {
+                // 접근 검사 예산을 남기되 같은 끝자리 후보를 영구히 누락하지 않는다.
+                if (_positionCount > MaxAttackPositionQueries
+                    && i >= skippedTailStart && i < skippedTailStart + MaxApproachPositionQueries)
+                {
+                    continue;
+                }
+
                 PositionCandidate candidate = _positions[i];
 
                 // 혼잡 비용은 음수가 아니다. 거리만으로 이미 불리하면
@@ -172,13 +204,85 @@ namespace Units
                 bestPosition = candidate.Position;
             }
 
-            // 빈자리가 없으면 막힌 위치로 밀어 넣지 않는다.
-            // 타겟을 유지한 채 Unit_AI의 짧은 위치 재탐색 주기를 사용한다.
+            // 공격 반원이 차 있어도 멀리서 멈추지 않고 빈 접근 지점까지 이동한다.
+            // 접근 경로까지 막혔으면 현재 위치에서 기다린다.
+            if (float.IsPositiveInfinity(bestCost))
+                TryFindApproachPosition(unit, target, range, out bestPosition);
+
             context.SetPosition(
                 bestPosition,
                 DefaultPositionTolerance,
                 float.IsPositiveInfinity(bestCost)
             );
+
+            return true;
+        }
+
+
+        // =========================
+        // Waiting Approach
+        // =========================
+
+        private bool TryFindApproachPosition(
+            Unit_Gateway unit,
+            ICombatTarget target,
+            float range,
+            out Vector2 position)
+        {
+            Vector2 origin = unit.Transform.position;
+
+            position = origin;
+
+            float remaining = CombatRangeUtility.Distance(unit, target) - range;
+
+            float step = Mathf.Min(2f, remaining * 0.5f);
+
+            if (step <= DefaultPositionTolerance)
+                return false;
+
+            Vector2 direction = ((Vector2)target.Transform.position - origin).normalized;
+
+            for (int i = 0; i < MaxApproachPositionQueries; i++)
+            {
+                float angle = i == 0 ? 0f : i == 1 ? 30f : -30f;
+
+                Vector2 candidate = origin + Rotate(direction, angle) * step;
+
+                if (!IsPositionAvailable(unit, candidate) || !IsApproachClear(unit, candidate))
+                    continue;
+
+                position = candidate;
+
+                return true;
+            }
+
+            return false;
+        }
+
+
+        private bool IsApproachClear(Unit_Gateway unit, Vector2 position)
+        {
+            Vector2 origin = unit.Transform.position;
+
+            Vector2 delta = position - origin;
+
+            int count = Physics2D.CircleCast(
+                origin, _bodyRadius * 0.9f, delta.normalized,
+                _contactFilter, _pathHits, delta.magnitude
+            );
+
+            if (count == _pathHits.Length)
+                return false;
+
+            for (int i = 0; i < count; i++)
+            {
+                Unit_Gateway occupant = _pathHits[i].collider.GetComponentInParent<Unit_Gateway>();
+
+                if (occupant == unit || (occupant != null && !occupant.IsTargetable))
+                    continue;
+
+                return false;
+            }
 
             return true;
         }
@@ -325,7 +429,10 @@ namespace Units
             Unit_Gateway requester,
             Vector2 position)
         {
-            for (int i = 0; i < _reservations.Count; i++)
+            if (_combatQueries != null && _combatQueries.IsReserved(requester, position))
+                return false;
+
+            for (int i = 0; _combatQueries == null && i < _reservations.Count; i++)
             {
                 PositionReservation reservation = _reservations[i];
 

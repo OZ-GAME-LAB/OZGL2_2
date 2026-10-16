@@ -24,7 +24,7 @@ public class AltarButtonUI : MonoBehaviour,
 
     private void Awake()
     {
-        SetSelected(false);
+        SetSelected(IsSelected);
         SetHovered(false);
     }
 

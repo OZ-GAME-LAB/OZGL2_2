@@ -39,8 +39,14 @@ namespace OZGL.KDH
         public BuildingData Data { get; }
         public BuildingInteractionCost Cost { get; }
         public bool HasValidCost { get; }
-        internal BuildingInteractionCandidate(BuildingData data, BuildingInteractionCost cost, bool valid)
-        { Data = data; Cost = cost; HasValidCost = valid; }
+        public int RequiredCoreLevel { get; }
+        public bool IsCoreLevelMet { get; }
+        internal BuildingInteractionCandidate(BuildingData data, BuildingInteractionCost cost, bool valid,
+            int requiredCoreLevel = 0, bool isCoreLevelMet = true)
+        {
+            Data = data; Cost = cost; HasValidCost = valid;
+            RequiredCoreLevel = requiredCoreLevel; IsCoreLevelMet = isCoreLevelMet;
+        }
     }
 
     public sealed class BuildingInteractionOffer
@@ -62,16 +68,21 @@ namespace OZGL.KDH
         public bool CanInteract => Failure == BuildingInteractionFailure.None;
         public BuildingData DisplayData { get; }
         public IReadOnlyList<BuildingInteractionCandidate> Candidates { get; }
+        public IReadOnlyList<BuildingInteractionCandidate> DisplayCandidates { get; }
         public BuildingInteractionOffer Build { get; }
         public BuildingInteractionOffer Upgrade { get; }
         public BuildingInteractionOffer Demolish { get; }
+        public int? RequiredUpgradeCoreLevel { get; }
 
         internal BuildingInteractionState(BuildingInteractionTarget target, BuildingInteractionFailure failure,
             BuildingData displayData, List<BuildingInteractionCandidate> candidates,
-            BuildingInteractionOffer build, BuildingInteractionOffer upgrade, BuildingInteractionOffer demolish)
+            BuildingInteractionOffer build, BuildingInteractionOffer upgrade, BuildingInteractionOffer demolish,
+            int? requiredUpgradeCoreLevel = null, List<BuildingInteractionCandidate> displayCandidates = null)
         {
             Target = target; Failure = failure; DisplayData = displayData;
             Candidates = candidates.AsReadOnly(); Build = build; Upgrade = upgrade; Demolish = demolish;
+            RequiredUpgradeCoreLevel = requiredUpgradeCoreLevel;
+            DisplayCandidates = displayCandidates == null ? Candidates : displayCandidates.AsReadOnly();
         }
     }
 

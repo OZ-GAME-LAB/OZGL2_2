@@ -15,6 +15,8 @@ namespace Units
 
         private const float LocalDistanceAllowance = 0.75f;
 
+        private const float LocalCombatDepth = 4f;
+
         private const int MaxDetailedCandidates = 4;
 
         private const int MaxApproachNeighbours = 16;
@@ -60,6 +62,14 @@ namespace Units
         // References
         // =========================
 
+        private CombatQueryContext _combatQueries;
+
+        private readonly HashSet<Unit_GroupAI> _allowedGroups = new();
+
+        private readonly List<Unit_Gateway> _nearby = new();
+
+
+
         private readonly List<Unit_GroupAI> _enemyGroups;
 
         private readonly Dictionary<Unit_Gateway, UnitAssignmentContext>
@@ -73,6 +83,8 @@ namespace Units
         private readonly Dictionary<ICombatTarget, int> _pressure = new();
 
         private readonly List<TargetCandidate> _candidates = new();
+
+        private readonly HashSet<ICombatTarget> _localTargets = new();
 
         private readonly TargetCandidate[] _shortlist =
             new TargetCandidate[MaxDetailedCandidates];
@@ -92,6 +104,8 @@ namespace Units
 
         private float _bodyRadius;
 
+        private float _localAreaRadiusSqr;
+
 
         // =========================
         // Constructor
@@ -105,6 +119,26 @@ namespace Units
 
             _assignmentContexts = assignmentContexts;
         }
+
+
+        // =========================
+        // Shared Combat Queries
+        // =========================
+
+        public void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+            RefreshEnemyGroups();
+        }
+
+        public void RefreshEnemyGroups()
+        {
+            _allowedGroups.Clear();
+
+            for (int i = 0; i < _enemyGroups.Count; i++)
+                _allowedGroups.Add(_enemyGroups[i]);
+        }
+
 
 
         // =========================
@@ -194,12 +228,14 @@ namespace Units
 
             float nearestDistance = GatherCandidates(unit, range);
 
+            RestrictLocalCandidates(range, nearestDistance);
+
             GatherPressure(unit);
 
             if (_candidates.Count == 0)
                 return null;
 
-            // 15:5라면 평균 3명이 기준이지만 인원 상한은 두지 않는다.
+            // 주변 전선의 집중도는 접근 비용을 보완하며 균등 배정을 강제하지 않는다.
             // 실제 접근 비용이 높으면 더 가까운 대상에게 집중할 수 있다.
             float expectedPressure = Mathf.Max(
                 1f,
@@ -222,7 +258,7 @@ namespace Units
             {
                 TargetCandidate candidate = _candidates[i];
 
-                candidate.Cost = CalculateBaseCost(candidate, expectedPressure);
+                candidate.Cost = CalculateBaseCost(candidate, expectedPressure, unit);
 
                 if (ReferenceEquals(candidate.Target, currentTarget))
                 {
@@ -291,6 +327,9 @@ namespace Units
             Unit_Gateway unit,
             float range)
         {
+            if (_combatQueries != null)
+                return GatherNearbyCandidates(unit, range);
+
             float nearestDistance = float.PositiveInfinity;
 
             for (int i = 0; i < _enemyGroups.Count; i++)
@@ -335,15 +374,119 @@ namespace Units
         }
 
 
+        private float GatherNearbyCandidates(Unit_Gateway unit, float range)
+        {
+            if (_allowedGroups.Count == 0)
+                return float.PositiveInfinity;
+
+            _combatQueries.CollectNearby(_origin, range + LocalCombatDepth, _bodyRadius, _nearby);
+
+            float nearestDistance = AddNearbyCandidates(unit, range);
+
+            if (_candidates.Count > 0)
+                return nearestDistance;
+
+            Unit_Gateway nearest = _combatQueries.FindNearestEnemy(unit, _allowedGroups);
+
+            if (nearest == null)
+                return float.PositiveInfinity;
+
+            float distance = CombatRangeUtility.Distance(unit, nearest);
+
+            _combatQueries.CollectNearby(
+                _origin, distance + LocalDistanceAllowance, _bodyRadius, _nearby
+            );
+
+            return AddNearbyCandidates(unit, range);
+        }
+
+
+        private float AddNearbyCandidates(Unit_Gateway unit, float range)
+        {
+            float nearestDistance = float.PositiveInfinity;
+
+            for (int i = 0; i < _nearby.Count; i++)
+            {
+                Unit_Gateway target = _nearby[i];
+
+                if (!IsValidTarget(target) || target.Team == unit.Team)
+                    continue;
+
+                Vector2 position = target.Transform.position;
+                float radius = target.BodyRadius;
+
+                // 다른 교전의 몸체도 접근 경로를 막을 수 있다.
+                AddNeighbour(unit, target, position, radius);
+
+                if (target.GroupAI == null || !_allowedGroups.Contains(target.GroupAI))
+                    continue;
+
+                float distance = Mathf.Max(0f, Vector2.Distance(_origin, position)
+                    - CombatRangeUtility.Correction(_bodyRadius, radius));
+
+                _candidates.Add(new TargetCandidate
+                {
+                    Target = target,
+                    Position = position,
+                    Distance = distance,
+                    ApproachDistance = Mathf.Max(0f, distance - range)
+                });
+
+                nearestDistance = Mathf.Min(nearestDistance, distance);
+            }
+
+            return nearestDistance;
+        }
+
+
         // =========================
         // Candidate Evaluation
         // =========================
 
+        private void RestrictLocalCandidates(
+            float range,
+            float nearestDistance)
+        {
+            _localTargets.Clear();
+
+            // Engagement는 참여 관계를 나타낸다. 합류로 멀리 있는 그룹이 늘어도
+            // 개별 유닛의 후보와 분산 비율은 현재 전선 주변에서 계산한다.
+            float radius = Mathf.Max(
+                range + LocalCombatDepth,
+                nearestDistance + LocalDistanceAllowance
+            );
+
+            _localAreaRadiusSqr = radius * radius;
+
+            int writeIndex = 0;
+
+            for (int i = 0; i < _candidates.Count; i++)
+            {
+                TargetCandidate candidate = _candidates[i];
+
+                if (candidate.Distance > radius)
+                    continue;
+
+                _candidates[writeIndex++] = candidate;
+                if (_combatQueries == null)
+                    _localTargets.Add(candidate.Target);
+            }
+
+            _candidates.RemoveRange(writeIndex, _candidates.Count - writeIndex);
+        }
+
+
         private float CalculateBaseCost(
             TargetCandidate candidate,
-            float expectedPressure)
+            float expectedPressure,
+            Unit_Gateway requester)
         {
-            _pressure.TryGetValue(candidate.Target, out int pressure);
+            int pressure;
+
+            if (_combatQueries != null)
+                pressure = _combatQueries.GetPressure(candidate.Target, requester);
+            else
+                _pressure.TryGetValue(candidate.Target, out pressure);
 
             // 인원 비용은 이동 거리와 같은 점수 단위로 합산한다.
             // 비용에 상한을 두어 빈 타겟을 찾느라 적진 깊숙이 이동하지 않게 한다.
@@ -509,6 +652,13 @@ namespace Units
             _pressure.Clear();
             _attackerCount = 0;
 
+            if (_combatQueries != null)
+            {
+                GatherNearbyPressure(requester);
+
+                return;
+            }
+
             IReadOnlyList<Unit_GroupAI> groups = requester.GroupAI?.EngagementAllies;
 
             if (groups == null)
@@ -526,6 +676,27 @@ namespace Units
                     continue;
 
                 CountAssignments(requester, group.AssignmentContexts);
+            }
+        }
+
+
+        private void GatherNearbyPressure(Unit_Gateway requester)
+        {
+            // 후보 조회에서 얻은 주변 목록을 재사용한다. 먼 공격자의 배정은 대상별
+            // 집중도에 반영하되, 현재 전선의 아군 수까지 부풀리지 않는다.
+            for (int i = 0; i < _nearby.Count; i++)
+            {
+                Unit_Gateway member = _nearby[i];
+
+                if (member.Team != requester.Team)
+                    continue;
+
+                Vector2 position = member.Transform.position;
+
+                if ((position - _origin).sqrMagnitude <= _localAreaRadiusSqr)
+                    _attackerCount++;
+
+                AddNeighbour(requester, member, position);
             }
         }
 
@@ -556,14 +727,24 @@ namespace Units
             if (unit == null || !unit.IsTargetable)
                 return;
 
+            Vector2 position = unit.Transform.position;
+
+            bool nearby = (position - _origin).sqrMagnitude <= _localAreaRadiusSqr;
+
+            bool assignedLocally = context.HasTarget
+                && _localTargets.Contains(context.AssignedTarget);
+
+            if (!nearby && !assignedLocally)
+                return;
+
             _attackerCount++;
 
             if (unit == requester)
                 return;
 
-            AddNeighbour(requester, unit, unit.Transform.position);
+            AddNeighbour(requester, unit, position);
 
-            if (!context.HasTarget)
+            if (!assignedLocally)
                 return;
 
             ICombatTarget target = context.AssignedTarget;

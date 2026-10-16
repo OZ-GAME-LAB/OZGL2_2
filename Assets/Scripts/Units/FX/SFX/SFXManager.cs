@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
+using UnityEngine.Audio;
+using Game.Audio;
 
 namespace Units.FX
 {
@@ -10,6 +12,8 @@ namespace Units.FX
         // References / Runtime State
         // ============================================================
         [SerializeField] private SFXCatalogSO _catalog;
+        [SerializeField, Tooltip("음원별 그룹이 없을 때 사용할 공통 SFX 그룹입니다.")]
+        private AudioMixerGroup _mixerGroup;
         [SerializeField, Min(0)] private int _maxStored = 32;
         [SerializeField, Min(1)] private int _maxActive = 64;
         private readonly Dictionary<FXHandle, SFXInstance> _active = new();
@@ -17,6 +21,10 @@ namespace Units.FX
         private readonly HashSet<string> _missing = new();
         private readonly Dictionary<string, float> _lastPlayed = new();
         private SFXPool _pool;
+        private const int PrewarmCount = 3;
+        private const float PrewarmDuration = 5f;
+        private float _prewarmStartedAt;
+        private int _prewarmIndex;
         public static SFXManager Instance { get; private set; }
         public int ActiveCount => _active.Count;
 
@@ -28,6 +36,27 @@ namespace Units.FX
             { Debug.LogError("[SFXManager] 활성 매니저가 중복되었습니다.", this); enabled = false; return; }
             Instance = this;
             if (_pool == null) _pool = new SFXPool(transform, _maxStored);
+            _prewarmStartedAt = Time.unscaledTime;
+            _prewarmIndex = 0;
+        }
+
+        // 공통 사용자 음량은 씬이 바뀌어도 유지하며, Mixer 적용은 Start 이후에 수행한다.
+        private void Start()
+        {
+            if (_mixerGroup != null) AudioVolumeSettings.Bind(_mixerGroup.audioMixer);
+        }
+
+        private void Update()
+        {
+            if (_prewarmIndex >= PrewarmCount) return;
+            int due = Mathf.FloorToInt(PrewarmCount * Mathf.Clamp01(
+                (Time.unscaledTime - _prewarmStartedAt) / PrewarmDuration));
+            // SFX는 클립별 풀이 아니라 공용 AudioSource 3개를 준비한다.
+            while (_prewarmIndex < due)
+            {
+                _pool.PrewarmOne(_prewarmIndex + 1, _active.Count);
+                _prewarmIndex++;
+            }
         }
 
         // ============================================================
@@ -55,7 +84,7 @@ namespace Units.FX
             _lastPlayed[definition.Key] = Time.time;
             var instance = _pool.Rent();
             var handle = FXHandle.Create();
-            instance.Play(definition, request);
+            instance.Play(definition, request, _mixerGroup);
             _active.Add(handle, instance);
             return handle;
         }
@@ -123,7 +152,12 @@ namespace Units.FX
             foreach (var instance in _active.Values) if (instance != null) _pool.Return(instance);
             _active.Clear();
             _lastPlayed.Clear();
-            if (clearPool) _pool?.Clear();
+            if (clearPool)
+            {
+                _pool?.Clear();
+                _prewarmStartedAt = Time.unscaledTime;
+                _prewarmIndex = isActiveAndEnabled ? 0 : PrewarmCount;
+            }
         }
         private void OnDisable()
         {
