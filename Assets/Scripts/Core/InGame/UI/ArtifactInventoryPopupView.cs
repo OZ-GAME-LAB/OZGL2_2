@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Game.Core;
 using Game.UI.InGame;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,6 +14,8 @@ public class ArtifactInventoryPopupView : MonoBehaviour
     [SerializeField] private ScrollRect _scrollRect;
     [SerializeField] private GameObject _emptyMessage;
     [SerializeField] private ArtifactPopupView _artifactPopupView;
+    [SerializeField] private Button _hudButton;
+
     private IArtifactReader _artifactReader;
     
     public void Initialize(IArtifactReader artifactReader)
@@ -20,10 +23,34 @@ public class ArtifactInventoryPopupView : MonoBehaviour
         _artifactReader = artifactReader;
     }
 
+    private void OnEnable()
+    {
+        if (_hudButton != null)
+            _hudButton.onClick.AddListener(Open);
+    }
+
+    private void OnDisable()
+    {
+        if (_hudButton != null)
+            _hudButton.onClick.RemoveListener(Open);
+    }
+
     public void Open()
     {
         if (_artifactReader == null || !_artifactReader.IsInitialized)
             return;
+
+        var artifacts = new List<RunArtifactEntry>();
+        foreach (ArtifactInstance instance in _artifactReader.Instances)
+            if (instance != null && instance.Data != null)
+                artifacts.Add(new RunArtifactEntry(instance.Data, instance.StackCount));
+        Show(artifacts);
+    }
+
+    // HUD의 현재 목록과 결산의 확정 목록이 같은 슬롯 표시 코드를 사용한다.
+    public void Show(IReadOnlyList<RunArtifactEntry> artifacts)
+    {
+        if (artifacts == null) return;
 
         if (_screen == null || _screen.Manager == null || _slotPrefab == null ||
             _slotRoot == null || _artifactPopupView == null)
@@ -37,7 +64,7 @@ public class ArtifactInventoryPopupView : MonoBehaviour
         if (!_screen.Manager.OpenPopup(_screen.Id))
             return;
 
-        RefreshSlots();
+        RefreshSlots(artifacts);
         if (_scrollRect != null)
         {
             Canvas.ForceUpdateCanvases();
@@ -58,22 +85,21 @@ public class ArtifactInventoryPopupView : MonoBehaviour
     }
 
     /// <summary> 보유중인 아티팩트 정보를 조회해 해당 아티팩트를 인벤토리 슬롯과 연결</summary>
-    private void RefreshSlots()
+    private void RefreshSlots(IReadOnlyList<RunArtifactEntry> artifacts)
     {
-        var instances = _artifactReader.Instances;
-        EnsureSlotCount(instances.Count);
+        EnsureSlotCount(artifacts.Count);
 
         for (int i = 0; i < Slots.Count; i++)
         {
             UIItemSlot slot = Slots[i];
-            if (i >= instances.Count || instances[i]?.Data == null)
+            if (i >= artifacts.Count || artifacts[i]?.Data == null)
             {
                 slot.Unbind();
                 slot.gameObject.SetActive(false);
                 continue;
             }
 
-            ArtifactInstance instance = instances[i];
+            RunArtifactEntry instance = artifacts[i];
             slot.Bind(
                 instance.Data.Icon != null ? instance.Data.Icon : _defaultIcon,
                 instance.Data.DisplayName,
@@ -86,7 +112,7 @@ public class ArtifactInventoryPopupView : MonoBehaviour
         }
 
         if (_emptyMessage != null)
-            _emptyMessage.SetActive(instances.Count == 0);
+            _emptyMessage.SetActive(artifacts.Count == 0);
     }
 
     /// <summary> 아티팩트 이미지를 클릭했을 때 클릭한 이미지 위치에 상세화면을 여는 기능</summary>

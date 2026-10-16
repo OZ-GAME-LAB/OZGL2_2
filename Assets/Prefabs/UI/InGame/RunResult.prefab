@@ -407,6 +407,7 @@ GameObject:
   - component: {fileID: 8740820545167129611}
   - component: {fileID: 3316928089616065711}
   - component: {fileID: 3960418521161462129}
+  - component: {fileID: 998040349042420431}
   m_Layer: 0
   m_Name: RunResult
   m_TagString: Untagged
@@ -479,6 +480,21 @@ MonoBehaviour:
   _artifacts: {fileID: 2526689397693768075}
   _bloodstone: {fileID: 7415586019111823138}
   _mainButton: {fileID: 6645728257315342057}
+--- !u!114 &998040349042420431
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 763244518301168892}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6df0fbae048f0884c95b5e6d0a6a10a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.RunArtifactPopupView
+  _artifactButton: {fileID: 5912222445676672557}
+  _resultView: {fileID: 3960418521161462129}
+  _inventoryView: {fileID: 0}
 --- !u!1 &1227715549923834089
 GameObject:
   m_ObjectHideFlags: 0
@@ -3910,6 +3926,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+--- !u!114 &5912222445676672557 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5824936662316188418, guid: 518535b6f2a03054abfc4d109bbf943e, type: 3}
+  m_PrefabInstance: {fileID: 205542657108718895}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!114 &6645728257315342057 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 6836575656875733958, guid: 518535b6f2a03054abfc4d109bbf943e, type: 3}

@@ -92,7 +92,8 @@ namespace Game.Core
             _isRecording = false;
 
             IReadOnlyList<ActiveTotem> totems = _totemReader.ActiveTotems;
-            _runSummary = new RunSummary(_runStats, totems, _altarReader?.Selected, _traitReader?.CaptureLevels());
+            _runSummary = new RunSummary(_runStats, totems, _altarReader?.Selected,
+                _traitReader?.CaptureLevels(), _artifactReader.Instances);
         }
 
         public bool TryGetRunSummary(out RunSummary summary)
@@ -189,13 +190,23 @@ namespace Game.Core
         public int ClearWaveCount { get; }
         public int ClearBossCount { get; }
         public IReadOnlyDictionary<ArtifactRarity, int> Artifacts { get; }
+        public IReadOnlyList<RunArtifactEntry> ArtifactInventory { get; }
         public IReadOnlyList<ActiveTotem> Totems { get; }
         public AltarData Altar { get; }
         public IReadOnlyList<TraitLevelEntry> Traits { get; }
 
         public RunSummary(RunStats stats, IReadOnlyList<ActiveTotem> totems,
-            AltarData altar = null, IReadOnlyList<TraitLevelEntry> traits = null)
+            AltarData altar = null, IReadOnlyList<TraitLevelEntry> traits = null,
+            IReadOnlyList<ArtifactInstance> artifactInstances = null)
         {
+            // 종료 후 인벤토리가 비워지거나 중첩 수가 바뀌어도 이 기록은 유지한다
+            var copiedArtifacts = new List<RunArtifactEntry>();
+            if (artifactInstances != null)
+                foreach (ArtifactInstance instance in artifactInstances)
+                    if (instance != null && instance.Data != null)
+                        copiedArtifacts.Add(new RunArtifactEntry(instance.Data, instance.StackCount));
+            ArtifactInventory = copiedArtifacts.AsReadOnly();
+
             Altar = altar;
             var copiedTraits = new List<TraitLevelEntry>();
             if (traits != null)
