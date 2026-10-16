@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Game.UI.InGame
 {
@@ -8,13 +9,13 @@ namespace Game.UI.InGame
     {
         [SerializeField] private UIScreen _screen;
         [SerializeField] private RectTransform _panel;
-        [SerializeField] private UnityEngine.UI.Image _icon;
+        [SerializeField] private Image _icon;
         [SerializeField] private UIIcon _emptyIcon;
         [SerializeField] private TMP_Text _nameText;
         [SerializeField] private TMP_Text _rarityText;
         [SerializeField] private TMP_Text _effectText;
         [SerializeField] private TMP_Text _loreText;
-
+        
         private readonly Vector3[] _panelCorners = new Vector3[4];
 
         public bool Open(ArtifactData artifact, Vector2 screenPosition)

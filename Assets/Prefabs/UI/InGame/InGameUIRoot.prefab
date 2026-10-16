@@ -2060,6 +2060,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: RunResult
       objectReference: {fileID: 0}
+    - target: {fileID: 998040349042420431, guid: e1c56ad0180915a4d8c5af670b8ff9af, type: 3}
+      propertyPath: _inventoryView
+      value: 
+      objectReference: {fileID: 8789348044962764029}
     - target: {fileID: 1190435760612149449, guid: e1c56ad0180915a4d8c5af670b8ff9af, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
@@ -3146,7 +3150,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8137671958767916008, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8137671958767916008, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
@@ -3267,6 +3271,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 416cb14476665fa43bb41659f52be7fe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.RunDecisionView
+--- !u!114 &7309280814475880619 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8137671958767916008, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
+  m_PrefabInstance: {fileID: 1549547941900680003}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!114 &8365367597049422001 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7032045528772566002, guid: 83cace9bf3e49af4196a4ae20ab35759, type: 3}
@@ -7063,6 +7078,10 @@ PrefabInstance:
       propertyPath: m_Size
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1716311836173777702, guid: 2486213757fa4a74fbc886cdc6924250, type: 3}
+      propertyPath: _hudButton
+      value: 
+      objectReference: {fileID: 7309280814475880619}
     - target: {fileID: 1716311836173777702, guid: 2486213757fa4a74fbc886cdc6924250, type: 3}
       propertyPath: _artifactPopupView
       value: 
