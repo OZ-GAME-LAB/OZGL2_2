@@ -1,91 +1,183 @@
-using System;
 using Game.Core;
 using UnityEngine;
 
 namespace Game.Audio
 {
-    /// <summary>외부에서 전달받은 페이즈와 승패에 따라 음악을 선택한다. Flow 연결은 아직 활성화하지 않는다.</summary>
+    /// <summary>인게임에서 사용하는 일곱 음원과 게임 진행 연결.</summary>
     public sealed class BGMManager_InGame : BGMManagerBase
     {
-        // ============================================================
-        // Phase / Result Settings
-        // ============================================================
-        public enum PlaybackAction { KeepCurrent, Play, Stop }
+        [Header("반복 BGM")]
+        [SerializeField, InspectorName("건설 단계")] private BGMContext _construction = new();
+        [SerializeField, InspectorName("일반 전투")] private BGMContext _battle = new();
+        [SerializeField, InspectorName("보스 전투")] private BGMContext _boss = new();
+        [SerializeField, InspectorName("이벤트")] private BGMContext _event = new();
+        [Header("단발 음악")]
+        [SerializeField, InspectorName("웨이브 시작")] private BGMContext _waveStart = new(false);
+        [SerializeField, InspectorName("매 웨이브 승리")] private BGMContext _victory = new(false);
+        [SerializeField, InspectorName("패배")] private BGMContext _defeat = new(false);
 
-        [Serializable]
-        private sealed class PhaseMusic
+        private GameFlowController _flow;
+        private AudioSource _cue;
+        private bool _ready;
+        private bool _cuePaused;
+
+        protected override void Awake()
         {
-            [SerializeField] private GamePhase _phase;
-            [SerializeField] private PlaybackAction _action;
-            [SerializeField] private BGMContext _music = new();
-
-            internal GamePhase Phase => _phase;
-            internal PlaybackAction Action => _action;
-            internal BGMContext Music => _music;
-
-            internal PhaseMusic(GamePhase phase, PlaybackAction action)
-            { _phase = phase; _action = action; }
+            base.Awake();
+            var child = new GameObject("Wave Start Channel");
+            child.transform.SetParent(transform, false);
+            _cue = child.AddComponent<AudioSource>();
+            _cue.playOnAwake = false;
+            _cue.loop = false;
+            _cue.spatialBlend = 0f;
+            _cue.outputAudioMixerGroup = MixerGroup;
         }
 
-        [SerializeField] private PhaseMusic[] _phaseMusic =
+        protected override void Start()
         {
-            new(GamePhase.None, PlaybackAction.Stop),
-            new(GamePhase.Preparation, PlaybackAction.Play),
-            new(GamePhase.BattlePreparing, PlaybackAction.KeepCurrent),
-            new(GamePhase.Battle, PlaybackAction.Play),
-            new(GamePhase.BattleResolving, PlaybackAction.KeepCurrent),
-            new(GamePhase.QuarterComplete, PlaybackAction.KeepCurrent),
-            new(GamePhase.Reward, PlaybackAction.KeepCurrent),
-            new(GamePhase.Event, PlaybackAction.KeepCurrent),
-            new(GamePhase.Store, PlaybackAction.KeepCurrent),
-            new(GamePhase.Finished, PlaybackAction.KeepCurrent)
-        };
-        [SerializeField] private BGMContext _victory = new(false);
-        [SerializeField] private BGMContext _defeat = new(false);
+            base.Start();
+            _ready = true;
+            Bind(true);
+        }
 
-        // ============================================================
-        // Playback Requests
-        // ============================================================
-        /// <summary>페이즈 정책을 적용한다. 목록에 없는 페이즈는 기존 음악을 유지한다.</summary>
-        public void HandlePhaseChanged(GamePhase phase)
+        protected override void OnEnable()
         {
-            if (_phaseMusic == null) return;
-            foreach (var entry in _phaseMusic)
+            base.OnEnable();
+            if (_ready) Bind();
+        }
+
+        private void Bind(bool initial = false)
+        {
+            _flow = FindFirstObjectByType<GameFlowController>();
+
+            if (_flow == null)
             {
-                if (entry == null || entry.Phase != phase) continue;
-                switch (entry.Action)
-                {
-                    case PlaybackAction.Play: Play(entry.Music); break;
-                    case PlaybackAction.Stop: Stop(); break;
-                }
+                Debug.LogWarning("[BGM] GameFlowController를 찾을 수 없습니다.", this);
                 return;
             }
+
+            _flow.PhaseChanged += HandlePhaseChanged;
+            _flow.BattleResultConfirmed += PlayBattleResult;
+
+            // 최초 연결 시 현재 페이즈에 맞는 음악을 적용한다.
+            // BattlePreparing 상태라면 Wave Start를 한 번 재생한다.
+            ApplyPhase(
+                _flow.CurPhase,
+                initial && _flow.CurPhase == GamePhase.BattlePreparing
+            );
         }
 
-        /// <summary>확정된 승패를 전달받는다. 승리·패배 Context의 Loop를 끄면 한 번만 재생한다.</summary>
-        public void PlayBattleResult(ResultType result)
+        public void HandlePhaseChanged(GamePhase phase) => ApplyPhase(phase, true);
+
+        private void ApplyPhase(GamePhase phase, bool announce)
         {
-            switch (result)
+            switch (phase)
             {
-                case ResultType.Victory: Play(_victory); break;
-                case ResultType.Defeat: Play(_defeat); break;
+                case GamePhase.None:
+                    Stop();
+                    StopCue();
+                    break;
+
+                case GamePhase.Preparation:
+                    StopCue();
+                    Play(_construction);
+                    break;
+
+                case GamePhase.BattlePreparing:
+                    Stop();
+                    StopCue();
+
+                    if (announce)
+                        PlayCue();
+
+                    break;
+
+                case GamePhase.Battle:
+                    StopCue();
+
+                    Play(
+                        _flow != null &&
+                        _flow.CurrentNode?.BattleType == WaveBattleType.Boss
+                            ? _boss
+                            : _battle
+                    );
+
+                    break;
+
+                case GamePhase.Event:
+                    Play(_event);
+                    break;
+
+                case GamePhase.BattleResolving:
+                    if (!announce &&
+                        _flow != null &&
+                        _flow.LastBattleResult.HasValue)
+                    {
+                        PlayBattleResult(_flow.LastBattleResult.Value);
+                    }
+                    break;
+
+                    // 보상/상점/결산에는 직전 음악을 유지한다.
             }
         }
 
-        // ============================================================
-        // Flow Integration (연결 시 활성화)
-        // ============================================================
-        // 현재는 GameFlowController와 씬을 수정하지 않는다.
-        // 추후 Flow 참조를 주입한 뒤 아래 구독과 해제를 수명에 맞춰 함께 활성화한다.
-        // OnEnable:  flow.PhaseChanged += HandlePhaseChanged;
-        // 초기 동기화: HandlePhaseChanged(flow.CurPhase);
-        // OnDisable: flow.PhaseChanged -= HandlePhaseChanged;
-        //
-        // PhaseChanged(GamePhase)만으로는 승리와 패배를 구분할 수 없다.
-        // Flow에서 결과 확정 후 BattleResolving 진입 직전에 다음을 호출한다.
-        // bgmManager.PlayBattleResult(result);
-        // 런 포기 시에도 ResultType.Defeat를 전달한다.
-        // 늦은 활성화 시 결과 복원이 필요하면 Flow에 현재 결과 보관 기능을 추가한다.
-        // 씬 전환 페이드가 필요하면 Stop() 후 IsSilent가 될 때까지 기다린 뒤 언로드한다.
+        public void PlayBattleResult(ResultType result)
+        {
+            StopCue();
+            Play(result == ResultType.Victory ? _victory : _defeat, true);
+        }
+
+        private void PlayCue()
+        {
+            StopCue();
+            if (_waveStart.Clip == null) return;
+            _cue.clip = _waveStart.Clip;
+            _cue.volume = _waveStart.Volume;
+            _cue.pitch = _waveStart.Pitch;
+            _cue.Play();
+            RefreshCuePause();
+        }
+
+        private void LateUpdate() => RefreshCuePause();
+
+        private void RefreshCuePause()
+        {
+            if (_cue == null) return;
+            if (IsApplicationSuspended && !_cuePaused)
+            {
+                _cue.Pause();
+                _cuePaused = true;
+            }
+            else if (!IsApplicationSuspended && _cuePaused)
+            {
+                _cue.UnPause();
+                _cuePaused = false;
+            }
+        }
+
+        private void StopCue()
+        {
+            if (_cue != null) { _cue.Stop(); _cue.clip = null; }
+            _cuePaused = false;
+        }
+
+        protected override void OnDisable()
+        {
+            if (_flow != null)
+            {
+                _flow.PhaseChanged -= HandlePhaseChanged;
+                _flow.BattleResultConfirmed -= PlayBattleResult;
+            }
+            _flow = null;
+            StopCue();
+            base.OnDisable();
+        }
+
+        protected override void OnDestroy()
+        {
+            if (_cue != null) Destroy(_cue.gameObject);
+            base.OnDestroy();
+        }
     }
 }
+
