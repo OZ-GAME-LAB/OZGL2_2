@@ -58,40 +58,33 @@ public class CurrencyRewardCalculator
         return dropReward;
     }
 
-    public CurrencyAmount CalculateRunSettlementReward(
-        CurrencyData currency, int totalWaveCleared, int totalBossesCleared,
-        IReadOnlyList<CurrencyModifier> modifiers)
-    {
-
-        if (totalWaveCleared < 0 || totalBossesCleared < 0)
-        {
-            return new CurrencyAmount(currency, -1);
-        }
-
-        // 기본 배수 1, 보스 처치 1회당 배수 1 증가
-        // TODO: 실제 유닛 처치 수 집계 연결 후 정산식에 추가
-        double baseReward = (double)totalWaveCleared * (1d + totalBossesCleared);
-        return CalculateModifiedReward(currency, baseReward, CurrencyRewardType.RunSettlement, modifiers);
-    }
-
     private CurrencyAmount CalculateModifiedReward(CurrencyData currency, double baseAmount,
         CurrencyRewardType rewardType, IReadOnlyList<CurrencyModifier> modifiers)
     {
-        // 잘못된 입력은 기존 Wallet의 음수 거부 처리로 지급을 실패시킵니다.
-        if (currency == null || baseAmount < 0)
+        if (currency == null || !TryCalculateModifiedAmount(currency.Type, baseAmount, rewardType,
+                modifiers, out double finalAmount, out _, out _) || finalAmount > int.MaxValue)
             return new CurrencyAmount(currency, -1);
+        // 기존 웨이브/생산 보상은 여기서 정수화합니다. 런 정산은 토템 적용 후 정수화합니다.
+        return new CurrencyAmount(currency, (int)finalAmount);
+    }
 
-        double totalFlat = 0;
-        double totalPercent = 0;
+    public static bool TryCalculateModifiedAmount(CurrencyType currencyType, double baseAmount,
+        CurrencyRewardType rewardType, IReadOnlyList<CurrencyModifier> modifiers,
+        out double finalAmount, out double totalFlat, out double totalPercent)
+    {
+        finalAmount = 0;
+        totalFlat = 0;
+        totalPercent = 0;
+        if (baseAmount < 0 || double.IsNaN(baseAmount) || double.IsInfinity(baseAmount)) return false;
         if (modifiers != null)
         {
             foreach (CurrencyModifier modifier in modifiers)
             {
-                if (modifier.CurrencyType != currency.Type || modifier.RewardType != rewardType)
+                if (modifier.CurrencyType != currencyType || modifier.RewardType != rewardType)
                     continue;
 
                 if (float.IsNaN(modifier.Value) || float.IsInfinity(modifier.Value))
-                    return new CurrencyAmount(currency, -1);
+                    return false;
 
                 if (modifier.ModifierType == CurrencyModifierType.Flat)
                     totalFlat += modifier.Value;
@@ -103,11 +96,7 @@ public class CurrencyRewardCalculator
         // 감소 효과는 0까지만 적용하여 음수끼리 곱해 보상이 늘어나는 것을 방지합니다.
         double adjustedBase = System.Math.Max(0, baseAmount + totalFlat);
         double multiplier = System.Math.Max(0, 1 + totalPercent);
-        double finalAmount = adjustedBase * multiplier;
-        if (double.IsNaN(finalAmount) || double.IsInfinity(finalAmount) || finalAmount > int.MaxValue)
-            return new CurrencyAmount(currency, -1);
-
-        // 모든 효과를 합산한 뒤 마지막에만 소수점을 버립니다.
-        return new CurrencyAmount(currency, (int)finalAmount);
+        finalAmount = adjustedBase * multiplier;
+        return !double.IsNaN(finalAmount) && !double.IsInfinity(finalAmount);
     }
 }
