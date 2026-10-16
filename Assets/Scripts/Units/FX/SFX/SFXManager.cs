@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using Units.Skills;
 using UnityEngine;
+using UnityEngine.Audio;
+using Game.Audio;
 
 namespace Units.FX
 {
@@ -10,6 +12,8 @@ namespace Units.FX
         // References / Runtime State
         // ============================================================
         [SerializeField] private SFXCatalogSO _catalog;
+        [SerializeField, Tooltip("음원별 그룹이 없을 때 사용할 공통 SFX 그룹입니다.")]
+        private AudioMixerGroup _mixerGroup;
         [SerializeField, Min(0)] private int _maxStored = 32;
         [SerializeField, Min(1)] private int _maxActive = 64;
         private readonly Dictionary<FXHandle, SFXInstance> _active = new();
@@ -34,6 +38,12 @@ namespace Units.FX
             if (_pool == null) _pool = new SFXPool(transform, _maxStored);
             _prewarmStartedAt = Time.unscaledTime;
             _prewarmIndex = 0;
+        }
+
+        // 공통 사용자 음량은 씬이 바뀌어도 유지하며, Mixer 적용은 Start 이후에 수행한다.
+        private void Start()
+        {
+            if (_mixerGroup != null) AudioVolumeSettings.Bind(_mixerGroup.audioMixer);
         }
 
         private void Update()
@@ -74,7 +84,7 @@ namespace Units.FX
             _lastPlayed[definition.Key] = Time.time;
             var instance = _pool.Rent();
             var handle = FXHandle.Create();
-            instance.Play(definition, request);
+            instance.Play(definition, request, _mixerGroup);
             _active.Add(handle, instance);
             return handle;
         }
