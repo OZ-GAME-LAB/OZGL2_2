@@ -19,7 +19,7 @@ public class CurrencyTestPanel : MonoBehaviour
     [SerializeField] private ArtifactTestPanel _artifactTestPanel;
     [SerializeField] private ConsumableItemTestPanel _consumableTestPanel;
     [SerializeField] private PersistentCurrencyManager _persistent;
-    [SerializeField] private RunSettlementManager _settlement;
+    [SerializeField] private RunRewardManager _settlement;
     [SerializeField] private CurrencyData _gold;
     [SerializeField] private CurrencyData _gem;
     [SerializeField] private CurrencyData _bloodstone;
@@ -533,8 +533,8 @@ public class CurrencyTestPanel : MonoBehaviour
     {
         int before = _persistent.GetBalance(_bloodstone.Type);
         RunSummary summary = CreateTestRunSummary();
-        int expectedReward = summary.ClearWaveCount * (1 + summary.ClearBossCount);
-        if (_totemRunApplier != null) expectedReward += _totemRunApplier.CalculateBonusBloodstone(expectedReward);
+        int expectedReward = new RunRewardCalculator().Calculate(summary, _settlement.Settings,
+            _effectManager != null ? _effectManager.CurrencyModifiers : null).FinalBloodstones;
         bool applied = await _settlement.TryApplyReward(summary);
         int balance = _persistent.GetBalance(_bloodstone.Type);
         Check(applied && balance == before + expectedReward && _settlementTestUI.ShownBloodstones == expectedReward &&
@@ -554,7 +554,7 @@ public class CurrencyTestPanel : MonoBehaviour
             ClearBossCount = clearedWaves / WaveController.MAX_WAVE,
             MaxQuarter = _waveController.CurQuarter,
             MaxWave = _waveController.CurWave
-        });
+        }, _totemRunApplier != null ? _totemRunApplier.ActiveTotems : null);
     }
 
     // 게임용 정산 매니저의 계약을 사용하는 EconomyTestScene 전용 대체 구현입니다.
@@ -562,10 +562,10 @@ public class CurrencyTestPanel : MonoBehaviour
     {
         public int ShownBloodstones { get; private set; }
 
-        public UniTask ShowAndWaitAsync(RunSummary summary, int bloodstones, CancellationToken token)
+        public UniTask ShowAndWaitAsync(RunSummary summary, RunResult result, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            ShownBloodstones = bloodstones;
+            ShownBloodstones = result.FinalBloodstones;
             return UniTask.CompletedTask;
         }
     }

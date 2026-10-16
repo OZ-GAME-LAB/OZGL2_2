@@ -101,6 +101,9 @@ public class OutGameTraitView : MonoBehaviour
 
     private ITraitProgression _progression;
     private PersistentCurrencyManager _wallet;
+    private bool _readOnly;
+    private IReadOnlyList<TraitData> _data;
+    private readonly List<TraitLevelEntry> _levels = new List<TraitLevelEntry>();
     private TraitId _inspectedTrait = TraitId.None;
     private TraitId _hoveredTrait = TraitId.None;
     private Vector2 _lastHoverMousePosition;
@@ -175,14 +178,33 @@ public class OutGameTraitView : MonoBehaviour
         return valid;
     }
 
-    public void Initialize(ITraitProgression progression, PersistentCurrencyManager wallet)
+    public void Initialize(ITraitProgression progression, PersistentCurrencyManager wallet,
+        bool readOnly = false, IReadOnlyList<TraitData> data = null,
+        IReadOnlyList<TraitLevelEntry> levels = null)
     {
         Shutdown();
-        if (progression == null || wallet == null || !ValidateReferences()) return;
+        if (!ValidateReferences()) return;
+        if (readOnly ? data == null || levels == null : progression == null || wallet == null)
+            throw new ArgumentException("특성 표시 데이터 또는 구매 연결이 필요합니다.");
 
+        _readOnly = readOnly;
         _progression = progression;
         _wallet = wallet;
+        _data = readOnly ? data : progression.Data;
         _inspectedTrait = _initialSelection;
+        if (readOnly)
+        {
+            _inspectedTrait = TraitId.None;
+            foreach (TraitLevelEntry entry in levels)
+            {
+                _levels.Add(new TraitLevelEntry { Id = entry.Id, Level = entry.Level });
+                if (_inspectedTrait == TraitId.None && entry.Level > 0) _inspectedTrait = entry.Id;
+            }
+        }
+        _walletLabel.gameObject.SetActive(!readOnly);
+        _upgradeButton.gameObject.SetActive(!readOnly);
+        _nextLevelLabel.gameObject.SetActive(!readOnly);
+        if (_backButton != null) _backButton.gameObject.SetActive(!readOnly);
         _hoveredTrait = TraitId.None;
 
         _rootCanvas = GetComponentInParent<Canvas>();
@@ -238,21 +260,24 @@ public class OutGameTraitView : MonoBehaviour
         states.pressedSprite = _upgradePressedSprite != null ? _upgradePressedSprite : _upgradeNormalSprite;
         states.disabledSprite = _upgradeOffSprite;
         _upgradeButton.spriteState = states;
-        _upgradeButton.onClick.AddListener(OnUpgradeClicked);
-        if (_backButton != null) _backButton.onClick.AddListener(OnBackClicked);
+        if (!readOnly)
+        {
+            _upgradeButton.onClick.AddListener(OnUpgradeClicked);
+            if (_backButton != null) _backButton.onClick.AddListener(OnBackClicked);
+        }
         Refresh();
     }
 
     public void Refresh()
     {
-        if (_progression == null || _wallet == null) return;
-        _walletLabel.text = " " + _wallet.Balance;
+        if (_data == null) return;
+        if (!_readOnly) _walletLabel.text = " " + _wallet.Balance;
 
         foreach (TraitButtonSlot s in _slots)
         {
             TraitData data = FindData(s.Id);
             if (data == null) continue;
-            int level = _progression.GetLevel(s.Id);
+            int level = GetLevel(s.Id);
             bool prereqReady = HasPrerequisite(data);
 
             // 구매됐어도 기본 테두리는 Unlocked(Off) 유지. 아이콘만 On.
@@ -271,7 +296,7 @@ public class OutGameTraitView : MonoBehaviour
             foreach (TraitConnectionSlot c in _connections)
             {
                 TraitId triggerId = c.OnRule == TraitArrowOnRule.TargetPurchased ? c.To : c.From;
-                c.Image.sprite = _progression.GetLevel(triggerId) > 0 ? c.OnSprite : c.OffSprite;
+                c.Image.sprite = GetLevel(triggerId) > 0 ? c.OnSprite : c.OffSprite;
                 c.Image.color = Color.white;
                 c.Image.enabled = c.Image.sprite != null;
             }
@@ -296,7 +321,7 @@ public class OutGameTraitView : MonoBehaviour
     {
         TraitData inspected = _inspectedTrait == TraitId.None ? null : FindData(_inspectedTrait);
         TraitButtonSlot slot = inspected == null ? null : FindSlot(_inspectedTrait);
-        int current = inspected == null ? 0 : _progression.GetLevel(inspected.Id);
+        int current = inspected == null ? 0 : GetLevel(inspected.Id);
         Sprite sprite = slot == null ? null : current > 0 ? slot.IconOn : slot.IconOff;
         if (sprite == null && inspected != null) sprite = inspected.Icon;
         bool hasIcon = sprite != null;
@@ -313,7 +338,7 @@ public class OutGameTraitView : MonoBehaviour
         if (inspected == null)
         {
             _title.text = string.Empty;
-            _description.text = string.Empty;
+            _description.text = _readOnly ? "적용된 특성이 없습니다.\n노드를 눌러 설명을 확인하세요." : string.Empty;
             _currentLevelLabel.text = string.Empty;
             _nextLevelLabel.text = string.Empty;
             _upgradeDescription.text = string.Empty;
@@ -325,6 +350,14 @@ public class OutGameTraitView : MonoBehaviour
 
         _title.text = inspected.DisplayName;
         _description.text = inspected.Description;
+        if (_readOnly)
+        {
+            _currentLevelLabel.text = current > 0 ? "Lv. " + current : "미적용";
+            _upgradeDescription.text = inspected.EffectLabel + "   " +
+                (inspected.ValuePerLevel * current).ToString("0.##") + inspected.ValueUnit;
+            SetUpgradeAvailability(false);
+            return;
+        }
         bool max = current >= inspected.MaxLevel;
         int next = Mathf.Min(current + 1, inspected.MaxLevel);
         _currentLevelLabel.text = "Lv. " + current;
@@ -392,14 +425,18 @@ public class OutGameTraitView : MonoBehaviour
 
     private void ShowHoverInfo(TraitId id, Vector2 mousePosition)
     {
-        if (_progression == null || _hoverInfoPanel == null || !isActiveAndEnabled) return;
+        if (_data == null || _hoverInfoPanel == null || !isActiveAndEnabled) return;
         TraitData data = FindData(id);
         if (data == null) { HideHoverInfo(); return; }
 
-        int level = _progression.GetLevel(id);
+        int level = GetLevel(id);
         _hoverTitleText.text = data.DisplayName;
         string description = data.Description;
-        if (!HasPrerequisite(data))
+        if (_readOnly)
+        {
+            description += level > 0 ? "\n\n이번 판 적용 레벨: " + level : "\n\n이번 판 미적용";
+        }
+        else if (!HasPrerequisite(data))
         {
             description += "\n\n잠금 해제 조건\n" + data.Prerequisite.DisplayName + " " + data.PrerequisiteLevel + "레벨 필요";
         }
@@ -468,7 +505,7 @@ public class OutGameTraitView : MonoBehaviour
     private bool HasPrerequisite(TraitData data)
     {
         return data.Prerequisite == null ||
-            _progression.GetLevel(data.Prerequisite.Id) >= data.PrerequisiteLevel;
+            GetLevel(data.Prerequisite.Id) >= data.PrerequisiteLevel;
     }
 
     private TraitButtonSlot FindSlot(TraitId id)
@@ -481,8 +518,8 @@ public class OutGameTraitView : MonoBehaviour
 
     private TraitData FindData(TraitId id)
     {
-        if (_progression == null) return null;
-        IReadOnlyList<TraitData> list = _progression.Data;
+        if (_data == null) return null;
+        IReadOnlyList<TraitData> list = _data;
         for (int i = 0; i < list.Count; i++)
             if (list[i] != null && list[i].Id == id) return list[i];
         return null;
@@ -501,12 +538,20 @@ public class OutGameTraitView : MonoBehaviour
 
     private void OnUpgradeClicked()
     {
-        if (_inspectedTrait == TraitId.None || _progression == null) return;
+        if (_readOnly || _inspectedTrait == TraitId.None || _progression == null) return;
         if (_progression.CanUpgrade(_inspectedTrait, out _))
             UpgradeRequested?.Invoke(_inspectedTrait);
     }
 
-    private void OnBackClicked() { BackRequested?.Invoke(); }
+    private void OnBackClicked() { if (!_readOnly) BackRequested?.Invoke(); }
+
+    private int GetLevel(TraitId id)
+    {
+        if (!_readOnly) return _progression.GetLevel(id);
+        foreach (TraitLevelEntry entry in _levels)
+            if (entry.Id == id) return entry.Level;
+        return 0;
+    }
 
     public void Shutdown()
     {
@@ -526,6 +571,8 @@ public class OutGameTraitView : MonoBehaviour
         if (_backButton != null) _backButton.onClick.RemoveListener(OnBackClicked);
         _progression = null;
         _wallet = null;
+        _data = null;
+        _levels.Clear();
         _hoveredTrait = TraitId.None;
         HideHoverInfo();
     }
@@ -533,7 +580,7 @@ public class OutGameTraitView : MonoBehaviour
     private void OnEnable()
     {
         // 제단/토템 화면에서 돌아올 때 저장된 특성/혈석 상태 재동기화.
-        if (_progression != null && _wallet != null) Refresh();
+        if (_data != null) Refresh();
     }
 
     private void OnDisable()

@@ -48,6 +48,9 @@ namespace Game.Core
     public class ArchiveManager : MonoBehaviour, ISummary, ISaveDataProvider<ArchiveSaveData>
     {
         private IArtifactReader _artifactReader;
+        private TotemRunApplier _totemReader;
+        private AltarManager _altarReader;
+        private TraitRunApplier _traitReader;
         private RuntimeUnitManager _unitManager;
         private WaveController _waveController;
         private RunStats _runStats; //현재 진행중인 정보를 저장
@@ -66,9 +69,13 @@ namespace Game.Core
                 _unitManager.UnitDied -= RefreshUnitDied;
         }
 
-        public void Initialize(IArtifactReader reader, RuntimeUnitManager unitManager, WaveController waveController)
+        public void Initialize(IArtifactReader reader, RuntimeUnitManager unitManager, WaveController waveController,
+            TotemRunApplier totemReader, AltarManager altarReader = null, TraitRunApplier traitReader = null)
         {
             _artifactReader = reader;
+            _totemReader = totemReader;
+            _altarReader = altarReader;
+            _traitReader = traitReader;
             _unitManager = unitManager;
             _waveController = waveController;
             _artifactReader.StackChanged += RefreshArtifacts;
@@ -83,7 +90,9 @@ namespace Game.Core
         public void CompleteRun()
         {
             _isRecording = false;
-            _runSummary = new RunSummary(_runStats);
+
+            IReadOnlyList<ActiveTotem> totems = _totemReader.ActiveTotems;
+            _runSummary = new RunSummary(_runStats, totems, _altarReader?.Selected, _traitReader?.CaptureLevels());
         }
 
         public bool TryGetRunSummary(out RunSummary summary)
@@ -180,17 +189,29 @@ namespace Game.Core
         public int ClearWaveCount { get; }
         public int ClearBossCount { get; }
         public IReadOnlyDictionary<ArtifactRarity, int> Artifacts { get; }
+        public IReadOnlyList<ActiveTotem> Totems { get; }
+        public AltarData Altar { get; }
+        public IReadOnlyList<TraitLevelEntry> Traits { get; }
 
-        public RunSummary(RunStats stats)
+        public RunSummary(RunStats stats, IReadOnlyList<ActiveTotem> totems,
+            AltarData altar = null, IReadOnlyList<TraitLevelEntry> traits = null)
         {
+            Altar = altar;
+            var copiedTraits = new List<TraitLevelEntry>();
+            if (traits != null)
+                foreach (TraitLevelEntry entry in traits)
+                    copiedTraits.Add(new TraitLevelEntry { Id = entry.Id, Level = entry.Level });
+            Traits = copiedTraits.AsReadOnly();
             AllyDeathCount = stats.AllyDeathCount;
             EnemyKillCount = stats.EnemyKillCount;
             MaxQuarter = stats.MaxQuarter;
             MaxWave = stats.MaxWave;
             ClearWaveCount = stats.ClearWaveCount;
             ClearBossCount = stats.ClearBossCount;
-            
             // 현재 기록과 독립된 복사본을 만든 뒤 읽기 전용으로 제공
+            Totems = totems == null
+                ? Array.Empty<ActiveTotem>()
+                : new List<ActiveTotem>(totems).AsReadOnly();
             Artifacts = new ReadOnlyDictionary<ArtifactRarity, int>(
                 new Dictionary<ArtifactRarity, int>(stats.Artifacts));
         }
