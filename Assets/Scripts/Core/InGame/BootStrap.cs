@@ -11,7 +11,7 @@ using Units.Skills;
 using UnityEngine;
 using UnityEngine.Serialization;
 /// 각 시스템의 참조 연결과 초기화 순서를 관리하고,
-/// 준비가 완료되면 GameFlowController.BeginRun()을 호출한다.
+/// 준비가 완료되고 화면이 표시되면 GameFlowController.BeginRun()을 호출한다.
 ///
 /// 각 담당 파트 요청 사항:
 /// - 외부 연결이 필요한 대표 매니저와 Initialize 메서드를 제공
@@ -23,7 +23,7 @@ using UnityEngine.Serialization;
 ///
 /// 초기화 중 다른 시스템에 게임 진행을 요청하는 이벤트는 발생시키지 않고
 /// 이벤트 구독 해제와 재초기화 시 중복 구독 방지는 각 시스템에서 처리.
-public class BootStrap : MonoBehaviour
+public class BootStrap : MonoBehaviour, ISceneEntry
 {
     #region Systems
     [Header("Systems")]
@@ -79,29 +79,38 @@ public class BootStrap : MonoBehaviour
 
     async void Start()
     {
+        if (SceneLoadingManager.Instance != null) return;
 
-        if (!ValidateReferences()) return;
         try
         {
+            await InitializeAsync(null);
+            OnPresented();
+        }
+        catch (OperationCanceledException) when (this == null) { }
+        catch (Exception exception)
+        {
+            StopStartup(exception.Message);
+        }
+    }
+
+    public async UniTask InitializeAsync(ISceneTransition transition)
+    {
+        try
+        {
+            if (!ValidateReferences())
+                throw new InvalidOperationException("인게임 시작에 필요한 참조를 확인해주세요.");
+
+            _gameFlowController.InitializeSceneTransition(transition);
             InitializePersistentManagers();
             if (!InitializeManagers())
-            {
-                _gameFlowController.BlockStartup();
-                return;
-            }
+                throw new InvalidOperationException("인게임 매니저 초기화에 실패했습니다.");
             // 모든 슬롯의 Start에서 기본 배치 연결이 끝난 뒤 UI와 저장 상태를 연결한다.
             await UniTask.NextFrame(cancellationToken: this.GetCancellationTokenOnDestroy());
             if (!InitializeUI())
-            {
-                _gameFlowController.BlockStartup();
-                return;
-            }
+                throw new InvalidOperationException("인게임 UI 초기화에 실패했습니다.");
             if (!_eventManager.Initialize(_runCurrencyManager, _artifactManager, _gameFlowController,
                     _uiStartup.EventUI, _uiStartup.ArtifactSelectionUI))
-            {
-                StopStartup("EventManager 초기화에 실패했습니다.");
-                return;
-            }
+                throw new InvalidOperationException("EventManager 초기화에 실패했습니다.");
             _gameFlowController.InitializeEventFlow(_eventManager);
             _testScript.Initialize(_gameFlowController, _waveController);
             _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
@@ -114,21 +123,19 @@ public class BootStrap : MonoBehaviour
             bool hasRunSave = _saveManager.HasSaveFile(InGameSaveCoordinator.SaveKey);
             if (!_outGameSaveCoordinator.TryLoad(hasRunSave, out string error)
                 || !TryPrepareRun(hasRunSave, out error))
-            {
-                StopStartup(error);
-                return;
-            }
+                throw new InvalidOperationException(error);
             _archiveController.Initialize(_saveManager, _artifactManager, _buildingSlots,
                 _gameFlowController, _runtimeUnitManager);
             _uiStartup.InitializeArchive(_archiveController);
-            _gameFlowController.BeginRun();
         }
-        catch (OperationCanceledException) when (this == null) { }
-        catch (Exception exception)
+        catch
         {
-            StopStartup(exception.Message);
+            _gameFlowController?.BlockStartup();
+            throw;
         }
     }
+
+    public void OnPresented() => _gameFlowController.BeginRun();
 
     private bool TryPrepareRun(bool hasRunSave, out string error)
     {
@@ -214,7 +221,7 @@ public class BootStrap : MonoBehaviour
         _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager, _altarManager, _totemRunApplier, _traitRunApplier);
     }
     // UI 부분을 초기화 한다
-    public bool InitializeUI()
+    private bool InitializeUI()
     {
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())

@@ -1,6 +1,6 @@
 using System.Text;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 // 선택 결과를 모아 게임 시작을 처리합니다. UI 표시와 화면 이동은 UIController가 담당합니다.
 public class OutGameStartController : MonoBehaviour
@@ -8,17 +8,19 @@ public class OutGameStartController : MonoBehaviour
     private IAltarSelection _altars;
     private ITraitProgression _traits;
     private ITotemSelection _totems;
+    private ISceneTransition _transition;
     private OutGameSaveCoordinator _saveCoordinator;
 
     public OutGameStartContext LastStartContext { get; private set; }
 
     private bool _isRunning;
     public void Initialize(IAltarSelection altars, ITraitProgression traits, ITotemSelection totems,
-        OutGameSaveCoordinator saveCoordinator = null)
+        ISceneTransition transition, OutGameSaveCoordinator saveCoordinator = null)
     {
         _altars = altars;
         _traits = traits;
         _totems = totems;
+        _transition = transition;
         _saveCoordinator = saveCoordinator;
         LastStartContext = null;
         _isRunning = false;
@@ -41,7 +43,9 @@ public class OutGameStartController : MonoBehaviour
         return context;
     }
 
-    public void StartRun()
+    public void StartRun() => StartRunAsync().Forget();
+
+    private async UniTask StartRunAsync()
     {
         if (_isRunning) return;
         _isRunning = true;
@@ -68,11 +72,11 @@ public class OutGameStartController : MonoBehaviour
 
             LastStartContext = context;
             Debug.Log(BuildStartLog(context), this);
-            SceneManager.LoadScene("Test_InGame");
+            await _transition.LoadAsync("Test_InGame");
         }
         catch (System.Exception exception)
         {
-            _isRunning = false;
+            if (this != null) _isRunning = false;
             Debug.LogError("[OutGameController] 게임 시작에 실패했습니다. " + exception.Message, this);
         }
     }

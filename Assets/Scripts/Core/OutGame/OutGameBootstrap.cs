@@ -1,8 +1,9 @@
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
 
 // 테스트 시작에 필요한 참조와 초기화 순서만 담당합니다.
-public class OutGameBootstrap : MonoBehaviour
+public class OutGameBootstrap : MonoBehaviour, ISceneEntry
 {
     [SerializeField] private PersistentCurrencyManager _wallet;
     [SerializeField] private OutGameAltarController altarController;
@@ -17,13 +18,17 @@ public class OutGameBootstrap : MonoBehaviour
     public bool IsInitialized { get; private set; }
     private bool _initializationStarted;
 
-    private void Start()
+    public UniTask InitializeAsync(ISceneTransition transition)
     {
-        Initialize();
+        if (!Initialize(transition))
+            throw new System.InvalidOperationException("[OutGameBootstrap] 아웃게임 초기화에 실패했습니다.");
+        return UniTask.CompletedTask;
     }
 
+    public void OnPresented() { }
+
     // 판 설정은 초기화하고, 특성과 혈석은 저장된 상태로 복원합니다.
-    public bool Initialize()
+    public bool Initialize(ISceneTransition transition)
     {
         if (IsInitialized) return true;
         if (_initializationStarted)
@@ -55,7 +60,7 @@ public class OutGameBootstrap : MonoBehaviour
             return false;
         }
 
-        startController.Initialize(altarController, traitController, totemController, _persistentSaveCoordinator);
+        startController.Initialize(altarController, traitController, totemController, transition, _persistentSaveCoordinator);
         _uiController.Initialize(altarController, traitController, totemController, _wallet, startController);
         IsInitialized = true;
         return true;
