@@ -57,6 +57,7 @@ public class BootStrap : MonoBehaviour, ISceneEntry
     #region UI
     [Header("UI")]
     [SerializeField] private InGameUIStartup _uiStartup;
+    [SerializeField] private TutorialController _tutorial;
     [SerializeField] private ArchiveController _archiveController;
     private BuildingSlot[] _buildingSlots;
     public bool IsUIConnected => _uiStartup != null && _uiStartup.IsReady;
@@ -135,7 +136,13 @@ public class BootStrap : MonoBehaviour, ISceneEntry
         }
     }
 
-    public void OnPresented() => _gameFlowController.BeginRun();
+    public void OnPresented() => PresentAsync().Forget();
+
+    private async UniTask PresentAsync()
+    {
+        await _gameFlowController.BeginRunAsync();
+        if (this != null) _tutorial?.StartInGame(_outGameSaveCoordinator, _gameFlowController);
+    }
 
     private bool TryPrepareRun(bool hasRunSave, out string error)
     {

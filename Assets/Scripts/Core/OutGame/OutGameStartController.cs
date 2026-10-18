@@ -63,6 +63,12 @@ public class OutGameStartController : MonoBehaviour
                 _isRunning = false;
                 return;
             }
+            if (_saveCoordinator.IsFirstRunRestricted && context.Totems.Exists(entry => entry.Level != 0))
+            {
+                Debug.LogError("[OutGameController] 첫 원정에는 토템을 적용할 수 없습니다.", this);
+                _isRunning = false;
+                return;
+            }
             if (!_saveCoordinator.TrySave(out string error))
             {
                 Debug.LogError("[OutGameController] 시작 설정 저장에 실패했습니다. " + error, this);

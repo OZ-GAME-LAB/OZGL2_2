@@ -9,6 +9,21 @@ public class PersistentSaveData
     public AltarRunSaveData Altar;
     public TotemRunSaveData Totem;
     public string LastSettledRunId;
+    public TutorialSaveData Tutorial;
+}
+
+[Serializable]
+public class TutorialSaveData
+{
+    // 0은 기능 도입 이전 저장입니다. 신규 프로필 생성 시에만 1로 설정합니다.
+    public int Version;
+    public bool OutGameHandled;
+    public bool InGameHandled;
+
+    public TutorialSaveData Copy() => new TutorialSaveData
+    {
+        Version = Version, OutGameHandled = OutGameHandled, InGameHandled = InGameHandled
+    };
 }
 
 [Serializable]

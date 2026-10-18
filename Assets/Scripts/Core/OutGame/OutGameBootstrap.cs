@@ -14,6 +14,7 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
     [SerializeField] private OutGameSaveCoordinator _persistentSaveCoordinator;
     [FormerlySerializedAs("_uiBinding")]
     [SerializeField] private OutGameUIController _uiController;
+    [SerializeField] private TutorialController _tutorial;
 
     public bool IsInitialized { get; private set; }
     private bool _initializationStarted;
@@ -25,7 +26,7 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
         return UniTask.CompletedTask;
     }
 
-    public void OnPresented() { }
+    public void OnPresented() => _tutorial?.StartOutGame();
 
     // 판 설정은 초기화하고, 특성과 혈석은 저장된 상태로 복원합니다.
     public bool Initialize(ISceneTransition transition)
@@ -60,8 +61,10 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
             return false;
         }
 
+        totemController.SetSelectionLocked(_persistentSaveCoordinator.IsFirstRunRestricted);
         startController.Initialize(altarController, traitController, totemController, transition, _persistentSaveCoordinator);
         _uiController.Initialize(altarController, traitController, totemController, _wallet, startController);
+        _tutorial?.InitializeOutGame(_persistentSaveCoordinator, _uiController);
         IsInitialized = true;
         return true;
     }

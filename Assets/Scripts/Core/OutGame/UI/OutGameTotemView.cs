@@ -8,6 +8,7 @@ using UnityEngine.UI;
 
 public class OutGameTotemView : MonoBehaviour
 {
+    private bool SelectionLocked => selection is OutGameTotemController controller && controller.SelectionLocked;
     [Header("Totems")]
     [SerializeField]
     private TotemButtonUI[] totemButtons;
@@ -388,7 +389,7 @@ public class OutGameTotemView : MonoBehaviour
         TotemButtonUI button,
         PointerEventData.InputButton mouseButton)
     {
-        if (_readOnly || _data == null ||
+        if (_readOnly || SelectionLocked || _data == null ||
             button == null)
         {
             return;
@@ -562,7 +563,9 @@ public class OutGameTotemView : MonoBehaviour
         if (builder.Length == 0)
         {
             activeEffectsText.text =
-                "활성화된 토템 없음";
+                SelectionLocked
+                    ? "첫 원정에는 토템을 적용하지 않습니다.\n효과는 자유롭게 살펴보세요.\n첫 원정 정산 후 사용할 수 있습니다."
+                    : "활성화된 토템 없음";
         }
         else
         {
