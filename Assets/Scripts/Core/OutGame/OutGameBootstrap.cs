@@ -11,6 +11,7 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
     [SerializeField] private OutGameTotemController totemController;
     [SerializeField] private OutGameStartController startController;
     [SerializeField] private SaveManager _saveManager;
+    [SerializeField] private GameSettingsManager _gameSettingsManager;
     [SerializeField] private OutGameSaveCoordinator _persistentSaveCoordinator;
     [FormerlySerializedAs("_uiBinding")]
     [SerializeField] private OutGameUIController _uiController;
@@ -41,6 +42,7 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
         if (!ValidateReferences()) return false;
         _initializationStarted = true;
 
+        _gameSettingsManager.Initialize(_saveManager);
         _uiController.Shutdown();
         _wallet.Initialize();
         altarController.Initialize(_persistentSaveCoordinator.Unlocks);

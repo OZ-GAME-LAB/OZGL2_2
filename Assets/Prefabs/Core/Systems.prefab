@@ -40,8 +40,53 @@ Transform:
   - {fileID: 4954199605053253758}
   - {fileID: 4652459651026553525}
   - {fileID: 5058123225636442769}
+  - {fileID: 4491413548785706161}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &7085958542651214237
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4491413548785706161}
+  - component: {fileID: 289553411117783004}
+  m_Layer: 0
+  m_Name: GameSettings
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4491413548785706161
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7085958542651214237}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4207534559104598044}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &289553411117783004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7085958542651214237}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 528cf25fffdb3d14c9f1c80c7d0438d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameSettingsManager
 --- !u!1001 &2603212802389430256
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -227,6 +272,10 @@ PrefabInstance:
       propertyPath: _runtimeUnitManager
       value: 
       objectReference: {fileID: 4817448607606958477}
+    - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
+      propertyPath: _gameSettingsManager
+      value: 
+      objectReference: {fileID: 289553411117783004}
     - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
       propertyPath: _buildingCoreProgress
       value: 

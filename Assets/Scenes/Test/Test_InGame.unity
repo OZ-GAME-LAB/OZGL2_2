@@ -2052,6 +2052,7 @@ GameObject:
   - component: {fileID: 812993879}
   - component: {fileID: 812993880}
   - component: {fileID: 812993881}
+  - component: {fileID: 812993882}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2238,11 +2239,23 @@ MonoBehaviour:
   _zoomSensitivity: 0.15
   _zoomResponse: 12
   _battlePrepareDelay: 2
-  _battleOverviewMoveDuration: 2
-  _battleOverviewHoldDuration: 3
+  _battleOverviewMoveDuration: 1.5
+  _battleOverviewHoldDuration: 2
   _battleReturnDuration: 1
   _maxOverviewOrthographicSize: 20
   _buildingFocusSize: 8
+--- !u!114 &812993882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 812993875}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db7a49b86999ed34699bb923d2229daa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraResolutionRatioController
 --- !u!114 &859719478 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 3398978627708695298, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
@@ -3711,7 +3724,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4719435597006020467, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 4770411913577818815, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -3727,7 +3740,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5145535021911383695, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5198625656778652387, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -3817,6 +3830,14 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5870211892474738740, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+      propertyPath: OptionButton
+      value: 
+      objectReference: {fileID: 1324357010}
+    - target: {fileID: 5870211892474738740, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+      propertyPath: OptionUIPanel
+      value: 
+      objectReference: {fileID: 1324357009}
     - target: {fileID: 6246436131577331069, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4281348144
@@ -3992,6 +4013,10 @@ PrefabInstance:
     - target: {fileID: 7892190984137814239, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 7974081592293763767, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8393690153922661579, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -4673,6 +4698,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f93557fa4bbb0344bf1d2cb3e7a7c71, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingSlot
+--- !u!1 &1324357009 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7974081592293763767, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+  m_PrefabInstance: {fileID: 1150398547}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1324357010 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5411282944673093453, guid: 7bad2141f59304c4dbc2f75721d0759a, type: 3}
+  m_PrefabInstance: {fileID: 1150398547}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1 &1342776863
 GameObject:
   m_ObjectHideFlags: 0
@@ -6004,7 +6045,7 @@ Transform:
   m_GameObject: {fileID: 1787196295}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -17, y: -2, z: 0}
+  m_LocalPosition: {x: -12, y: -2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

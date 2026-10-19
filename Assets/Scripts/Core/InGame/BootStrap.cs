@@ -53,6 +53,7 @@ public class BootStrap : MonoBehaviour, ISceneEntry
     [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
     [SerializeField] private OutGameSaveCoordinator _outGameSaveCoordinator;
     [SerializeField] private SaveManager _saveManager;
+    [SerializeField] private GameSettingsManager _gameSettingsManager;
     #endregion
 
     #region UI
@@ -102,6 +103,7 @@ public class BootStrap : MonoBehaviour, ISceneEntry
             if (!ValidateReferences())
                 throw new InvalidOperationException("인게임 시작에 필요한 참조를 확인해주세요.");
 
+            _gameSettingsManager.Initialize(_saveManager);
             _gameFlowController.InitializeSceneTransition(transition);
             InitializePersistentManagers();
             if (!InitializeManagers())
