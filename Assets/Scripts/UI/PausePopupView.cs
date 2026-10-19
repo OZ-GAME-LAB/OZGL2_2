@@ -6,8 +6,13 @@ using UnityEngine.UI;
 
 public class PausePopupView : MonoBehaviour
 {
+    [Header("Buttons")]
+    [SerializeField] private Button OptionButton;
     [SerializeField] private Button AbandonButton;
     [SerializeField] private Button ReturnToMainButton;
+
+    [Header("UI")]
+    [SerializeField] private GameObject OptionUIPanel;
 
     private GameFlowController _gameFlowController;
     private InGameUIManager _uiManager;
@@ -16,6 +21,7 @@ public class PausePopupView : MonoBehaviour
 
     private void Start()
     {
+        OptionButton.onClick.AddListener(OpenOptionPanel);
         AbandonButton.onClick.AddListener(AbandonRun);
         ReturnToMainButton.onClick.AddListener(ReturnToMain);
     }
@@ -33,6 +39,7 @@ public class PausePopupView : MonoBehaviour
 
     private void OnDestroy()
     {
+        OptionButton.onClick.RemoveListener(OpenOptionPanel);
         AbandonButton.onClick.RemoveListener(AbandonRun);
         ReturnToMainButton.onClick.RemoveListener(ReturnToMain);
     }
@@ -43,6 +50,12 @@ public class PausePopupView : MonoBehaviour
         _uiManager = uiManager;
         _confirmPopup = confirmPopup;
     }
+
+    private void OpenOptionPanel()
+    {
+        OptionUIPanel.SetActive(true);
+    }
+
     private void ReturnToMain()
     {
         ShowConfirmation("메인화면으로 이동하시겠습니까?\n전투 진행사항은 저장되지 않습니다", _gameFlowController.QuitRun);
