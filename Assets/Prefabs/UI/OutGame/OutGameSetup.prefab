@@ -1,5 +1,54 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1677317768412183523
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4658853302996519772}
+  - component: {fileID: 1627989713883504278}
+  m_Layer: 0
+  m_Name: Core
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4658853302996519772
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1677317768412183523}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3994593085020175243}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1627989713883504278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1677317768412183523}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70fe7354b07db964f920f52397efa311, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Core.UnlockManager
+  _definitions:
+  - {fileID: 11400000, guid: c46880739362be44db6c35b96bbd1cd3, type: 2}
+  - {fileID: 11400000, guid: 0b6e88a05b2b8aa4e992193faa37e53d, type: 2}
+  - {fileID: 11400000, guid: 20288d93677df8c4abaf92d66923b149, type: 2}
+  - {fileID: 11400000, guid: cccfe90444ba2db4daaddfd756ad82f1, type: 2}
 --- !u!1 &3252665843454623991
 GameObject:
   m_ObjectHideFlags: 0
@@ -66,6 +115,7 @@ GameObject:
   - component: {fileID: 3767920757123793249}
   - component: {fileID: 2730888209641633859}
   - component: {fileID: 7589715593568898011}
+  - component: {fileID: 3051250007463998317}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -85,7 +135,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 4658853302996519772}
   m_Father: {fileID: 1072019051224296481}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3975238382577291440
@@ -205,6 +256,8 @@ MonoBehaviour:
   _saveManager: {fileID: 2730888209641633859}
   _gameSettingsManager: {fileID: 7577218579336318049}
   _persistentSaveCoordinator: {fileID: 7589715593568898011}
+  _archiveController: {fileID: 3051250007463998317}
+  _unlockManager: {fileID: 1627989713883504278}
   _uiController: {fileID: 3920198623483833111}
   _tutorial: {fileID: 0}
 --- !u!114 &2730888209641633859
@@ -231,11 +284,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c89d73aa1c21dda43b2c7655017378ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutGameSaveCoordinator
-  _unlockDefinitions:
-  - {fileID: 11400000, guid: c46880739362be44db6c35b96bbd1cd3, type: 2}
-  - {fileID: 11400000, guid: 0b6e88a05b2b8aa4e992193faa37e53d, type: 2}
-  - {fileID: 11400000, guid: 20288d93677df8c4abaf92d66923b149, type: 2}
-  - {fileID: 11400000, guid: cccfe90444ba2db4daaddfd756ad82f1, type: 2}
+--- !u!114 &3051250007463998317
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4939792028421604940}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f337c7853b01094686c31fffa69d034, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Archive.ArchiveController
 --- !u!1 &5380570442913128589
 GameObject:
   m_ObjectHideFlags: 0

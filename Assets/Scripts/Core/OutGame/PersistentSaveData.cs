@@ -4,6 +4,9 @@ using System;
 [Serializable]
 public class PersistentSaveData
 {
+    // 0은 도감 통합 이전 파일입니다. 1부터 Archive는 필수입니다.
+    public int ArchiveVersion;
+    public Game.Archive.ArchiveProgressSaveData Archive;
     // 0은 누적 기록 도입 이전 저장입니다. 필드 누락을 새 데이터와 구분합니다.
     public int ProgressVersion;
     public Game.Core.PlayerRecordSaveData Records;

@@ -237,6 +237,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 3203228187692769034}
     - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
+      propertyPath: _unlockManager
+      value: 
+      objectReference: {fileID: 6032334704481917067}
+    - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
       propertyPath: _archiveManager
       value: 
       objectReference: {fileID: 3857504133096635395}
@@ -264,6 +268,10 @@ PrefabInstance:
       propertyPath: _persistentTraits
       value: 
       objectReference: {fileID: 4276260885721077902}
+    - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
+      propertyPath: _runRecordManager
+      value: 
+      objectReference: {fileID: 3857504133096635395}
     - target: {fileID: 6902105097158593958, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
       propertyPath: _runCurrencyManager
       value: 
@@ -330,6 +338,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 9210137385767385224, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6600772222949329545}
+    - targetCorrespondingSourceObject: {fileID: 9210137385767385224, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6032334704481917067}
   m_SourcePrefab: {fileID: 100100000, guid: 15e618dbf1afa6a4cb947270ac53b37a, type: 3}
 --- !u!4 &2869757339014737461 stripped
 Transform:
@@ -387,6 +398,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b48747441f147ec84458ee219de1da9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingUIConnection
+--- !u!114 &6032334704481917067
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5522329597704422637}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70fe7354b07db964f920f52397efa311, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Game.Core.UnlockManager
+  _definitions:
+  - {fileID: 11400000, guid: c46880739362be44db6c35b96bbd1cd3, type: 2}
+  - {fileID: 11400000, guid: 0b6e88a05b2b8aa4e992193faa37e53d, type: 2}
+  - {fileID: 11400000, guid: 20288d93677df8c4abaf92d66923b149, type: 2}
+  - {fileID: 11400000, guid: cccfe90444ba2db4daaddfd756ad82f1, type: 2}
 --- !u!1001 &4606525673056401832
 PrefabInstance:
   m_ObjectHideFlags: 0

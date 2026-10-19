@@ -42,17 +42,16 @@ namespace Game.Core.Editor
                 var root = PrefabUtility.LoadPrefabContents(path);
                 try
                 {
-                    foreach (var coordinator in root.GetComponentsInChildren<OutGameSaveCoordinator>(true)) Connect(coordinator, definitions);
+                    Connect(root, definitions);
                     PrefabUtility.SaveAsPrefabAsset(root, path);
                 }
                 finally { PrefabUtility.UnloadPrefabContents(root); }
             }
             // 현재 인스턴스의 override도 확인하고 필요한 참조만 연결합니다.
             bool changed = false;
-            foreach (var root in original.GetRootGameObjects())
-                foreach (var coordinator in root.GetComponentsInChildren<OutGameSaveCoordinator>(true)) changed |= Connect(coordinator, definitions);
+            foreach (var root in original.GetRootGameObjects()) changed |= Connect(root, definitions);
             if (changed) EditorSceneManager.SaveScene(original);
-            return "해금 4종, 제단 4종, 저장 프리팹 3종 연결 완료";
+            return "해금 4종, 제단 4종, Core의 UnlockManager와 Bootstrap 연결 완료";
         }
 
         private static UnlockData Create(string name, string id, bool defaultUnlocked, UnlockCondition condition, int required, string description)
@@ -72,17 +71,43 @@ namespace Game.Core.Editor
             return data;
         }
 
-        private static bool Connect(OutGameSaveCoordinator coordinator, UnlockData[] definitions)
+        public static bool Connect(GameObject root, UnlockData[] definitions)
         {
-            var so = new SerializedObject(coordinator);
-            var array = so.FindProperty("_unlockDefinitions");
-            if (array.arraySize == definitions.Length && definitions.Select((d, i) => array.GetArrayElementAtIndex(i).objectReferenceValue == d).All(same => same))
-                return false;
-            array.arraySize = definitions.Length;
-            for (int i = 0; i < definitions.Length; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = definitions[i];
-            so.ApplyModifiedPropertiesWithoutUndo();
-            if (PrefabUtility.IsPartOfPrefabInstance(coordinator)) PrefabUtility.RecordPrefabInstancePropertyModifications(coordinator);
-            return true;
+            Component bootstrap = root.GetComponentInChildren<BootStrap>(true);
+            if (bootstrap == null) bootstrap = root.GetComponentInChildren<OutGameBootstrap>(true);
+            if (bootstrap == null) return false;
+
+            bool changed = false;
+            var core = bootstrap is BootStrap ? bootstrap.transform : bootstrap.transform.Find("Core");
+            if (core == null)
+            {
+                core = new GameObject("Core").transform;
+                core.SetParent(bootstrap.transform, false);
+                changed = true;
+            }
+            var manager = core.GetComponent<UnlockManager>();
+            if (manager == null) { manager = core.gameObject.AddComponent<UnlockManager>(); changed = true; }
+            var so = new SerializedObject(manager);
+            var array = so.FindProperty("_definitions");
+            if (array.arraySize != definitions.Length ||
+                !definitions.Select((d, i) => array.GetArrayElementAtIndex(i).objectReferenceValue == d).All(same => same))
+            {
+                array.arraySize = definitions.Length;
+                for (int i = 0; i < definitions.Length; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = definitions[i];
+                so.ApplyModifiedPropertiesWithoutUndo();
+                if (PrefabUtility.IsPartOfPrefabInstance(manager)) PrefabUtility.RecordPrefabInstancePropertyModifications(manager);
+                changed = true;
+            }
+            var entry = new SerializedObject(bootstrap);
+            var reference = entry.FindProperty("_unlockManager");
+            if (reference.objectReferenceValue != manager)
+            {
+                reference.objectReferenceValue = manager;
+                entry.ApplyModifiedPropertiesWithoutUndo();
+                if (PrefabUtility.IsPartOfPrefabInstance(bootstrap)) PrefabUtility.RecordPrefabInstancePropertyModifications(bootstrap);
+                changed = true;
+            }
+            return changed;
         }
     }
 }

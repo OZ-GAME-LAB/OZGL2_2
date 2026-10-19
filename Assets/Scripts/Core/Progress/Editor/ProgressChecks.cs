@@ -40,7 +40,19 @@ namespace Game.Core.Editor
             holder.SetActive(false);
             try
             {
-                var unlocks = new UnlockManager(Definitions());
+                var unlocks = holder.AddComponent<UnlockManager>();
+                var serializedUnlocks = new SerializedObject(unlocks);
+                var definitionArray = serializedUnlocks.FindProperty("_definitions");
+                var definitions = Definitions();
+                definitionArray.arraySize = definitions.Length;
+                for (int i = 0; i < definitions.Length; i++)
+                    definitionArray.GetArrayElementAtIndex(i).objectReferenceValue = definitions[i];
+                serializedUnlocks.ApplyModifiedPropertiesWithoutUndo();
+                unlocks.Initialize();
+                var unconfigured = holder.AddComponent<UnlockManager>();
+                Reject(() => unconfigured.Initialize(), "정의가 없는 MonoBehaviour 초기화 거부");
+                Check(!unconfigured.IsInitialized, "초기화 실패 시 준비 완료로 처리하지 않음");
+                Object.DestroyImmediate(unconfigured);
                 var records = PlayerRecordSaveData.CreateEmpty();
                 var initial = unlocks.CaptureSaveData();
                 Check(initial.Ids.SequenceEqual(new[] { "altar.abundance" }), "풍요 기본 해금");
@@ -56,6 +68,9 @@ namespace Game.Core.Editor
                 earned = unlocks.Evaluate(records, earned);
                 Check(earned.Ids.Contains("altar.guardian"), "4분기 보스 클리어 해금");
                 Check(unlocks.Evaluate(PlayerRecordSaveData.CreateEmpty(), earned).Ids.Count == 4, "해금 ID 영구 유지");
+                unlocks.RestoreSaveData(earned);
+                unlocks.Initialize();
+                Check(unlocks.CaptureSaveData().Ids.Count == 4, "반복 초기화가 복원된 해금을 유지");
                 Reject(() => new PlayerRecordSaveData { Version = 1, EnemyKills = -1 }.Validate(), "음수 횟수 거부");
                 Reject(() => new PlayerRecordSaveData { Version = 1, TotalDamage = double.NaN }.Validate(), "NaN 피해 거부");
                 Reject(() => new PlayerRecordSaveData { Version = 1, TotalDamage = double.PositiveInfinity }.Validate(), "무한 피해 거부");
@@ -101,8 +116,10 @@ namespace Game.Core.Editor
                 var traits = root.GetComponentInChildren<OutGameTraitController>(true);
                 var altar = root.GetComponentInChildren<OutGameAltarController>(true);
                 var totems = root.GetComponentInChildren<OutGameTotemController>(true);
-                wallet.Initialize(); altar.Initialize(coordinator.Unlocks); traits.Initialize(wallet, coordinator); totems.Initialize();
-                coordinator.Initialize(save, traits, wallet, altar, totems);
+                var sceneUnlocks = root.GetComponentInChildren<UnlockManager>(true);
+                sceneUnlocks.Initialize();
+                wallet.Initialize(); altar.Initialize(sceneUnlocks); traits.Initialize(wallet, coordinator); totems.Initialize();
+                coordinator.Initialize(save, traits, wallet, altar, totems, root.GetComponentInChildren<Game.Archive.ArchiveController>(true), sceneUnlocks);
                 Check(coordinator.TryLoadOrCreate(out string error), "최초 영구 저장: " + error);
                 var locked = coordinator.CaptureSaveData();
                 locked.Altar.SelectedAltar = AltarId.Guardian;
@@ -110,18 +127,18 @@ namespace Game.Core.Editor
                 var oldSave = coordinator.CaptureSaveData();
                 oldSave.ProgressVersion = 0; oldSave.Records = null; oldSave.Unlocks = null;
                 Check(save.TrySave(OutGameSaveCoordinator.SaveKey, oldSave, out error) && coordinator.TryLoad(out error), "구버전 영구 저장 변환: " + error);
-                Check(coordinator.Records.CaptureSaveData().EnemyKills == 0 && coordinator.Unlocks.IsUnlocked("altar.abundance"), "이전 프로필 빈 기록 / 풍요 유지");
+                Check(coordinator.Records.CaptureSaveData().EnemyKills == 0 && sceneUnlocks.IsUnlocked("altar.abundance"), "이전 프로필 빈 기록 / 풍요 유지");
                 var provider = new SummaryProvider { Summary = summary };
                 var ui = new ResultStub();
                 var bridge = new RunSettlementSaveBridge(coordinator, () => "progress-test-run", ui, _ => UniTask.CompletedTask,
-                    provider, coordinator.Records, coordinator.Unlocks);
+                    provider, coordinator.Records, sceneUnlocks);
                 var next = bridge.CaptureSaveData();
                 int before = next.Wallet.Amount;
                 next.Wallet = new PersistentWalletSaveData(before + 30);
                 string blocked = Path.Combine(directory, "blocked"); File.WriteAllText(blocked, "not a directory");
                 save.ConfigureDirectory(blocked);
                 Check(!bridge.TrySave(next, out error), "실제 파일 저장 실패 검출");
-                Check(coordinator.Records.CaptureSaveData().TotalDamage == 0 && !coordinator.Unlocks.IsUnlocked("altar.conquest") && wallet.CaptureSaveData().Amount == before,
+                Check(coordinator.Records.CaptureSaveData().TotalDamage == 0 && !sceneUnlocks.IsUnlocked("altar.conquest") && wallet.CaptureSaveData().Amount == before,
                     "저장 실패 시 기록·해금·지갑 불변");
                 save.ConfigureDirectory(directory);
                 next = bridge.CaptureSaveData(); next.Wallet = new PersistentWalletSaveData(before + 30);

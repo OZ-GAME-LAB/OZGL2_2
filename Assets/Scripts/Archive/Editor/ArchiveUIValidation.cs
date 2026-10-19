@@ -61,7 +61,8 @@ namespace Game.Archive.Editor
                 var buildingDetail = (BuildingInfoView)Get(view, "_buildingDetail");
                 var unitDetail = (UnitPopupView)Get(view, "_unitDetail");
                 AssertReferences(artifactDetail, "_screen");
-                AssertReferences(buildingDetail, "_playerPopup");
+                Check(!(bool)Get(buildingDetail, "_compactManagement"), "archive uses full building details");
+                AssertReferences(buildingDetail, "_playerPopup", "_spawnRoot", "_spawnTimingText", "_spawnValueText");
                 AssertReferences(unitDetail, "_screen");
                 Check(Get(unitDetail, "_skillPopup") is SkillPopupView skill && skill.transform.IsChildOf(ui.transform),
                     "archive skills use the shared ingame popup");
@@ -128,11 +129,11 @@ namespace Game.Archive.Editor
                     },
                     UnreadKeys = new List<string> { "0:" + knownArtifact.Id, "1:" + primary.BuildingId, "2:" + knownEnemy.UnitId }
                 };
-                Check(save.TrySave(ArchiveController.SaveKey, fixture, out string error), "temporary fixture save: " + error);
                 var flow = root.AddComponent<GameFlowController>();
                 var units = root.AddComponent<RuntimeUnitManager>();
                 controller = root.AddComponent<ArchiveController>();
-                controller.Initialize(save, new EmptyArtifactReader(), Array.Empty<BuildingSlot>(), flow, units);
+                controller.RestoreSaveData(fixture);
+                controller.Initialize(new EmptyArtifactReader(), Array.Empty<BuildingSlot>(), flow, units);
                 view.Initialize(controller);
                 Call(buildingDetail, "Awake");
                 Check(manager.InitializeScreens(), "actual ingame screen registry initializes");
@@ -228,8 +229,8 @@ namespace Game.Archive.Editor
                     Call(view, "OnDisable");
                     Check(Mathf.Approximately(Time.timeScale, speed), "repeated disable cannot restore twice");
                 }
-                Check(save.TryLoad(ArchiveController.SaveKey, out ArchiveProgressSaveData persisted, out error) &&
-                    persisted.UnreadKeys.Count == 0, "read flags persisted only in isolated temporary save");
+                Check(controller.CaptureSaveData().UnreadKeys.Count == 0 && controller.IsDirty,
+                    "read flags remain dirty until coordinator saves");
                 return $"PASS: {_checks} archive UI checks (real prefabs; isolated data/save; EditMode lifecycle invocation).";
             }
             finally

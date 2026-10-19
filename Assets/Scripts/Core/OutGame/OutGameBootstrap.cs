@@ -1,6 +1,8 @@
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Game.Archive;
+using Game.Core;
 
 // 테스트 시작에 필요한 참조와 초기화 순서만 담당합니다.
 public class OutGameBootstrap : MonoBehaviour, ISceneEntry
@@ -13,6 +15,8 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
     [SerializeField] private SaveManager _saveManager;
     [SerializeField] private GameSettingsManager _gameSettingsManager;
     [SerializeField] private OutGameSaveCoordinator _persistentSaveCoordinator;
+    [SerializeField] private ArchiveController _archiveController;
+    [SerializeField] private UnlockManager _unlockManager;
     [FormerlySerializedAs("_uiBinding")]
     [SerializeField] private OutGameUIController _uiController;
     [SerializeField] private TutorialController _tutorial;
@@ -45,7 +49,8 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
         _gameSettingsManager.Initialize(_saveManager);
         _uiController.Shutdown();
         _wallet.Initialize();
-        altarController.Initialize(_persistentSaveCoordinator.Unlocks);
+        _unlockManager.Initialize();
+        altarController.Initialize(_unlockManager);
         traitController.Initialize(_wallet, _persistentSaveCoordinator);
         totemController.Initialize();
 
@@ -56,7 +61,8 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
             return false;
         }
 
-        _persistentSaveCoordinator.Initialize(_saveManager, traitController, _wallet, altarController, totemController);
+        // 아웃게임의 도감은 저장 상태만 보관하므로 전투 이벤트 Initialize는 호출하지 않습니다.
+        _persistentSaveCoordinator.Initialize(_saveManager, traitController, _wallet, altarController, totemController, _archiveController, _unlockManager);
         if (!_persistentSaveCoordinator.TryLoadOrCreate(out string error))
         {
             Debug.LogError("[OutGameBootstrap] 영구 데이터 초기화 실패: " + error, this);
@@ -75,9 +81,9 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
     {
         if (_wallet == null || altarController == null || traitController == null ||
             totemController == null || startController == null || _uiController == null ||
-            _saveManager == null || _persistentSaveCoordinator == null)
+            _saveManager == null || _persistentSaveCoordinator == null || _archiveController == null || _unlockManager == null)
         {
-            Debug.LogError("[OutGameBootstrap] Inspector의 지갑, Selector 3개, Controller, UI Controller, SaveManager, OutGameSaveCoordinator를 연결해주세요.", this);
+            Debug.LogError("[OutGameBootstrap] Inspector의 지갑, Selector 3개, Controller, UI Controller, SaveManager, OutGameSaveCoordinator, ArchiveController, UnlockManager를 연결해주세요.", this);
             return false;
         }
 

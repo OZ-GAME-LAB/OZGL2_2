@@ -29,6 +29,20 @@ namespace Game.Core.Editor
         static ProgressPlayChecks()
         {
             SceneManager.sceneLoaded += ConfigureScene;
+            EditorApplication.playModeStateChanged += ReleaseSharedFontReferences;
+        }
+
+        // TMP 글꼴 복사본은 원본 머티리얼·아틀라스를 공유합니다. 종료 시 원본 삭제를 시도하지 않게 합니다.
+        private static void ReleaseSharedFontReferences(PlayModeStateChange state)
+        {
+            if (state != PlayModeStateChange.ExitingPlayMode) return;
+            foreach (Object asset in TemporaryAssets)
+                if (asset is TMPro.TMP_FontAsset font && font != null)
+                {
+                    font.atlasTextures = Array.Empty<Texture2D>();
+                    font.material = null;
+                }
+            TemporaryAssets.Clear();
         }
 
         public static string Prepare()
@@ -88,6 +102,7 @@ namespace Game.Core.Editor
                 await SceneLoadingManager.Instance.LoadAsync("Test_OutGame");
                 var coordinator = Find<OutGameSaveCoordinator>();
                 Check(coordinator.IsReady, "실제 아웃게임 초기화");
+                CheckUnlockConnection(Find<OutGameBootstrap>());
                 Check(Find<SaveManager>().DirectoryPath == SessionState.GetString(DirectoryKey, ""), "사용자 저장과 분리된 경로");
                 var seed = coordinator.CaptureSaveData();
                 seed.Tutorial.OutGameHandled = true; seed.Tutorial.InGameHandled = true;
@@ -103,6 +118,7 @@ namespace Game.Core.Editor
                 var waves = Find<WaveController>();
                 var flow = Find<GameFlowController>();
                 coordinator = Find<OutGameSaveCoordinator>();
+                CheckUnlockConnection(Find<BootStrap>());
                 var artifact = Find<ArtifactManager>();
                 archive.Initialize(artifact, units, waves, Find<TotemRunApplier>(), Find<AltarManager>(), Find<TraitRunApplier>());
                 archive.Initialize(artifact, units, waves, Find<TotemRunApplier>(), Find<AltarManager>(), Find<TraitRunApplier>());
@@ -145,17 +161,20 @@ namespace Game.Core.Editor
                 // 진행을 건너뛴 실제 테스트 입력과 같은 알림. 자연 클리어 검증과 구분합니다.
                 typeof(WaveController).GetMethod("NotifyWaveCleared", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(waves, new object[] { new WaveInfo(4, 5, WaveBattleType.Boss, default) });
-                Check(!coordinator.Unlocks.IsUnlocked("altar.conquest") && !coordinator.Unlocks.IsUnlocked("altar.guardian"), "정산 전 영구 해금 불변");
+                Check(!Find<UnlockManager>().IsUnlocked("altar.conquest") && !Find<UnlockManager>().IsUnlocked("altar.guardian"), "정산 전 영구 해금 불변");
                 Check(Find<InGameSaveCoordinator>().TrySave(out error), "종료 전 체크포인트 저장: " + error);
                 string runId = flow.RunId;
                 int balanceBefore = Find<PersistentCurrencyManager>().Balance;
+                var archiveBefore = coordinator.CaptureSaveData().Archive;
                 flow.AbandonRun();
                 await Until(() => Find<RunResultView>() != null && Find<RunResultView>().IsPending);
                 var view = Find<RunResultView>();
                 Check(coordinator.Records.CaptureSaveData().TotalDamage == 5220 && coordinator.Records.CaptureSaveData().SkillKills == 500,
                     "실제 종료 정산에서 기록 합산");
-                Check(coordinator.Unlocks.CaptureSaveData().Ids.Count == 4 && coordinator.LastSettledRunId == runId, "실제 종료에서 제단 3종 해금·영수증 확정");
+                Check(Find<UnlockManager>().CaptureSaveData().Ids.Count == 4 && coordinator.LastSettledRunId == runId, "실제 종료에서 제단 3종 해금·영수증 확정");
                 Check(Find<SaveManager>().TryLoad(OutGameSaveCoordinator.SaveKey, out var persisted, out error), "실제 정산 파일 조회");
+                Check(persisted.ArchiveVersion == 1 && archiveBefore.DiscoveredKeys.All(persisted.Archive.DiscoveredKeys.Contains) &&
+                    archiveBefore.UnreadKeys.All(persisted.Archive.UnreadKeys.Contains), "실제 정산 저장에 발견·미열람 도감 보존");
                 int reward = int.Parse(((TMPro.TMP_Text)Get(view, "_bloodstone")).text.Replace(",", ""));
                 Check(reward > 0 && persisted.Wallet.Amount - balanceBefore == reward && Find<PersistentCurrencyManager>().Balance == persisted.Wallet.Amount,
                     "결과 표시액 = 파일 증가분 = 지갑 증가분");
@@ -178,6 +197,15 @@ namespace Game.Core.Editor
                 Directory.CreateDirectory("PersonalDocs/ProgressValidation");
                 File.WriteAllText("PersonalDocs/ProgressValidation/play-checks.txt", Status);
             }
+        }
+
+        private static void CheckUnlockConnection(Component bootstrap)
+        {
+            var managers = Object.FindObjectsByType<UnlockManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Check(managers.Length == 1 && managers[0].name == "Core" && managers[0].IsInitialized &&
+                (UnlockManager)Get(bootstrap, "_unlockManager") == managers[0] &&
+                (UnlockManager)Get(Find<OutGameSaveCoordinator>(), "_unlocks") == managers[0],
+                bootstrap.GetType().Name + " → Core의 동일 UnlockManager 초기화·연결");
         }
 
         private static object Get(object target, string name) => target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(target);

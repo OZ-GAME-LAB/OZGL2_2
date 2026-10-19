@@ -19,6 +19,10 @@ public interface IRunCheckpointWriter
 public class SaveManager : MonoBehaviour
 {
     private string _directory;
+#if UNITY_EDITOR
+    // 회귀 검사에서 실제 파일 교체 성공 횟수를 확인합니다. 플레이어 빌드에는 포함하지 않습니다.
+    public int SuccessfulWriteCount { get; private set; }
+#endif
 
     // Editor의 도메인 재로드에서 null 문자열이 빈 값으로 복원될 수 있다.
     public string DirectoryPath => string.IsNullOrWhiteSpace(_directory)
@@ -115,6 +119,9 @@ public class SaveManager : MonoBehaviour
             // 기존 파일은 새 JSON 쓰기가 완료된 뒤 한 번에 교체합니다.
             if (File.Exists(path)) ReplaceFile(temporaryPath, path);
             else File.Move(temporaryPath, path);
+#if UNITY_EDITOR
+            SuccessfulWriteCount++;
+#endif
             return true;
         }
         catch (Exception exception)
@@ -134,7 +141,8 @@ public class SaveManager : MonoBehaviour
     }
 
     // 파일 없음/손상/버전 불일치는 실패로 반환합니다. 기본값 저장으로 덮어쓰지 않습니다.
-    public bool TryLoad<T>(SaveKey<T> key, out T data, out string error) where T : class
+    public bool TryLoad<T>(SaveKey<T> key, out T data, out string error,
+        Action<string> validateJson = null) where T : class
     {
         data = null;
         error = null;
@@ -148,7 +156,10 @@ public class SaveManager : MonoBehaviour
                 return false;
             }
 
-            var file = JsonUtility.FromJson<SaveFile<T>>(File.ReadAllText(path, Encoding.UTF8));
+            string json = File.ReadAllText(path, Encoding.UTF8);
+            // JsonUtility가 누락된 목록을 빈 목록으로 바꾸기 전에 필요한 영역을 검사합니다.
+            validateJson?.Invoke(json);
+            var file = JsonUtility.FromJson<SaveFile<T>>(json);
             if (file == null || file.Key != key.Id || file.Version != key.Version ||
                 file.DataType != typeof(T).FullName || file.Data == null)
             {
