@@ -134,6 +134,8 @@ namespace Units
 
         public event Action
             RuntimeCleared;
+        public event Action<CombatApplicationResult> DamageApplied;
+        private void HandleDamageApplied(CombatApplicationResult result) => DamageApplied?.Invoke(result);
 
 
         // =========================
@@ -199,6 +201,8 @@ namespace Units
 
         private void OnDestroy()
         {
+            foreach (var unit in _allyUnits) UnsubscribeUnitEvents(unit);
+            foreach (var unit in _enemyUnits) UnsubscribeUnitEvents(unit);
             for (int i = 0; i < _allyGroups.Count; i++)
                 UnsubscribeGroupEvents(_allyGroups[i]);
 
@@ -509,6 +513,7 @@ namespace Units
 
             unit.Died +=
                 HandleUnitDied;
+            unit.DamageApplied += HandleDamageApplied;
         }
 
 
@@ -521,6 +526,7 @@ namespace Units
 
             unit.Died -=
                 HandleUnitDied;
+            unit.DamageApplied -= HandleDamageApplied;
         }
 
 

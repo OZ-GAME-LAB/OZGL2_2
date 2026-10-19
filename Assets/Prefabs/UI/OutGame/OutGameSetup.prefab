@@ -157,6 +157,7 @@ MonoBehaviour:
   _saveManager: {fileID: 2730888209641633859}
   _persistentSaveCoordinator: {fileID: 7589715593568898011}
   _uiController: {fileID: 3920198623483833111}
+  _tutorial: {fileID: 0}
 --- !u!114 &2730888209641633859
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -181,6 +182,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c89d73aa1c21dda43b2c7655017378ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutGameSaveCoordinator
+  _unlockDefinitions:
+  - {fileID: 11400000, guid: c46880739362be44db6c35b96bbd1cd3, type: 2}
+  - {fileID: 11400000, guid: 0b6e88a05b2b8aa4e992193faa37e53d, type: 2}
+  - {fileID: 11400000, guid: 20288d93677df8c4abaf92d66923b149, type: 2}
+  - {fileID: 11400000, guid: cccfe90444ba2db4daaddfd756ad82f1, type: 2}
 --- !u!1 &5380570442913128589
 GameObject:
   m_ObjectHideFlags: 0

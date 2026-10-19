@@ -56,6 +56,7 @@ namespace Game.Core
         public bool IsLastWave => _controller != null && _controller.IsLastNode;
         public event Action<WaveInfo> WaveChanged;
         public event Action<WaveInfo> WaveCleared;
+        public event Action BattleStarted;
 
         
         private ISpawnManager _spawner;
@@ -206,6 +207,7 @@ namespace Game.Core
 
         public void BattleStart()
         {
+            BattleStarted?.Invoke();
             _runtimeUnitManager.StartBattlePhase();
         }
 

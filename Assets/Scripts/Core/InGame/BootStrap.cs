@@ -30,7 +30,8 @@ public class BootStrap : MonoBehaviour, ISceneEntry
     [SerializeField] private TestWaitingScript _testScript; //테스트용으로 , 실제 구현시 삭제할것
     [SerializeField] private GameFlowController _gameFlowController;
     [SerializeField] private WaveController _waveController;
-    [SerializeField] private ArchiveManager _archiveManager;
+    [FormerlySerializedAs("_archiveManager")]
+    [SerializeField] private RunRecordManager _runRecordManager;
     [SerializeField] private ArtifactManager _artifactManager;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private SpawnManager _spawnManager;
@@ -115,8 +116,8 @@ public class BootStrap : MonoBehaviour, ISceneEntry
             _gameFlowController.InitializeEventFlow(_eventManager);
             _testScript.Initialize(_gameFlowController, _waveController);
             _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
-                _artifactManager, _shopManager, _consumableItemManager, _buildController, _archiveManager, _eventManager,
-                () => _archiveManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController,
+                _artifactManager, _shopManager, _consumableItemManager, _buildController, _runRecordManager, _eventManager,
+                () => _runRecordManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController,
                     _totemRunApplier, _altarManager, _traitRunApplier));
             _gameFlowController.InitializeSave(_inGameSaveCoordinator);
             _eventManager.InitializeSave(_inGameSaveCoordinator);
@@ -183,7 +184,7 @@ public class BootStrap : MonoBehaviour, ISceneEntry
 
     private bool InitializeManagers()
     {
-        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _archiveManager, 
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _runRecordManager, 
             _runSettlementManager, _cameraController, _shopManager);
         _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager,
             _totemRunApplier.FlowEffects, _unitStatModifierManager);
@@ -209,7 +210,8 @@ public class BootStrap : MonoBehaviour, ISceneEntry
 
         var settlementBridge = new RunSettlementSaveBridge(_outGameSaveCoordinator,
             () => _gameFlowController.RunId, _uiStartup.SettlementUI,
-            _gameFlowController.PrepareSettlementViewAsync);
+            _gameFlowController.PrepareSettlementViewAsync,
+            _runRecordManager, _outGameSaveCoordinator.Records, _outGameSaveCoordinator.Unlocks);
         _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier, 
             settlementBridge, settlementBridge);
         
@@ -262,7 +264,7 @@ public class BootStrap : MonoBehaviour, ISceneEntry
         }
         if (_persistentCurrencyManager == null || _runSettlementManager == null || _saveManager == null ||
             _outGameSaveCoordinator == null || _inGameSaveCoordinator == null || _persistentTraits == null ||
-            _archiveManager == null || _runCurrencyManager == null || _buildController == null || _cameraController == null)
+            _runRecordManager == null || _runCurrencyManager == null || _buildController == null || _cameraController == null)
         {
             Debug.LogError("[BootStrap] 정산 매니저·혈석 지갑·SaveManager·영구 저장·특성 데이터 참조를 연결해주세요.", this);
             valid = false;

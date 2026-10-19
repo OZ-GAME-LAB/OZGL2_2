@@ -43,7 +43,7 @@ public class OutGameBootstrap : MonoBehaviour, ISceneEntry
 
         _uiController.Shutdown();
         _wallet.Initialize();
-        altarController.Initialize();
+        altarController.Initialize(_persistentSaveCoordinator.Unlocks);
         traitController.Initialize(_wallet, _persistentSaveCoordinator);
         totemController.Initialize();
 

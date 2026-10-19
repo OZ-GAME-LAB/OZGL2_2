@@ -1,11 +1,23 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Game.Core;
 
 // 아웃게임 저장 데이터를 모으고 저장/복원 순서를 관리합니다
 // JSON 변환과 파일 입출력은 SaveManager에서 합니다
 public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
 {
+    [SerializeField] private UnlockData[] _unlockDefinitions;
+    public PlayerRecordManager Records { get; } = new PlayerRecordManager();
+    private UnlockManager _unlocks;
+    public UnlockManager Unlocks
+    {
+        get
+        {
+            if (_unlocks == null) _unlocks = new UnlockManager(_unlockDefinitions);
+            return _unlocks;
+        }
+    }
     // 기존 저장 테스트나 실제 영구재화 파일과 구분하는 키입니다.
     public static readonly SaveKey<PersistentSaveData> SaveKey =
         new SaveKey<PersistentSaveData>("outgame-test-persistent");
@@ -43,6 +55,7 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         _altar = altar;
         _totem = totem;
         _traitRun = traitRun;
+        _ = Unlocks;
         _isInitialized = true;
         IsReady = false;
         LastError = null;
@@ -81,7 +94,7 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         }
     }
 
-    // 콘텐츠가 만든 데이터를 검증하고 파일에 저장만 합니다. 구매나 상태 변경은 하지 않습니다.
+    // 구매·지갑 반영은 호출자가 담당합니다. 기록·해금 캐시는 파일 저장 성공 후 갱신합니다.
     public bool TrySave(PersistentSaveData data, out string error)
     {
         if (!CheckReady(out error)) return false;
@@ -110,6 +123,7 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         if (!CheckReferences(out error)) return false;
         if (!_saveManager.TryLoad(SaveKey, out PersistentSaveData data, out error))
             return Fail(error, out error);
+        if (!TryUpgradeProgress(data, out error)) return false;
         if (!TryValidate(data, out error)) return false;
 
         try
@@ -142,7 +156,10 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
             Altar = altar,
             Totem = _totem.CaptureSaveData(),
             LastSettledRunId = _lastSettledRunId,
-            Tutorial = _tutorial.Copy()
+            Tutorial = _tutorial.Copy(),
+            ProgressVersion = 1,
+            Records = Records.CaptureSaveData(),
+            Unlocks = Unlocks.CaptureSaveData()
         };
     }
 
@@ -163,11 +180,18 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
             Totem = data.Totem,
             LastSettledRunId = string.IsNullOrWhiteSpace(data.LastSettledRunId)
                 ? _lastSettledRunId : data.LastSettledRunId,
-            Tutorial = (data.Tutorial ?? _tutorial).Copy()
+            Tutorial = (data.Tutorial ?? _tutorial).Copy(),
+            ProgressVersion = 1,
+            Records = data.Records.Copy(),
+            Unlocks = data.Unlocks.Copy()
         };
         if (!_saveManager.TrySave(SaveKey, saveData, out error)) return Fail(error, out error);
         _lastSettledRunId = saveData.LastSettledRunId;
         _tutorial = saveData.Tutorial.Copy();
+        Records.RestoreSaveData(saveData.Records);
+        Unlocks.RestoreSaveData(saveData.Unlocks);
+        // 정산 Bridge가 지갑 반영까지 끝난 뒤 알립니다. 관찰자가 여기서 다시
+        // 저장하면 아직 반영 전인 지갑 잔액으로 파일을 덮어쓸 수 있습니다.
         LastError = null;
         return true;
     }
@@ -184,16 +208,37 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     private bool TryValidate(PersistentSaveData data, out string error)
     {
         if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
+        try
+        {
+            if (data.ProgressVersion != 1 || data.Records == null || data.Unlocks == null)
+                return Fail("누적 기록 버전 또는 필수 데이터가 없습니다.", out error);
+            data.Records.Validate();
+            data.Unlocks.Validate();
+        }
+        catch (Exception exception) { return Fail(exception.Message, out error); }
         if (!_traits.TryValidateSaveData(data.Traits, out error)) return Fail("특성 저장 데이터 검증 실패: " + error, out error);
         if (!_wallet.TryValidateSaveData(data.Wallet, out error)) return Fail("혈석 저장 데이터 검증 실패: " + error, out error);
-        return TryValidateSelections(data.Altar, data.Totem, out error);
+        return TryValidateSelections(data.Altar, data.Totem, data.Unlocks, out error);
     }
 
-    private bool TryValidateSelections(AltarRunSaveData altar, TotemRunSaveData totem, out string error)
+    private bool TryValidateSelections(AltarRunSaveData altar, TotemRunSaveData totem, UnlockSaveData unlocks, out string error)
     {
         if (altar == null || altar.SelectedAltar == AltarId.None ||
             !Enum.IsDefined(typeof(AltarId), altar.SelectedAltar))
             return Fail("제단 저장 데이터의 ID가 올바르지 않습니다.", out error);
+
+        IReadOnlyList<AltarData> altars = null;
+        if (_altar is OutGameAltarController selector) altars = selector.Data;
+        if (_altar is AltarManager manager) altars = manager.AvailableAltars;
+        if (altars != null)
+        {
+            AltarData selected = null;
+            foreach (AltarData candidate in altars)
+                if (candidate != null && candidate.Id == altar.SelectedAltar) selected = candidate;
+            if (selected == null || selected.Unlock == null ||
+                (!selected.Unlock.DefaultUnlocked && !unlocks.Ids.Contains(selected.Unlock.Id)))
+                return Fail("저장된 제단이 없거나 아직 해금되지 않았습니다.", out error);
+        }
 
         if (totem == null || totem.Totems == null)
             return Fail("토템 저장 데이터의 목록이 없습니다.", out error);
@@ -215,6 +260,9 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     // 특성과 제단의 시작 지급은 isContinue로 판단하며, 영구 저장 데이터의 지급 플래그는 변경하지 않습니다.
     private void Apply(PersistentSaveData data, bool isContinue)
     {
+        // 제단 선택의 잠금 검증보다 먼저 복원합니다.
+        Records.RestoreSaveData(data.Records);
+        Unlocks.RestoreSaveData(data.Unlocks);
         _wallet.RestoreSaveData(data.Wallet, false);
         _traits.RestoreSaveData(data.Traits, false);
         if (_traitRun != null)
@@ -235,6 +283,21 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         // 모든 상태가 적용된 다음 UI에 한 번씩 알립니다.
         _wallet.NotifyChanged();
         _traits.NotifyChanged();
+        Records.NotifyChanged();
+        Unlocks.NotifyChanged();
+    }
+
+    private bool TryUpgradeProgress(PersistentSaveData data, out string error)
+    {
+        if (data == null) return Fail("영구 저장 데이터가 없습니다.", out error);
+        if (data.ProgressVersion == 0)
+        {
+            data.Records = PlayerRecordSaveData.CreateEmpty();
+            data.Unlocks = Unlocks.Evaluate(data.Records, UnlockSaveData.CreateEmpty());
+            data.ProgressVersion = 1;
+        }
+        error = null;
+        return true;
     }
 
     // 10.9 / 문규성 / 선택 캐시 대신 실제 Provider를 사용하므로 제단과 토템 연결도 기존 참조 확인에 포함했습니다.

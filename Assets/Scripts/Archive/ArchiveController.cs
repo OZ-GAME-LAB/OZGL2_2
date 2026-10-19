@@ -21,7 +21,7 @@ namespace Game.Archive
         public List<string> UnreadKeys = new();
     }
 
-    // 런 통계와 별도로, 한 번 발견한 콘텐츠와 아직 읽지 않은 항목을 유지합니다.
+    // 런 통계와 별도로 한 번 발견한 콘텐츠와 아직 읽지 않은 항목을 유지합니다.
     public sealed class ArchiveController : MonoBehaviour
     {
         public static readonly SaveKey<ArchiveProgressSaveData> SaveKey =

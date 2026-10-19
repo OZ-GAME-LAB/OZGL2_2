@@ -4,6 +4,10 @@ using System;
 [Serializable]
 public class PersistentSaveData
 {
+    // 0은 누적 기록 도입 이전 저장입니다. 필드 누락을 새 데이터와 구분합니다.
+    public int ProgressVersion;
+    public Game.Core.PlayerRecordSaveData Records;
+    public Game.Core.UnlockSaveData Unlocks;
     public TraitSaveData Traits;
     public PersistentWalletSaveData Wallet;
     public AltarRunSaveData Altar;

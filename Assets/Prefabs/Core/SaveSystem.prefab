@@ -47,10 +47,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c89d73aa1c21dda43b2c7655017378ee, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::OutGameSaveCoordinator
-  _restoreTraits: 1
-  _restoreWallet: 1
-  _restoreAltar: 1
-  _restoreTotem: 1
+  _unlockDefinitions:
+  - {fileID: 11400000, guid: c46880739362be44db6c35b96bbd1cd3, type: 2}
+  - {fileID: 11400000, guid: 0b6e88a05b2b8aa4e992193faa37e53d, type: 2}
+  - {fileID: 11400000, guid: 20288d93677df8c4abaf92d66923b149, type: 2}
+  - {fileID: 11400000, guid: cccfe90444ba2db4daaddfd756ad82f1, type: 2}
 --- !u!114 &2005282474242791097
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -63,12 +64,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 67a698cb4c55eb449afb7e678457dfe7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InGameSaveCoordinator
-  _restoreRunCurrency: 1
-  _restoreArtifact: 1
-  _restoreShop: 1
-  _restoreConsumableItem: 1
-  _restoreBuilding: 1
-  _restoreArchive: 1
 --- !u!114 &4556701183062533751
 MonoBehaviour:
   m_ObjectHideFlags: 0
