@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Game.Core;
 using Game.UI.InGame;
@@ -17,6 +18,9 @@ public class ArtifactInventoryPopupView : MonoBehaviour
     [SerializeField] private Button _hudButton;
 
     private IArtifactReader _artifactReader;
+    private bool _isSelecting;
+    private Action<ArtifactData> _onSelected;
+    private Action _onCanceled;
     
     public void Initialize(IArtifactReader artifactReader)
     {
@@ -27,13 +31,20 @@ public class ArtifactInventoryPopupView : MonoBehaviour
     {
         if (_hudButton != null)
             _hudButton.onClick.AddListener(Open);
+        if (_screen != null)
+            _screen.Closed += HandleScreenClosed;
     }
 
     private void OnDisable()
     {
         if (_hudButton != null)
             _hudButton.onClick.RemoveListener(Open);
+        if (_screen != null)
+            _screen.Closed -= HandleScreenClosed;
+        CancelSelection();
     }
+
+    private void OnDestroy() => CancelSelection();
 
     public void Open()
     {
@@ -50,21 +61,50 @@ public class ArtifactInventoryPopupView : MonoBehaviour
     // HUD의 현재 목록과 결산의 확정 목록이 같은 슬롯 표시 코드를 사용한다.
     public void Show(IReadOnlyList<RunArtifactEntry> artifacts)
     {
-        if (artifacts == null) return;
+        if (_isSelecting || artifacts == null || !TryOpenPopup()) return;
 
+        RefreshSlots(artifacts);
+        ResetScroll();
+    }
+
+    public bool OpenSelection(IReadOnlyList<ArtifactInstance> candidates,
+        Action<ArtifactData> onSelected, Action onCanceled = null)
+    {
+        if (_isSelecting || !isActiveAndEnabled || candidates == null || onSelected == null)
+            return false;
+
+        var artifacts = new List<RunArtifactEntry>();
+        foreach (ArtifactInstance instance in candidates)
+            if (instance != null && instance.Data != null)
+                artifacts.Add(new RunArtifactEntry(instance.Data, instance.StackCount));
+        if (artifacts.Count == 0 || !TryOpenPopup()) return false;
+
+        _isSelecting = true;
+        _onSelected = onSelected;
+        _onCanceled = onCanceled;
+        RefreshSlots(artifacts);
+        ResetScroll();
+        return true;
+    }
+
+    public void CancelSelection() => FinishSelection(null, true);
+
+    private bool TryOpenPopup()
+    {
         if (_screen == null || _screen.Manager == null || _slotPrefab == null ||
             _slotRoot == null || _artifactPopupView == null)
         {
             Debug.LogWarning("[ArtifactInventory] 인벤토리의 UI 참조를 확인해주세요.", this);
-            return;
+            return false;
         }
 
         if (_screen.IsVisible && _screen.Manager.TopPopup != _screen)
-            return;
-        if (!_screen.Manager.OpenPopup(_screen.Id))
-            return;
+            return false;
+        return _screen.Manager.OpenPopup(_screen.Id);
+    }
 
-        RefreshSlots(artifacts);
+    private void ResetScroll()
+    {
         if (_scrollRect != null)
         {
             Canvas.ForceUpdateCanvases();
@@ -106,13 +146,59 @@ public class ArtifactInventoryPopupView : MonoBehaviour
                 $"×{instance.StackCount}",
                 false,
                 true,
-                () => ShowDetail(instance.Data, slot) 
+                () => HandleSlotClicked(instance.Data, slot)
             );
             slot.gameObject.SetActive(true);
         }
 
         if (_emptyMessage != null)
             _emptyMessage.SetActive(artifacts.Count == 0);
+    }
+
+    private void HandleSlotClicked(ArtifactData artifact, UIItemSlot slot)
+    {
+        if (!isActiveAndEnabled || _screen == null || !_screen.IsVisible ||
+            _screen.Manager == null || _screen.Manager.TopPopup != _screen)
+            return;
+
+        if (_isSelecting)
+            FinishSelection(artifact, true);
+        else
+            ShowDetail(artifact, slot);
+    }
+
+    private void HandleScreenClosed(UIScreen screen, UICloseReason reason)
+    {
+        // Manager가 이미 닫는 중이므로 여기서는 다시 닫기를 요청하지 않는다.
+        FinishSelection(null, false);
+    }
+
+    private void FinishSelection(ArtifactData selected, bool closePopup)
+    {
+        if (!_isSelecting) return;
+
+        Action<ArtifactData> onSelected = _onSelected;
+        Action onCanceled = _onCanceled;
+        _isSelecting = false;
+        _onSelected = null;
+        _onCanceled = null;
+        foreach (UIItemSlot slot in Slots)
+            if (slot != null) slot.Unbind();
+
+        bool closed = false;
+        if (closePopup && _screen != null)
+        {
+            InGameUIManager manager = _screen.Manager;
+            if (manager != null)
+                closed = manager.ClosePopup(_screen.Id,
+                    selected != null ? UICloseReason.Completed : UICloseReason.ContextLost);
+        }
+
+        // 선택 결과는 위의 ClosePopup이 반환된 뒤 전달한다. 외부 닫힘에서는 취소만 알린다.
+        if (selected != null && closed)
+            onSelected?.Invoke(selected);
+        else
+            onCanceled?.Invoke();
     }
 
     /// <summary> 아티팩트 이미지를 클릭했을 때 클릭한 이미지 위치에 상세화면을 여는 기능</summary>
