@@ -9,6 +9,15 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
 
     public event Action Changed;
     public IReadOnlyList<TotemData> Data => _data;
+    public bool SelectionLocked { get; private set; }
+
+    public void SetSelectionLocked(bool locked)
+    {
+        SelectionLocked = locked;
+        if (locked)
+            foreach (TotemLevelEntry entry in _levels) entry.Level = 0;
+        Changed?.Invoke();
+    }
 
     private readonly List<TotemData> _data = new List<TotemData>();
     private readonly List<TotemLevelEntry> _levels = new List<TotemLevelEntry>();
@@ -48,7 +57,7 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
     {
         // 한 번의 클릭으로 한 단계만 변경합니다.
         // 단, 최대 단계에서 좌클릭하여 0단계로 순환하는 경우에는 현재 레벨만큼 한 번에 감소할 수 있습니다.
-        if (delta == 0) return false;
+        if (SelectionLocked || delta == 0) return false;
 
         int index = FindIndex(id);
         if (index < 0) return false;
@@ -125,7 +134,7 @@ public class OutGameTotemController : MonoBehaviour, ITotemSelection, ISaveDataP
                 throw new ArgumentException("저장된 토템 레벨이 허용 범위를 벗어났습니다.", nameof(data));
 
             // 보류한 토템도 저장 ID는 유지하되 선택은 해제합니다.
-            restoredLevels[index] = totem.IsAvailable ? entry.Level : 0;
+            restoredLevels[index] = totem.IsAvailable && !SelectionLocked ? entry.Level : 0;
         }
 
         bool changed = false;

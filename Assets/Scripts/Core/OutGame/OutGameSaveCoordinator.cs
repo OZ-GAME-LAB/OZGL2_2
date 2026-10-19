@@ -13,6 +13,9 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     public bool IsReady { get; private set; }
     public string LastError { get; private set; }
     public string LastSettledRunId => _lastSettledRunId;
+    public bool IsFirstRunRestricted => _tutorial.Version >= 1 && string.IsNullOrWhiteSpace(_lastSettledRunId);
+    public bool NeedsTutorial(bool inGame) => IsReady && IsFirstRunRestricted &&
+        !(inGame ? _tutorial.InGameHandled : _tutorial.OutGameHandled);
     public string SavePath => _saveManager == null ? string.Empty : _saveManager.GetFilePath(SaveKey);
 
     private SaveManager _saveManager;
@@ -22,6 +25,7 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
     private ISaveDataProvider<TotemRunSaveData> _totem;
     private ISaveDataProvider<TraitRunSaveData> _traitRun;
     private string _lastSettledRunId;
+    private TutorialSaveData _tutorial = new TutorialSaveData();
     private bool _isInitialized;
 
     // 10.9 / 문규성 / 두 씬에서 제단과 토템 Provider를 모두 연결하고, 인게임에서는 런 특성 Provider도 연결하도록 변경했습니다.
@@ -52,7 +56,9 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
 
         try
         {
-            if (!TryWrite(CaptureSaveData(), out error)) return false;
+            PersistentSaveData initial = CaptureSaveData();
+            initial.Tutorial = new TutorialSaveData { Version = 1 };
+            if (!TryWrite(initial, out error)) return false;
             IsReady = true;
             return true;
         }
@@ -110,6 +116,7 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
         {
             Apply(data, isContinue);
             _lastSettledRunId = data.LastSettledRunId;
+            _tutorial = data.Tutorial?.Copy() ?? new TutorialSaveData();
             IsReady = true;
             LastError = null;
             error = null;
@@ -134,7 +141,8 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
             Wallet = _wallet.CaptureSaveData(),
             Altar = altar,
             Totem = _totem.CaptureSaveData(),
-            LastSettledRunId = _lastSettledRunId
+            LastSettledRunId = _lastSettledRunId,
+            Tutorial = _tutorial.Copy()
         };
     }
 
@@ -154,12 +162,23 @@ public class OutGameSaveCoordinator : MonoBehaviour, IPersistentSaveWriter
             },
             Totem = data.Totem,
             LastSettledRunId = string.IsNullOrWhiteSpace(data.LastSettledRunId)
-                ? _lastSettledRunId : data.LastSettledRunId
+                ? _lastSettledRunId : data.LastSettledRunId,
+            Tutorial = (data.Tutorial ?? _tutorial).Copy()
         };
         if (!_saveManager.TrySave(SaveKey, saveData, out error)) return Fail(error, out error);
         _lastSettledRunId = saveData.LastSettledRunId;
+        _tutorial = saveData.Tutorial.Copy();
         LastError = null;
         return true;
+    }
+
+    public bool TryCompleteTutorial(bool inGame, out string error)
+    {
+        if (!CheckReady(out error)) return false;
+        PersistentSaveData next = CaptureSaveData();
+        if (inGame) next.Tutorial.InGameHandled = true;
+        else next.Tutorial.OutGameHandled = true;
+        return TrySave(next, out error);
     }
 
     private bool TryValidate(PersistentSaveData data, out string error)
