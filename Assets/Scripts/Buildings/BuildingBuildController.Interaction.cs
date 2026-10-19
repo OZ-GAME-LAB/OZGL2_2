@@ -16,92 +16,46 @@ namespace OZGL.KDH
             var target = new BuildingInteractionTarget(slot);
             var failure = ValidateInteractionTarget(target);
             var candidates = new List<BuildingInteractionCandidate>();
-            List<BuildingInteractionCandidate> displayCandidates = null;
+            var displayCandidates = new List<BuildingInteractionCandidate>();
             BuildingInteractionOffer build = null, upgrade = null, demolish = null;
             BuildingData displayed = null;
             int? requiredUpgradeCoreLevel = null;
             if (IsLiveInteractionSlot(slot))
             {
-                foreach (BuildingData data in CollectInteractionCandidates(slot))
+                // 현재 슬롯의 전체 후보를 수집하고 실행 조건을 함께 판정한다.
+                displayCandidates = CollectInteractionCandidates(target, failure);
+                foreach (BuildingInteractionCandidate candidate in displayCandidates)
                 {
-                    BuildingInteractionCost cost;
-                    bool valid = slot.IsOccupied
-                        ? TryReadInteractionCosts(GetUpgradeCost(slot, data), out cost)
-                        : TryReadConstructionCost(data, out cost, out _);
-                    candidates.Add(new BuildingInteractionCandidate(data, cost, valid));
+                    if (candidate.IsCoreLevelMet) candidates.Add(candidate);
+                    else if (!requiredUpgradeCoreLevel.HasValue || candidate.RequiredCoreLevel < requiredUpgradeCoreLevel.Value)
+                        requiredUpgradeCoreLevel = candidate.RequiredCoreLevel;
                 }
+                if (!slot.IsOccupied || candidates.Count > 0) requiredUpgradeCoreLevel = null;
                 displayed = slot.IsOccupied ? target.ExpectedData : selectedOption;
                 if (slot.IsOccupied)
                 {
-                    displayCandidates = CollectUpgradeDisplayCandidates(target.ExpectedData, candidates);
-                    if (candidates.Count == 0)
-                        requiredUpgradeCoreLevel = GetRequiredUpgradeCoreLevel(target.ExpectedData);
                     if (selectedOption != null)
-                        upgrade = CreateInteractionOffer(target, BuildingInteractionAction.Upgrade, selectedOption);
+                        upgrade = EvaluateInteraction(target, BuildingInteractionAction.Upgrade, selectedOption, displayCandidates, failure);
                     if (!IsCoreSlot(slot))
-                        demolish = CreateInteractionOffer(target, BuildingInteractionAction.Demolish, null);
+                        demolish = EvaluateInteraction(target, BuildingInteractionAction.Demolish, null, displayCandidates, failure);
                 }
                 else if (selectedOption != null)
-                    build = CreateInteractionOffer(target, BuildingInteractionAction.Build, selectedOption);
+                    build = EvaluateInteraction(target, BuildingInteractionAction.Build, selectedOption, displayCandidates, failure);
             }
             return new BuildingInteractionState(target, failure, displayed, candidates, build, upgrade, demolish,
                 requiredUpgradeCoreLevel, displayCandidates);
-        }
-
-        private List<BuildingInteractionCandidate> CollectUpgradeDisplayCandidates(BuildingData current,
-            List<BuildingInteractionCandidate> availableCandidates)
-        {
-            var byId = new Dictionary<string, BuildingInteractionCandidate>();
-            var availableById = new Dictionary<string, BuildingInteractionCandidate>();
-            foreach (BuildingInteractionCandidate candidate in availableCandidates)
-                availableById[candidate.Data.BuildingId] = candidate;
-            int coreLevel = GetCurrentCoreLevel();
-            foreach (BuildingUpgradeOption option in current?.Upgrades ?? Array.Empty<BuildingUpgradeOption>())
-            {
-                if (!current.IsUpgradeAvailable(option, int.MaxValue)) continue;
-                BuildingData next = option.nextBuilding;
-                if (string.IsNullOrWhiteSpace(next.BuildingId) || string.IsNullOrWhiteSpace(next.DisplayName) ||
-                    IsSupportAlreadyBuilt(next)) continue;
-                bool coreLevelMet = current.IsUpgradeAvailable(option, coreLevel);
-                if (byId.TryGetValue(next.BuildingId, out BuildingInteractionCandidate existing) &&
-                    (existing.IsCoreLevelMet || (!coreLevelMet && existing.RequiredCoreLevel <= option.requiredCoreLevel)))
-                    continue;
-                bool validCost = TryReadInteractionCosts(option.cost, out BuildingInteractionCost cost);
-                if (coreLevelMet && availableById.TryGetValue(next.BuildingId, out BuildingInteractionCandidate available))
-                {
-                    next = available.Data;
-                    cost = available.Cost;
-                    validCost = available.HasValidCost;
-                }
-                byId[next.BuildingId] = new BuildingInteractionCandidate(next, cost, validCost,
-                    option.requiredCoreLevel, coreLevelMet);
-            }
-            return new List<BuildingInteractionCandidate>(byId.Values);
-        }
-
-        private int? GetRequiredUpgradeCoreLevel(BuildingData current)
-        {
-            if (current == null || current.Upgrades == null) return null;
-            int coreLevel = GetCurrentCoreLevel();
-            int? requiredLevel = null;
-            foreach (BuildingUpgradeOption option in current.Upgrades)
-            {
-                if (!current.IsUpgradeAvailable(option, int.MaxValue)) continue;
-                BuildingData next = option.nextBuilding;
-                if (string.IsNullOrWhiteSpace(next.BuildingId) || string.IsNullOrWhiteSpace(next.DisplayName) ||
-                    IsSupportAlreadyBuilt(next) || option.requiredCoreLevel <= coreLevel) continue;
-                if (!requiredLevel.HasValue || option.requiredCoreLevel < requiredLevel.Value)
-                    requiredLevel = option.requiredCoreLevel;
-            }
-            return requiredLevel;
         }
 
         /// <summary>Build는 빈 슬롯 전용이다. 기존 TryBuild의 점유 슬롯 교체 계약은 그대로 유지한다.</summary>
         public BuildingInteractionResult TryExecuteInteraction(BuildingInteractionTarget target,
             BuildingInteractionAction action, BuildingData option = null)
         {
-            BuildingInteractionFailure failure = EvaluateInteraction(target, action, option, out _);
-            if (failure != BuildingInteractionFailure.None) return new BuildingInteractionResult(failure);
+            BuildingInteractionFailure availability = ValidateInteractionTarget(target);
+            if (!IsInteractionTargetCurrent(target)) return new BuildingInteractionResult(availability);
+            var candidates = action == BuildingInteractionAction.Demolish
+                ? null : CollectInteractionCandidates(target, availability);
+            BuildingInteractionOffer offer = EvaluateInteraction(target, action, option, candidates, availability);
+            if (!offer.CanExecute) return new BuildingInteractionResult(offer.Failure, offer.RequiredCoreLevel);
             _interactionExecuting = true;
             try
             {
@@ -155,81 +109,103 @@ namespace OZGL.KDH
             return InteractionAvailability();
         }
 
-        private BuildingInteractionOffer CreateInteractionOffer(BuildingInteractionTarget target,
-            BuildingInteractionAction action, BuildingData option)
+        private BuildingInteractionOffer EvaluateInteraction(BuildingInteractionTarget target,
+            BuildingInteractionAction action, BuildingData option,
+            IReadOnlyList<BuildingInteractionCandidate> candidates, BuildingInteractionFailure availability)
         {
-            var failure = EvaluateInteraction(target, action, option, out BuildingInteractionCost cost);
-            return new BuildingInteractionOffer(action, option ?? target.ExpectedData, cost, failure);
-        }
-
-        private BuildingInteractionFailure EvaluateInteraction(BuildingInteractionTarget target,
-            BuildingInteractionAction action, BuildingData option, out BuildingInteractionCost cost)
-        {
-            cost = default;
-            var availability = ValidateInteractionTarget(target);
-            if (target == null || !IsInteractionTargetCurrent(target)) return availability;
             BuildingSlot slot = target.Slot;
-            BuildingData current = slot.IsOccupied ? slot.CurrentBuilding.Data : option;
-            if (!TryReadConstructionCost(current, out BuildingInteractionCost buildCost,
-                out BuildingInteractionCost refund)) return BuildingInteractionFailure.InvalidCost;
-
-            switch (action)
+            BuildingData data = action == BuildingInteractionAction.Demolish ? target.ExpectedData : option;
+            BuildingInteractionCost cost = default;
+            BuildingInteractionFailure failure;
+            if (action == BuildingInteractionAction.Demolish)
             {
-                case BuildingInteractionAction.Build:
-                    cost = buildCost;
-                    if (slot.IsOccupied) return BuildingInteractionFailure.TargetChanged;
-                    if (option == null || !CollectInteractionCandidates(slot).Contains(option))
-                        return BuildingInteractionFailure.CandidateUnavailable;
-                    if (!HasBuildCapacity) return BuildingInteractionFailure.BuildCapacity;
-                    if (!CanAffordCandidate(slot, option)) return BuildingInteractionFailure.InsufficientFunds;
-                    break;
-                case BuildingInteractionAction.Upgrade:
-                    if (!slot.IsOccupied || option == null || !CollectInteractionCandidates(slot).Contains(option))
-                        return BuildingInteractionFailure.CandidateUnavailable;
-                    if (!TryReadInteractionCosts(GetUpgradeCost(slot, option), out cost))
-                        return BuildingInteractionFailure.InvalidCost;
-                    if (!CanAffordUpgrade(slot, option)) return BuildingInteractionFailure.InsufficientFunds;
-                    break;
-                case BuildingInteractionAction.Demolish:
-                    cost = refund;
-                    if (!slot.IsOccupied) return BuildingInteractionFailure.TargetChanged;
-                    if (IsCoreSlot(slot)) return BuildingInteractionFailure.CoreProtected;
-                    break;
-                default: return BuildingInteractionFailure.CandidateUnavailable;
+                failure = !slot.IsOccupied ? BuildingInteractionFailure.TargetChanged :
+                    !TryReadConstructionCost(data, out _, out cost) ? BuildingInteractionFailure.InvalidCost :
+                    IsCoreSlot(slot) ? BuildingInteractionFailure.CoreProtected : availability;
             }
-            return availability;
+            else if (action == BuildingInteractionAction.Build && slot.IsOccupied)
+                failure = BuildingInteractionFailure.TargetChanged;
+            else
+            {
+                if (action == (slot.IsOccupied ? BuildingInteractionAction.Upgrade : BuildingInteractionAction.Build))
+                    foreach (BuildingInteractionCandidate candidate in candidates)
+                        if (candidate.Data == option) return candidate.Offer;
+                failure = BuildingInteractionFailure.CandidateUnavailable;
+            }
+            return new BuildingInteractionOffer(action, data, cost, failure);
         }
 
-        private List<BuildingData> CollectInteractionCandidates(BuildingSlot slot)
+        private List<BuildingInteractionCandidate> CollectInteractionCandidates(BuildingInteractionTarget target,
+            BuildingInteractionFailure availability)
         {
-            var candidates = new List<BuildingData>();
+            BuildingSlot slot = target.Slot;
+            int coreLevel = GetCurrentCoreLevel();
+            var byId = new Dictionary<string, BuildingInteractionCandidate>();
             if (slot.IsOccupied)
             {
-                if (slot.CurrentBuilding.Data != null)
+                BuildingData current = target.ExpectedData;
+                var executionCosts = new Dictionary<string, BuildingResourceCost[]>();
+                foreach (BuildingUpgradeOption option in current?.Upgrades ?? Array.Empty<BuildingUpgradeOption>())
                 {
-                    slot.CurrentBuilding.Data.CollectUpgrades(candidates, GetCurrentCoreLevel());
-                    // Current date KDH 2026-10-08
-                    // 상호작용 업그레이드 목록도 이미 지어진 지원 T2를 빼야 버튼이 남지 않습니다.
-                    RemoveBuiltSupports(candidates);
+                    if (!current.IsUpgradeAvailable(option, int.MaxValue)) continue;
+                    BuildingData next = option.nextBuilding;
+                    bool coreLevelMet = coreLevel >= option.requiredCoreLevel;
+                    if (string.IsNullOrWhiteSpace(next.BuildingId)) continue;
+                    // TryGetUpgradeCost는 표시명과 관계없이 같은 ID의 첫 해제 경로를 사용한다.
+                    if (coreLevelMet && !executionCosts.ContainsKey(next.BuildingId))
+                        executionCosts.Add(next.BuildingId, option.cost);
+                    if (string.IsNullOrWhiteSpace(next.DisplayName) ||
+                        IsSupportAlreadyBuilt(next)) continue;
+                    if (byId.TryGetValue(next.BuildingId, out BuildingInteractionCandidate existing) &&
+                        (existing.IsCoreLevelMet || (!coreLevelMet && existing.RequiredCoreLevel <= option.requiredCoreLevel)))
+                        continue;
+                    bool validCost = TryReadInteractionCosts(coreLevelMet ? executionCosts[next.BuildingId] : option.cost,
+                        out BuildingInteractionCost cost);
+                    byId[next.BuildingId] = CreateInteractionCandidate(target, next, cost, validCost,
+                        option.requiredCoreLevel, coreLevelMet, availability);
                 }
             }
-            else slot.CollectCandidates(candidates, database, GetCurrentCoreLevel(), _census);
-
-            var byId = new Dictionary<string, BuildingData>();
-            var duplicates = new HashSet<string>();
-            foreach (BuildingData data in candidates)
+            else
             {
-                if (data == null || string.IsNullOrWhiteSpace(data.BuildingId) || string.IsNullOrWhiteSpace(data.DisplayName) ||
-                    (!slot.IsOccupied && data.IsCore)) continue;
-                if (byId.ContainsKey(data.BuildingId))
+                var buildings = new List<BuildingData>();
+                // 표시 후보에서만 사령부 제한을 완화한다. 슬롯/가문/빈 칸 건설 제한은 그대로 사용한다.
+                slot.CollectCandidates(buildings, database, int.MaxValue, _census);
+                var duplicates = new HashSet<string>();
+                foreach (BuildingData data in buildings)
                 {
-                    if (!slot.IsOccupied) duplicates.Add(data.BuildingId);
-                    continue;
+                    if (data == null || string.IsNullOrWhiteSpace(data.BuildingId) ||
+                        string.IsNullOrWhiteSpace(data.DisplayName) || data.IsCore) continue;
+                    if (byId.ContainsKey(data.BuildingId)) { duplicates.Add(data.BuildingId); continue; }
+                    bool validCost = TryReadConstructionCost(data, out BuildingInteractionCost cost, out _);
+                    byId.Add(data.BuildingId, CreateInteractionCandidate(target, data, cost, validCost,
+                        data.RequiredCoreLevel, coreLevel >= data.RequiredCoreLevel, availability));
                 }
-                byId.Add(data.BuildingId, data);
+                foreach (string id in duplicates) byId.Remove(id);
             }
-            foreach (string id in duplicates) byId.Remove(id);
-            return new List<BuildingData>(byId.Values);
+            return new List<BuildingInteractionCandidate>(byId.Values);
+        }
+
+        private BuildingInteractionCandidate CreateInteractionCandidate(BuildingInteractionTarget target,
+            BuildingData data, BuildingInteractionCost cost, bool validCost, int requiredCoreLevel,
+            bool coreLevelMet, BuildingInteractionFailure availability)
+        {
+            BuildingSlot slot = target.Slot;
+            BuildingInteractionFailure failure;
+            if (!validCost || (slot.IsOccupied && !TryReadConstructionCost(target.ExpectedData, out _, out _)))
+                failure = BuildingInteractionFailure.InvalidCost;
+            else if (!coreLevelMet)
+                failure = BuildingInteractionFailure.CoreLevelRequired;
+            else if (!slot.IsOccupied && !HasBuildCapacity)
+                failure = BuildingInteractionFailure.BuildCapacity;
+            else if (!HasWallet() || (cost.Gold > 0 && !wallet.CanSpend(CurrencyType.Gold, cost.Gold)) ||
+                (cost.Gems > 0 && !wallet.CanSpend(CurrencyType.Gem, cost.Gems)))
+                failure = BuildingInteractionFailure.InsufficientFunds;
+            else
+                failure = availability;
+            var action = slot.IsOccupied ? BuildingInteractionAction.Upgrade : BuildingInteractionAction.Build;
+            var offer = new BuildingInteractionOffer(action, data, cost, failure,
+                failure == BuildingInteractionFailure.CoreLevelRequired ? requiredCoreLevel : (int?)null);
+            return new BuildingInteractionCandidate(data, cost, validCost, requiredCoreLevel, coreLevelMet, offer);
         }
 
         private bool TryReadConstructionCost(BuildingData data, out BuildingInteractionCost cost,
