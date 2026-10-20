@@ -5,6 +5,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Cameras;
 using Game.UI;
+using OZGL.KDH;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -76,6 +77,13 @@ namespace Game.Core
         public bool IsLastNode => _nodeController != null && _nodeController.IsLastNode;
 
         public event Action<GamePhase> PhaseChanged;
+        public event Action<ResultType> BattleResultConfirmed;
+        public ResultType? LastBattleResult { get; private set; }
+        public event Action BattleAvailabilityChanged;
+        public bool HasBarracks => _buildingCensus != null &&
+            _buildingCensus.CountType(BuildingType.Barracks) > 0;
+        private BuildingCensus _buildingCensus;
+
         public event Action QuarterDecisionRequested;
         public event Action ArtifactSelectionRequested;
         public GamePhase CurPhase => _curPhase;
@@ -91,14 +99,18 @@ namespace Game.Core
         private TestWaitingScript _testScript;
         private WaveController _waveController; //인게임 전투 담당
         private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
-        private ArchiveManager _archiveManager;
+        private RunRecordManager _runRecordManager;
         private IRunSettlementRewards _settlementRewards;
         private IContinueUI _continueUI;
         private IRunDecisionUI _decisionUI;
         private IShopFlow _shopFlow;
+        private IEventFlow _eventFlow;
+        private ISceneTransition _sceneTransition;
+        private IRunCheckpointWriter _checkpointWriter;
+        
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
-        private IRunCheckpointWriter _checkpointWriter;
+        
         private bool _hasBegun;
         private bool _restoredStep;
         private bool _startupBlocked;
@@ -108,6 +120,8 @@ namespace Game.Core
         public bool IsResumingStep { get; private set; }
         private bool _isTransitioning;
         private bool _isResetting;
+        private bool _isEndingRun;
+        private UniTaskCompletionSource _flowCompletion;
         private UniTaskCompletionSource _spawnCompletion;
         private CancellationTokenSource _cts;
         private RunDecision? _runDecision;
@@ -121,7 +135,7 @@ namespace Game.Core
             WaveController waveController, 
             TestWaitingScript testScript, 
             ArtifactManager artifactManager, 
-            ArchiveManager archiveManager = null,
+            RunRecordManager runRecordManager = null,
             IRunSettlementRewards settlementRewards = null,
             InGameCameraController cameraController = null,
             IShopFlow shopFlow = null)
@@ -129,14 +143,16 @@ namespace Game.Core
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
-            _archiveManager = archiveManager;
+            _runRecordManager = runRecordManager;
             _settlementRewards = settlementRewards;
             _cameraController = cameraController;
             _shopFlow = shopFlow;
             _nodeController = new NodeController(waveController.WaveCatalog);
+            
             ClearToken();
             ResetDecisionState();
             _isTransitioning = false;
+            _isEndingRun = false;
             _curPhase = GamePhase.None;
             _resumeStep = RunResumeStep.Preparation;
             HasClearedMainGame = false;
@@ -146,13 +162,35 @@ namespace Game.Core
             _startupBlocked = false;
             _settlementViewPrepared = false;
             IsResumingStep = false;
+            
             if (!_nodeController.TryStartQuarter(1, _twoEliteChance, out string error))
                 throw new InvalidOperationException("기본 런 준비 실패: " + error);
         }
 
+        public void InitializeBuildings(BuildingCensus census)
+        {
+            if (census == null) throw new ArgumentNullException(nameof(census));
+            if (_buildingCensus != null)
+                _buildingCensus.Changed -= HandleBuildingsChanged;
+            _buildingCensus = census;
+            _buildingCensus.Changed += HandleBuildingsChanged;
+            HandleBuildingsChanged();
+        }
+
+
         public void InitializeSave(IRunCheckpointWriter checkpointWriter)
         {
             _checkpointWriter = checkpointWriter ?? throw new ArgumentNullException(nameof(checkpointWriter));
+        }
+
+        public void InitializeEventFlow(IEventFlow eventFlow)
+        {
+            _eventFlow = eventFlow ?? throw new ArgumentNullException(nameof(eventFlow));
+        }
+
+        public void InitializeSceneTransition(ISceneTransition sceneTransition)
+        {
+            _sceneTransition = sceneTransition;
         }
 
         public void BlockStartup()
@@ -164,21 +202,41 @@ namespace Game.Core
         /// <summary>호출하고 결과를 기다리는 UI 계약을 연결한다. 게임 데이터는 Flow가 전달한다.</summary>
         public void InitializeUI(IContinueUI continueUI, IRunDecisionUI decisionUI)
         {
-            if (continueUI == null) throw new ArgumentNullException(nameof(continueUI));
-            if (decisionUI == null) throw new ArgumentNullException(nameof(decisionUI));
+            if (continueUI == null) 
+                throw new ArgumentNullException(nameof(continueUI));
+            if (decisionUI == null) 
+                throw new ArgumentNullException(nameof(decisionUI));
             _continueUI = continueUI;
             _decisionUI = decisionUI;
         }
 
         private void OnDestroy()
         {
+            if (_buildingCensus != null)
+                _buildingCensus.Changed -= HandleBuildingsChanged;
             _cts?.Cancel();
             _cts?.Dispose();
         }
-        
+        /// <summary>
+        /// 현재 건물 건설이 가능한 페이즈인지 반환하는 메서드
+        /// 사용처 : 건설시스템
+        /// </summary>
+        public bool CanEnterBuildMode()
+        {
+            return !_isTransitioning && _curPhase == GamePhase.Preparation;
+        }
+
+        /// <summary>
+        /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
+        /// 사용처 : 유닛시스템
+        /// </summary>
+        public bool CanBattle()
+        {
+            return !_isTransitioning && _curPhase == GamePhase.Battle;
+        }
+
         // 기존 버튼/샘플의 연결은 유지하되 준비된 런을 다시 초기화하지 않는다.
         public void BeginRun() => BeginRunAsync().Forget();
-
         public async UniTask BeginRunAsync()
         {
             if (_hasBegun || _startupBlocked || _curPhase != GamePhase.None) return;
@@ -186,6 +244,8 @@ namespace Game.Core
             _isTransitioning = true;
             var lifetime = _cts;
             var token = lifetime.Token;
+            var completion = new UniTaskCompletionSource();
+            _flowCompletion = completion;
             try
             {
                 if (_resumeStep == RunResumeStep.Finished)
@@ -211,6 +271,8 @@ namespace Game.Core
             {
                 IsResumingStep = false;
                 if (ReferenceEquals(_cts, lifetime) && !_startupBlocked) _isTransitioning = false;
+                if (ReferenceEquals(_flowCompletion, completion)) _flowCompletion = null;
+                completion.TrySetResult();
             }
         }
 
@@ -228,6 +290,32 @@ namespace Game.Core
             _isResetting = true;
             ReturnToMainMenuAsync().Forget();
         }
+
+        /// <summary>현재 진행을 중단하고 누적 기록으로 정산한 뒤 런을 종료한다.</summary>
+        public void AbandonRun() => AbandonRunAsync().SuppressCancellationThrow().Forget();
+
+        private async UniTask AbandonRunAsync()
+        {
+            if (_isEndingRun || _isResetting || _curPhase == GamePhase.None || _curPhase == GamePhase.Finished) return;
+            _isEndingRun = true;
+            _isTransitioning = true;
+            var pendingFlow = _flowCompletion?.Task ?? UniTask.CompletedTask;
+            var pendingSpawn = _spawnCompletion?.Task ?? UniTask.CompletedTask;
+            _waveController.BattlePause();
+            ClearToken();
+            var token = _cts.Token;
+            LastBattleResult = ResultType.Defeat;
+            ChangePhase(GamePhase.BattleResolving);
+            BattleResultConfirmed?.Invoke(ResultType.Defeat);
+
+            // 취소된 UI의 finally와 스폰 정리가 끝난 뒤 정산 UI를 연다.
+            await pendingFlow;
+            await pendingSpawn;
+            token.ThrowIfCancellationRequested();
+            await CleanupBattleAsync(token);
+            await FinishRun(ResultType.Defeat, token);
+        }
+
         //현재 진행중인 값 저장
         public GameFlowSaveData CaptureSaveData()
         {
@@ -271,38 +359,25 @@ namespace Game.Core
                 // 스포너의 배치 공간 정리까지 끝난 후 런타임을 비운다.
                 await pendingSpawn;
                 token.ThrowIfCancellationRequested();
-                await SceneManager.LoadSceneAsync(MainMenuScene);
+                if (_sceneTransition != null)
+                    await _sceneTransition.LoadAsync(MainMenuScene);
+                else
+                    await SceneManager.LoadSceneAsync(MainMenuScene);
             }
             finally
             {
                 _isResetting = false;
             }
         }
+        private void HandleBuildingsChanged() => BattleAvailabilityChanged?.Invoke();
 
-        /// <summary>
-        /// 현재 건물 건설이 가능한 페이즈인지 반환하는 메서드
-        /// 사용처 : 건설시스템
-        /// </summary>
-        public bool CanEnterBuildMode()
-        {
-            return !_isTransitioning && _curPhase == GamePhase.Preparation;
-        }
-
-        /// <summary>
-        /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
-        /// 사용처 : 유닛시스템
-        /// </summary>
-        public bool CanBattle()
-        {
-            return !_isTransitioning && _curPhase == GamePhase.Battle;
-        }
 
         // 전투준비 페이즈를 담당.
         // 실제 유닛 실행까지만 요청하고 실제 전투페이즈는 TryStartWave 메서드에서 실행
         public async UniTask<bool> TrySpawnUnits()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
-            if (_waveController.CurrentPreset == null) return false;
+            if (!HasBarracks || _waveController.CurrentPreset == null) return false;
             _isTransitioning = true;
             var token = _cts.Token;
             var completion = new UniTaskCompletionSource();
@@ -325,9 +400,9 @@ namespace Game.Core
             }
             finally
             {
-                completion.TrySetResult();
                 if (ReferenceEquals(_spawnCompletion, completion))
                     _spawnCompletion = null;
+                completion.TrySetResult();
             }
         }
 
@@ -347,6 +422,8 @@ namespace Game.Core
             _isTransitioning = true;
             CancellationTokenSource lifetime = _cts;
             var token = lifetime.Token;
+            var completion = new UniTaskCompletionSource();
+            _flowCompletion = completion;
             try
             {
                 await ResolveBattleCoreAsync(result, token).SuppressCancellationThrow();
@@ -355,6 +432,8 @@ namespace Game.Core
             {
                 // 화면 취소/오류도 현재 작업의 잠금을 해제한다. 이전 판은 새 판을 변경하지 않는다.
                 if (ReferenceEquals(_cts, lifetime)) _isTransitioning = false;
+                if (ReferenceEquals(_flowCompletion, completion)) _flowCompletion = null;
+                completion.TrySetResult();
             }
         }
 
@@ -362,7 +441,9 @@ namespace Game.Core
         private async UniTask ResolveBattleCoreAsync(ResultType result, CancellationToken token)
         {
             Node completedNode = CurrentNode;
+            LastBattleResult = result;
             ChangePhase(GamePhase.BattleResolving);
+            BattleResultConfirmed?.Invoke(result);
             // 실제 유닛 파트는 이 페이즈 진입 시 공격·이동·피해 처리를 중단해야 한다.
             await PlayBattleResultAsync(result, token);
             token.ThrowIfCancellationRequested(); //token이 들어간 작업이 중단되면 취소 예외 발생
@@ -478,6 +559,20 @@ namespace Game.Core
                 return;
             }
 
+            if (completedNode.PostBattleEvent == PostBattleEventType.Event)
+            {
+                if (_eventFlow == null)
+                    throw new InvalidOperationException("이벤트 진행 계약을 먼저 연결해주세요.");
+                _resumeStep = RunResumeStep.Event;
+                ChangePhase(GamePhase.Event);
+                // 사건 준비와 체크포인트 저장은 이벤트 시스템이 맡는다.
+                await _eventFlow.OpenEventAsync(token);
+                token.ThrowIfCancellationRequested();
+                IsResumingStep = false;
+                return;
+            }
+
+            // 저주는 기존 임시 안내/테스트 대기 경로를 유지한다.
             _resumeStep = RunResumeStep.Event;
             GamePhase phase = GamePhase.Event;
             if (_continueUI != null)
@@ -541,17 +636,18 @@ namespace Game.Core
         // 게임 종료 및 내부 상태 관리
         private async UniTask FinishRun(ResultType type, CancellationToken token)
         {
+            _isEndingRun = true;
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
             token.ThrowIfCancellationRequested();
-            if (_archiveManager == null || _settlementRewards == null)
+            if (_runRecordManager == null || _settlementRewards == null)
                 throw new InvalidOperationException("게임 종료 기록과 정산 매니저를 먼저 연결해주세요.");
 
             // 재시도에도 같은 확정 기록을 사용해야 이미 저장한 보상을 다시 지급하지 않는다.
-            if (!_archiveManager.TryGetRunSummary(out RunSummary summary))
+            if (!_runRecordManager.TryGetRunSummary(out RunSummary summary))
             {
-                _archiveManager.CompleteRun();
-                if (!_archiveManager.TryGetRunSummary(out summary))
+                _runRecordManager.CompleteRun();
+                if (!_runRecordManager.TryGetRunSummary(out summary))
                     throw new InvalidOperationException("게임 결산 기록을 불러올 수 없습니다.");
             }
 
@@ -618,15 +714,17 @@ namespace Game.Core
 
         private void ChangePhase(GamePhase phase)
         {
+            if (phase == GamePhase.None || phase == GamePhase.Preparation) LastBattleResult = null;
             _curPhase = phase;
             PhaseChanged?.Invoke(phase);
         }
 
         private void ClearToken()
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
+            var previous = _cts;
             _cts = new CancellationTokenSource();
+            previous?.Cancel();
+            previous?.Dispose();
         }
 
         private void ResetDecisionState()

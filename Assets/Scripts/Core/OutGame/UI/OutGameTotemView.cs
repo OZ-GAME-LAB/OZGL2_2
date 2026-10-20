@@ -1,154 +1,1187 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
-/// <summary>고정된 6열에 두 페이지의 토템을 표시하고, 입력을 UIController에 전달합니다.</summary>
 public class OutGameTotemView : MonoBehaviour
 {
-    [SerializeField] private OutGameTotemColumn[] _columns;
-    [SerializeField] private TMP_Text _description;
-    [SerializeField] private TMP_Text _bonusLabel;
-    [SerializeField] private UnityEngine.UI.Button _leftButton;
-    [SerializeField] private UnityEngine.UI.Button _rightButton;
-    [SerializeField] private UnityEngine.UI.Button _backButton;
-    [SerializeField] private UnityEngine.UI.Button _startButton;
+    private bool SelectionLocked => selection is OutGameTotemController controller && controller.SelectionLocked;
+    [Header("Totems")]
+    [SerializeField]
+    private TotemButtonUI[] totemButtons;
 
-    private ITotemSelection _selection;
-    private TotemId _inspectedTotem;
-    private int _page;
 
-    public event Action<TotemId, int> LevelChangeRequested;
+    [Header("Active Totem Effects")]
+    [SerializeField]
+    private GameObject totemInfoPanel;
+
+    [SerializeField]
+    private TMP_Text activeEffectsTitleText;
+
+    [SerializeField]
+    private TMP_Text activeEffectsText;
+
+    [SerializeField]
+    private ScrollRect activeEffectsScrollRect;
+
+    [SerializeField]
+    private RectTransform activeEffectsContent;
+
+
+    [Header("Reward Bonus")]
+    [SerializeField]
+    private Image bonusFillImage;
+
+    [SerializeField]
+    private TMP_Text bonusPercentText;
+
+
+    [Header("Hover Info")]
+    [SerializeField]
+    private RectTransform hoverInfoPanel;
+
+    [SerializeField]
+    private TMP_Text hoverTitleText;
+
+    [SerializeField]
+    private TMP_Text hoverDescriptionText;
+
+
+    [Header("Hover Position")]
+    [SerializeField]
+    private float mouseOffsetX = 30f;
+
+    [SerializeField]
+    private float mouseOffsetY = 30f;
+
+
+    [Header("Navigation")]
+    [SerializeField]
+    private Button backButton;
+
+    [SerializeField]
+    private Button startButton;
+
+
+    // 예전 버튼.
+    // Inspector 참조가 남아 있어도 상관없음.
+    // GameObject는 비활성화해도 됨.
+    [Header("Legacy - Not Used")]
+    [SerializeField]
+    private Button leftButton;
+
+    [SerializeField]
+    private Button rightButton;
+
+
+    private ITotemSelection selection;
+    private bool _readOnly;
+    private IReadOnlyList<TotemData> _data;
+    private readonly List<ActiveTotem> _totems = new List<ActiveTotem>();
+
+    private TotemButtonUI hoveredTotem;
+
+    private Vector2 lastHoverMousePosition;
+
+
+    private Canvas rootCanvas;
+
+    private RectTransform hoverPanelParent;
+
+    private bool activeEffectsInitialized;
+
+
+    public event Action<TotemId, int>
+        LevelChangeRequested;
+
     public event Action BackRequested;
+
     public event Action StartRequested;
+
+
+    // =====================================================
+    // Validation
+    // =====================================================
 
     public bool ValidateReferences()
     {
-        bool valid = _columns != null && _columns.Length == 6 && _description != null &&
-            _bonusLabel != null && _leftButton != null && _rightButton != null &&
-            _backButton != null && _startButton != null;
-        if (valid)
+        bool valid =
+            totemButtons != null &&
+            totemButtons.Length == 8 &&
+            backButton != null &&
+            startButton != null;
+
+
+        if (!valid)
         {
-            for (int i = 0; i < _columns.Length; i++)
+            Debug.LogError(
+                "[OutGameTotemView] 토템 8개와 Back / Start 버튼 참조를 확인해주세요.",
+                this
+            );
+
+            return false;
+        }
+
+
+        HashSet<TotemId> ids =
+            new HashSet<TotemId>();
+
+
+        for (int i = 0;
+            i < totemButtons.Length;
+            i++)
+        {
+            TotemButtonUI button =
+                totemButtons[i];
+
+            if (button == null ||
+                !button.ValidateBaseReferences())
             {
-                if (_columns[i] == null || !_columns[i].ValidateReferences()) valid = false;
+                valid = false;
+                continue;
+            }
+
+
+            if (!ids.Add(button.TotemId))
+            {
+                Debug.LogError(
+                    "[OutGameTotemView] TotemId가 중복되었습니다: " +
+                    button.TotemId,
+                    button
+                );
+
+                valid = false;
             }
         }
-        if (!valid) Debug.LogError("[OutGameTotemView] 6개 열과 UI 참조를 연결해주세요.", this);
+
+
+        if (totemInfoPanel == null ||
+            activeEffectsTitleText == null ||
+            activeEffectsText == null ||
+            activeEffectsScrollRect == null ||
+            activeEffectsContent == null)
+        {
+            Debug.LogError(
+                "[OutGameTotemView] 현재 활성화된 토템 효과 목록 UI 참조를 확인해주세요.",
+                this
+            );
+        }
+
+
+        if (bonusFillImage == null ||
+            bonusPercentText == null)
+        {
+            Debug.LogError(
+                "[OutGameTotemView] 누적 보너스 Fill Bar 참조를 확인해주세요.",
+                this
+            );
+        }
+
+
+        if (hoverInfoPanel == null ||
+            hoverTitleText == null ||
+            hoverDescriptionText == null)
+        {
+            Debug.LogError(
+                "[OutGameTotemView] Hover 정보 UI 참조를 확인해주세요.",
+                this
+            );
+        }
+
+
         return valid;
     }
 
-    public void Initialize(ITotemSelection selection)
+
+    // =====================================================
+    // Initialize
+    // =====================================================
+
+    public void Initialize(
+        ITotemSelection selection, bool readOnly = false,
+        IReadOnlyList<TotemData> catalogData = null, IReadOnlyList<ActiveTotem> totems = null)
     {
         Shutdown();
-        if (!ValidateReferences() || selection == null) return;
-        _selection = selection;
-        _page = 0;
-        _inspectedTotem = TotemId.EnemyDamage;
-        for (int i = 0; i < _columns.Length; i++)
+
+
+        if (!ValidateReferences())
         {
-            _columns[i].Initialize();
-            _columns[i].LevelChangeRequested += OnLevelChangeRequested;
+            return;
         }
-        _leftButton.onClick.AddListener(OnLeftClicked);
-        _rightButton.onClick.AddListener(OnRightClicked);
-        _backButton.onClick.AddListener(OnBackClicked);
-        _startButton.onClick.AddListener(OnStartClicked);
+
+
+        this.selection = selection;
+        if (readOnly ? catalogData == null || totems == null : selection == null)
+            throw new ArgumentException("토템 표시 데이터 또는 선택 연결이 필요합니다.");
+        _readOnly = readOnly;
+        _data = readOnly ? catalogData : selection.Data;
+        if (readOnly) _totems.AddRange(totems);
+        backButton.gameObject.SetActive(!readOnly);
+        startButton.gameObject.SetActive(!readOnly);
+
+
+        rootCanvas =
+            GetComponentInParent<Canvas>();
+
+        if (rootCanvas != null)
+            rootCanvas =
+                rootCanvas.rootCanvas;
+
+
+        if (hoverInfoPanel != null)
+        {
+            hoverPanelParent =
+                hoverInfoPanel.parent
+                as RectTransform;
+
+            hoverInfoPanel.gameObject
+                .SetActive(false);
+        }
+
+
+        if (totemInfoPanel != null)
+        {
+            totemInfoPanel
+                .SetActive(true);
+        }
+
+
+        if (activeEffectsTitleText != null)
+        {
+            activeEffectsTitleText.text =
+                "현재 활성화 됨";
+        }
+
+
+        ConfigureBonusFill();
+
+
+        hoveredTotem = null;
+
+        lastHoverMousePosition =
+            Vector2.zero;
+
+        activeEffectsInitialized =
+            false;
+
+
+        for (int i = 0;
+            i < totemButtons.Length;
+            i++)
+        {
+            TotemButtonUI button =
+                totemButtons[i];
+
+            if (button == null)
+                continue;
+
+
+            TotemData data =
+                FindData(button.TotemId);
+
+
+            if (data == null)
+            {
+                Debug.LogError(
+                    "[OutGameTotemView] TotemData를 찾을 수 없습니다: " +
+                    button.TotemId,
+                    button
+                );
+
+                continue;
+            }
+
+            button.gameObject
+                .SetActive(data.IsAvailable);
+
+
+            button.Initialize(
+                data,
+                GetLevel(data.Id)
+            );
+
+
+            button.PointerEntered +=
+                OnPointerEntered;
+
+            button.PointerMoved +=
+                OnPointerMoved;
+
+            button.PointerExited +=
+                OnPointerExited;
+
+            if (!readOnly) button.Clicked += OnTotemClicked;
+        }
+
+
+        if (!readOnly)
+        {
+            backButton.onClick.AddListener(OnBackClicked);
+            startButton.onClick.AddListener(OnStartClicked);
+        }
+
+
         Refresh();
     }
+
+
+    // =====================================================
+    // Refresh
+    // =====================================================
 
     public void Refresh()
     {
-        if (_selection == null) return;
-        for (int i = 0; i < _columns.Length; i++)
-        {
-            TotemData data = FindData(GetColumnId(i));
-            _columns[i].gameObject.SetActive(data != null);
-            if (data != null) _columns[i].SetDisplay(data, _selection.GetLevel(data.Id));
-        }
-        _leftButton.interactable = _page > 0;
-        _rightButton.interactable = _page < 1;
-        _bonusLabel.text = "누적 보너스 " + _selection.GetRewardBonusPercent() + "%";
+        if (_data == null)
+            return;
 
-        TotemData inspected = FindData(_inspectedTotem);
-        if (inspected == null) return;
-        int level = _selection.GetLevel(inspected.Id);
-        _description.text = inspected.DisplayName + " (" + level + " / " + inspected.MaxLevel + ")\n" +
-            inspected.Description + "\n" + inspected.EffectLabel + ": " +
-            (inspected.ValuePerLevel * level).ToString("0.##") + inspected.ValueUnit;
+
+        for (int i = 0;
+            i < totemButtons.Length;
+            i++)
+        {
+            TotemButtonUI button =
+                totemButtons[i];
+
+            if (button == null)
+                continue;
+
+
+            TotemData data =
+                FindData(button.TotemId);
+
+
+            if (data == null ||
+                !data.IsAvailable)
+            {
+                button.gameObject
+                    .SetActive(false);
+
+                continue;
+            }
+
+
+            button.gameObject
+                .SetActive(true);
+
+
+            button.SetLevel(
+                GetLevel(data.Id)
+            );
+        }
+
+
+        RefreshActiveEffects();
+
+        RefreshBonus();
+
+        RefreshHoveredInfo();
     }
 
-    public void Shutdown()
+
+    // =====================================================
+    // Click
+    // =====================================================
+
+    private void OnTotemClicked(
+        TotemButtonUI button,
+        PointerEventData.InputButton mouseButton)
     {
-        if (_columns != null)
+        if (_readOnly || SelectionLocked || _data == null ||
+            button == null)
         {
-            for (int i = 0; i < _columns.Length; i++)
+            return;
+        }
+
+
+        TotemData data =
+            FindData(button.TotemId);
+
+
+        if (data == null ||
+            !data.IsAvailable)
+            return;
+
+
+        int currentLevel =
+            GetLevel(data.Id);
+
+
+        int delta = 0;
+
+
+        // -----------------------------------------
+        // 큰 토템
+        // OFF <-> ENABLE
+        // -----------------------------------------
+
+        if (data.SelectionMode ==
+            TotemSelectionMode.Toggle)
+        {
+            if (mouseButton ==
+                PointerEventData.InputButton.Left)
             {
-                if (_columns[i] == null) continue;
-                _columns[i].LevelChangeRequested -= OnLevelChangeRequested;
-                _columns[i].Shutdown();
+                delta =
+                    currentLevel == 0
+                    ? 1
+                    : -1;
+            }
+            else if (
+                mouseButton ==
+                PointerEventData.InputButton.Right &&
+                currentLevel > 0)
+            {
+                delta = -1;
             }
         }
-        if (_leftButton != null) _leftButton.onClick.RemoveListener(OnLeftClicked);
-        if (_rightButton != null) _rightButton.onClick.RemoveListener(OnRightClicked);
-        if (_backButton != null) _backButton.onClick.RemoveListener(OnBackClicked);
-        if (_startButton != null) _startButton.onClick.RemoveListener(OnStartClicked);
-        _selection = null;
+
+        // -----------------------------------------
+        // 작은 3단 토템
+        // 좌클릭: 0 -> 1 -> 2 -> 3 -> 0
+        // 우클릭: 3 -> 2 -> 1 -> 0
+        // -----------------------------------------
+
+        else
+        {
+            if (mouseButton ==
+                PointerEventData.InputButton.Left)
+            {
+                if (currentLevel <
+                    data.MaxLevel)
+                {
+                    delta = 1;
+                }
+                else
+                {
+                    delta =
+                        -currentLevel;
+                }
+            }
+            else if (
+                mouseButton ==
+                PointerEventData.InputButton.Right &&
+                currentLevel > 0)
+            {
+                delta = -1;
+            }
+        }
+
+
+        if (delta != 0)
+        {
+            LevelChangeRequested?.Invoke(
+                data.Id,
+                delta
+            );
+        }
+
+
+        Refresh();
     }
 
-    // 기존 열 순서는 3단 / 단일 / 3단 / 3단 / 단일 / 3단입니다.
-    private TotemId GetColumnId(int column)
+
+    // =====================================================
+    // Active Totem Effects
+    // =====================================================
+
+    private void RefreshActiveEffects()
     {
-        if (_page == 1)
+        if (_data == null ||
+            activeEffectsText == null)
         {
-            if (column == 1) return TotemId.DeathBurst;
-            if (column == 4) return TotemId.Pursuer;
-            return TotemId.None;
+            return;
         }
 
-        switch (column)
+
+        float previousScrollPosition =
+            1f;
+
+
+        if (activeEffectsInitialized &&
+            activeEffectsScrollRect != null)
         {
-            case 0: return TotemId.EnemyDamage;
-            case 1: return TotemId.EchoAttack;
-            case 2: return TotemId.EnemyCount;
-            case 3: return TotemId.DamageTaken;
-            case 4: return TotemId.Crossfire;
-            case 5: return TotemId.GoldReduction;
+            previousScrollPosition =
+                activeEffectsScrollRect
+                    .verticalNormalizedPosition;
         }
-        return TotemId.None;
+
+
+        StringBuilder builder =
+            new StringBuilder();
+
+
+        for (int i = 0;
+            i < _data.Count;
+            i++)
+        {
+            TotemData data =
+                _data[i];
+
+
+            if (data == null ||
+                !data.IsAvailable)
+                continue;
+
+
+            int level =
+                GetLevel(
+                    data.Id
+                );
+
+
+            if (level <= 0)
+                continue;
+
+
+            if (builder.Length > 0)
+            {
+                builder.Append(
+                    "\n"
+                );
+            }
+
+
+            builder.Append(
+                data.DisplayName
+            );
+
+            builder.Append(
+                " - "
+            );
+
+            builder.Append(
+                BuildActiveDescription(
+                    data,
+                    level
+                )
+            );
+        }
+
+
+        if (builder.Length == 0)
+        {
+            activeEffectsText.text =
+                SelectionLocked
+                    ? "첫 원정에는 토템을 적용하지 않습니다.\n효과는 자유롭게 살펴보세요.\n첫 원정 정산 후 사용할 수 있습니다."
+                    : "활성화된 토템 없음";
+        }
+        else
+        {
+            activeEffectsText.text =
+                builder.ToString();
+        }
+
+
+        activeEffectsText
+            .ForceMeshUpdate();
+
+
+        Canvas.ForceUpdateCanvases();
+
+
+        if (activeEffectsContent != null)
+        {
+            LayoutRebuilder
+                .ForceRebuildLayoutImmediate(
+                    activeEffectsContent
+                );
+        }
+
+
+        Canvas.ForceUpdateCanvases();
+
+
+        if (activeEffectsScrollRect != null)
+        {
+            activeEffectsScrollRect
+                .StopMovement();
+
+            activeEffectsScrollRect
+                .verticalNormalizedPosition =
+                Mathf.Clamp01(
+                    previousScrollPosition
+                );
+        }
+
+
+        activeEffectsInitialized =
+            true;
     }
 
-    private TotemData FindData(TotemId id)
+
+    private string BuildActiveDescription(
+        TotemData data,
+        int level)
     {
-        for (int i = 0; i < _selection.Data.Count; i++)
+        string text =
+            data.ActiveDescription;
+
+
+        if (string.IsNullOrWhiteSpace(
+            text))
         {
-            if (_selection.Data[i].Id == id) return _selection.Data[i];
+            text =
+                data.Description;
         }
+
+
+        float totalValue =
+            data.ValuePerLevel *
+            level;
+
+
+        text =
+            text.Replace(
+                "{level}",
+                level.ToString()
+            );
+
+
+        text =
+            text.Replace(
+                "{max}",
+                data.MaxLevel.ToString()
+            );
+
+
+        text =
+            text.Replace(
+                "{value}",
+                totalValue.ToString("0.##")
+            );
+
+
+        text =
+            text.Replace(
+                "{unit}",
+                data.ValueUnit ??
+                string.Empty
+            );
+
+
+        return text;
+    }
+
+
+    // =====================================================
+    // Reward Bonus
+    // =====================================================
+
+    private void ConfigureBonusFill()
+    {
+        if (bonusFillImage == null)
+            return;
+
+
+        bonusFillImage.type =
+            Image.Type.Filled;
+
+
+        bonusFillImage.fillMethod =
+            Image.FillMethod.Horizontal;
+
+
+        bonusFillImage.fillOrigin =
+            (int)Image.OriginHorizontal.Left;
+
+
+        bonusFillImage.fillAmount =
+            0f;
+    }
+
+
+    private void RefreshBonus()
+    {
+        if (_data == null)
+            return;
+
+
+        int currentPercent =
+            GetRewardBonusPercent();
+
+
+        int maxPercent =
+            GetMaximumRewardBonusPercent();
+
+
+        if (bonusFillImage != null)
+        {
+            bonusFillImage.fillAmount =
+                maxPercent > 0
+                ? Mathf.Clamp01(
+                    (float)currentPercent /
+                    maxPercent
+                )
+                : 0f;
+        }
+
+
+        if (bonusPercentText != null)
+        {
+            bonusPercentText.text =
+                (_readOnly ? 100L + currentPercent : currentPercent) +
+                "%";
+        }
+    }
+
+
+    private int GetMaximumRewardBonusPercent()
+    {
+        if (_data == null)
+            return 0;
+
+
+        long maximumBonus =
+            0;
+
+
+        for (int i = 0;
+            i < _data.Count;
+            i++)
+        {
+            TotemData data =
+                _data[i];
+
+
+            if (data == null ||
+                !data.IsAvailable)
+                continue;
+
+
+            maximumBonus +=
+                data.GetRewardBonusPercent(
+                    data.MaxLevel
+                );
+        }
+
+
+        return (int)Math.Min(
+            maximumBonus,
+            int.MaxValue
+        );
+    }
+
+
+    // =====================================================
+    // Hover
+    // =====================================================
+
+    private void OnPointerEntered(
+        TotemButtonUI button,
+        Vector2 mousePosition)
+    {
+        hoveredTotem =
+            button;
+
+
+        lastHoverMousePosition =
+            mousePosition;
+
+
+        ShowHoverInfo(
+            button,
+            mousePosition
+        );
+    }
+
+
+    private void OnPointerMoved(
+        TotemButtonUI button,
+        Vector2 mousePosition)
+    {
+        if (hoveredTotem != button)
+            return;
+
+
+        lastHoverMousePosition =
+            mousePosition;
+
+
+        UpdateHoverPanelPosition(
+            mousePosition
+        );
+    }
+
+
+    private void OnPointerExited(
+        TotemButtonUI button)
+    {
+        if (hoveredTotem != button)
+            return;
+
+
+        hoveredTotem = null;
+
+
+        if (hoverInfoPanel != null)
+        {
+            hoverInfoPanel.gameObject
+                .SetActive(false);
+        }
+    }
+
+
+    private void RefreshHoveredInfo()
+    {
+        if (hoveredTotem == null ||
+            !hoveredTotem.IsHovered)
+        {
+            return;
+        }
+
+
+        ShowHoverInfo(
+            hoveredTotem,
+            lastHoverMousePosition
+        );
+    }
+
+
+    private void ShowHoverInfo(
+        TotemButtonUI button,
+        Vector2 mousePosition)
+    {
+        if (_data == null ||
+            button == null ||
+            hoverInfoPanel == null ||
+            hoverTitleText == null ||
+            hoverDescriptionText == null)
+        {
+            return;
+        }
+
+
+        TotemData data =
+            FindData(button.TotemId);
+
+
+        if (data == null ||
+            !data.IsAvailable)
+        {
+            hoverInfoPanel.gameObject
+                .SetActive(false);
+
+            return;
+        }
+
+
+        int level =
+            GetLevel(data.Id);
+
+
+        hoverTitleText.text =
+            data.DisplayName;
+
+
+        if (data.SelectionMode ==
+            TotemSelectionMode.Leveled)
+        {
+            hoverDescriptionText.text =
+                data.Description +
+                "\n\n현재 단계: " +
+                level +
+                " / " +
+                data.MaxLevel;
+        }
+        else
+        {
+            hoverDescriptionText.text =
+                data.Description +
+                "\n\n현재 상태: " +
+                (
+                    level > 0
+                    ? "활성화"
+                    : "비활성화"
+                );
+        }
+
+
+        hoverInfoPanel.gameObject
+            .SetActive(true);
+
+
+        hoverTitleText
+            .ForceMeshUpdate();
+
+
+        hoverDescriptionText
+            .ForceMeshUpdate();
+
+
+        Canvas.ForceUpdateCanvases();
+
+
+        LayoutRebuilder
+            .ForceRebuildLayoutImmediate(
+                hoverInfoPanel
+            );
+
+
+        Canvas.ForceUpdateCanvases();
+
+
+        UpdateHoverPanelPosition(
+            mousePosition
+        );
+    }
+
+
+    // =====================================================
+    // Hover Position
+    // =====================================================
+
+    private void UpdateHoverPanelPosition(
+        Vector2 mouseScreenPosition)
+    {
+        if (hoverInfoPanel == null ||
+            hoverPanelParent == null)
+        {
+            return;
+        }
+
+
+        // 기본:
+        // 마우스 우상단
+        // 패널 Pivot = 좌하단
+
+        hoverInfoPanel.pivot =
+            new Vector2(0f, 0f);
+
+
+        Vector2 position =
+            mouseScreenPosition +
+            new Vector2(
+                mouseOffsetX,
+                mouseOffsetY
+            );
+
+
+        SetHoverPanelScreenPosition(
+            position
+        );
+
+
+        Vector3[] corners =
+            new Vector3[4];
+
+
+        hoverInfoPanel.GetWorldCorners(
+            corners
+        );
+
+
+        Vector2 upperRight =
+            RectTransformUtility
+                .WorldToScreenPoint(
+                    GetUICamera(),
+                    corners[2]
+                );
+
+
+        // 오른쪽 화면 밖으로 나갈 때만
+        // 마우스 좌측으로 뒤집음
+
+        if (upperRight.x >
+            Screen.width)
+        {
+            hoverInfoPanel.pivot =
+                new Vector2(1f, 0f);
+
+
+            position =
+                mouseScreenPosition +
+                new Vector2(
+                    -mouseOffsetX,
+                    mouseOffsetY
+                );
+
+
+            SetHoverPanelScreenPosition(
+                position
+            );
+        }
+    }
+
+
+    private void SetHoverPanelScreenPosition(
+        Vector2 screenPosition)
+    {
+        if (hoverPanelParent == null)
+            return;
+
+
+        if (
+            RectTransformUtility
+                .ScreenPointToLocalPointInRectangle(
+                    hoverPanelParent,
+                    screenPosition,
+                    GetUICamera(),
+                    out Vector2 localPoint
+                )
+        )
+        {
+            hoverInfoPanel
+                .anchoredPosition =
+                localPoint;
+        }
+    }
+
+
+    private Camera GetUICamera()
+    {
+        if (rootCanvas == null)
+            return null;
+
+
+        if (rootCanvas.renderMode ==
+            RenderMode.ScreenSpaceOverlay)
+        {
+            return null;
+        }
+
+
+        return rootCanvas.worldCamera;
+    }
+
+
+    // =====================================================
+    // Data
+    // =====================================================
+
+    private TotemData FindData(
+        TotemId id)
+    {
+        if (_data == null)
+            return null;
+
+
+        for (int i = 0;
+            i < _data.Count;
+            i++)
+        {
+            if (_data[i].Id ==
+                id)
+            {
+                return _data[i];
+            }
+        }
+
+
         return null;
     }
 
-    private void OnLevelChangeRequested(TotemId id, int delta)
+
+    // =====================================================
+    // Navigation
+    // =====================================================
+
+    private void OnBackClicked()
     {
-        _inspectedTotem = id;
-        LevelChangeRequested?.Invoke(id, delta);
-        // 상한/하한이라 실제 레벨이 바뀌지 않아도 클릭한 토템의 설명은 표시합니다.
-        Refresh();
+        if (!_readOnly) BackRequested?.Invoke();
     }
 
-    private void OnLeftClicked()
+
+    private void OnStartClicked()
     {
-        _page = 0;
-        _inspectedTotem = TotemId.EnemyDamage;
-        Refresh();
+        if (!_readOnly) StartRequested?.Invoke();
     }
 
-    private void OnRightClicked()
+    private int GetLevel(TotemId id)
     {
-        _page = 1;
-        _inspectedTotem = TotemId.DeathBurst;
-        Refresh();
+        if (!_readOnly) return selection.GetLevel(id);
+        foreach (ActiveTotem totem in _totems)
+            if (totem.Data != null && totem.Data.Id == id) return totem.Level;
+        return 0;
     }
 
-    private void OnBackClicked() { BackRequested?.Invoke(); }
-    private void OnStartClicked() { StartRequested?.Invoke(); }
-    private void OnDestroy() { Shutdown(); }
+    private int GetRewardBonusPercent()
+    {
+        if (!_readOnly) return selection.GetRewardBonusPercent();
+        int bonus = 0;
+        foreach (ActiveTotem totem in _totems)
+            bonus += totem.Data.GetRewardBonusPercent(totem.Level);
+        return bonus;
+    }
+
+
+    // =====================================================
+    // Shutdown
+    // =====================================================
+
+    public void Shutdown()
+    {
+        if (totemButtons != null)
+        {
+            for (int i = 0;
+                i < totemButtons.Length;
+                i++)
+            {
+                TotemButtonUI button =
+                    totemButtons[i];
+
+
+                if (button == null)
+                    continue;
+
+
+                button.PointerEntered -=
+                    OnPointerEntered;
+
+                button.PointerMoved -=
+                    OnPointerMoved;
+
+                button.PointerExited -=
+                    OnPointerExited;
+
+                button.Clicked -=
+                    OnTotemClicked;
+            }
+        }
+
+
+        if (backButton != null)
+        {
+            backButton.onClick
+                .RemoveListener(
+                    OnBackClicked
+                );
+        }
+
+
+        if (startButton != null)
+        {
+            startButton.onClick
+                .RemoveListener(
+                    OnStartClicked
+                );
+        }
+
+
+        selection = null;
+        _data = null;
+        _totems.Clear();
+
+        hoveredTotem = null;
+
+        lastHoverMousePosition =
+            Vector2.zero;
+
+        activeEffectsInitialized =
+            false;
+
+
+        if (hoverInfoPanel != null)
+        {
+            hoverInfoPanel.gameObject
+                .SetActive(false);
+        }
+    }
+
+
+    private void OnDestroy()
+    {
+        Shutdown();
+    }
 }

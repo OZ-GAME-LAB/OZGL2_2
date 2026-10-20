@@ -568,7 +568,18 @@ namespace Units
             }
 
             // 이미 타격한 대상의 사망은 남은 공격 동작을 취소하지 않는다.
-            return run.AttackHolding || EnsureTarget(run);
+            if (run.AttackHolding) return true;
+
+            // 후속 공격이 재탐색을 담당한다. 선행 동작 중에는 대상을 바꾸지 않는다.
+            // Cast는 남은 시간을 마치고, Dash는 기존 타겟 상실 종료 처리로 끝낸다.
+            if (run.Entered && run.Index + 1 < run.Actions.Count
+                && (run.Actions[run.Index] is SkillCastActionData
+                    || run.Actions[run.Index] is SkillDashActionData)
+                && run.Actions[run.Index + 1] is SkillAttackActionData nextAttack
+                && nextAttack.TargetLostPolicy == SkillTargetLostPolicy.Reselect)
+                return true;
+
+            return EnsureTarget(run);
         }
 
         private void CompleteDelayed(
@@ -898,7 +909,8 @@ namespace Units
                 initialTarget: run.Initial,
                 currentTarget: run.Current,
                 previousTarget: run.Previous,
-                hostileFilter: filter
+                hostileFilter: filter,
+                useBodyRange: action.Origin == SkillAreaOrigin.Owner
             );
 
             var selected = _targetResolver.ResolveSkillTargets(Request(run.Engagement.HostileFilter));
@@ -926,7 +938,8 @@ namespace Units
             {
                 if (_data.UsesLegacyTargetSelection)
                 {
-                    var candidates = _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, GetTargetTeam(settings.Relation), run.Engagement.HostileFilter));
+                    var candidates = _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, GetTargetTeam(settings.Relation), run.Engagement.HostileFilter,
+                        action.Origin == SkillAreaOrigin.Owner ? _core.BodyRadius : (float?)null));
 
                     var fallback = new SkillTargetSelector(_core, _data).SelectTarget(run.Initial.Target, candidates);
 
@@ -1060,7 +1073,8 @@ namespace Units
 
             if (action.IsLegacy && action.Target.MaxTargetCount > 1)
             {
-                foreach (var candidate in _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, run.Targets.PrimaryTarget.Team, action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null)))
+                foreach (var candidate in _targetResolver.ResolveCandidates(new TargetCandidateRequest(origin, _data.SkillRange, run.Targets.PrimaryTarget.Team, action.Target.Relation == SkillTargetRelation.Hostile ? run.Engagement.HostileFilter : null,
+                    action.Origin == SkillAreaOrigin.Owner ? _core.BodyRadius : (float?)null)))
                 {
                     if (targets.Count >= action.Target.MaxTargetCount)
                         break;

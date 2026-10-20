@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_SW_T3_11_\uD658\uC601\uAC80\uC0AC_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uD658\uC601\uB09C\uBB34"
+    _icon: {fileID: 21300000, guid: 6b5fbb524736bec4ead8f77fd387ca53, type: 3}
+    _description: "\uC5F0\uC18D \uAC80\uACA9\uC73C\uB85C \uACF5\uACA9\uB825\uC758
+      150% \u2192 200% \u2192 300% \uB9C8\uBC95 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4.
+      [\uCFE8\uD0C0\uC784 6\uCD08]"
   _skillRange: 3
   _skillCooldown: 6
   _targetSide: 0
@@ -53,7 +59,7 @@ MonoBehaviour:
           _filters: []
           _priorities:
           - _policy: 2
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -81,7 +87,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Ally_ActiveAttack_Cone
@@ -90,7 +96,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Ally_ActiveOnHit_Melee
@@ -113,6 +119,7 @@ MonoBehaviour:
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
         _executionDuration: 0.4
+        _impactTiming: 0
         _area: 3
         _radius: 5
         _angle: 180
@@ -138,7 +145,7 @@ MonoBehaviour:
           _clusterRadius: 1
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -166,7 +173,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 2
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Ally_ActiveAttack_Single
@@ -175,7 +182,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Ally_ActiveOnHit_Melee
@@ -198,6 +205,7 @@ MonoBehaviour:
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
         _executionDuration: 0.4
+        _impactTiming: 0
         _area: 0
         _radius: 1
         _angle: 90
@@ -252,7 +260,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Ally_ActiveAttack_Circle
@@ -261,7 +269,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Ally_ActiveOnHit_Melee
@@ -284,6 +292,7 @@ MonoBehaviour:
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
         _executionDuration: 0.4
+        _impactTiming: 0
         _area: 2
         _radius: 5
         _angle: 360

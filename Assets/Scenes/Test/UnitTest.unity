@@ -489,11 +489,11 @@ MonoBehaviour:
   _allyCount1: 5
   _allySpawnPosition1: {fileID: 1840431897}
   _allyRallyPoint1: {x: -10, y: 10}
-  _allyUnitType2: 14
+  _allyUnitType2: 6
   _allyCount2: 5
   _allySpawnPosition2: {fileID: 1621234831}
   _allyRallyPoint2: {x: -10, y: -10}
-  _allyUnitType3: 25
+  _allyUnitType3: 24
   _allyCount3: 5
   _allySpawnPosition3: {fileID: 1714150252}
   _allyRallyPoint3: {x: -20, y: 10}
@@ -502,6 +502,8 @@ MonoBehaviour:
   _allySpawnPosition4: {fileID: 669533017}
   _allyRallyPoint4: {x: -20, y: -10}
   _enemyCost: 20
+  _isInfiniteWave: 1
+  _bossUnitTypes: 
   _enemyClassWeights:
     Tanker: 10
     Bruiser: 10
@@ -509,7 +511,7 @@ MonoBehaviour:
     RangedPhysical: 10
     RangedMagic: 10
     Supporter: 10
-  _enemyUnitTypes: 3d0000003e0000004000000042000000
+  _enemyUnitTypes: 01000000020000000500000006000000
 --- !u!4 &358314845
 Transform:
   m_ObjectHideFlags: 0
@@ -1112,6 +1114,7 @@ Transform:
   - {fileID: 2683295878933123598}
   - {fileID: 986024961}
   - {fileID: 849099563}
+  - {fileID: 9029185880303096311}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &147271585948380993
@@ -1161,6 +1164,26 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!1 &696748146477513584
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9029185880303096311}
+  - component: {fileID: 7545694283944111043}
+  - component: {fileID: 7706617996778549658}
+  - component: {fileID: 6125257778241295305}
+  - component: {fileID: 9029185880303096312}
+  m_Layer: 5
+  m_Name: UnitHPUI_Canvas
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
 --- !u!4 &792153543745054531
 Transform:
   m_ObjectHideFlags: 0
@@ -1176,6 +1199,25 @@ Transform:
   m_Children: []
   m_Father: {fileID: 3764417624871240925}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!224 &1466806233130935488
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7637051753433988793}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 9029185880303096311}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!4 &1520809790730272516
 Transform:
   m_ObjectHideFlags: 0
@@ -1660,6 +1702,33 @@ Transform:
   m_Children: []
   m_Father: {fileID: 21032384238722671}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6125257778241295305
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696748146477513584}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a4bdc712ba4a074f960dd58df55afe0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UI.UnitHpUIManager
+  _worldCamera: {fileID: 535314509}
+  _uiRoot: {fileID: 1466806233130935488}
+  _uiPrefab: {fileID: 6591311055882119978, guid: 1bc9e2cd0a2cc6b439f57b655c8b9a0b, type: 3}
+  _poolSize: 10
+  _bossUiPrefab: {fileID: 3721801271455258463, guid: 8eb505fe5fa43be4e96afdf75c725b1b, type: 3}
+  _alwaysShowBossHp: 1
+  _bossWorldOffset: {x: 0, y: 2, z: 0}
+  _bossPoolSize: 1
+  _runtimeUnitManager: {fileID: 0}
+  _detectionRadius: 5
+  _detectionInterval: 0.1
+  _unitLayerMask:
+    serializedVersion: 2
+    m_Bits: 8192
+  _worldOffset: {x: 0, y: 1, z: 0}
 --- !u!1 &6699934028052572569
 GameObject:
   m_ObjectHideFlags: 0
@@ -1817,6 +1886,29 @@ MonoBehaviour:
     _maxJoinDistance: 6
     _maxCombinedExtent: 15
     _maxCombinedGroups: 10
+--- !u!223 &7545694283944111043
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696748146477513584}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 0
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 0
+  m_TargetDisplay: 0
 --- !u!1 &7566435820222951739
 GameObject:
   m_ObjectHideFlags: 0
@@ -1834,6 +1926,46 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!1 &7637051753433988793
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1466806233130935488}
+  - component: {fileID: 9080510965614792245}
+  m_Layer: 5
+  m_Name: UnitHPUI_Panel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &7706617996778549658
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696748146477513584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 0
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 800, y: 600}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 0
 --- !u!114 &8040656306710418605
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1889,6 +2021,59 @@ Transform:
   m_Children: []
   m_Father: {fileID: 21032384238722671}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!224 &9029185880303096311
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696748146477513584}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1466806233130935488}
+  m_Father: {fileID: 21032384238722671}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0, y: 0}
+--- !u!114 &9029185880303096312
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 696748146477513584}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9be03405759362f46882ef415f6382a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Units.UI.UnitHPUIManager_HitAppear
+  _worldCamera: {fileID: 535314509}
+  _uiRoot: {fileID: 1466806233130935488}
+  _uiPrefab: {fileID: 164761138608501173, guid: 422d951d2fb03f640aa195c0d190c98e, type: 3}
+  _spawnManager: {fileID: 0}
+  _runtimeUnitManager: {fileID: 0}
+  _initialPoolSize: 50
+  _createPerFrame: 2
+  _bossUiPrefab: {fileID: 5401996202629105460, guid: 92b108ccfa83d5e478e528258f2a9556, type: 3}
+  _alwaysShowBossHp: 1
+  _bossWorldOffset: {x: 0, y: 2, z: 0}
+  _bossPoolSize: 1
+  _showWhenHasShield: 1
+  _worldOffset: {x: 0, y: 1, z: 0}
+--- !u!222 &9080510965614792245
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7637051753433988793}
+  m_CullTransparentMesh: 1
 --- !u!1 &9141679359197635597
 GameObject:
   m_ObjectHideFlags: 0

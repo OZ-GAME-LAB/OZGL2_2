@@ -1,4 +1,5 @@
 using Game.Cameras;
+using Game.Archive;
 using Game.Core;
 using OZGL.KDH;
 using UnityEngine;
@@ -14,23 +15,38 @@ namespace Game.UI.InGame
         [SerializeField] private GameHudView _hudView;
         [SerializeField] private HudPresenter _hudPresenter;
         [SerializeField] private ArtifactRewardPresenter _artifactSelectionUI;
+        [SerializeField] private EventPopupView _eventUI;
         [SerializeField] private ContinueView _continueUI;
         [SerializeField] private RunDecisionView _runDecisionUI;
-        [SerializeField] private SettlementView _settlementUI;
+        [SerializeField] private RunResultView _settlementUI;
         [SerializeField] private ShopView _shopView;
         [SerializeField] private ArtifactInventoryPopupView _artifactInventoryView;
         [SerializeField] private ConsumableItemView _consumableItemView;
         [SerializeField] private ConsumableItemActionButton _consumableUsePopup;
         [SerializeField] private BuildingUIPresenter _buildingUI;
         [SerializeField] private BuildingUIConnection _buildingUIConnection;
+        [SerializeField] private ArchiveView _archiveView;
+        [SerializeField] private PausePopupView _pausePopupView;
+        [SerializeField] private ConfirmPopupView _confirmPopupView;
+        [SerializeField] private RunInfoPresenter _runInfo;
 
         public InGameUIManager UIManager => _uiManager;
         public IArtifactSelectionUI ArtifactSelectionUI => _artifactSelectionUI;
+        public IEventUI EventUI => _eventUI;
         public IContinueUI ContinueUI => _continueUI;
         public IRunDecisionUI RunDecisionUI => _runDecisionUI;
         public IRunSettlementUI SettlementUI => _settlementUI;
         public IShopUI ShopUI => _shopView;
         public bool IsReady { get; private set; }
+
+        public void InitializeArchive(ArchiveController archive) => _archiveView.Initialize(archive);
+
+        public void InitializeRunInfo(AltarManager altars, TraitRunApplier traits, TotemRunApplier totems,
+            TraitCatalog traitCatalog, TotemEffectCatalog totemCatalog)
+        {
+            // 이전 독립 테스트 UI도 유지한다. 실제 Test 프리팹에는 반드시 연결한다.
+            if (_runInfo != null) _runInfo.Initialize(_uiManager, altars, traits, totems, traitCatalog, totemCatalog);
+        }
 
         public void InitializeArtifactInventory(IArtifactReader artifactReader)
         {
@@ -45,20 +61,23 @@ namespace Game.UI.InGame
         {
             IsReady = false;
             if (_uiManager == null || _hudView == null || _hudPresenter == null ||
-                _artifactSelectionUI == null || _continueUI == null || _runDecisionUI == null ||
-                _settlementUI == null || _shopView == null || _buildingUI == null || _buildingUIConnection == null || consumableItems == null)
+                _artifactSelectionUI == null || _eventUI == null || _continueUI == null || _runDecisionUI == null ||
+                _settlementUI == null || _shopView == null || _artifactInventoryView == null ||
+                _buildingUI == null || _buildingUIConnection == null || consumableItems == null)
             {
                 Debug.LogError("[InGameUIStartup] UI 연결 참조를 확인해주세요.", this);
                 return false;
             }
             if (!_uiManager.InitializeScreens()) return false;
             _shopView.Initialize(wallet);
+            _shopView.InitializeExchangeUI(_artifactInventoryView);
             _hudView.Initialize(cameraController);
             _hudPresenter.Initialize(_hudView, wallet, flow, waves);
             _consumableItemView.Initialize(consumableItems, consumableItems, consumableItems, _consumableUsePopup);
             flow.InitializeUI(_continueUI, _runDecisionUI);
             _buildingUIConnection.Initialize(controller, wallet, flow, core, slots, _buildingUI, spawnManager);
             if (!_buildingUIConnection.IsReady) return false;
+            _pausePopupView.Initialize(flow, _uiManager, _confirmPopupView);
             IsReady = true;
             _uiManager.ShowHud();
             return true;

@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_MG_T1_\uB9C8\uBC95\uC0AC_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uB9C8\uB825 \uD3ED\uBC1C"
+    _icon: {fileID: 21300000, guid: 36025de80a40d154e8f97270f0bf3445, type: 3}
+    _description: "\uB300\uC0C1 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
+      300% \uB9C8\uBC95 \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784
+      7\uCD08]"
   _skillRange: 8
   _skillCooldown: 7
   _targetSide: 0
@@ -26,6 +32,7 @@ MonoBehaviour:
   _areaAngle: 90
   _effects: []
   _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
   _dashDistance: 3
   _dashSpeed: 10
   _skillFXType: 0
@@ -62,7 +69,6 @@ MonoBehaviour:
     - rid: 4844432381217865740
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _executionDuration: 0
         _target:
           _source: 4
           _relation: 0
@@ -73,7 +79,7 @@ MonoBehaviour:
           _filters: []
           _priorities:
           - _policy: 2
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -101,7 +107,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveExplosion_Fire
@@ -110,7 +116,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_ActiveOnHit_Fire
@@ -120,6 +126,8 @@ MonoBehaviour:
           _kind: 0
           _attachment: 2
           _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveOnHit_Fire
           _hook: 1
           _operation: 5
@@ -127,15 +135,21 @@ MonoBehaviour:
           _kind: 1
           _attachment: 2
           _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
+        _executionDuration: 0
+        _impactTiming: 0
         _area: 1
         _radius: 2.5
         _angle: 360
         _maxEffectTargets: 10
         _projectileSpeed: 10
+        _projectilePrefab: {fileID: 0}
         _isLegacy: 0
     - rid: 4844432381217865741
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 1
         _damageMultiplier: 3

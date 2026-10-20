@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_SW_T3_11_\uD658\uC601\uAC80\uC0AC_PassiveSkill_DmgReduceOnce"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uC0DD\uC874 \uBCF8\uB2A5"
+    _icon: {fileID: 21300000, guid: f96c362917c4e1f4b9245db3b3d23ff4, type: 3}
+    _description: "\uCCB4\uB825\uC774 30% \uC774\uD558\uAC00 \uB418\uBA74 6\uCD08\uAC04
+      \uBC1B\uB294 \uD53C\uD574\uAC00 75% \uAC10\uC18C\uD569\uB2C8\uB2E4. \uC804\uD22C
+      \uC911 1\uD68C \uBC1C\uB3D9\uD569\uB2C8\uB2E4."
   _skillSchemaVersion: 1
   _triggerType: 4
   _tickInterval: 0.25
@@ -44,7 +50,6 @@ MonoBehaviour:
     - rid: 4617381517528662030
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 03d4bca4dde92754ca6bbd33fef5238e, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -55,3 +60,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 03d4bca4dde92754ca6bbd33fef5238e, type: 2}

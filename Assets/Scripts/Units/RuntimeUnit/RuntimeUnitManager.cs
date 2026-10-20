@@ -1,19 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
-
 
 namespace Units
 {
     public class RuntimeUnitManager : MonoBehaviour, IRuntimeUnitManager
     {
         // =========================
-        // Runtime States
+        // Settings
         // =========================
 
         [Header("Engagement Expansion")]
         [SerializeField]
-        private EngagementExpansionPolicy _engagementExpansionPolicy = new EngagementExpansionPolicy();
+        private EngagementExpansionPolicy _engagementExpansionPolicy =
+            new EngagementExpansionPolicy();
+
+
+        // =========================
+        // Runtime States
+        // =========================
 
         private bool _battleStarted;
 
@@ -27,6 +33,11 @@ namespace Units
 
         private int _pendingPreparationGroupCount;
 
+        private bool _clearingRuntime;
+
+        private CancellationTokenSource _preparationLifetime =
+            new();
+
 
         // =========================
         // Runtime Units
@@ -38,10 +49,6 @@ namespace Units
         private readonly List<Unit_Gateway> _enemyUnits =
             new();
 
-        public int AllyUnitCount => _allyUnits.Count;
-
-        public int EnemyUnitCount => _enemyUnits.Count;
-
 
         // =========================
         // Runtime Groups
@@ -52,6 +59,20 @@ namespace Units
 
         private readonly List<Unit_GroupAI> _enemyGroups =
             new();
+
+
+        // =========================
+        // Boss Units
+        // =========================
+
+        private readonly List<Unit_Gateway> _bossUnits =
+            new();
+
+        private bool _hadBosses;
+
+        private bool _bossRemovedWithoutDeath;
+
+        private bool _allBossesDefeated;
 
 
         // =========================
@@ -77,6 +98,8 @@ namespace Units
         // Controllers
         // =========================
 
+        private readonly CombatQueryContext _combatQueries = new();
+
         private RuntimeUnitRegistrator _unitRegistrator;
 
         private EngagementController _engagementController;
@@ -97,6 +120,23 @@ namespace Units
         public event Action
             PreparationCompleted;
 
+        public event Action<Unit_Gateway>
+            BossSpawned;
+
+        public event Action<Unit_Gateway>
+            BossDied;
+
+        public event Action<Unit_Gateway>
+            BossRemoved;
+
+        public event Action
+            AllBossesDefeated;
+
+        public event Action
+            RuntimeCleared;
+        public event Action<CombatApplicationResult> DamageApplied;
+        private void HandleDamageApplied(CombatApplicationResult result) => DamageApplied?.Invoke(result);
+
 
         // =========================
         // Properties
@@ -114,8 +154,20 @@ namespace Units
         public IReadOnlyList<Unit_GroupAI> EnemyGroups
             => _enemyGroups;
 
+        public IReadOnlyList<Unit_Gateway> BossUnits
+            => _bossUnits.AsReadOnly();
+
         public IReadOnlyList<EngagementContext> Engagements
             => _engagements;
+
+        public int AllyUnitCount
+            => _allyUnits.Count;
+
+        public int EnemyUnitCount
+            => _enemyUnits.Count;
+
+        public int BossUnitCount
+            => _bossUnits.Count;
 
         public int PendingPreparationGroupCount
             => _pendingPreparationGroupCount;
@@ -126,6 +178,9 @@ namespace Units
                 _isEnemySpawnCompleted &&
                 _pendingPreparationGroupCount == 0;
 
+        internal CancellationToken PreparationToken
+            => _preparationLifetime.Token;
+
 
         // =========================
         // Unity Lifecycle
@@ -134,6 +189,29 @@ namespace Units
         private void Awake()
         {
             InitializeControllers();
+        }
+
+
+        private void Update()
+        {
+            if (_battleStarted && !_battlePaused && !_battleEnded)
+                _combatQueries.RefreshSpatial();
+        }
+
+
+        private void OnDestroy()
+        {
+            foreach (var unit in _allyUnits) UnsubscribeUnitEvents(unit);
+            foreach (var unit in _enemyUnits) UnsubscribeUnitEvents(unit);
+            for (int i = 0; i < _allyGroups.Count; i++)
+                UnsubscribeGroupEvents(_allyGroups[i]);
+
+            for (int i = 0; i < _enemyGroups.Count; i++)
+                UnsubscribeGroupEvents(_enemyGroups[i]);
+
+            _combatQueries.Clear();
+            _preparationLifetime.Cancel();
+            _preparationLifetime.Dispose();
         }
 
 
@@ -183,7 +261,13 @@ namespace Units
             }
 
 
+            _combatQueries.Register(unit);
+
             SubscribeUnitEvents(
+                unit
+            );
+
+            TrackBoss(
                 unit
             );
 
@@ -194,6 +278,17 @@ namespace Units
 
         public bool UnregisterUnit(
             Unit_Gateway unit)
+        {
+            return RemoveUnit(
+                unit,
+                false
+            );
+        }
+
+
+        private bool RemoveUnit(
+            Unit_Gateway unit,
+            bool died)
         {
             if (unit == null)
                 return false;
@@ -206,12 +301,114 @@ namespace Units
             }
 
 
+            _combatQueries.Unregister(unit);
+
             UnsubscribeUnitEvents(
                 unit
             );
 
 
+            if (_bossUnits.Remove(
+                unit))
+            {
+                if (!died)
+                {
+                    _bossRemovedWithoutDeath =
+                        true;
+                }
+
+
+                if (died)
+                {
+                    BossDied?.Invoke(
+                        unit
+                    );
+                }
+
+
+                BossRemoved?.Invoke(
+                    unit
+                );
+
+
+                if (died)
+                {
+                    TryNotifyAllBossesDefeated();
+                }
+            }
+
+
             return true;
+        }
+
+
+        // =========================
+        // Boss Management
+        // =========================
+
+        private void TrackBoss(
+            Unit_Gateway unit)
+        {
+            if (unit?.RuntimeStatus?.UnitData == null)
+                return;
+
+
+            if (!unit.RuntimeStatus.UnitData.IsBoss)
+                return;
+
+
+            if (_bossUnits.Contains(
+                unit))
+            {
+                return;
+            }
+
+
+            _bossUnits.Add(
+                unit
+            );
+
+            _hadBosses =
+                true;
+
+
+            BossSpawned?.Invoke(
+                unit
+            );
+        }
+
+
+        private void TryNotifyAllBossesDefeated()
+        {
+            if (_clearingRuntime)
+                return;
+
+
+            if (!_isEnemySpawnCompleted)
+                return;
+
+
+            if (!_hadBosses)
+                return;
+
+
+            if (_bossRemovedWithoutDeath)
+                return;
+
+
+            if (_allBossesDefeated)
+                return;
+
+
+            if (_bossUnits.Count != 0)
+                return;
+
+
+            _allBossesDefeated =
+                true;
+
+
+            AllBossesDefeated?.Invoke();
         }
 
 
@@ -240,6 +437,14 @@ namespace Units
 
 
             _pendingPreparationGroupCount++;
+
+
+            foreach (var member in group.Members)
+            {
+                TrackBoss(
+                    member
+                );
+            }
 
 
             Debug.Log(
@@ -308,6 +513,7 @@ namespace Units
 
             unit.Died +=
                 HandleUnitDied;
+            unit.DamageApplied += HandleDamageApplied;
         }
 
 
@@ -320,6 +526,7 @@ namespace Units
 
             unit.Died -=
                 HandleUnitDied;
+            unit.DamageApplied -= HandleDamageApplied;
         }
 
 
@@ -364,6 +571,20 @@ namespace Units
                 return;
 
 
+            group.AssignmentChanged += HandleAssignmentChanged;
+            group.MemberAdded += HandleQueryMemberAdded;
+            group.MemberRemoved += HandleQueryMemberRemoved;
+
+            foreach (Unit_Gateway unit in group.Members)
+            {
+                _combatQueries.Register(unit);
+
+                if (group.AssignmentContexts.TryGetValue(unit, out UnitAssignmentContext context))
+                    _combatQueries.UpdateAssignment(unit, context);
+            }
+
+            group.SetCombatQueries(_combatQueries);
+
             group.SetSkillEngagementHandler(
                 HandleSkillEngagementRequested
             );
@@ -389,6 +610,14 @@ namespace Units
                 return;
 
 
+            group.AssignmentChanged -= HandleAssignmentChanged;
+            group.MemberAdded -= HandleQueryMemberAdded;
+            group.MemberRemoved -= HandleQueryMemberRemoved;
+            group.SetCombatQueries(null);
+
+            foreach (Unit_Gateway unit in group.Members)
+                _combatQueries.Unregister(unit);
+
             group.SetSkillEngagementHandler(
                 null
             );
@@ -411,11 +640,33 @@ namespace Units
         // Event Handlers
         // =========================
 
+        private void HandleAssignmentChanged(Unit_Gateway unit, UnitAssignmentContext context)
+        {
+            _combatQueries.UpdateAssignment(unit, context);
+        }
+
+
+        private void HandleQueryMemberAdded(Unit_Gateway unit)
+        {
+            if (!_allyUnits.Contains(unit) && !_enemyUnits.Contains(unit))
+                RegisterUnit(unit);
+
+            _combatQueries.Register(unit);
+        }
+
+
+        private void HandleQueryMemberRemoved(Unit_Gateway unit)
+        {
+            _combatQueries.Unregister(unit);
+        }
+
+
         private void HandleUnitDied(
             Unit_Gateway unit)
         {
-            if (!UnregisterUnit(
-                unit))
+            if (!RemoveUnit(
+                unit,
+                true))
             {
                 return;
             }
@@ -497,12 +748,22 @@ namespace Units
 
             PauseAllGroups();
 
-            var winners = team == UnitTeam.Enemy ? _allyUnits : _enemyUnits;
+
+            var winners =
+                team == UnitTeam.Enemy
+                    ? _allyUnits
+                    : _enemyUnits;
+
+
             foreach (var winner in winners)
             {
-                if (winner != null && winner.IsAlive)
+                if (winner != null &&
+                    winner.IsAlive)
+                {
                     winner.PlayAnimation_Victory();
+                }
             }
+
 
             Debug.Log(
                 $"[RuntimeUnitManager] " +
@@ -632,6 +893,31 @@ namespace Units
         // Preparation
         // =========================
 
+        internal void BeginEnemySpawnCycle()
+        {
+            if (_enemyUnits.Count != 0 ||
+                _enemyGroups.Count != 0)
+            {
+                throw new InvalidOperationException(
+                    "기존 적을 정리한 뒤 새 스폰을 요청해야 합니다."
+                );
+            }
+
+
+            _isEnemySpawnCompleted =
+                false;
+
+            _hadBosses =
+                false;
+
+            _bossRemovedWithoutDeath =
+                false;
+
+            _allBossesDefeated =
+                false;
+        }
+
+
         public void NotifyAllySpawnCompleted()
         {
             if (_isAllySpawnCompleted)
@@ -655,6 +941,8 @@ namespace Units
             _isEnemySpawnCompleted =
                 true;
 
+
+            TryNotifyAllBossesDefeated();
 
             TryCompletePreparation();
         }
@@ -682,8 +970,11 @@ namespace Units
 
         private void TryCompletePreparation()
         {
-            if (!_isAllySpawnCompleted)
+            if (_clearingRuntime ||
+                !_isAllySpawnCompleted)
+            {
                 return;
+            }
 
 
             if (!_isEnemySpawnCompleted)
@@ -763,6 +1054,7 @@ namespace Units
 
             // 전투 시작 중복 방어를 통과한 뒤에만 VFX 보관 세대를 진행한다.
             Units.FX.VFXManager.Instance?.BeginGeneration();
+
 
             _battleStarted =
                 true;
@@ -934,8 +1226,20 @@ namespace Units
 
         public void ClearRuntime()
         {
+            _clearingRuntime =
+                true;
+
+
+            _preparationLifetime.Cancel();
+            _preparationLifetime.Dispose();
+
+            _preparationLifetime =
+                new CancellationTokenSource();
+
+
             // 투사체 종료 통지가 끝난 뒤 독립 연출까지 정리한다.
             ProjectileManager.Instance?.Clear();
+
 
             ClearGroups(
                 _allyGroups
@@ -957,9 +1261,17 @@ namespace Units
 
             // 사망 통지 후 Runtime 목록에서 빠진 연출 중 유닛도 회수한다.
             foreach (var member in FindObjectsByType<UnitPoolMember>(
-                FindObjectsInactive.Include, FindObjectsSortMode.None))
-                if (member.IsLeased && member.RuntimeManager == this)
-                    member.GetComponent<Unit_Core>()?.ReturnToPool();
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None))
+            {
+                if (member.IsLeased &&
+                    member.RuntimeManager == this)
+                {
+                    member.GetComponent<Unit_Core>()
+                        ?.ReturnToPool();
+                }
+            }
+
 
             _engagements.Clear();
 
@@ -983,10 +1295,35 @@ namespace Units
                 0;
 
 
+            _bossUnits.Clear();
+
+            _hadBosses =
+                false;
+
+            _bossRemovedWithoutDeath =
+                false;
+
+            _allBossesDefeated =
+                false;
+
+
+            _clearingRuntime =
+                false;
+
+
             ResetGroupIds();
+
+
             // 전투 사이에는 보관 풀을 유지하고, 오래 미사용한 인스턴스만 다음 세대에 정리한다.
-            Units.FX.VFXManager.Instance?.Clear(false);
+            Units.FX.VFXManager.Instance?.Clear(
+                false
+            );
+
             Units.FX.SFXManager.Instance?.Clear();
+
+            _combatQueries.Clear();
+
+            RuntimeCleared?.Invoke();
         }
 
 

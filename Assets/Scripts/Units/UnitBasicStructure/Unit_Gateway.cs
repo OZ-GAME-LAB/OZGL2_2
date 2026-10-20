@@ -31,6 +31,8 @@ namespace Units
 
         private Vector2 _rallyPosition;
 
+        private bool _isMovingToRallyVia;
+
 
         // ============================================================
         // Events
@@ -45,6 +47,9 @@ namespace Units
         internal void NotifyCombatStateChanged(CombatStateChange change) => CombatStateChanged?.Invoke(change);
 
         public event Action<CombatDeathResult> DeathConfirmed;
+        public event Action<CombatApplicationResult> DamageApplied;
+        public CombatDeathResult LastDeath => _core?.LastDeath;
+        internal void NotifyDamageApplied(CombatApplicationResult result) => DamageApplied?.Invoke(result);
 
         public event Action<Unit_Gateway> RequestFullAssignmentEvent;
 
@@ -54,6 +59,12 @@ namespace Units
 
         public event Action<Unit_Gateway> RallyCompleted;
 
+        public event Action<Unit_Gateway> RallyFailed;
+
+        public event Action<float, float> HpChanged;
+
+        public event Action<float, float> ShieldChanged;
+
 
         // ============================================================
         // Properties
@@ -61,11 +72,15 @@ namespace Units
 
         public Unit_Core Core => _core;
 
+        public bool IsRallyMoving => _isRallyMoving;
+
         public UnitTeam Team => _core != null ? _core.Team : default;
 
         public Unit_RuntimeStatus RuntimeStatus => _core != null ? _core.RuntimeStatus : default;
 
         public Unit_GroupAI GroupAI => _groupAI;
+
+        public float BodyRadius => _core != null ? _core.BodyRadius : CombatRangeUtility.StandardBodyRadius;
 
         public Transform Transform => transform;
 
@@ -79,9 +94,13 @@ namespace Units
 
         public float PreferredCombatRange => _core != null ? _core.PreferredCombatRange : 0f;
 
+        public float EngagementEntryRange => _core != null ? _core.EngagementEntryRange : 0f;
+
         public float CurrentHp => _core != null ? _core.CurrentHp : 0f;
 
         public float CurrentShield => _core != null ? _core.CurrentShield : 0f;
+
+        public float MaxHp => _core?.RuntimeStatus?.MaxHp ?? 0f;
 
 
         // ============================================================
@@ -105,7 +124,7 @@ namespace Units
 
             _core = core;
 
-            _isRallyMoving = false;
+            ResetRally();
 
             BindEvents();
         }
@@ -117,6 +136,8 @@ namespace Units
 
         protected virtual void OnDisable()
         {
+            ResetRally();
+
             NotifyCombatStateChanged(CombatStateChange.Lifetime);
         }
 
@@ -157,9 +178,20 @@ namespace Units
             if (!_isRallyMoving)
                 return;
 
-            _isRallyMoving = false;
+            if (_isMovingToRallyVia)
+            {
+                _isMovingToRallyVia = false;
 
-            _core?.HoldMovementPosition(_rallyPosition);
+                _core.MoveToRally(_rallyPosition);
+
+                return;
+            }
+
+            Vector2 destination = _rallyPosition;
+
+            ResetRally();
+
+            _core?.HoldMovementPosition(destination);
 
             RallyCompleted?.Invoke(this);
         }
@@ -169,11 +201,13 @@ namespace Units
             if (!_isRallyMoving)
                 return;
 
-            _isRallyMoving = false;
+            string stage = _isMovingToRallyVia ? "Via" : "Destination";
 
-            RallyCompleted?.Invoke(this);
+            ResetRally();
 
-            Debug.LogError($"[Unit_Gateway] {gameObject.name} Rally movement failed.");
+            Debug.LogWarning($"[Unit_Gateway] {name} Rally movement failed: {stage}.");
+
+            RallyFailed?.Invoke(this);
         }
 
 
@@ -332,7 +366,30 @@ namespace Units
 
         internal void NotifyDeath()
         {
+            ResetRally();
+
             Died?.Invoke(this);
+        }
+
+        public void NotifyHpChanged(
+            float previousHp,
+            float currentHp)
+        {
+            HpChanged?.Invoke(
+                previousHp,
+                currentHp
+            );
+        }
+
+
+        public void NotifyShieldChanged(
+            float previousShield,
+            float currentShield)
+        {
+            ShieldChanged?.Invoke(
+                previousShield,
+                currentShield
+            );
         }
 
 
@@ -371,11 +428,15 @@ namespace Units
 
         public void MoveTo(Vector2 destination)
         {
+            ResetRally();
+
             _core?.MoveTo(destination);
         }
 
         public void StopMovement()
         {
+            ResetRally();
+
             _core?.StopMovement();
         }
 
@@ -386,14 +447,35 @@ namespace Units
 
         public void MoveToRally(Vector2 destination)
         {
+            BeginRally(destination, destination, false);
+        }
+
+        public void MoveToRally(Vector2 viaPoint, Vector2 destination)
+        {
+            BeginRally(viaPoint, destination, true);
+        }
+
+        private void BeginRally(Vector2 firstPoint, Vector2 destination, bool useVia)
+        {
             if (_core == null)
                 return;
 
             _rallyPosition = destination;
 
+            _isMovingToRallyVia = useVia;
+
             _isRallyMoving = true;
 
-            _core.MoveTo(destination);
+            _core.MoveToRally(firstPoint, useVia);
+        }
+
+        private void ResetRally()
+        {
+            _isRallyMoving = false;
+
+            _isMovingToRallyVia = false;
+
+            _rallyPosition = default;
         }
 
 

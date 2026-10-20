@@ -130,6 +130,10 @@ namespace Units.Skills
         private List<SkillConditionData> _conditions = new();
 
         // 투사체에서 조건을 고정한 뒤에도 소비할 상태를 보존하는 실행 전용 정보.
+        [SerializeField, Tooltip("자신의 중첩을 실행당 한 번만 소비하고 같은 조건부 효과의 모든 명중 대상에 강화를 적용합니다.")]
+        private bool _consumeOncePerExecution;
+
+        private IReadOnlyList<SkillConditionData> _frozenConditionsAfterConsumption;
         private bool _consumptionFrozen;
         private bool _frozenConsumeStacks;
         private SkillConditionSubject _frozenConsumeSubject;
@@ -154,6 +158,9 @@ namespace Units.Skills
         internal void FreezeConditions(SkillConditionContext context)
         {
             // Owner 조건이 FrozenCondition으로 바뀌기 전에 소비 정보를 보존한다.
+            var consumedCondition = ConsumptionCondition;
+            var remaining = _conditions.FindAll(condition => !ReferenceEquals(condition, consumedCondition));
+            _frozenConditionsAfterConsumption = CombatSourceSnapshot.FreezeConditions(remaining, context);
             _frozenConsumeStacks = ConsumeStacks;
             _frozenConsumeSubject = ConsumeSubject;
             _frozenStackQuery = StackQuery;
@@ -191,6 +198,21 @@ namespace Units.Skills
                     if (condition is SkillStackCondition stack && stack.ConsumeOnApply) return true;
                 return false;
             }
+        }
+
+        // 대상 중첩은 대상별 자원이므로 실행당 소비 공유는 Owner에만 허용한다.
+        public bool ConsumeOncePerExecution => _consumeOncePerExecution && ConsumeStacks
+            && ConsumeSubject == SkillConditionSubject.Owner;
+
+        internal bool ConditionsSatisfied(SkillConditionContext context, bool alreadyConsumed)
+        {
+            if (!alreadyConsumed) return SkillConditionData.All(_conditions, context);
+            if (_consumptionFrozen) return SkillConditionData.All(_frozenConditionsAfterConsumption, context);
+            var consumedCondition = ConsumptionCondition;
+            foreach (var condition in _conditions)
+                if (condition != null && !ReferenceEquals(condition, consumedCondition) && !condition.Evaluate(context))
+                    return false;
+            return true;
         }
 
         public SkillConditionSubject ConsumeSubject => _consumptionFrozen ? _frozenConsumeSubject : ConsumptionCondition?.Subject ?? SkillConditionSubject.Target;
@@ -264,7 +286,7 @@ namespace Units.Skills
         private FXAttachment _attachment;
 
         [SerializeField, Tooltip("위치 추적과 별도로 대상의 방향 변화를 반영합니다.")]
-        private bool _followDirection;
+        private bool _followDirection = true;
 
         [SerializeField] private SkillFXScaleMode _scaleMode;
         [SerializeField] private Vector2 _scaleMultiplier = Vector2.one;
@@ -297,8 +319,7 @@ namespace Units.Skills
                 : operation == SkillFXOperation.Hit ? FXAttachment.Target
                 : operation == SkillFXOperation.Cast || operation == SkillFXOperation.Dash ? FXAttachment.Owner
                 : FXAttachment.World;
-            _followDirection = operation == SkillFXOperation.ProjectileFlight || operation == SkillFXOperation.Dash
-                || operation == SkillFXOperation.Hit;
+            _followDirection = true;
             _endPolicy = operation == SkillFXOperation.ProjectileFlight ? SkillFXEndPolicy.ClearImmediately
                 : operation == SkillFXOperation.Cast || operation == SkillFXOperation.Dash ? SkillFXEndPolicy.StopEmission
                 : SkillFXEndPolicy.Independent;
@@ -312,7 +333,7 @@ namespace Units.Skills
             _endPolicy = endPolicy;
             _kind = kind;
             _attachment = attachment ?? (hook == SkillFXHook.OnHit ? FXAttachment.Target : FXAttachment.World);
-            _followDirection = followDirection ?? hook == SkillFXHook.OnHit;
+            _followDirection = followDirection ?? true;
         }
 
         public string Key => _key;

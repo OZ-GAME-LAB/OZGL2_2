@@ -32,7 +32,7 @@ namespace OZGL.KDH
         private BuildingSlot _focusedSlot;
         private BuildingCoreProgress _coreProgress;
         private BuildingCensus _census;
-        private readonly List<BuildingData> _candidates = new List<BuildingData>(16);
+        private IRunCheckpointWriter _checkpointWriter;
         private readonly Collider2D[] _hits = new Collider2D[HitBufferSize];
         private ContactFilter2D _filter;
 
@@ -108,6 +108,7 @@ namespace OZGL.KDH
             RunCurrencyManager runCurrencyManager,
             GameFlowController gameFlowController,
             BuildingCoreProgress buildingCoreProgress,
+            IRunCheckpointWriter checkpointWriter,
             BuildingCensus buildingCensus = null)
         {
             if (wallet != null)
@@ -124,6 +125,7 @@ namespace OZGL.KDH
             gameFlow = gameFlowController;
             _coreProgress = buildingCoreProgress;
             _census = buildingCensus;
+            _checkpointWriter = checkpointWriter;
 
             if (wallet == null)
             {
@@ -354,6 +356,7 @@ namespace OZGL.KDH
             }
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -404,6 +407,7 @@ namespace OZGL.KDH
             Destroy(oldBuilding.gameObject);
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -490,6 +494,7 @@ namespace OZGL.KDH
             }
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -623,6 +628,7 @@ namespace OZGL.KDH
             }
 
             HideMenu();
+            TrySave();
             return true;
         }
 
@@ -691,8 +697,6 @@ namespace OZGL.KDH
             // 점유된 칸은 건설 목록 대신 현재 건물의 업그레이드만 보여 줍니다. 최종 단계면 철거만 나옵니다.
             if (slot.IsOccupied)
             {
-                CollectOccupiedMenuRows(slot);
-                //_menu.Show(slot, _candidates, wallet);
                 NotifySlotSelected(slot);
                 return;
             }
@@ -703,28 +707,13 @@ namespace OZGL.KDH
                 return;
             }
 
-            slot.CollectCandidates(_candidates, database, GetCurrentCoreLevel(), _census);
-            if (_candidates.Count == 0)
+            if (QueryInteraction(slot).DisplayCandidates.Count == 0)
             {
-                Debug.LogWarning("[BuildingBuildController] 이 칸에 건설 가능한 건물이 없습니다.", this);
+                Debug.LogWarning("[BuildingBuildController] 이 칸에 표시할 건설 후보가 없습니다.", this);
                 return;
             }
 
-            //_menu.Show(slot, _candidates, wallet);
             NotifySlotSelected(slot);
-        }
-
-        private void CollectOccupiedMenuRows(BuildingSlot slot)
-        {
-            _candidates.Clear();
-            if (slot == null || slot.CurrentBuilding == null || slot.CurrentBuilding.Data == null)
-            {
-                Debug.LogWarning("[BuildingBuildController] 점유 건물에 BuildingData가 없어 업그레이드 목록을 만들 수 없습니다.", this);
-                return;
-            }
-
-            slot.CurrentBuilding.Data.CollectUpgrades(_candidates, GetCurrentCoreLevel());
-            RemoveBuiltSupports(_candidates);
         }
 
         // Current date KDH 2026-10-08
@@ -1111,6 +1100,13 @@ namespace OZGL.KDH
             return eventSystem != null && eventSystem.IsPointerOverGameObject();
         }
 
+        private void TrySave()
+        {
+            if (!_checkpointWriter.TrySave(out string error))
+            {
+                Debug.LogWarning(error);
+            }
+        }
 #if UNITY_EDITOR
         private void OnValidate()
         {

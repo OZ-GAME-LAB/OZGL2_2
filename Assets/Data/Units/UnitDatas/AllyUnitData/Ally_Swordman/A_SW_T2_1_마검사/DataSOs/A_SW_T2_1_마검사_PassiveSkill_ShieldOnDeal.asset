@@ -12,6 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_SW_T2_1_\uB9C8\uAC80\uC0AC_PassiveSkill_ShieldOnDeal"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uB9C8\uB825 \uC7A5\uB9C9"
+    _icon: {fileID: 21300000, guid: c19947d6ce598e5459b852f3f276b9e3, type: 3}
+    _description: "\uD53C\uD574\uB97C \uC904 \uB54C \uACF5\uACA9\uB825\uC758 30%\uB9CC\uD07C
+      \uBCF4\uD638\uB9C9\uC744 \uC5BB\uC2B5\uB2C8\uB2E4."
   _skillSchemaVersion: 1
   _triggerType: 3
   _tickInterval: 0.25
@@ -27,8 +32,6 @@ MonoBehaviour:
     - rid: 4617381517528662018
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _scalingStatType: 1
-        _shieldRatio: 0.3
         _applicationFX:
         - _key: VFX_OnApply_Buff
           _hook: 1
@@ -39,6 +42,8 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _scalingStatType: 1
+        _shieldRatio: 0.3
     - rid: 4617381517528662019
       type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
       data: 

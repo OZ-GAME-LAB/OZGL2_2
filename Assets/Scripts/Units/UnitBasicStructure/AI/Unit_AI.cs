@@ -58,11 +58,14 @@ namespace Units
 
         private bool _isTargetReevaluationLocked;
 
+        private bool _suppressSkillSelection;
+
         private bool _pendingSkillTargetReevaluation;
 
         private float _nextTargetReevaluationTime;
 
         private float _nextAssignmentRetryTime;
+        private float _nextWaitingPositionRetryTime;
         private const float AssignmentRetryInterval = 0.5f;
 
 
@@ -312,21 +315,27 @@ namespace Units
                 Time.time + _thinkInterval;
 
 
-            if (_pendingSkillTargetReevaluation)
+            // Do not replace the target/assignment during an attack or skill execution.
+            if (_core.IsCombatBusy) return;
+            if ((_pendingSkillTargetReevaluation || Time.time >= _nextTargetReevaluationTime)
+                && HasAssignment)
             {
-                _pendingSkillTargetReevaluation =
-                    false;
-
-                if (!ValidateCurrentAssignment())
-                    return;
-
+                _pendingSkillTargetReevaluation = false;
+                _nextTargetReevaluationTime = Time.time + Mathf.Max(0.1f, _targetReevaluationInterval);
+                if (!ValidateCurrentAssignment()) return;
                 RequestTargetReevaluation();
-
-                return;
+                if (_core.IsCombatBusy) return;
             }
 
+            // Retry a blocked position independently of the slower target-distribution tick.
+            if (_currentAssignment.HasValue && _currentAssignment.Value.WaitingForPosition
+                && Time.time >= _nextWaitingPositionRetryTime)
+            {
+                _nextWaitingPositionRetryTime = Time.time + 0.15f;
+                _core.RequestPositionAssignment();
+                if (_core.IsCombatBusy) return;
+            }
 
-            if (_core.IsCombatBusy) return;
             if (_core.TrySelectActiveSkill(CurrentTarget, out _))
             { ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!ValidateCurrentAssignment()) return;
@@ -363,7 +372,7 @@ namespace Units
         private void EvaluateAction()
         {
             if (_core == null || !_isRunning || _core.IsCombatBusy) return;
-            if (_isRunning && _core.TrySelectActiveSkill(CurrentTarget, out _))
+            if (_isRunning && !_suppressSkillSelection && _core.TrySelectActiveSkill(CurrentTarget, out _))
             { ChangeAction(UnitAIActionType.ActiveSkill); return; }
             if (!HasAssignment)
             {
@@ -390,7 +399,9 @@ namespace Units
 
             UnitAIActionType nextAction =
                 _actionSelector.SelectAction(
-                    assignment, approaching: IsCurrentAction(UnitAIActionType.Move) && !_movementCompleted && !_currentActionEnded
+                    assignment,
+                    approaching: IsCurrentAction(UnitAIActionType.Move) && !_movementCompleted && !_currentActionEnded,
+                    allowActiveSkill: !_suppressSkillSelection
                 );
 
 
@@ -423,8 +434,26 @@ namespace Units
             // 승인 실패는 행동 전환이 아니다. Move.Exit/Stop 전에 실행 준비를 마친다.
             if (actionType == UnitAIActionType.ActiveSkill && !skillPrepared)
             {
-                _core.TryActiveSkill(_core.SelectedSkillDecision,
+                bool started = _core.TryActiveSkill(_core.SelectedSkillDecision,
                     () => ChangeAction(UnitAIActionType.ActiveSkill, skillPrepared: true));
+
+                if (!started && !_core.IsCombatBusy)
+                {
+                    // 합류/준비 거절은 Idle 유지 사유가 아니다. 같은 판단에서
+                    // 평타 또는 이동을 검토하며 위치 재배정의 재진입도 보호한다.
+                    bool previous = _suppressSkillSelection;
+                    _suppressSkillSelection = true;
+
+                    try
+                    {
+                        EvaluateAction();
+                    }
+                    finally
+                    {
+                        _suppressSkillSelection = previous;
+                    }
+                }
+
                 return;
             }
 
@@ -652,23 +681,9 @@ namespace Units
 
         public void NotifyTargetReevaluation()
         {
-            if (!_isRunning)
-                return;
-
-
-            if (Time.time <
-                _nextTargetReevaluationTime)
-            {
-                return;
-            }
-
-
-            _nextTargetReevaluationTime =
-                Time.time
-                + _targetReevaluationInterval;
-
-
-            RequestTargetReevaluation();
+            // UpdateThinking owns throttling and the execution-safe boundary.
+            if (_isRunning && Time.time >= _nextTargetReevaluationTime)
+                _pendingSkillTargetReevaluation = true;
         }
 
 
@@ -686,6 +701,10 @@ namespace Units
                 true;
 
             _nextAssignmentRetryTime = 0f;
+            _nextWaitingPositionRetryTime = Time.time + 0.15f;
+            _nextTargetReevaluationTime = Time.time
+                + Mathf.Max(0.1f, _targetReevaluationInterval)
+                    * (0.5f + (GetInstanceID() & 255) / 510f);
 
             _nextThinkTime =
                 0f;
@@ -853,8 +872,13 @@ namespace Units
                 target.Transform.position;
 
 
-            Gizmos.color =
-                Color.red;
+            // 빨강은 실제 기본 공격, 청록은 스킬, 노랑은 자리 대기,
+            // 회색은 그 밖의 Idle이다. 대상이 있다는 이유만으로 공격처럼 표시하지 않는다.
+            Gizmos.color = _currentAction.ActionType == UnitAIActionType.BasicAttack
+                ? Color.red
+                : _currentAction.ActionType == UnitAIActionType.ActiveSkill
+                    ? Color.cyan
+                    : _currentAssignment.Value.WaitingForPosition ? Color.yellow : Color.gray;
 
 
             // 현재 위치 -> 현재 배정된 타겟

@@ -16,6 +16,8 @@ namespace Units
 
 
         public GameObject Prefab { get; }
+        public RallyZone RallyZone { get; }
+        public EnemyRank Rank { get; }
 
 
         // ============================================================
@@ -25,13 +27,17 @@ namespace Units
         public EnemySpawnEntry(
             EnemyUnitFaction faction,
             EnemyUnitClass unitClass,
-            GameObject prefab)
+            GameObject prefab,
+            RallyZone rallyZone = RallyZone.Front,
+            EnemyRank rank = EnemyRank.Normal)
         {
             Faction = faction;
 
             UnitClass = unitClass;
 
             Prefab = prefab;
+            RallyZone = rallyZone;
+            Rank = rank;
         }
     }
 }

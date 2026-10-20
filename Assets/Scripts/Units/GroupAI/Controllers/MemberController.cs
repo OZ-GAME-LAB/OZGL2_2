@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 
 
@@ -9,6 +10,8 @@ namespace Units
         // =========================
         // References
         // =========================
+
+        internal event Action<Unit_Gateway, UnitAssignmentContext> AssignmentChanged;
 
         private readonly List<Unit_Gateway> _members;
 
@@ -30,6 +33,16 @@ namespace Units
 
 
         // =========================
+        // Assignment Events
+        // =========================
+
+        private void HandleAssignmentChanged(UnitAssignmentContext context)
+        {
+            AssignmentChanged?.Invoke(context.Owner, context);
+        }
+
+
+        // =========================
         // Member Management
         // =========================
 
@@ -40,9 +53,11 @@ namespace Units
 
             _members.Add(unit);
 
-            _assignmentContexts.Add(
-                unit,
-                new UnitAssignmentContext());
+            var context = new UnitAssignmentContext(unit);
+
+            context.Changed += HandleAssignmentChanged;
+
+            _assignmentContexts.Add(unit, context);
 
             return true;
         }
@@ -51,6 +66,12 @@ namespace Units
         {
             if (unit == null || !_members.Remove(unit))
                 return false;
+
+            if (_assignmentContexts.TryGetValue(unit, out UnitAssignmentContext context))
+            {
+                context.Clear();
+                context.Changed -= HandleAssignmentChanged;
+            }
 
             _assignmentContexts.Remove(unit);
 
@@ -64,6 +85,12 @@ namespace Units
 
         public void Clear()
         {
+            foreach (UnitAssignmentContext context in _assignmentContexts.Values)
+            {
+                context.Clear();
+                context.Changed -= HandleAssignmentChanged;
+            }
+
             _members.Clear();
             _assignmentContexts.Clear();
         }

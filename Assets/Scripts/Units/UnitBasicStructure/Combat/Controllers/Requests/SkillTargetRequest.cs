@@ -17,6 +17,8 @@ namespace Units
 
         public bool IndependentSource { get; }
 
+        public bool UseBodyRange { get; }
+
         public bool CanSelect => IndependentSource || Owner.IsTargetable;
 
         public CombatTargetSnapshot InitialTarget { get; }
@@ -49,9 +51,11 @@ namespace Units
             CombatTargetSnapshot previousTarget = default,
             CombatTargetSnapshot triggerTarget = default,
             Predicate<ICombatTarget> hostileFilter = null,
-            CombatSourceSnapshot sourceSnapshot = null)
+            CombatSourceSnapshot sourceSnapshot = null,
+            bool useBodyRange = false)
         {
             IndependentSource = sourceSnapshot != null;
+            UseBodyRange = useBodyRange;
 
             Owner = sourceSnapshot?.Owner ?? new CombatTargetSnapshot(owner);
 

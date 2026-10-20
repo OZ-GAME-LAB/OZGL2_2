@@ -98,6 +98,7 @@ MonoBehaviour:
   _ai: {fileID: 0}
   _passive: {fileID: 0}
   _team: 0
+  _bodyRadius: 0.5
 --- !u!114 &1338639069716403496
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -139,6 +140,10 @@ MonoBehaviour:
   _arrivalDistance: 0.15
   _stuckDistanceThreshold: 0.2
   _stuckTimeLimit: 1
+  _rallyStuckDelay: 3
+  _rallyMoveSpeed: 15
+  _rallyFailureDelay: 8
+  _rallyViaArrivalDistance: 3
   _holdStartReturnDistance: 0.35
   _holdStopReturnDistance: 0.15
   _holdReturnSpeed: 5

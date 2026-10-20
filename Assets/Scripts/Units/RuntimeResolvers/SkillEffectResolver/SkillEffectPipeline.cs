@@ -15,6 +15,16 @@ namespace Units.Skills
         // ============================================================
 
         private readonly HashSet<int> _once = new();
+        private readonly HashSet<int> _consumed = new();
+        private readonly HashSet<int> _consuming = new();
+
+        internal bool HasConsumed(int entryId) => _consumed.Contains(entryId);
+        internal bool BeginConsumption(int entryId) => _consuming.Add(entryId);
+        internal void EndConsumption(int entryId, bool consumed)
+        {
+            _consuming.Remove(entryId);
+            if (consumed) _consumed.Add(entryId);
+        }
 
         private readonly HashSet<int> _onceRunning = new();
 
@@ -323,7 +333,9 @@ namespace Units.Skills
             if (applicationTargets.Count == 0)
                 return;
 
-            if (entry is SkillConditionalEffectEntry conditional && !SkillConditionData.All(conditional.Conditions, context))
+            bool alreadyConsumed = entry is SkillConditionalEffectEntry shared && shared.ConsumeOncePerExecution
+                && batch.Ledger.HasConsumed(entry.EntryId);
+            if (entry is SkillConditionalEffectEntry conditional && !conditional.ConditionsSatisfied(context, alreadyConsumed))
                 return;
 
             if (!batch.Ledger.Enter(
@@ -345,12 +357,23 @@ namespace Units.Skills
 
                 if (entry is SkillConditionalEffectEntry extra)
                 {
-                    if (extra.ConsumeStacks)
+                    if (extra.ConsumeStacks && !alreadyConsumed)
                     {
-                        var subject = extra.ConsumeSubject == SkillConditionSubject.Owner ? context.Owner : context.Target;
-
-                        if (!subject.IsTargetable || !subject.Target.TryConsumeEffectStacks(new EffectStackConsumeRequest(subject.Target, extra.StackQuery, extra.StackCount, metadata)))
+                        bool sharedConsumption = extra.ConsumeOncePerExecution;
+                        if (sharedConsumption && !batch.Ledger.BeginConsumption(entry.EntryId))
                             return;
+                        bool consumed = false;
+                        try
+                        {
+                            var subject = extra.ConsumeSubject == SkillConditionSubject.Owner ? context.Owner : context.Target;
+                            consumed = subject.IsTargetable && subject.Target.TryConsumeEffectStacks(
+                                new EffectStackConsumeRequest(subject.Target, extra.StackQuery, extra.StackCount, metadata));
+                        }
+                        finally
+                        {
+                            if (sharedConsumption) batch.Ledger.EndConsumption(entry.EntryId, consumed);
+                        }
+                        if (!consumed) return;
                     }
 
                     foreach (var fx in extra.FXEntries)

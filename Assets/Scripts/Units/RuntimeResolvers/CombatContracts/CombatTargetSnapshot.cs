@@ -21,6 +21,8 @@ namespace Units
 
         public Vector2 Position { get; }
 
+        public float BodyRadius { get; }
+
         public float Hp { get; }
 
         public float Shield { get; }
@@ -52,6 +54,8 @@ namespace Units
             Team = exists ? target.Team : default;
 
             Position = exists && target.Transform != null ? (Vector2)target.Transform.position : default;
+
+            BodyRadius = exists ? target.BodyRadius : 0f;
 
             Hp = exists ? target.CurrentHp : 0f;
 

@@ -22,7 +22,8 @@ namespace OZGL.KDH
         private BuildingUIPresenter _presenter;
         private ISpawnManager _spawnManager;
         private BuildingSlot[] _slots = Array.Empty<BuildingSlot>();
-        private readonly Dictionary<string, BuildingData> _byId = new Dictionary<string, BuildingData>();
+        private readonly Dictionary<string, BuildingInteractionCandidate> _byId =
+            new Dictionary<string, BuildingInteractionCandidate>();
         private readonly List<BuildingCatalogItem> _items = new List<BuildingCatalogItem>();
         private readonly Stack<BuildingData> _previewPath = new Stack<BuildingData>();
         private readonly HashSet<BuildingSlot> _observedSlots = new HashSet<BuildingSlot>();
@@ -104,23 +105,33 @@ namespace OZGL.KDH
             _presenter.SetWallet(_wallet.GetBalance(CurrencyType.Gold), _wallet.GetBalance(CurrencyType.Gem));
             _presenter.SetActionsAllowed(state.CanInteract, Reason(state.Failure));
             _byId.Clear(); _items.Clear();
-            foreach (BuildingInteractionCandidate candidate in state.Candidates)
+            foreach (BuildingInteractionCandidate candidate in state.DisplayCandidates)
             {
                 BuildingData data = candidate.Data;
-                BuildingInteractionState option = _controller.QueryInteraction(_target.Slot, data);
-                BuildingActionOffer offer = Offer(_target.Slot.IsOccupied ? option.Upgrade : option.Build);
-                _byId.Add(data.BuildingId, data);
+                BuildingActionOffer offer = Offer(candidate.Offer);
+                _byId.Add(data.BuildingId, candidate);
                 _items.Add(new BuildingCatalogItem(data.BuildingId, data.DisplayName,
                     BuildingUiQuote.Category(data.BuildingType), candidate.HasValidCost ? candidate.Cost.Gold : (int?)null,
-                    candidate.HasValidCost ? candidate.Cost.Gems : (int?)null, data.BuildingType, data.Icon, offer));
+                    candidate.HasValidCost ? candidate.Cost.Gems : (int?)null, data.BuildingType, data.Icon, offer,
+                    candidate.IsCoreLevelMet ? (int?)null : candidate.RequiredCoreLevel));
             }
             if (!_target.Slot.IsOccupied)
             {
                 _presenter.ShowCatalog(_selectionId, _items);
                 return;
             }
-            if (_candidate != null && !_byId.ContainsKey(_candidate.BuildingId)) _candidate = null;
-            state = _controller.QueryInteraction(_target.Slot, _candidate);
+            BuildingInteractionCandidate selectedCandidate = null;
+            if (_candidate != null && _byId.TryGetValue(_candidate.BuildingId, out selectedCandidate) &&
+                selectedCandidate.IsCoreLevelMet)
+            {
+                _candidate = selectedCandidate.Data;
+            }
+            else
+            {
+                _candidate = null;
+                selectedCandidate = null;
+            }
+            BuildingInteractionOffer upgrade = selectedCandidate?.Offer;
             BuildingData displayed = state.DisplayData;
             if (displayed == null) return;
             if (string.IsNullOrWhiteSpace(displayed.BuildingId) || string.IsNullOrWhiteSpace(displayed.DisplayName))
@@ -128,25 +139,31 @@ namespace OZGL.KDH
             BuildingInfoData comparison = null;
             if (_candidate != null)
             {
-                string costSummary = state.Upgrade.Failure == BuildingInteractionFailure.InvalidCost
+                string costSummary = upgrade.Failure == BuildingInteractionFailure.InvalidCost
                     ? "업그레이드 비용 설정 오류"
-                    : "업그레이드 비용: " + BuildingCurrencyText.Format(state.Upgrade.Cost.Gold, state.Upgrade.Cost.Gems);
+                    : "업그레이드 비용: " + BuildingCurrencyText.Format(upgrade.Cost.Gold, upgrade.Cost.Gems);
                 comparison = CreateInfo(_candidate, costSummary);
             }
             _presenter.ShowManagement(CreateInfo(displayed),
                 new BuildingActionViewData(_selectionId, displayed.DisplayName,
-                    Offer(state.Build), Offer(state.Upgrade), Offer(state.Demolish)),
-                _items, comparison, state.CanInteract, Reason(state.Failure));
+                    Offer(state.Build), Offer(upgrade), Offer(state.Demolish)),
+                _items, comparison, state.CanInteract, Reason(state.Failure), state.RequiredUpgradeCoreLevel);
         }
 
         private BuildingInfoData CreateInfo(BuildingData data, string costSummary = null)
         {
             UnitData unit = null;
+            string spawnUnitName = null;
+            int? spawnCount = null;
             string production = BuildingUiQuote.Production(data);
             if (data.HasSpawn)
             {
-                if (_spawnManager != null && _spawnManager.TryGetAllyPrefab(data.Spawn.unitType, out GameObject prefab))
-                    unit = prefab.GetComponent<Unit_RuntimeStatus>().UnitData;
+                if (_spawnManager != null && _spawnManager.TryGetAllyPrefab(data.Spawn.unitType, out GameObject prefab) &&
+                    prefab != null && prefab.TryGetComponent<Unit_RuntimeStatus>(out var runtimeStatus))
+                    unit = runtimeStatus.UnitData;
+                spawnUnitName = unit != null && !string.IsNullOrWhiteSpace(unit.UnitName)
+                    ? unit.UnitName : "알 수 없는 유닛";
+                spawnCount = Mathf.Min(data.Spawn.countPerWave, data.Spawn.maxAlive);
                 if (unit == null) production += "\n유닛 정보 없음";
             }
             if (costSummary == null)
@@ -156,7 +173,8 @@ namespace OZGL.KDH
             }
             return new BuildingInfoData(_selectionId, data.DisplayName,
                 BuildingUiQuote.Category(data.BuildingType), 1, data.Description, production,
-                BuildingUiQuote.Effects(data), data.Icon, unit, costSummary, data.BuildingId);
+                BuildingUiQuote.Effects(data), data.Icon, unit, costSummary, data.BuildingId,
+                spawnUnitName, spawnCount);
         }
 
         private static BuildingActionOffer Offer(BuildingInteractionOffer offer)
@@ -165,7 +183,8 @@ namespace OZGL.KDH
             BuildingUiAction action = offer.Action == BuildingInteractionAction.Build ? BuildingUiAction.Build :
                 offer.Action == BuildingInteractionAction.Upgrade ? BuildingUiAction.Upgrade : BuildingUiAction.Dismantle;
             return new BuildingActionOffer(action, action == BuildingUiAction.Dismantle ? "철거" : offer.Data.DisplayName,
-                offer.Cost.Gold, offer.Cost.Gems, offer.CanExecute, Reason(offer.Failure), offer.Data.BuildingId);
+                offer.Cost.Gold, offer.Cost.Gems, offer.CanExecute,
+                Reason(offer.Failure, offer.RequiredCoreLevel), offer.Data.BuildingId);
         }
 
         private void HandleCandidateSelected(string id)
@@ -177,7 +196,7 @@ namespace OZGL.KDH
                 if (candidate.Data.BuildingId == id)
                 {
                     _candidate = candidate.Data;
-                    RenderSelection(_controller.QueryInteraction(_target.Slot, _candidate));
+                    RenderSelection(state);
                     return;
                 }
         }
@@ -198,8 +217,8 @@ namespace OZGL.KDH
             }
             else if (_target.ExpectedData != null && _target.ExpectedData.BuildingId == id)
                 data = _target.ExpectedData;
-            else
-                _byId.TryGetValue(id, out data);
+            else if (_byId.TryGetValue(id, out BuildingInteractionCandidate candidate))
+                data = candidate.Data;
 
             if (data == null) return;
             _previewPath.Push(data);
@@ -240,12 +259,12 @@ namespace OZGL.KDH
                         break;
                     }
             }
-            else if (_target.Slot.IsOccupied && _byId.ContainsKey(data.BuildingId))
+            else if (_target.Slot.IsOccupied &&
+                _byId.TryGetValue(data.BuildingId, out BuildingInteractionCandidate candidate))
             {
-                BuildingInteractionOffer offer = _controller.QueryInteraction(_target.Slot, data).Upgrade;
-                costSummary = offer.Failure == BuildingInteractionFailure.InvalidCost
-                    ? "업그레이드 비용 설정 오류"
-                    : "업그레이드 비용: " + BuildingCurrencyText.Format(offer.Cost.Gold, offer.Cost.Gems);
+                costSummary = candidate.HasValidCost
+                    ? "업그레이드 비용: " + BuildingCurrencyText.Format(candidate.Cost.Gold, candidate.Cost.Gems)
+                    : "업그레이드 비용 설정 오류";
             }
             _presenter.ShowBuildingPreview(CreateInfo(data, costSummary), upgrades, _previewPath.Count > 1);
         }
@@ -265,7 +284,8 @@ namespace OZGL.KDH
                 switch (request.Action)
                 {
                     case BuildingUiAction.Build:
-                        if (!_byId.TryGetValue(request.OptionId, out option)) return;
+                        if (!_byId.TryGetValue(request.OptionId, out BuildingInteractionCandidate buildCandidate)) return;
+                        option = buildCandidate.Data;
                         action = BuildingInteractionAction.Build;
                         break;
                     case BuildingUiAction.Upgrade:
@@ -281,7 +301,7 @@ namespace OZGL.KDH
             finally
             {
                 _executing = false;
-                string message = Message(result.Failure);
+                string message = Message(result.Failure, result.RequiredCoreLevel);
                 _presenter.ResolveRequest(request.RequestId, result.Succeeded, message);
                 if (selectionId != null && _selectionId == selectionId && request.TargetId == selectionId)
                 {
@@ -369,10 +389,10 @@ namespace OZGL.KDH
             ClearSelection();
         }
 
-        private static string Reason(BuildingInteractionFailure failure) =>
-            failure == BuildingInteractionFailure.None ? null : Message(failure);
+        private static string Reason(BuildingInteractionFailure failure, int? requiredCoreLevel = null) =>
+            failure == BuildingInteractionFailure.None ? null : Message(failure, requiredCoreLevel);
 
-        private static string Message(BuildingInteractionFailure failure)
+        private static string Message(BuildingInteractionFailure failure, int? requiredCoreLevel = null)
         {
             switch (failure)
             {
@@ -384,6 +404,8 @@ namespace OZGL.KDH
                 case BuildingInteractionFailure.CoreProtected: return "코어는 철거할 수 없습니다.";
                 case BuildingInteractionFailure.BuildCapacity: return "건설 한도에 도달했습니다. 코어를 업그레이드하세요.";
                 case BuildingInteractionFailure.InsufficientFunds: return "재화가 부족합니다.";
+                case BuildingInteractionFailure.CoreLevelRequired: return requiredCoreLevel.HasValue
+                    ? $"사령부 {requiredCoreLevel.Value}레벨 필요" : "사령부 레벨이 부족합니다.";
                 case BuildingInteractionFailure.Busy: return "건물 처리 중입니다.";
                 case BuildingInteractionFailure.ExecutionFailed: return "실행하지 못했습니다. 현재 재화와 건물을 확인해 주세요.";
                 case BuildingInteractionFailure.UnexpectedError: return "건물 처리 중 오류가 발생했습니다. 재화와 건물 상태를 확인해 주세요.";

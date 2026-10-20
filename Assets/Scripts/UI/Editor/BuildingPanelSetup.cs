@@ -38,14 +38,14 @@ namespace Game.UI.Editor
             var title = window.Find("PopupTitle").GetComponent<TMP_Text>();
             title.text = "건물 건설";
             var body = Child(window, "UnifiedContent");
-            Stretch(body, 20, 92, 20, 58);
+            Stretch(body, 20, 92, 20, 20);
             var wallet = Text(window, "Wallet", "골드 0   ·   보석 0", 21, Gold);
             Top(wallet.rectTransform, 20, 58, 390, 28);
             var feedback = Text(window, "Feedback", "", 18, Gold);
             Bottom(feedback.rectTransform, 20, 14, 390, 36);
 
             var catalogRoot = Child(body, "Catalog");
-            Stretch(catalogRoot);
+            Stretch(catalogRoot, bottom: 38);
             var tabs = new UnityEngine.UI.Button[3];
             string[] tabNames = { "전투", "자원", "연구" };
             for (int i = 0; i < tabs.Length; i++)
@@ -75,44 +75,95 @@ namespace Game.UI.Editor
 
             var managementRoot = Child(body, "Management");
             Stretch(managementRoot);
-            Vertical(managementRoot, false, 14);
+            Vertical(managementRoot, false, 10);
             var managementScroll = Scroll(managementRoot, "Information", out var managementContent);
             Stretch((RectTransform)managementScroll.transform);
             var scrollSize = Component<UnityEngine.UI.LayoutElement>(managementScroll.transform);
             scrollSize.minHeight = 0;
             scrollSize.preferredHeight = 0;
             scrollSize.flexibleHeight = 1;
-            Vertical(managementContent, true, 14);
+            Vertical(managementContent, true, 10);
             var currentHeading = Child(managementContent, "CurrentHeading");
             Height(currentHeading, 38);
             var currentLabel = Text(currentHeading, "Label", "현재 건물", 20, Gold);
             Top(currentLabel.rectTransform, 0, 0, 272, 36);
             var currentInfoButton = Button(currentHeading, "Details", "상세");
             Top((RectTransform)currentInfoButton.transform, 286, 0, 96, 36);
+            currentHeading.gameObject.SetActive(false);
             var current = Info(managementContent, "Current", panel, managementScroll, true);
+            var currentDisplay = current.transform.Find("DisplayContent");
+            var heading = (RectTransform)currentDisplay.Find("Heading");
+            Height(heading, 92);
+            Top((RectTransform)heading.Find("Icon"), 0, 10, 70, 70);
+            Top((RectTransform)heading.Find("Placeholder"), 0, 10, 70, 70);
+            var currentName = heading.Find("Name").GetComponent<TMP_Text>();
+            Top(currentName.rectTransform, 84, 0, 164, 86);
+            currentName.fontSize = 32;
+            currentName.enableAutoSizing = true;
+            currentName.fontSizeMin = 24;
+            currentName.fontSizeMax = 32;
+            currentName.alignment = TextAlignmentOptions.MidlineLeft;
+            heading.Find("Category").gameObject.SetActive(false);
+            var separator = Component<UnityEngine.UI.Image>(Child(heading, "Separator"));
+            Top((RectTransform)separator.transform, 0, 91, 382, 1);
+            separator.color = Muted;
+            separator.raycastTarget = false;
+            var spawn = Child(heading, "SpawnSummary");
+            Top(spawn, 250, 41, 132, 44);
+            var timing = Text(spawn, "Timing", "웨이브 시작 시", 17, Muted);
+            Top(timing.rectTransform, 0, 0, 132, 20);
+            timing.alignment = TextAlignmentOptions.BottomRight;
+            var value = Text(spawn, "Value", "", 20, Mint);
+            Top(value.rectTransform, 0, 20, 132, 24);
+            value.alignment = TextAlignmentOptions.BottomRight;
+            value.enableAutoSizing = true;
+            value.fontSizeMin = 14;
+            value.fontSizeMax = 20;
+            value.textWrappingMode = TextWrappingModes.NoWrap;
+            var unitButton = ((UnityEngine.UI.Button)new SerializedObject(current)
+                .FindProperty("_unitButton").objectReferenceValue).transform;
+            if (unitButton.parent != spawn) unitButton.SetParent(spawn, false);
+            Stretch((RectTransform)unitButton, top: 20);
+            unitButton.GetComponent<UnityEngine.UI.Image>().color = Color.clear;
+            var unitSize = unitButton.GetComponent<UnityEngine.UI.LayoutElement>();
+            if (unitSize != null) UnityEngine.Object.DestroyImmediate(unitSize);
+            unitButton.Find("Label").gameObject.SetActive(false);
+            Boolean(current, "_compactManagement", true);
+            Reference(current, "_spawnRoot", spawn.gameObject);
+            Reference(current, "_spawnTimingText", timing);
+            Reference(current, "_spawnValueText", value);
             Text(managementContent, "UpgradesTitle", "업그레이드", 24, Gold);
             var upgradeHint = Text(managementContent, "UpgradeHint", "업그레이드할 건물을 선택하세요.", 18, Muted);
             var upgradeContent = Child(managementContent, "UpgradeCandidates");
-            Grid(upgradeContent, 186);
-            var upgradeTemplate = Card(upgradeContent, "CardTemplate", 186);
+            Grid(upgradeContent, 186, cellHeight: 188);
+            var upgradeTemplate = Card(upgradeContent, "CardTemplate", 186, true);
             var comparisonRoot = Child(managementContent, "Comparison");
             Vertical(comparisonRoot, false, 12);
             Text(comparisonRoot, "Heading", "업그레이드 후", 24, Gold);
             var comparison = Info(comparisonRoot, "Information", panel, managementScroll, false);
+            comparisonRoot.gameObject.SetActive(false);
             // 비교 정보를 스크롤해도 실행 비용과 버튼은 하단에 남긴다.
             var oldActions = managementContent.Find("Actions");
             if (oldActions != null) oldActions.gameObject.SetActive(false);
             var actionRoot = Child(managementRoot, "Actions");
-            Vertical(actionRoot, false, 10);
+            var oldActionLayout = actionRoot.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
+            if (oldActionLayout != null) UnityEngine.Object.DestroyImmediate(oldActionLayout);
+            Height(actionRoot, 92);
             var actionTitle = Text(actionRoot, "Title", "", 20, Paper);
             actionTitle.gameObject.SetActive(false);
             var status = Text(actionRoot, "Status", "", 18, Gold);
+            Bottom(status.rectTransform, 0, 0, 382, 18);
+            status.enableAutoSizing = true;
+            status.fontSizeMin = 13;
+            status.fontSizeMax = 18;
+            status.textWrappingMode = TextWrappingModes.NoWrap;
             Reference(actions, "_title", actionTitle);
             Reference(actions, "_status", status);
             ActionRow(actionRoot, actions, "_build", "건설", "건설 비용", false);
             ActionRow(actionRoot, actions, "_upgrade", "업그레이드", "업그레이드 비용", false);
             ActionRow(actionRoot, actions, "_dismantle", "철거", "철거 시 환급", true);
             Boolean(actions, "_compactPresentation", true);
+            Boolean(actions, "_fixedManagementActions", true);
             managementRoot.gameObject.SetActive(false);
 
             var detailWindow = ConfigureWindow(detail, false);
@@ -132,6 +183,7 @@ namespace Game.UI.Editor
             back.gameObject.SetActive(false);
 
             Reference(presenter, "_panel", panel);
+            Reference(presenter, "_panelWindow", window);
             Reference(presenter, "_catalogRoot", catalogRoot.gameObject);
             Reference(presenter, "_managementRoot", managementRoot.gameObject);
             Reference(presenter, "_titleText", title);
@@ -183,8 +235,8 @@ namespace Game.UI.Editor
                     child.gameObject.SetActive(false);
 
             window.anchorMin = window.anchorMax = new Vector2(left ? 0 : .5f, .5f);
-            window.pivot = new Vector2(left ? 0 : .5f, .5f);
-            window.anchoredPosition = new Vector2(left ? 24 : 0, 0);
+            window.pivot = new Vector2(left ? 0 : .5f, left ? 1 : .5f);
+            window.anchoredPosition = new Vector2(left ? 24 : 0, left ? 420 : 0);
             window.sizeDelta = new Vector2(left ? 430 : 470, 840);
             window.GetComponent<UnityEngine.UI.Image>().color = Panel;
             window.GetComponent<UnityEngine.UI.Image>().raycastTarget = true;
@@ -237,7 +289,9 @@ namespace Game.UI.Editor
             var production = Text(display, "Production", "", 21, Mint);
             var effect = Text(display, "Effect", "", 20, Mint);
             var cost = Text(display, "Cost", "", 19, Gold);
-            var unit = Button(display, "Unit", "유닛 정보 보기");
+            var headerUnit = heading.Find("SpawnSummary/Unit");
+            var unit = headerUnit != null ? headerUnit.GetComponent<UnityEngine.UI.Button>() :
+                Button(display, "Unit", "유닛 정보 보기");
             Height((RectTransform)unit.transform, 42);
             var empty = Text(owner, "Empty", "건물을 선택하세요.", 20, Muted);
             empty.gameObject.SetActive(false);
@@ -260,24 +314,39 @@ namespace Game.UI.Editor
             return view;
         }
 
-        private static BuildingCardView Card(Transform parent, string name, float width)
+        private static BuildingCardView Card(Transform parent, string name, float width, bool management = false)
         {
             var card = Child(parent, name);
-            card.sizeDelta = new Vector2(width, 176);
+            card.sizeDelta = new Vector2(width, management ? 188 : 176);
             var body = Button(card, "Body", "");
             Stretch((RectTransform)body.transform);
             body.transform.Find("Label").gameObject.SetActive(false);
             var slot = Component<UIItemSlot>(body.transform);
             var icon = Component<UnityEngine.UI.Image>(Child(body.transform, "Icon"));
-            Top((RectTransform)icon.transform, 12, 12, 32, 32);
+            Top((RectTransform)icon.transform, 12, 12, management ? 64 : 32, management ? 64 : 32);
             icon.preserveAspect = true;
             icon.raycastTarget = false;
-            var label = Text(body.transform, "Name", "건물 이름", 20, Paper);
-            Top(label.rectTransform, 12, 54, width - 24, 48);
+            var label = Text(body.transform, "Name", "건물 이름", management ? 24 : 20, Paper);
+            Top(label.rectTransform, 12, management ? 82 : 54, width - 24, management ? 54 : 48);
+            if (management)
+            {
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 20;
+                label.fontSizeMax = 24;
+            }
             var price = Text(body.transform, "Price", "0 골드", 18, Gold);
-            Top(price.rectTransform, 12, 105, width - 24, 26);
+            Top(price.rectTransform, 12, management ? 137 : 105, width - 24, management ? 22 : 26);
+            if (management) price.alignment = TextAlignmentOptions.BottomRight;
             var summary = Text(body.transform, "Summary", "", 16, Muted);
-            Top(summary.rectTransform, 12, 135, width - 24, 34);
+            Top(summary.rectTransform, 12, management ? 161 : 135, width - 24, management ? 22 : 34);
+            if (management)
+            {
+                summary.alignment = TextAlignmentOptions.BottomRight;
+                summary.enableAutoSizing = true;
+                summary.fontSizeMin = 12;
+                summary.fontSizeMax = 16;
+                summary.textWrappingMode = TextWrappingModes.NoWrap;
+            }
             var selected = Child(card, "Selected");
             Stretch(selected);
             var outline = Component<UnityEngine.UI.Image>(selected);
@@ -312,20 +381,44 @@ namespace Game.UI.Editor
             string caption, string quoteCaption, bool demolition)
         {
             var row = Child(parent, field);
-            Vertical(row, false, 5);
-            Text(row, "Caption", quoteCaption, 17, demolition ? Muted : Gold);
+            var layout = row.GetComponent<UnityEngine.UI.VerticalLayoutGroup>();
+            if (layout != null) UnityEngine.Object.DestroyImmediate(layout);
+            Top(row, demolition ? 196 : 0, 0, 186, 70);
+            Text(row, "Caption", quoteCaption, 17, demolition ? Muted : Gold).gameObject.SetActive(false);
             var line = Child(row, "Line");
-            Height(line, 44);
-            var quote = Text(line, "Quote", "", 19, Paper);
-            Top(quote.rectTransform, 0, 3, 214, 38);
+            Stretch(line);
+            var existingQuote = line.Find("Quote") ?? line.Find("Action/Quote");
+            var quote = existingQuote != null ? existingQuote.GetComponent<TMP_Text>() :
+                Text(line, "Quote", "", 19, Paper);
+            quote.font = _font;
+            quote.color = Paper;
+            quote.text = string.Empty;
+            quote.raycastTarget = false;
+            quote.textWrappingMode = TextWrappingModes.Normal;
+            quote.overflowMode = TextOverflowModes.Overflow;
             var button = Button(line, "Action", caption);
-            Top((RectTransform)button.transform, 228, 0, 150, 44);
+            Stretch((RectTransform)button.transform);
+            var buttonLabel = button.transform.Find("Label").GetComponent<TMP_Text>();
+            Top(buttonLabel.rectTransform, 6, 4, 174, 24);
+            if (quote.transform.parent != button.transform) quote.transform.SetParent(button.transform, false);
+            Top(quote.rectTransform, 6, 29, 174, 37);
+            quote.fontSize = 17;
+            quote.enableAutoSizing = true;
+            quote.fontSizeMin = 13;
+            quote.fontSizeMax = 17;
+            quote.alignment = TextAlignmentOptions.Center;
             if (demolition) button.GetComponent<UnityEngine.UI.Image>().color = new Color32(94, 49, 44, 255);
             var reason = Text(row, "Reason", "", 17, Muted);
+            Top(reason.rectTransform, 0, 72, 186, 18);
+            reason.enableAutoSizing = true;
+            reason.fontSizeMin = 12;
+            reason.fontSizeMax = 17;
+            reason.textWrappingMode = TextWrappingModes.NoWrap;
             Reference(actions, field + "._rowRoot", row.gameObject);
             Reference(actions, field + "._button", button);
             Reference(actions, field + "._quote", quote);
             Reference(actions, field + "._reason", reason);
+            if (field == "_build") row.gameObject.SetActive(false);
         }
 
         private static UnityEngine.UI.ScrollRect Scroll(Transform parent, string name, out RectTransform content)
@@ -369,10 +462,10 @@ namespace Game.UI.Editor
             return scroll;
         }
 
-        private static void Grid(RectTransform content, float cellWidth, bool fitHeight = false)
+        private static void Grid(RectTransform content, float cellWidth, bool fitHeight = false, float cellHeight = 176)
         {
             var grid = Component<UnityEngine.UI.GridLayoutGroup>(content);
-            grid.cellSize = new Vector2(cellWidth, 176);
+            grid.cellSize = new Vector2(cellWidth, cellHeight);
             grid.spacing = new Vector2(10, 10);
             grid.constraint = UnityEngine.UI.GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 2;

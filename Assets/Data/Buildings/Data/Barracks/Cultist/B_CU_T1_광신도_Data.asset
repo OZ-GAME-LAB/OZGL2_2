@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_CU_T1_\uAD11\uC2E0\uB3C4"
   buildingFamilyId: cultist_barracks
-  displayName: "\uAD11\uC2E0\uB3C4"
-  description: "\uAD11\uC2E0\uB3C4 \uC18C\uD658 \uBCD1\uC601"
+  displayName: "\uad11\uc2e0\ub3c4\uc758 \uad50\ud68c"
+  description: "\ub9c8\uc655\uc744 \uc22d\ubc30\ud558\uba70 \uc544\uad70\uc758 \uc804\ud22c\ub97c \ub3d5\ub294 \uad11\uc2e0\ub3c4\uc758 \uad50\ud68c\uc785\ub2c8\ub2e4."
   buildingType: 2
-  icon: {fileID: 21300000, guid: b477ba7c1f824c1484581e02edd22612, type: 3}
-  worldSprite: {fileID: 21300000, guid: b477ba7c1f824c1484581e02edd22612, type: 3}
+  icon: {fileID: 21300000, guid: e002fe413d3a2f5419e91e29e3fb072f, type: 3}
+  worldSprite: {fileID: 21300000, guid: e002fe413d3a2f5419e91e29e3fb072f, type: 3}
   prefab: {fileID: 7407155394761952784, guid: dfe1a8d8849240d9b720a76c357a04ef, type: 3}
   buildCost:
   - type: 0
@@ -38,6 +38,12 @@ MonoBehaviour:
     unitType: 41
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 5193f22dabaf4ee6b62396ac17371482, type: 2}
     cost:

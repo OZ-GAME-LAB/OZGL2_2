@@ -14,7 +14,6 @@ namespace Game.UI.InGame
         
         [SerializeField] private TMP_Text _goldText;
         [SerializeField] private TMP_Text _waveText;
-        [SerializeField] private TMP_Text _phaseText;
         [SerializeField] private TMP_Text _changeViewText;
         [SerializeField] private Button _waveStartButton;
         [SerializeField] private Button _changeViewButton;
@@ -42,7 +41,6 @@ namespace Game.UI.InGame
             _isWaveStartRequestPending = false;
             SetTextIfAssigned(_goldText, "--");
             SetTextIfAssigned(_waveText, "-- / --");
-            SetTextIfAssigned(_phaseText, "연결 대기");
             SetWaveStartInteractable(false);
         }
 
@@ -62,8 +60,6 @@ namespace Game.UI.InGame
                 throw new ArgumentOutOfRangeException(nameof(currentWave));
             SetTextIfAssigned(_waveText, $"{currentWave} / {totalWaves}");
         }
-
-        public void SetPhaseLabel(string phaseLabel) => SetTextIfAssigned(_phaseText, phaseLabel);
 
         public void SetWaveStartInteractable(bool canStart)
         {

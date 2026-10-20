@@ -16,6 +16,8 @@ public class ConsumableItemDataEditor : Editor
         EditorGUILayout.PropertyField(serializedObject.FindProperty("_displayName"), new GUIContent("이름"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("_description"), new GUIContent("설명"));
         EditorGUILayout.PropertyField(serializedObject.FindProperty("_icon"), new GUIContent("아이콘"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("_useVFX"), new GUIContent("사용 VFX (범위 중심)"));
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("_targetVFX"), new GUIContent("적용 VFX (각 대상)"));
 
         EditorGUILayout.PropertyField(serializedObject.FindProperty("_targetTeam"), new GUIContent("대상 팀"));
         SerializedProperty mode = serializedObject.FindProperty("_targetMode");

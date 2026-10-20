@@ -24,7 +24,8 @@ namespace Game.UI.InGame
             IReadOnlyList<ArtifactData> candidates,
             CancellationToken token,
             bool allowForfeit = false,
-            string message = null)
+            string message = null,
+            ArtifactSelectionPurpose purpose = ArtifactSelectionPurpose.Reward)
         {
             token.ThrowIfCancellationRequested();
             if (!isActiveAndEnabled || _panel == null || _panel.Screen == null)
@@ -84,7 +85,7 @@ namespace Game.UI.InGame
                 using (token.Register(() => completion.TrySetCanceled(token)))
                 {
                     token.ThrowIfCancellationRequested();
-                    _panel.ShowSelection(requestCandidates, allowForfeit, message);
+                    _panel.ShowSelection(requestCandidates, allowForfeit, message, purpose);
                     if (!_panel.IsVisible)
                         throw new InvalidOperationException("Artifact selection popup could not open.");
                     return await completion.Task;

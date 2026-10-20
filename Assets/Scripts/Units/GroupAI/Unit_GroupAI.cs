@@ -65,6 +65,8 @@ namespace Units
 
         private bool _isSpawnCompleted;
 
+        private readonly HashSet<Unit_Gateway> _rallyFailedMembers = new();
+
         private readonly HashSet<Unit_Gateway>
             _rallyCompletedMembers =
             new();
@@ -100,6 +102,8 @@ namespace Units
 
         private EnemyGroupController _enemyGroupController;
 
+        private CombatQueryContext _combatQueries;
+
         private TargetSelector _targetSelector;
 
         private PositionAssigner _positionAssigner;
@@ -114,6 +118,12 @@ namespace Units
         // =========================
         // Events
         // =========================
+
+        internal event Action<Unit_Gateway, UnitAssignmentContext> AssignmentChanged;
+
+        internal event Action<Unit_Gateway> MemberAdded;
+
+        internal event Action<Unit_Gateway> MemberRemoved;
 
         public event Action<
             Unit_GroupAI,
@@ -139,6 +149,11 @@ namespace Units
 
         public Unit_GroupAI AdvanceReference
             => _advanceReference;
+
+        private IReadOnlyList<Unit_GroupAI> _engagementAllies;
+        internal IReadOnlyList<Unit_GroupAI> EngagementAllies => _engagementAllies;
+        internal void SetEngagementAllies(IReadOnlyList<Unit_GroupAI> groups)
+            => _engagementAllies = groups;
 
         public IReadOnlyList<Unit_GroupAI> EnemyGroups
             => _enemyGroups;
@@ -235,14 +250,15 @@ namespace Units
                 0f;
 
 
+            _groupDetector?.Detect();
+
+
+            // 같은 갱신에서 합류가 승인되면 추가 전진 명령을 내리지 않는다.
             if (_state == GroupAIState.Advancing)
             {
                 _advanceController
                     .UpdateAdvance();
             }
-
-
-            _groupDetector?.Detect();
         }
 
 
@@ -261,6 +277,8 @@ namespace Units
                 false;
 
             _rallyCompletedMembers.Clear();
+
+            _rallyFailedMembers.Clear();
 
 
             SetState(
@@ -324,11 +342,33 @@ namespace Units
                 );
 
 
+            _memberController.AssignmentChanged += HandleAssignmentChanged;
+
+            SetCombatQueries(_combatQueries);
+
             _groupDetector.NewEnemyGroupDetected +=
                 HandleNewEnemyGroupDetected;
 
             _advanceController.AdvanceReferenceRequired +=
                 HandleAdvanceReferenceRequired;
+        }
+
+
+        // =========================
+        // Shared Combat Queries
+        // =========================
+
+        internal void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+            _targetSelector?.SetCombatQueries(queries);
+            _positionAssigner?.SetCombatQueries(queries);
+            _groupDetector?.SetCombatQueries(queries);
+        }
+
+        private void HandleAssignmentChanged(Unit_Gateway unit, UnitAssignmentContext context)
+        {
+            AssignmentChanged?.Invoke(unit, context);
         }
 
 
@@ -368,6 +408,10 @@ namespace Units
             unit.RallyCompleted +=
                 HandleRallyCompleted;
 
+            unit.RallyFailed += HandleRallyFailed;
+
+
+            MemberAdded?.Invoke(unit);
 
             if (_state == GroupAIState.Engaged)
             {
@@ -408,11 +452,17 @@ namespace Units
             unit.RallyCompleted -=
                 HandleRallyCompleted;
 
+            unit.RallyFailed -= HandleRallyFailed;
+
+            _rallyFailedMembers.Remove(unit);
+
 
             _rallyCompletedMembers.Remove(
                 unit
             );
 
+
+            MemberRemoved?.Invoke(unit);
 
             unit.ClearGroupAI();
 
@@ -527,6 +577,8 @@ namespace Units
             }
 
 
+            _rallyFailedMembers.Remove(unit);
+
             if (!_rallyCompletedMembers.Add(
                 unit))
             {
@@ -537,6 +589,21 @@ namespace Units
             TryCompleteSpawning();
         }
 
+
+        private void HandleRallyFailed(Unit_Gateway unit)
+        {
+            if (_state != GroupAIState.Spawning || unit == null
+                || !_memberController.Contains(unit))
+                return;
+
+            _rallyCompletedMembers.Remove(unit);
+
+            if (!_rallyFailedMembers.Add(unit))
+                return;
+
+            // 실패를 성공으로 집계하지 않되 그룹 전체의 준비 대기는 종료할 수 있다.
+            TryCompleteSpawning();
+        }
 
         private void TryCompleteSpawning()
         {
@@ -552,7 +619,7 @@ namespace Units
                 return;
 
 
-            if (_rallyCompletedMembers.Count <
+            if (_rallyCompletedMembers.Count + _rallyFailedMembers.Count <
                 _members.Count)
             {
                 return;
@@ -663,6 +730,8 @@ namespace Units
                 enemyGroups
             );
 
+            _targetSelector.RefreshEnemyGroups();
+
 
             if (updateState)
                 UpdateEngagementState();
@@ -676,7 +745,9 @@ namespace Units
 
         public void ClearEnemyGroups()
         {
+            _engagementAllies = null;
             _enemyGroupController.Clear();
+            _targetSelector.RefreshEnemyGroups();
 
 
             UpdateEngagementState();
@@ -865,13 +936,10 @@ namespace Units
             }
 
 
-            if (_targetSelector.TryReevaluateTarget(
-                unit))
-            {
-                // Target이 변경되었으므로
-                // 기존 Target을 기준으로 만들어진 Position과 Assignment는 무효다.
-                context.ClearPosition();
-            }
+            bool changed = _targetSelector.TryReevaluateTarget(unit);
+            if (!changed && context.HasAssignment && !context.WaitingForPosition)
+                return;
+            if (changed) context.ClearPosition();
 
             if (!_positionAssigner.TryAssignPosition(
                 unit))
@@ -1095,21 +1163,17 @@ namespace Units
 
         private void UpdateAdvanceReferenceRequest()
         {
-            if (_advanceReference != null)
-            {
-                _advanceReferenceRequestTimer =
-                    0f;
-
-                return;
-            }
-
-
             _advanceReferenceRequestTimer +=
                 Time.deltaTime;
 
 
-            if (_advanceReferenceRequestTimer <
-                _advanceReferenceRequestInterval)
+            // 기존 목표가 있으면 느리게 재평가하여 배정 변화에 대응한다.
+            float interval = _advanceReference == null
+                ? _advanceReferenceRequestInterval
+                : Mathf.Max(2f, _advanceReferenceRequestInterval)
+                    + (GetInstanceID() & 15) * 0.05f;
+
+            if (_advanceReferenceRequestTimer < interval)
             {
                 return;
             }
@@ -1152,6 +1216,9 @@ namespace Units
             if (reference.Team == _team)
                 return;
 
+
+            if (_advanceReference == reference)
+                return;
 
             _advanceReference =
                 reference;

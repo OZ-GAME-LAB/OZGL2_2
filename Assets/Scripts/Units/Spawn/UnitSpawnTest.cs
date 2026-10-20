@@ -144,6 +144,13 @@ namespace Units
         [SerializeField]
         private int _enemyCost = 20;
 
+        [SerializeField]
+        private bool _isInfiniteWave = false;
+
+        [Header("Boss Types (one boss per entry)")]
+        [SerializeField]
+        private List<EnemyUnitType> _bossUnitTypes = new List<EnemyUnitType>();
+
 
         [Header("Enemy Class Weights")]
 
@@ -550,7 +557,8 @@ namespace Units
             SpawnContext context =
                 new SpawnContext(
                     _enemyClassWeights,
-                    _enemyUnitTypes
+                    _enemyUnitTypes,
+                    _bossUnitTypes
                 );
 
 
@@ -561,7 +569,8 @@ namespace Units
             _spawnManager.SpawnEnemyWaveAsync(
                 _enemyCost,
                 context,
-                cancellationToken
+                cancellationToken,
+                _isInfiniteWave
             ).Forget();
 
 
@@ -749,7 +758,7 @@ namespace Units
             }
 
 
-            if (_enemyCost <= 0)
+            if (_enemyCost < 0 || (_enemyCost == 0 && (_bossUnitTypes == null || _bossUnitTypes.Count == 0)))
             {
                 Debug.LogError(
                     "[UnitSpawnTest] Enemy Cost가 올바르지 않습니다."
@@ -759,8 +768,8 @@ namespace Units
             }
 
 
-            if (_enemyUnitTypes == null ||
-                _enemyUnitTypes.Count == 0)
+            if ((_enemyUnitTypes == null || _enemyUnitTypes.Count == 0) &&
+                (_bossUnitTypes == null || _bossUnitTypes.Count == 0))
             {
                 Debug.LogError(
                     "[UnitSpawnTest] Enemy Unit Type이 설정되지 않았습니다."

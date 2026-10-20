@@ -14,18 +14,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ConsumableItemData
   _id: consumable_025
   _displayName: "\uACA8\uC6B8\uC758 \uC228\uACB0"
-  _description: "4\uCD08 \uB3D9\uC548 \uBAA8\uB4E0 \uC801\uC758 \uC774\uB3D9\uC18D\uB3C4\uAC00
-    15% \uAC10\uC18C\uD569\uB2C8\uB2E4."
-  _icon: {fileID: 0}
+  _description: "5\uCD08 \uB3D9\uC548 \uBAA8\uB4E0 \uC801\uC758 \uC774\uB3D9\uC18D\uB3C4\uAC00
+    25% \uAC10\uC18C"
+  _icon: {fileID: 21300000, guid: f3a924047385d44b59e20193d8094d95, type: 3}
+  _useVFX: {fileID: 0}
+  _targetVFX: {fileID: 1002, guid: f917f089bcc94dcf8c0484c013d1c548, type: 3}
   _targetTeam: 1
   _targetMode: 2
   _radius: 0
   _effects:
-  - rid: 1967714645891350714
+  - rid: 1967714963517341985
   references:
     version: 2
     RefIds:
-    - rid: 1967714645891350714
+    - rid: 1967714963517341985
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _effectData: {fileID: 11400000, guid: fbcf721355b38604c82e111e1c314abf, type: 2}

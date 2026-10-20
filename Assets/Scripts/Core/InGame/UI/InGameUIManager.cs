@@ -18,6 +18,7 @@ namespace Game.UI.InGame
         private bool _closingPopups;
 
         public bool IsReady { get; private set; }
+        public bool ExternalInputBlocked { get; set; }
         public UIScreen TopPopup => _openedPopups.Count == 0 ? null : _openedPopups[_openedPopups.Count - 1];
         public int OpenPopupCount => _openedPopups.Count;
         public bool HasBlockingPopup => _openedPopups.Exists(screen => screen.BlocksHudInput);
@@ -57,9 +58,9 @@ namespace Game.UI.InGame
         private void Update()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) CloseTopPopup();
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) HandleEscape();
 #elif ENABLE_LEGACY_INPUT_MANAGER
-            if (Input.GetKeyDown(KeyCode.Escape)) CloseTopPopup();
+            if (Input.GetKeyDown(KeyCode.Escape)) HandleEscape();
 #endif
         }
 
@@ -122,6 +123,15 @@ namespace Game.UI.InGame
             return OpenPopup(id);
         }
 
+        public void HandleEscape()
+        {
+            if (!IsReady || ExternalInputBlocked) return;
+
+            // 하나를 닫았다면 이번 ESC 처리는 끝낸다.
+            if (CloseTopPopup()) return;
+
+            OpenPopup(UIId.Pause);
+        }
         public bool CloseTopPopup() => TopPopup != null && ClosePopup(TopPopup.Id, UICloseReason.UserCancel);
 
         public bool ClosePopup(UIId id, UICloseReason reason = UICloseReason.UserCancel)

@@ -50,8 +50,8 @@ public class TestWaveViewer : MonoBehaviour
                     _text.text = "웨이브 프리셋 없음";
                     return;
                 }
-                string type = preset.BattleType == WaveBattleType.Normal ? "일반" :
-                    preset.BattleType == WaveBattleType.Elite ? "정예" : "보스";
+                string type = preset.BattleType == WaveBattleType.Boss ? "보스" :
+                    _gameFlowController.CurrentNode.IsElite ? "정예" : "일반";
                 string faction;
                 switch (_waveController.CurrentFaction)
                 {

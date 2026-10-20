@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+using System;
+using UnityEngine;
 
 
 
@@ -10,11 +11,17 @@ namespace Units
         // Assignment State
         // =========================
 
+        internal event Action<UnitAssignmentContext> Changed;
+
+        internal Unit_Gateway Owner { get; }
+
         public ICombatTarget AssignedTarget { get; private set; }
 
         public Vector2? AssignedPosition { get; private set; }
 
         public float PositionTolerance { get; private set; }
+
+        public bool WaitingForPosition { get; private set; }
 
         public UnitAssignment? Assignment { get; private set; }
 
@@ -34,6 +41,16 @@ namespace Units
 
 
         // =========================
+        // Constructor
+        // =========================
+
+        public UnitAssignmentContext(Unit_Gateway owner = null)
+        {
+            Owner = owner;
+        }
+
+
+        // =========================
         // Assignment Management
         // =========================
 
@@ -44,19 +61,25 @@ namespace Units
 
             AssignedTarget = target;
 
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void SetPosition(
             Vector2 position,
-            float positionTolerance)
+            float positionTolerance, bool waitingForPosition = false)
         {
+            WaitingForPosition = waitingForPosition;
             AssignedPosition = position;
             PositionTolerance = Mathf.Max(0f, positionTolerance);
 
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void SetAssignment(UnitAssignment assignment)
@@ -67,16 +90,22 @@ namespace Units
         public void ClearTarget()
         {
             AssignedTarget = null;
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void ClearPosition()
         {
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
 
         public void ClearAssignment()
@@ -87,9 +116,12 @@ namespace Units
         public void Clear()
         {
             AssignedTarget = null;
+            WaitingForPosition = false;
             AssignedPosition = null;
             PositionTolerance = 0f;
             Assignment = null;
+
+            Changed?.Invoke(this);
         }
     }
 }

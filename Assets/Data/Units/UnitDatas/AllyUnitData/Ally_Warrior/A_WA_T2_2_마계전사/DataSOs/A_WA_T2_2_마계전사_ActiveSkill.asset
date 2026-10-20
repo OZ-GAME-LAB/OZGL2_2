@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
   m_Name: "A_WA_T2_2_\uB9C8\uACC4\uC804\uC0AC_ActiveSkill"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uB9C8\uACC4 \uAC15\uC2B5"
+    _icon: {fileID: 21300000, guid: 282223e5879d8e64bbe43f7f766435a4, type: 3}
+    _description: "\uB3CC\uC9C4\uD574 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
+      300% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC8FC\uACE0 2\uCD08\uAC04 \uAE30\uC808\uC2DC\uD0B5\uB2C8\uB2E4.
+      [\uCFE8\uD0C0\uC784 8\uCD08]"
   _skillRange: 10
   _skillCooldown: 8
   _targetSide: 0
@@ -27,6 +33,7 @@ MonoBehaviour:
   _effects:
   - rid: 4844432152660541519
   _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
   _dashDistance: 10
   _dashSpeed: 12
   _skillFXType: 0
@@ -42,6 +49,7 @@ MonoBehaviour:
     - rid: 4844432152660541519
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
         _damageMultiplier: 3
     - rid: 4844432359097368580
@@ -68,7 +76,6 @@ MonoBehaviour:
     - rid: 4844432359097368581
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _executionDuration: 0
         _target:
           _source: 2
           _relation: 0
@@ -78,7 +85,7 @@ MonoBehaviour:
           _clusterRadius: 1.5
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -121,7 +128,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Dash_OnHit
@@ -130,7 +137,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Ally_ActiveOnHit_Melee
@@ -152,16 +159,18 @@ MonoBehaviour:
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0
+        _executionDuration: 0
+        _impactTiming: 0
         _area: 2
         _radius: 4
         _angle: 360
         _maxEffectTargets: 7
         _projectileSpeed: 10
+        _projectilePrefab: {fileID: 0}
         _isLegacy: 1
     - rid: 4844432377880510557
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 044cc9ccdf5ab5e459b9a77d3bc3d1f5, type: 2}
         _applicationFX:
         - _key: VFX_OnApply_Debuff
           _hook: 1
@@ -172,3 +181,4 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: 044cc9ccdf5ab5e459b9a77d3bc3d1f5, type: 2}

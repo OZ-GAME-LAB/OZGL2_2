@@ -39,6 +39,7 @@ namespace Game.UI
         private const int CardsPerPage = 3;
 
         [SerializeField] private GameObject _panelRoot;
+        [SerializeField] private TMP_Text _title;
         [SerializeField] private TMP_Text _rewardText;
         [SerializeField] private TMP_Text _statusText;
         [SerializeField] private Sprite _fallbackIcon;
@@ -72,6 +73,9 @@ namespace Game.UI
         private bool _completed;
         private bool _listening;
         private string _message;
+        private ArtifactSelectionPurpose _purpose;
+        private string _defaultTitle;
+        private bool _titleCached;
         private readonly Vector2[] _defaultCardPositions = new Vector2[CardsPerPage];
         private bool _cardPositionsCached;
         private Vector2 _defaultConfirmPosition;
@@ -124,7 +128,8 @@ namespace Game.UI
             Refresh();
         }
 
-        public void ShowReward(ArtifactRewardViewData data)
+        public void ShowReward(ArtifactRewardViewData data,
+            ArtifactSelectionPurpose purpose = ArtifactSelectionPurpose.Reward)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (!HasView()) throw new InvalidOperationException("Artifact reward view references are incomplete.");
@@ -138,6 +143,7 @@ namespace Game.UI
                 _message = null;
             }
             // 같은 보상 재오픈은 선택/대기/완료 상태와 최초 후보 스냅샷을 유지한다.
+            _purpose = purpose;
             _showRequested = !_completed;
             Refresh();
         }
@@ -159,6 +165,7 @@ namespace Game.UI
             _completed = false;
             _showRequested = false;
             _message = null;
+            _purpose = ArtifactSelectionPurpose.Reward;
             Refresh();
         }
 
@@ -250,8 +257,19 @@ namespace Game.UI
             if (opening && EventSystem.current != null)
                 _previousSelection = EventSystem.current.currentSelectedGameObject;
             _panelRoot.SetActive(true);
-            _rewardText.text = BuildRewardSummary(_data.AwardedGold, _data.AwardedGems);
-            _instructionText.text = _data.Candidates.Count == 1
+            bool exchange = _purpose == ArtifactSelectionPurpose.Exchange;
+            if (_title != null)
+            {
+                if (!_titleCached)
+                {
+                    _defaultTitle = _title.text;
+                    _titleCached = true;
+                }
+                _title.text = exchange ? "유물 교환" : _defaultTitle;
+            }
+            _rewardText.text = exchange ? "교환할 유물 선택" : BuildRewardSummary(_data.AwardedGold, _data.AwardedGems);
+            _instructionText.text = exchange ? "교환할 보유 유물을 선택하세요"
+                : _data.Candidates.Count == 1
                 ? "유물을 확인하세요"
                 : $"{_data.Candidates.Count}개의 유물 중 하나를 선택하세요";
             bool unlocked = !IsRequestPending;
@@ -283,7 +301,9 @@ namespace Game.UI
             _clearButton.gameObject.SetActive(_selectedIndex >= 0);
             _clearButton.interactable = unlocked && _selectedIndex >= 0;
             _confirmButton.interactable = unlocked && _choiceRequested != null && (_allowForfeit || _selectedIndex >= 0);
-            _confirmText.text = IsRequestPending ? "처리 중…" : _selectedIndex >= 0 ? "선택하기" : _allowForfeit ? "건너뛰기" : "유물을 선택하세요";
+            _confirmText.text = IsRequestPending ? "처리 중…"
+                : _selectedIndex >= 0 ? (exchange ? "교환하기" : "선택하기")
+                : _allowForfeit ? (exchange ? "돌아가기" : "건너뛰기") : "유물을 선택하세요";
             ConfigureActionPresentation(_selectedIndex >= 0);
             bool hasPages = PageCount > 1;
             _previousPageButton.gameObject.SetActive(hasPages);

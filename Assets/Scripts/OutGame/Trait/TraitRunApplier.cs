@@ -82,21 +82,22 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
     // 목록과 각 항목을 새로 복사해 이후 레벨 변경이 저장 사본에 영향을 주지 않도록 합니다.
     public TraitRunSaveData CaptureSaveData()
     {
-        TraitRunSaveData data = new TraitRunSaveData
-        {
-            IsApplied = _startEffectApplied
-        };
+        return new TraitRunSaveData { IsApplied = _startEffectApplied, Levels = CaptureLevels() };
+    }
 
+    public List<TraitLevelEntry> CaptureLevels()
+    {
+        var levels = new List<TraitLevelEntry>();
         foreach (var entry in _levels)
         {
-            data.Levels.Add(new TraitLevelEntry
+            levels.Add(new TraitLevelEntry
             {
                 Id = entry.Id,
                 Level = entry.Level
             });
         }
 
-        return data;
+        return levels;
     }
 
     // 10.9 / 문규성 / 저장된 레벨로 교체한 뒤 기존 효과를 해제하고 지속 효과를 즉시 다시 등록하도록 변경했습니다.

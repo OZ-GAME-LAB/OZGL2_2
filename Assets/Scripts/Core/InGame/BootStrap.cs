@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using Game.Archive;
 using Game.Cameras;
 using Game.Core;
 using Game.UI.InGame;
 using OZGL.KDH;
 using Units;
+using Units.Skills;
 using UnityEngine;
 using UnityEngine.Serialization;
 /// 각 시스템의 참조 연결과 초기화 순서를 관리하고,
-/// 준비가 완료되면 GameFlowController.BeginRun()을 호출한다.
+/// 준비가 완료되고 화면이 표시되면 GameFlowController.BeginRun()을 호출한다.
 ///
 /// 각 담당 파트 요청 사항:
 /// - 외부 연결이 필요한 대표 매니저와 Initialize 메서드를 제공
@@ -21,23 +23,26 @@ using UnityEngine.Serialization;
 ///
 /// 초기화 중 다른 시스템에 게임 진행을 요청하는 이벤트는 발생시키지 않고
 /// 이벤트 구독 해제와 재초기화 시 중복 구독 방지는 각 시스템에서 처리.
-public class BootStrap : MonoBehaviour
+public class BootStrap : MonoBehaviour, ISceneEntry
 {
     #region Systems
     [Header("Systems")]
     [SerializeField] private TestWaitingScript _testScript; //테스트용으로 , 실제 구현시 삭제할것
     [SerializeField] private GameFlowController _gameFlowController;
     [SerializeField] private WaveController _waveController;
-    [SerializeField] private ArchiveManager _archiveManager;
+    [FormerlySerializedAs("_archiveManager")]
+    [SerializeField] private RunRecordManager _runRecordManager;
     [SerializeField] private ArtifactManager _artifactManager;
     [SerializeField] private EffectManager _effectManager;
     [SerializeField] private SpawnManager _spawnManager;
     [SerializeField] private RuntimeUnitManager _runtimeUnitManager;
     [SerializeField] private RunCurrencyManager _runCurrencyManager;
     [SerializeField] private ShopManager _shopManager;
+    [SerializeField] private EventManager _eventManager;
     [SerializeField] private ConsumableItemManager _consumableItemManager;
-    [SerializeField] private RunSettlementManager _runSettlementManager;
+    [SerializeField] private RunRewardManager _runSettlementManager;
     [SerializeField] private PersistentCurrencyManager _persistentCurrencyManager;
+    [SerializeField] private UnlockManager _unlockManager;
     [SerializeField] private InGameCameraController _cameraController;
     [SerializeField] private BuildingBuildController _buildController;
     [SerializeField] private BuildingCoreProgress _buildingCoreProgress;
@@ -49,11 +54,15 @@ public class BootStrap : MonoBehaviour
     [SerializeField] private InGameSaveCoordinator _inGameSaveCoordinator;
     [SerializeField] private OutGameSaveCoordinator _outGameSaveCoordinator;
     [SerializeField] private SaveManager _saveManager;
+    [SerializeField] private GameSettingsManager _gameSettingsManager;
     #endregion
 
     #region UI
     [Header("UI")]
     [SerializeField] private InGameUIStartup _uiStartup;
+    [SerializeField] private TutorialController _tutorial;
+    [SerializeField] private ArchiveController _archiveController;
+    private BuildingSlot[] _buildingSlots;
     public bool IsUIConnected => _uiStartup != null && _uiStartup.IsReady;
     #endregion
 
@@ -74,43 +83,70 @@ public class BootStrap : MonoBehaviour
 
     async void Start()
     {
+        if (SceneLoadingManager.Instance != null) return;
 
-        if (!ValidateReferences()) return;
         try
         {
-            InitializePersistentManagers();
-            if (!InitializeManagers())
-            {
-                _gameFlowController.BlockStartup();
-                return;
-            }
-            // 모든 슬롯의 Start에서 기본 배치 연결이 끝난 뒤 UI와 저장 상태를 연결한다.
-            await UniTask.NextFrame(cancellationToken: this.GetCancellationTokenOnDestroy());
-            if (!InitializeUI())
-            {
-                _gameFlowController.BlockStartup();
-                return;
-            }
-            _testScript.Initialize(_gameFlowController, _waveController);
-            _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
-                _artifactManager, _shopManager, _consumableItemManager, _buildController, _archiveManager,
-                () => _archiveManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController));
-            _gameFlowController.InitializeSave(_inGameSaveCoordinator);
-
-            bool hasRunSave = _saveManager.HasSaveFile(InGameSaveCoordinator.SaveKey);
-            if (!_outGameSaveCoordinator.TryLoad(hasRunSave, out string error)
-                || !TryPrepareRun(hasRunSave, out error))
-            {
-                StopStartup(error);
-                return;
-            }
-            _gameFlowController.BeginRun();
+            await InitializeAsync(null);
+            OnPresented();
         }
         catch (OperationCanceledException) when (this == null) { }
         catch (Exception exception)
         {
             StopStartup(exception.Message);
         }
+    }
+
+    public async UniTask InitializeAsync(ISceneTransition transition)
+    {
+        try
+        {
+            if (!ValidateReferences())
+                throw new InvalidOperationException("인게임 시작에 필요한 참조를 확인해주세요.");
+
+            _gameSettingsManager.Initialize(_saveManager);
+            _gameFlowController.InitializeSceneTransition(transition);
+            InitializePersistentManagers();
+            if (!InitializeManagers())
+                throw new InvalidOperationException("인게임 매니저 초기화에 실패했습니다.");
+            // 모든 슬롯의 Start에서 기본 배치 연결이 끝난 뒤 UI와 저장 상태를 연결한다.
+            await UniTask.NextFrame(cancellationToken: this.GetCancellationTokenOnDestroy());
+            if (!InitializeUI())
+                throw new InvalidOperationException("인게임 UI 초기화에 실패했습니다.");
+            if (!_eventManager.Initialize(_runCurrencyManager, _artifactManager, _gameFlowController,
+                    _uiStartup.EventUI, _uiStartup.ArtifactSelectionUI))
+                throw new InvalidOperationException("EventManager 초기화에 실패했습니다.");
+            _gameFlowController.InitializeEventFlow(_eventManager);
+            _testScript.Initialize(_gameFlowController, _waveController);
+            _inGameSaveCoordinator.Initialize(_saveManager, _gameFlowController, _runCurrencyManager,
+                _artifactManager, _shopManager, _consumableItemManager, _buildController, _runRecordManager, _eventManager,
+                () => _runRecordManager.Initialize(_artifactManager, _runtimeUnitManager, _waveController,
+                    _totemRunApplier, _altarManager, _traitRunApplier));
+            _gameFlowController.InitializeSave(_inGameSaveCoordinator);
+            _eventManager.InitializeSave(_inGameSaveCoordinator);
+
+            bool hasRunSave = _saveManager.HasSaveFile(InGameSaveCoordinator.SaveKey);
+            if (!_outGameSaveCoordinator.TryLoad(hasRunSave, out string error)
+                || !TryPrepareRun(hasRunSave, out error))
+                throw new InvalidOperationException(error);
+            _archiveController.Initialize(_artifactManager, _buildingSlots,
+                _gameFlowController, _runtimeUnitManager);
+            _archiveController.RegisterOwnedEntries();
+            _uiStartup.InitializeArchive(_archiveController);
+        }
+        catch
+        {
+            _gameFlowController?.BlockStartup();
+            throw;
+        }
+    }
+
+    public void OnPresented() => PresentAsync().Forget();
+
+    private async UniTask PresentAsync()
+    {
+        await _gameFlowController.BeginRunAsync();
+        if (this != null) _tutorial?.StartInGame(_outGameSaveCoordinator, _gameFlowController);
     }
 
     private bool TryPrepareRun(bool hasRunSave, out string error)
@@ -152,39 +188,41 @@ public class BootStrap : MonoBehaviour
 
     private bool InitializeManagers()
     {
-        _gameFlowController.Initialize
-            (_waveController, _testScript, _artifactManager, _archiveManager, _runSettlementManager, _cameraController, _shopManager);
-        _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager);
-        _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _buildingCensus);
+        _gameFlowController.Initialize(_waveController, _testScript, _artifactManager, _runRecordManager, 
+            _runSettlementManager, _cameraController, _shopManager);
+        _waveController.Initialize(_gameFlowController, _spawnManager, _runtimeUnitManager,
+            _totemRunApplier.FlowEffects, _unitStatModifierManager);
+        _buildController.Initialize(_runCurrencyManager, _gameFlowController, _buildingCoreProgress, _inGameSaveCoordinator,_buildingCensus);
+        _gameFlowController.InitializeBuildings(_buildController.Census);
         _artifactManager.Initialize(_waveController, _effectManager, _runCurrencyManager, _uiStartup.ArtifactSelectionUI);
-        _uiStartup.InitializeArtifactInventory(_artifactManager);
         _runCurrencyManager.Initialize(_waveController,_gameFlowController, _effectManager, _buildingCoreProgress);
-        _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager,
-            Units.Skills.SkillEffectResolver.Instance);
+        _uiStartup.InitializeArtifactInventory(_artifactManager);
+
+        _consumableItemManager.Initialize(_effectManager, _gameFlowController, _runtimeUnitManager, SkillEffectResolver.Instance);
         if (!_consumableItemManager.IsInitialized)
         {
-            Debug.LogError("[BootStrap] 상점에 연결할 소모품 매니저 초기화에 실패했습니다.", this);
+            Debug.LogError("[BootStrap] ConsumableItemManager 초기화에 실패했습니다.", this);
             return false;
         }
 
-        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI);
+        _shopManager.Initialize(_artifactManager, _runCurrencyManager, _gameFlowController, _consumableItemManager, _uiStartup.ShopUI, _inGameSaveCoordinator);
         if (!_shopManager.IsInitialized)
         {
-            Debug.LogError("[BootStrap] 상점 매니저 초기화에 실패했습니다.", this);
+            Debug.LogError("[BootStrap] ShopManager 초기화에 실패했습니다.", this);
             return false;
         }
 
         var settlementBridge = new RunSettlementSaveBridge(_outGameSaveCoordinator,
             () => _gameFlowController.RunId, _uiStartup.SettlementUI,
-            _gameFlowController.PrepareSettlementViewAsync);
-        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier,
+            _gameFlowController.PrepareSettlementViewAsync,
+            _runRecordManager, _outGameSaveCoordinator.Records, _unlockManager);
+        _runSettlementManager.Initialize(_waveController, _effectManager, _persistentCurrencyManager, _totemRunApplier, 
             settlementBridge, settlementBridge);
+        
         _cameraController.Initialize(_buildController,_gameFlowController);
-        _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager,
-            _runCurrencyManager, _gameFlowController);
+        _traitRunApplier.Initialize(_traitCatalog, _effectManager, _unitStatModifierManager, _runCurrencyManager, _gameFlowController);
         _totemRunApplier.Initialize(_totemCatalog, _unitStatModifierManager, _effectManager, _gameFlowController);
-        _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager,
-            _gameFlowController);
+        _altarManager.Initialize(_effectManager, _runCurrencyManager, _unitStatModifierManager, _gameFlowController);
 
         return true;
     }
@@ -192,24 +230,26 @@ public class BootStrap : MonoBehaviour
     private void InitializePersistentManagers()
     {
         _persistentCurrencyManager.Initialize();
+        _unlockManager.Initialize();
         _persistentTraits.Initialize(_persistentCurrencyManager, _outGameSaveCoordinator);
-        _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager,
-            _altarManager, _totemRunApplier, _traitRunApplier);
+        _outGameSaveCoordinator.Initialize(_saveManager, _persistentTraits, _persistentCurrencyManager, _altarManager, _totemRunApplier, _archiveController, _unlockManager, _traitRunApplier);
     }
     // UI 부분을 초기화 한다
-    public bool InitializeUI()
+    private bool InitializeUI()
     {
         var buildingSlots = new List<BuildingSlot>();
         foreach (var root in gameObject.scene.GetRootGameObjects())
             buildingSlots.AddRange(root.GetComponentsInChildren<BuildingSlot>(true));
+        _buildingSlots = buildingSlots.ToArray();
         if (!_uiStartup.Initialize(_runCurrencyManager, _gameFlowController,
-                _waveController, _buildController, _buildingCoreProgress, buildingSlots.ToArray(),
+                _waveController, _buildController, _buildingCoreProgress, _buildingSlots,
                 _cameraController, _consumableItemManager, _spawnManager))
         {
             Debug.LogError("[BootStrap] UI 초기화에 실패했습니다.", this);
             return false;
         }
         _uiStartup.UIManager.gameObject.SetActive(true);
+        _uiStartup.InitializeRunInfo(_altarManager, _traitRunApplier, _totemRunApplier, _traitCatalog, _totemCatalog);
         return true;
     }
 
@@ -228,10 +268,10 @@ public class BootStrap : MonoBehaviour
             valid = false;
         }
         if (_persistentCurrencyManager == null || _runSettlementManager == null || _saveManager == null ||
-            _outGameSaveCoordinator == null || _inGameSaveCoordinator == null || _persistentTraits == null ||
-            _archiveManager == null || _runCurrencyManager == null || _buildController == null || _cameraController == null)
+            _outGameSaveCoordinator == null || _inGameSaveCoordinator == null || _persistentTraits == null || _unlockManager == null ||
+            _runRecordManager == null || _runCurrencyManager == null || _buildController == null || _cameraController == null)
         {
-            Debug.LogError("[BootStrap] 정산 매니저·혈석 지갑·SaveManager·영구 저장·특성 데이터 참조를 연결해주세요.", this);
+            Debug.LogError("[BootStrap] 정산 매니저·혈석 지갑·SaveManager·영구 저장·특성 데이터·UnlockManager 참조를 연결해주세요.", this);
             valid = false;
         }
         if (_uiStartup == null)
@@ -270,6 +310,11 @@ public class BootStrap : MonoBehaviour
             valid = false;
         }
 
+        if (_eventManager == null)
+        {
+            Debug.LogError("[BootStrap] EventManager를 Inspector에서 연결해주세요.", this);
+            valid = false;
+        }
         return valid;
     }
 }

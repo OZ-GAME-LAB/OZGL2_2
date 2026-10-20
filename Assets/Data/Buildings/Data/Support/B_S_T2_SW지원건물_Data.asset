@@ -14,11 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_S_T2_SW\uC9C0\uC6D0\uAC74\uBB3C"
   buildingFamilyId: Support
-  displayName: "\uC5F0\uAD6C\uC18C"
-  description: "\uACC4\uC5F4 \uC720\uB2DB\uC758 \uB2A5\uB825\uC744 \uAC15\uD654\uC2DC\uD0A8\uB2E4"
+  displayName: "\uAC80\uC0AC\uC758 \uC131\uC18C"
+  description: "\uAC80\uC0AC \uACC4\uC5F4\uC758 \uC804\uD22C \uB2A5\uB825\uC744 \uAC15\uD654\uD558\uB294
+    \uC131\uC18C\uC785\uB2C8\uB2E4."
   buildingType: 3
-  icon: {fileID: 21300000, guid: 6714aeef9546457a92f47e68c3db3fc9, type: 3}
-  worldSprite: {fileID: 21300000, guid: 6714aeef9546457a92f47e68c3db3fc9, type: 3}
+  icon: {fileID: 21300000, guid: 8c59eaf9262f52b4ea4328e12555a424, type: 3}
+  worldSprite: {fileID: 21300000, guid: b43ab800e645c0c43aa9da047ac09256, type: 3}
   prefab: {fileID: 6144687170867436702, guid: b0f6c51e6c184f3db5ef3fd667c3d681, type: 3}
   buildCost:
   - type: 0
@@ -41,7 +42,23 @@ MonoBehaviour:
   support:
     enabled: 1
     targetClass: 2
-    statType: 100
-    modifierType: 1
-    value: 0.2
-  upgrades: []
+    effects:
+    - statType: 100
+      modifierType: 1
+      value: 0.2
+    - statType: 0
+      modifierType: 1
+      value: 0.2
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
+  upgrades:
+  - nextBuilding: {fileID: 11400000, guid: 5eedc5f1ddab4ed18fe8f70f3f6e2387, type: 2}
+    cost:
+    - type: 0
+      amount: 100
+    requiredCoreLevel: 3
+  - nextBuilding: {fileID: 11400000, guid: 481db0a9addc4197b11afe548ffa6f7c, type: 2}
+    cost:
+    - type: 0
+      amount: 100
+    requiredCoreLevel: 3

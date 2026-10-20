@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 
 
@@ -6,6 +7,25 @@ namespace Units
 {
     public class AdvanceReferenceController
     {
+        // =========================
+        // Settings & Assignment State
+        // =========================
+
+        private const float VerticalWeight = 1.5f;
+
+        private const float AssignmentWeight = 3f;
+
+        private const float MaximumAssignmentPenalty = 6f;
+
+        private const float SwitchImprovement = 0.75f;
+
+        private readonly Dictionary<Unit_GroupAI, int> _assignedMembers = new();
+
+
+        // =========================
+        // References
+        // =========================
+
         private readonly IReadOnlyList<Unit_GroupAI>
             _allyGroups;
 
@@ -39,6 +59,8 @@ namespace Units
             if (candidates.Count == 0)
                 return null;
 
+            GatherAssignments(sourceGroup);
+
             return SelectBestReference(
                 sourceGroup,
                 candidates
@@ -65,6 +87,9 @@ namespace Units
             float bestScore =
                 float.MinValue;
 
+
+            Vector2 sourceCenter = sourceGroup.CenterPosition;
+
             for (int i = 0;
                  i < candidates.Count;
                  i++)
@@ -80,8 +105,9 @@ namespace Units
 
                 float score =
                     CalculateScore(
-                        sourceGroup,
-                        candidate
+                        sourceCenter,
+                        candidate,
+                        sourceGroup.AdvanceReference
                     );
 
                 if (score <= bestScore)
@@ -111,13 +137,102 @@ namespace Units
         }
 
 
+        // =========================
+        // Front Selection
+        // =========================
+
         private float CalculateScore(
-            Unit_GroupAI sourceGroup,
-            Unit_GroupAI candidate)
+            Vector2 sourceCenter,
+            Unit_GroupAI candidate,
+            Unit_GroupAI currentReference)
         {
-            // 그룹 중심이 가까울수록 높은 점수로 전진 목표를 선택한다.
-            return -(candidate.CenterPosition - sourceGroup.CenterPosition)
-                .sqrMagnitude;
+            float approachCost = float.PositiveInfinity;
+
+            int livingMembers = 0;
+
+            for (int i = 0; i < candidate.Members.Count; i++)
+            {
+                Unit_Gateway member = candidate.Members[i];
+
+                if (member == null || !member.IsTargetable)
+                    continue;
+
+                livingMembers++;
+
+                Vector2 offset = (Vector2)member.Transform.position - sourceCenter;
+
+                // 좌우로 싸우는 전장에서는 위아래 이동에 추가 비용을 준다.
+                // 같은 높이의 전선을 우선하되 그곳이 비면 인접 전선도 지원한다.
+                float cost = offset.magnitude + Mathf.Abs(offset.y) * VerticalWeight;
+
+                approachCost = Mathf.Min(approachCost, cost);
+            }
+
+            if (livingMembers == 0)
+                return float.NegativeInfinity;
+
+            _assignedMembers.TryGetValue(candidate, out int assignedMembers);
+
+            float assignmentCost = Mathf.Min(
+                MaximumAssignmentPenalty,
+                AssignmentWeight * assignedMembers / livingMembers
+            );
+
+            // 작은 배정 변화만으로 위아래 전진 목표를 계속 바꾸지 않는다.
+            float retention = candidate == currentReference ? SwitchImprovement : 0f;
+
+            return -(approachCost + assignmentCost) + retention;
+        }
+
+
+        // =========================
+        // Existing Assignments
+        // =========================
+
+        private void GatherAssignments(Unit_GroupAI requester)
+        {
+            _assignedMembers.Clear();
+
+            IReadOnlyList<Unit_GroupAI> groups = requester.Team == UnitTeam.Ally
+                ? _allyGroups
+                : _enemyGroups;
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                Unit_GroupAI group = groups[i];
+
+                if (group == null || group == requester)
+                    continue;
+
+                Unit_GroupAI reference = group.AdvanceReference;
+
+                for (int j = 0; j < group.Members.Count; j++)
+                {
+                    Unit_Gateway member = group.Members[j];
+
+                    if (member == null || !member.IsTargetable)
+                        continue;
+
+                    Unit_GroupAI destination = null;
+
+                    if (group.State == GroupAIState.Advancing)
+                    {
+                        destination = reference;
+                    }
+                    else if (group.State == GroupAIState.Engaged
+                        && group.AssignmentContexts.TryGetValue(member, out UnitAssignmentContext context)
+                        && context.HasTarget && context.AssignedTarget is Unit_Gateway target)
+                    {
+                        destination = target.GroupAI;
+                    }
+
+                    if (destination == null)
+                        continue;
+
+                    _assignedMembers.TryGetValue(destination, out int count);
+                    _assignedMembers[destination] = count + 1;
+                }
+            }
         }
     }
 }

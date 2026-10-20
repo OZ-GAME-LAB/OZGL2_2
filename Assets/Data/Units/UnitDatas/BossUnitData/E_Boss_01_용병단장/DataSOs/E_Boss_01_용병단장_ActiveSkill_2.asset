@@ -1,0 +1,130 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77d1bbd2066e45b46b3d537ccbc1c178, type: 3}
+  m_Name: "E_Boss_01_\uC6A9\uBCD1\uB2E8\uC7A5_ActiveSkill_2"
+  m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.ActiveSkillData
+  _display:
+    _name: "\uC804\uD22C \uC9C0\uD718"
+    _icon: {fileID: 21300000, guid: afebc21a23e4c0242a0b60c69a014dee, type: 3}
+    _description: "\uC8FC\uBCC0 \uC544\uAD70\uC758 \uACF5\uACA9\uB825\uC744 5\uCD08\uAC04
+      25% \uC99D\uAC00\uC2DC\uD0B5\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 10\uCD08]"
+  _skillRange: 5
+  _skillCooldown: 10
+  _targetSide: 2
+  _targetPolicy: 2
+  _actionType: 0
+  _castTime: 0
+  _deliveryType: 0
+  _maxTargetCount: 1
+  _maxEffectTargetCount: 1
+  _areaType: 0
+  _areaRadius: 1
+  _areaAngle: 90
+  _effects: []
+  _projectileSpeed: 10
+  _projectilePrefab: {fileID: 0}
+  _dashDistance: 3
+  _dashSpeed: 10
+  _skillFXType: 0
+  _hitFXType: 0
+  _actions:
+  - rid: 4617381741844758615
+  _skillSchemaVersion: 1
+  _usesLegacyTargetSelection: 0
+  references:
+    version: 2
+    RefIds:
+    - rid: 4617381741844758615
+      type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _target:
+          _source: 1
+          _relation: 1
+          _includeSelf: 1
+          _range: 7
+          _maxTargetCount: 15
+          _clusterRadius: 1
+          _filters: []
+          _priorities: []
+        _targetLostPolicy: 0
+        _failurePolicy: 0
+        _origin: 0
+        _conditions: []
+        _baseEffects:
+        - _entryId: 1
+          _timing: 1
+          _subject: 0
+          _frequency: 0
+          _snapshotAreaTarget:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 1
+            _maxTargetCount: 10
+            _clusterRadius: 1
+            _filters: []
+            _priorities: []
+          _effects:
+          - rid: 4617381741844758616
+        _conditionalEffects: []
+        _fxEntries:
+        - _key: VFX_OnApply_Buff
+          _hook: 0
+          _operation: 4
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 0
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: SFX_OnApply_Buff
+          _hook: 0
+          _operation: 4
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 0
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        _delivery: 0
+        _executionDuration: 0.3
+        _impactTiming: 0
+        _area: 2
+        _radius: 7
+        _angle: 90
+        _maxEffectTargets: 15
+        _projectileSpeed: 10
+        _projectilePrefab: {fileID: 0}
+        _isLegacy: 0
+    - rid: 4617381741844758616
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+      data:
+        _applicationFX:
+        - _key: VFX_OnApply_Buff
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 0
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        - _key: SFX_OnApply_Buff
+          _hook: 1
+          _operation: 5
+          _endPolicy: 2
+          _kind: 1
+          _attachment: 2
+          _followDirection: 1
+          _scaleMode: 0
+          _scaleMultiplier: {x: 1, y: 1}
+        _effectData: {fileID: 11400000, guid: bbe298def0ffee0468178a98c9f229ae, type: 2}

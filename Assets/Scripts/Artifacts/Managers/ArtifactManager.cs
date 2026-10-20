@@ -34,6 +34,15 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
 
     [SerializeField] private ArtifactCatalog _artifactCatalog;
     [SerializeField] private ArtifactRewardTable _rewardTable;
+    
+    [Header("아티팩트 획득 테스트")]
+    [Tooltip("플레이 중 F5로 카탈로그 획득 창을 엽니다. 일반 플레이에서는 꺼두세요.")]
+    [SerializeField] private bool _enableCatalogTest = true;
+    private bool _catalogTestOpen;
+    private Vector2 _catalogTestScroll;
+    private string _catalogTestSearch = "";
+    private string _catalogTestMessage = "목록에서 획득 버튼을 누르세요.";
+    private GUIStyle _catalogTestDescriptionStyle;
     private RunCurrencyManager _runCurrencyManager;
 
     private ArtifactInventory _inventory;
@@ -52,6 +61,91 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
     public bool IsSelectingReward => _selectionWait != null;
     public bool IsRewardApplied => _rewardApplied;
     public IReadOnlyList<ArtifactData> SelectionCandidates => _selectionCandidates;
+
+    // 별도 테스트 컴포넌트나 Canvas 없이 사용하는 카탈로그 획득 창입니다.
+    private void Update()
+    {
+        if (!_enableCatalogTest)
+        {
+            _catalogTestOpen = false;
+            return;
+        }
+#if ENABLE_INPUT_SYSTEM
+        var keyboard = UnityEngine.InputSystem.Keyboard.current;
+        bool toggle = keyboard != null && keyboard.f5Key.wasPressedThisFrame;
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        bool toggle = Input.GetKeyDown(KeyCode.F5);
+#else
+        bool toggle = false;
+#endif
+        if (toggle) _catalogTestOpen = !_catalogTestOpen;
+    }
+
+    private void OnGUI()
+    {
+        if (!_enableCatalogTest || !_catalogTestOpen) return;
+
+        if (_catalogTestDescriptionStyle == null)
+            _catalogTestDescriptionStyle = new GUIStyle(GUI.skin.label) { wordWrap = true };
+
+        float width = Mathf.Min(720f, Screen.width - 20f);
+        float height = Mathf.Min(720f, Screen.height - 20f);
+        GUI.Window(GetInstanceID(), new Rect((Screen.width - width) * 0.5f,
+            (Screen.height - height) * 0.5f, width, height), DrawCatalogTestWindow,
+            "아티팩트 획득 테스트 — F5로 열기 / 닫기");
+    }
+
+    private void DrawCatalogTestWindow(int windowId)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("이름 / ID 검색", GUILayout.Width(100f));
+        string search = GUILayout.TextField(_catalogTestSearch);
+        if (search != _catalogTestSearch)
+        {
+            _catalogTestSearch = search;
+            _catalogTestScroll = Vector2.zero;
+        }
+        if (GUILayout.Button("닫기", GUILayout.Width(60f))) _catalogTestOpen = false;
+        GUILayout.EndHorizontal();
+
+        GUILayout.Label(IsInitialized ? _catalogTestMessage : "초기화 대기 중입니다. 목록은 볼 수 있지만 획득은 초기화 후 가능합니다.",
+            _catalogTestDescriptionStyle);
+        if (_artifactCatalog == null)
+        {
+            GUILayout.Label("Artifact Catalog가 연결되어 있지 않습니다.");
+            return;
+        }
+
+        _catalogTestScroll = GUILayout.BeginScrollView(_catalogTestScroll);
+        int shown = 0;
+        string filter = _catalogTestSearch.Trim();
+        foreach (var artifact in _artifactCatalog.Artifacts)
+        {
+            if (artifact == null) continue;
+            if (filter.Length > 0 &&
+                (artifact.Id ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 &&
+                (artifact.DisplayName ?? "").IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            shown++;
+            int stacks = TryGetById(artifact.Id, out var instance) ? instance.StackCount : 0;
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label($"{artifact.Id} · {artifact.DisplayName} · {artifact.Rarity} · {stacks}/{artifact.MaxStacks}");
+            GUILayout.Label(artifact.Description ?? "", _catalogTestDescriptionStyle);
+            bool enabled = GUI.enabled;
+            GUI.enabled = enabled && IsInitialized && !_isChanging && stacks < artifact.MaxStacks;
+            if (GUILayout.Button(stacks >= artifact.MaxStacks ? "최대 중첩" : "획득", GUILayout.Height(28f)))
+            {
+                _catalogTestMessage = TryAdd(artifact)
+                    ? $"{artifact.DisplayName} 획득 완료"
+                    : $"{artifact.DisplayName} 획득 실패 — Console을 확인하세요.";
+            }
+            GUI.enabled = enabled;
+            GUILayout.EndVertical();
+        }
+        if (shown == 0) GUILayout.Label("표시할 아티팩트가 없습니다.");
+        GUILayout.EndScrollView();
+    }
 
    
     // 10.2(문규성) : 인자 추가중 오류가 많이 발생해서 일단 null 허용으로 만들어놓았습니다.
@@ -383,6 +477,118 @@ public class ArtifactManager : MonoBehaviour, IArtifactFlow, IArtifactReader, IA
         StackChanged?.Invoke(add.Instance, add.PreviousStacks, add.CurrentStacks);
         _isChanging = false;
         return true;
+    }
+
+    // costas 아티팩트를 소모하고 reward아티팩트를 인벤토리에 추가한다. 
+    // 특정 아티팩트를 바치고 다른 아티팩트를 획득하는 이벤트 구현을 위해 추가한 메서드
+    public bool TryApplyTrade(IReadOnlyList<ArtifactData> costArtifacts, ArtifactData rewardArtifact = null)
+    {
+        if (!IsInitialized || _isChanging || _effectManager == null)
+        {
+            return false;
+        }
+
+        var costCounts = new Dictionary<ArtifactData, int>();
+        if (costArtifacts != null)
+        {
+            foreach (ArtifactData artifact in costArtifacts)
+            {
+                if (!_artifactCatalog.Contains(artifact)) return false;
+                costCounts.TryGetValue(artifact, out int count);
+                costCounts[artifact] = count + 1;
+            }
+        }
+
+        if (rewardArtifact != null)
+        {
+            if (!_artifactCatalog.Contains(rewardArtifact))
+            {
+                return false;
+            }
+            if (!costCounts.ContainsKey(rewardArtifact))
+            {
+                costCounts.Add(rewardArtifact, 0);
+            }
+        }
+        
+        var changes = new List<PreparedChange>(); //인벤토리 변경과 이벤트 발행에 필요한 객체 + 변경 전 갯수 + 변경 후 갯수 기록 
+        var removedSources = new List<object>(); //지울 효과들의 목록
+        var finalEffects = new Dictionary<object, ConvertedEffects>(); //교환 완료 후 적용할 효과
+        //해당 foreach문에서는 소모 & 추가되는 아티팩트의 최종 수량을 검증하고 적용할 효과를 준비합니다
+        foreach (var cost in costCounts)
+        {
+            ArtifactData costArtifact = cost.Key; //처리할 유물의 정보
+            
+            _inventory.TryGetById(costArtifact.Id, out ArtifactInstance inventoryArtifact); //삭제할 유물이 실제로 인벤토리에 있는지 확인
+            int previousStacks = inventoryArtifact == null ? 0 : inventoryArtifact.StackCount; //삭제할 유물이 인벤토리에 있으면 기존 보유 수량 기록
+            // 같은 유물을 보상으로 받더라도 소모할 아티팩트는 교환 전에 보유해야 함
+            // (A아티팩트 2개를 소모하고 A 아티팩트를 다시 1개 받는다고 해도 기존 인벤토리에 A아티팩트 2개가 있어야 교환가능)
+            if (previousStacks < cost.Value || (inventoryArtifact != null && inventoryArtifact.Data != costArtifact)) 
+                return false;
+            
+            //소모되는 아티팩트가 보상 아티팩트라면 스택 + 1 (416번째 줄에서 추가한 아티팩트)
+            long finalStacks = (long)previousStacks - cost.Value + (costArtifact == rewardArtifact ? 1 : 0);
+            if (finalStacks > costArtifact.MaxStacks) 
+                return false;
+            //최종 수량 변경이 없다면 효과갱신이 필요 없음
+            int currentStacks = (int)finalStacks;
+            if (currentStacks == previousStacks) 
+                continue;
+
+            //인벤토리에 아이템이 없었다면 신규획득이기 때문에 새 인스턴스를 만들어줌
+            if (inventoryArtifact == null) 
+                inventoryArtifact = new ArtifactInstance(costArtifact);
+            ConvertedEffects effects = null;
+            if (currentStacks > 0 && !_effectManager.TryConvertEffects(inventoryArtifact, new EffectDataGroup
+                {
+                    StatEffects = costArtifact.UnitStatEffects,
+                    CurrencyEffects = costArtifact.CurrencyEffects,
+                    SlotEffects = costArtifact.ConsumableSlotEffects,
+                    PassiveEffects = costArtifact.PassiveSkillEffects
+                }, currentStacks, out effects))
+            {
+                return false;
+            }
+            //해당 유물의 변경정보(객체 정보, 교환 전 갯수, 교환 후 갯수)를 기록
+            changes.Add(new PreparedChange
+            {
+                Instance = inventoryArtifact,
+                PreviousStacks = previousStacks,
+                CurrentStacks = currentStacks,
+            });
+            //기존 보유 유물의 변경 전 효과를 제거대상에 추가(교환으로 개수가 감소한 아티팩트)
+            if (previousStacks > 0) 
+                removedSources.Add(inventoryArtifact);
+            //교환 이후에도 보유하고 있다면 해당 효과를 적용 대상으로 기록(교환을 하고도 남은 아티팩트 + 교환의 대가로 받은 아티팩트)
+            if (currentStacks > 0) 
+                finalEffects.Add(inventoryArtifact, effects);
+        }
+        if (changes.Count == 0) return true;
+
+        _isChanging = true;
+        try
+        {
+            // 앞서 검증 및 준비한 수량 변경을 인벤토리에 적용한다. 지금은 변경 알림을 보내지 않는다
+            foreach (PreparedChange change in changes)
+            {
+                if (change.CurrentStacks > change.PreviousStacks)
+                {
+                    _inventory.TryAdd(change.Instance);
+                }
+                else
+                {
+                    //현재는 아티팩트의 장비 중첩을 여러번 깎는 메서드가 없어서 for문 사용
+                    for (int i = change.CurrentStacks; i < change.PreviousStacks; i++)
+                        _inventory.TryRemove(change.Instance);
+                }
+            }
+            //변경 대상 유물의 효과를 최종 수량에 맞게 교체
+            _effectManager.ReplaceSourceEffects(removedSources, finalEffects);
+            foreach (PreparedChange change in changes)
+                StackChanged?.Invoke(change.Instance, change.PreviousStacks, change.CurrentStacks);
+            return true;
+        }
+        finally { _isChanging = false; }
     }
 
     // 획득 가능 여부와 증가 후 효과만 준비. 보유 상태 변경 X

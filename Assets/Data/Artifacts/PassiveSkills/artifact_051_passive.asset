@@ -12,29 +12,71 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: artifact_051_passive
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: 
+    _icon: {fileID: 0}
+    _description: 
   _skillSchemaVersion: 1
   _triggerType: 10
   _tickInterval: 1
   _conditions: []
   _effectMode: 0
   _actions:
-  - rid: 1967714782231658602
+  - rid: 1967714963517342008
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 1967714782231658602
-      type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
+    - rid: 1967714963517342008
+      type: {class: PassiveAdditionalAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _targetType: 2
-        _targetRelation: 0
-        _maxEffectTargetCount: 3
-        _areaType: 1
-        _areaRadius: 8
-        _areaAngle: 360
-        _effects:
-        - rid: 1967714782231658603
-    - rid: 1967714782231658603
-      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+        _attack:
+          _target:
+            _source: 6
+            _relation: 0
+            _includeSelf: 0
+            _range: 16
+            _maxTargetCount: 3
+            _clusterRadius: 1
+            _filters: []
+            _priorities:
+            - _policy: 2
+          _targetLostPolicy: 0
+          _failurePolicy: 0
+          _origin: 0
+          _conditions: []
+          _baseEffects:
+          - _entryId: 1
+            _timing: 1
+            _subject: 0
+            _frequency: 0
+            _snapshotAreaTarget:
+              _source: 6
+              _relation: 0
+              _includeSelf: 0
+              _range: 1
+              _maxTargetCount: 10
+              _clusterRadius: 1
+              _filters: []
+              _priorities: []
+            _effects:
+            - rid: 1967714963517342009
+          _conditionalEffects: []
+          _fxEntries: []
+          _delivery: 0
+          _executionDuration: 0.3
+          _impactTiming: 0
+          _area: 0
+          _radius: 1
+          _angle: 90
+          _maxEffectTargets: 1
+          _projectileSpeed: 10
+          _projectilePrefab: {fileID: 0}
+          _isLegacy: 0
+        _useTriggerPosition: 0
+    - rid: 1967714963517342009
+      type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
-        _effectData: {fileID: 11400000, guid: 84f42612a781430aa45caca34d61380c, type: 2}
+        _applicationFX: []
+        _damageType: 1
+        _damageMultiplier: 1.25

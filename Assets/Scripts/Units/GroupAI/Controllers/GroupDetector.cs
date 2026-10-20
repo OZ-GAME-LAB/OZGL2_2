@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,6 +17,12 @@ namespace Units
         // =========================
         // References
         // =========================
+
+        private CombatQueryContext _combatQueries;
+
+        private readonly List<Unit_Gateway> _nearby = new();
+
+
 
         private readonly List<Unit_Gateway> _members;
 
@@ -85,6 +91,17 @@ namespace Units
 
 
         // =========================
+        // Shared Combat Queries
+        // =========================
+
+        public void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+        }
+
+
+
+        // =========================
         // Detection
         // =========================
 
@@ -114,10 +131,35 @@ namespace Units
         private void DetectFromMember(
             Unit_Gateway member)
         {
+            // 긴 사거리 스킬이 고정 탐지 반경 때문에 합류 기회를 잃지 않게 한다.
+            float detectionRange = Mathf.Max(
+                _detectionRange,
+                member.EngagementEntryRange + CombatRangeUtility.Expansion(member.BodyRadius)
+            );
+
+            if (_combatQueries != null)
+            {
+                _combatQueries.CollectNearby(
+                    member.Transform.position, Mathf.Max(_detectionRange, member.EngagementEntryRange),
+                    member.BodyRadius, _nearby
+                );
+
+                for (int i = 0; i < _nearby.Count; i++)
+                {
+                    Unit_Gateway target = _nearby[i];
+                    Unit_GroupAI group = target.GroupAI;
+
+                    if (group != null && group.Team != _team && !_enemyGroups.Contains(group))
+                        _detectedGroups.Add(group);
+                }
+
+                return;
+            }
+
             int detectedCount =
                 Physics2D.OverlapCircle(
                     member.Transform.position,
-                    _detectionRange,
+                    detectionRange,
                     _contactFilter,
                     _detectionBuffer
                 );

@@ -12,6 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
   m_Name: "A_WA_T3_22_\uB9C8\uAC11\uC804\uC0AC_PassiveSkill_AreaDealOnHpRatio"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
+  _display:
+    _name: "\uACB0\uC0AC\uC758\uAC80\uACA9"
+    _icon: {fileID: 21300000, guid: 5d4e956184c5cb040b924806ce591702, type: 3}
+    _description: "\uCCB4\uB825\uC774 50% \uC774\uD558\uC77C \uB54C 5\uCD08\uB9C8\uB2E4
+      \uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758 150% \uBB3C\uB9AC
+      \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4."
   _skillSchemaVersion: 1
   _triggerType: 5
   _tickInterval: 5
@@ -66,15 +72,19 @@ MonoBehaviour:
           _conditionalEffects: []
           _fxEntries: []
           _delivery: 0
+          _executionDuration: 0.3
+          _impactTiming: 0
           _area: 2
-          _radius: 5
+          _radius: 4
           _angle: 90
           _maxEffectTargets: 5
           _projectileSpeed: 10
+          _projectilePrefab: {fileID: 0}
           _isLegacy: 0
         _useTriggerPosition: 0
     - rid: 4844432377880510575
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 0
         _damageMultiplier: 1.5

@@ -196,6 +196,8 @@ namespace Units
                     if (generation != _lifeGeneration)
                         return applied;
 
+                    // 실제 HP/보호막 감소량을 피격 반응과 사망에 따른 목록 제거 전에 전달합니다.
+                    _core?.NotifyDamageApplied(applied);
                     Damaged?.Invoke(result);
                 }
                 finally

@@ -1,10 +1,31 @@
 using System.Collections.Generic;
 using Game.UI.InGame;
+using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public class ConsumableItemView : MonoBehaviour
 {
+    // 슬롯 순서: 1~9, 0(10번째 슬롯).
+    private static readonly Key[] SlotDigitKeys =
+    {
+        Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5,
+        Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9, Key.Digit0
+    };
+    private static readonly Key[] SlotNumpadKeys =
+    {
+        Key.Numpad1, Key.Numpad2, Key.Numpad3, Key.Numpad4, Key.Numpad5,
+        Key.Numpad6, Key.Numpad7, Key.Numpad8, Key.Numpad9, Key.Numpad0
+    };
     [SerializeField] private UIItemSlot _slotPrefab; // 풀링용 오브젝트
+    [SerializeField] private ItemAreaIndicator _areaIndicatorPrefab;
+    private ItemAreaIndicator _areaIndicator;
+    private int _aimSlotIndex = -1;
+    private ConsumableItemData _aimItem;
+    private int _aimStartedFrame;
+    private readonly List<RaycastResult> _areaUIHits = new List<RaycastResult>();
 
     private readonly List<UIItemSlot> _slots = new List<UIItemSlot>();
     private Transform _slotRoot;
@@ -24,6 +45,7 @@ public class ConsumableItemView : MonoBehaviour
         IConsumableItemUser user,
         ConsumableItemActionButton actionButton)
     {
+        CancelAreaSelection();
         Unsubscribe();
         ClearSelection();
         IsReady = false;
@@ -56,12 +78,14 @@ public class ConsumableItemView : MonoBehaviour
 
     private void OnDisable()
     {
+        CancelAreaSelection();
         Unsubscribe();
         ClearSelection();
     }
 
     private void OnDestroy()
     {
+        if (_areaIndicator != null) Destroy(_areaIndicator.gameObject);
         Unsubscribe();
         ClearSelection();
     }
@@ -107,6 +131,7 @@ public class ConsumableItemView : MonoBehaviour
 
         if (_actionButton.Open(_slots[slotIndex].transform as RectTransform))
         {
+            CancelAreaSelection();
             _selectedSlotIndex = slotIndex;
             _selectedItem = item;
         }
@@ -121,11 +146,135 @@ public class ConsumableItemView : MonoBehaviour
 
     private void HandleUseRequested()
     {
-        if (!TryGetSelection(out int slotIndex)) return;
+        if (TryGetSelection(out int slotIndex)) UseSlot(slotIndex);
+    }
+
+    // 클릭과 단축키 모두 같은 검증과 사용 흐름을 거칩니다.
+    private void UseSlot(int slotIndex)
+    {
+        if (!IsReady || !isActiveAndEnabled || !_user.CanUse ||
+            slotIndex < 0 || slotIndex >= _reader.SlotCount ||
+            !_reader.TryGetItem(slotIndex, out ConsumableItemData item) || item == null) return;
+        CancelAreaSelection();
         // 사용 중 재고 알림이 즉시 발생하므로 선택을 먼저 정리한다.
         ClearSelection(UICloseReason.Completed);
-        // 범위 아이템은 별도 위치 선택 후 TryUse(slotIndex, worldPosition)가 필요하다.
-        _user.TryUse(slotIndex);
+        switch (item.TargetMode)
+        {
+            case ConsumableTargetMode.All:
+                _user.TryUse(slotIndex);
+                break;
+            case ConsumableTargetMode.Area:
+                BeginAreaSelection(slotIndex, item);
+                break;
+        }
+    }
+
+    private void BeginAreaSelection(int slotIndex, ConsumableItemData item)
+    {
+        if (_areaIndicatorPrefab == null)
+        {
+            Debug.LogError("[ConsumableItemView] Area Indicator Prefab을 연결해주세요.", this);
+            return;
+        }
+        // 현재 인게임 씬에 Canvas와 독립된 월드 오브젝트로 생성하고, OnDestroy에서 정리합니다.
+        if (_areaIndicator == null)
+            _areaIndicator = Instantiate(_areaIndicatorPrefab);
+        _areaIndicator.Hide();
+        _aimSlotIndex = slotIndex;
+        _aimItem = item;
+        _aimStartedFrame = Time.frameCount;
+    }
+
+    private void CancelAreaSelection()
+    {
+        _aimSlotIndex = -1;
+        _aimItem = null;
+        if (_areaIndicator != null) _areaIndicator.Hide();
+    }
+
+    private void Update()
+    {
+        HandleSlotHotkeys();
+        if (_aimSlotIndex < 0) return;
+        if (!_user.CanUse || _areaIndicator == null ||
+            !_reader.TryGetItem(_aimSlotIndex, out var current) || current != _aimItem ||
+            (_actionButton.Screen.Manager != null && _actionButton.Screen.Manager.HasBlockingPopup))
+        {
+            CancelAreaSelection();
+            return;
+        }
+        var mouse = Mouse.current;
+        var keyboard = Keyboard.current;
+        bool cancel = (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) ||
+            (mouse != null && mouse.rightButton.wasPressedThisFrame);
+        if (cancel) { CancelAreaSelection(); return; }
+        if (mouse == null) { _areaIndicator.Hide(); return; }
+        Vector2 pointer = mouse.position.ReadValue();
+        bool click = mouse.leftButton.wasPressedThisFrame;
+        Camera camera = Camera.main;
+        if (camera == null || !camera.pixelRect.Contains(pointer) || IsPointerOverAreaUI(pointer))
+        {
+            _areaIndicator.Hide();
+            return;
+        }
+        Ray ray = camera.ScreenPointToRay(pointer);
+        if (!new Plane(Vector3.forward, Vector3.zero).Raycast(ray, out float distance))
+        {
+            _areaIndicator.Hide();
+            return;
+        }
+        Vector2 worldPosition = ray.GetPoint(distance);
+        _areaIndicator.Show(worldPosition, _aimItem.Radius);
+        // 팝업의 사용 버튼 클릭이 위치 확정 클릭으로 이어지지 않게 합니다.
+        if (!click || Time.frameCount <= _aimStartedFrame) return;
+        try
+        {
+            if (_user.TryUse(_aimSlotIndex, worldPosition)) CancelAreaSelection();
+            // 대상이 없으면 아이템을 유지하고 다른 위치를 선택할 수 있습니다.
+        }
+        catch
+        {
+            CancelAreaSelection();
+            throw;
+        }
+    }
+
+    private void HandleSlotHotkeys()
+    {
+        if (!IsReady || !_user.CanUse) return;
+        var keyboard = Keyboard.current;
+        if (keyboard == null) return;
+
+        var manager = _actionButton.Screen.Manager;
+        if (manager != null && manager.HasBlockingPopup && !_actionButton.IsOpen) return;
+        GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+        if (selected != null && (selected.GetComponentInParent<TMP_InputField>() != null ||
+            selected.GetComponentInParent<InputField>() != null)) return;
+
+        // 현재 존재하는 슬롯에만 대응하며 한 프레임에 한 슬롯만 처리합니다.
+        int count = Mathf.Min(_reader.SlotCount, SlotDigitKeys.Length);
+        for (int i = 0; i < count; i++)
+        {
+            if (!keyboard[SlotDigitKeys[i]].wasPressedThisFrame &&
+                !keyboard[SlotNumpadKeys[i]].wasPressedThisFrame) continue;
+            UseSlot(i);
+            break;
+        }
+    }
+
+    private bool IsPointerOverAreaUI(Vector2 pointer)
+    {
+        if (EventSystem.current == null) return false;
+        _areaUIHits.Clear();
+        EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = pointer }, _areaUIHits);
+        foreach (var hit in _areaUIHits)
+            if (hit.module is GraphicRaycaster) return true;
+        return false;
+    }
+
+    private void OnApplicationFocus(bool focused)
+    {
+        if (!focused) CancelAreaSelection();
     }
 
     private void HandleRemoveRequested()
@@ -151,6 +300,7 @@ public class ConsumableItemView : MonoBehaviour
 
     private void HandleInventoryChange()
     {
+        CancelAreaSelection();
         // 슬롯이 이동하거나 비워지면 열린 팝업의 이전 선택은 유효하지 않다.
         ClearSelection();
         RefreshSlots();

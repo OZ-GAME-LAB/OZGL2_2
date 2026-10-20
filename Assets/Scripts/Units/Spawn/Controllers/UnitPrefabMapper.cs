@@ -237,7 +237,8 @@ namespace Units
                 new AllySpawnEntry(
                     unitData.GetAllyTier(),
                     unitData.GetAllyClass(),
-                    prefab
+                    prefab,
+                    unitData.RallyZone
                 )
             );
         }
@@ -320,7 +321,9 @@ namespace Units
                 new EnemySpawnEntry(
                     unitData.GetEnemyFaction(),
                     unitData.GetEnemyClass(),
-                    prefab
+                    prefab,
+                    unitData.RallyZone,
+                    unitData.EnemyRank
                 )
             );
         }

@@ -21,6 +21,7 @@ public sealed class ConsumableItemCaster : MonoBehaviour, ICombatTarget
     public int LifetimeVersion { get; private set; }
     public float CurrentHp => IsAlive ? RuntimeStatus.MaxHp : 0f;
     public float CurrentShield => 0f;
+    public float BodyRadius => 0f;
     private bool _initialized;
 
     private void Awake()

@@ -80,6 +80,12 @@ public static class OutGameSetupTestBuilder
         Set(bootstrap, "_wallet", wallet);
         Set(bootstrap, "_saveManager", saveManager);
         Set(bootstrap, "_persistentSaveCoordinator", persistentSaveCoordinator);
+        Set(bootstrap, "_archiveController", systems.AddComponent<Game.Archive.ArchiveController>());
+        Game.Core.Editor.ProgressSetup.Connect(root, new[] {
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Abundance.asset"),
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Conquest.asset"),
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Arcane.asset"),
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Guardian.asset") });
         Set(bootstrap, "_altarSelector", altar);
         Set(bootstrap, "_traitSelector", trait);
         Set(bootstrap, "_totemSelector", totem);
@@ -209,7 +215,7 @@ public static class OutGameSetupTestBuilder
             }
             OutGameTotemColumn viewColumn = column.gameObject.AddComponent<OutGameTotemColumn>();
             List<Object> steps = new List<Object>();
-            if (i == 1 || i == 4) steps.Add(Step(column.gameObject));
+            if (column.Find("Level3Button") == null) steps.Add(Step(column.gameObject));
             else
             {
                 // 기존 프리팹의 Level3Button이 아래에 있으므로 아래→위 순서로 연결합니다.

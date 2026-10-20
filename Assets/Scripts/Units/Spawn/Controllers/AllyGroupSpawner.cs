@@ -16,6 +16,8 @@ namespace Units
 
         private readonly UnitPoolManager _unitPoolManager;
 
+        private readonly Transform _rallyViaPoint;
+
         internal bool SpawnFailed { get; private set; }
 
         internal void ResetSpawnResult() => SpawnFailed = false;
@@ -55,12 +57,15 @@ namespace Units
             IReadOnlyDictionary<AllyUnitType, AllySpawnEntry> spawnEntries,
             GameObject groupPrefab,
             RallyGridAllocator rallyGridAllocator,
-            float groupSpawnDuration)
+            float groupSpawnDuration,
+            Transform rallyViaPoint = null)
         {
             _runtimeUnitManager =
                 runtimeUnitManager;
 
             _unitPoolManager = unitPoolManager;
+
+            _rallyViaPoint = rallyViaPoint;
 
             _unitStatModifierManager =
                 unitStatModifierManager;
@@ -115,7 +120,7 @@ namespace Units
             IReadOnlyList<Vector2> rallyPositions =
                 AllocateRallyPositions(
                     count,
-                    rallyPoint,
+                    _spawnEntries[unitType].RallyZone,
                     group
                 );
 
@@ -361,9 +366,14 @@ namespace Units
                         // Group 등록 후 Rally 이동을 시작한다.
                         // AddMember 시점에 RallyCompleted 이벤트가
                         // 먼저 구독되어 있어야 완료 이벤트를 놓치지 않는다.
-                        unit.MoveToRally(
-                            rallyPositions[i]
-                        );
+                        if (_rallyViaPoint != null)
+                        {
+                            unit.MoveToRally(_rallyViaPoint.position, rallyPositions[i]);
+                        }
+                        else
+                        {
+                            unit.MoveToRally(rallyPositions[i]);
+                        }
                     }
                 }
 
@@ -754,13 +764,15 @@ namespace Units
 
         private IReadOnlyList<Vector2> AllocateRallyPositions(
             int count,
-            Vector2 rallyPoint,
+            RallyZone zone,
             Unit_GroupAI group)
         {
             IReadOnlyList<Vector2> rallyPositions =
-                _rallyGridAllocator.Allocate(
+                // 기존 rallyPoint 인자는 API 호환용으로만 받으며 배치는 중앙/전후열 기준이다.
+                _rallyGridAllocator.AllocateCentered(
                     count,
-                    rallyPoint,
+                    zone,
+                    true,
                     group
                 );
 
