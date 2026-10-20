@@ -9,7 +9,7 @@ namespace OZGL.KDH
     {
         None, NotReady, PhaseBlocked, InvalidTarget, TargetChanged, InvalidData,
         InvalidCost, CandidateUnavailable, CoreProtected, BuildCapacity,
-        InsufficientFunds, Busy, ExecutionFailed, UnexpectedError
+        InsufficientFunds, Busy, ExecutionFailed, UnexpectedError, CoreLevelRequired
     }
 
     /// <summary>선택 당시의 대상. 전역 버전 대신 슬롯·건물·데이터 참조를 실행 직전에 비교한다.</summary>
@@ -41,11 +41,17 @@ namespace OZGL.KDH
         public bool HasValidCost { get; }
         public int RequiredCoreLevel { get; }
         public bool IsCoreLevelMet { get; }
+        public BuildingInteractionOffer Offer { get; }
         internal BuildingInteractionCandidate(BuildingData data, BuildingInteractionCost cost, bool valid,
             int requiredCoreLevel = 0, bool isCoreLevelMet = true)
+            : this(data, cost, valid, requiredCoreLevel, isCoreLevelMet, null) { }
+
+        internal BuildingInteractionCandidate(BuildingData data, BuildingInteractionCost cost, bool valid,
+            int requiredCoreLevel, bool isCoreLevelMet, BuildingInteractionOffer offer)
         {
             Data = data; Cost = cost; HasValidCost = valid;
             RequiredCoreLevel = requiredCoreLevel; IsCoreLevelMet = isCoreLevelMet;
+            Offer = offer;
         }
     }
 
@@ -55,10 +61,18 @@ namespace OZGL.KDH
         public BuildingData Data { get; }
         public BuildingInteractionCost Cost { get; }
         public BuildingInteractionFailure Failure { get; }
+        public int? RequiredCoreLevel { get; }
         public bool CanExecute => Failure == BuildingInteractionFailure.None;
         internal BuildingInteractionOffer(BuildingInteractionAction action, BuildingData data,
             BuildingInteractionCost cost, BuildingInteractionFailure failure)
-        { Action = action; Data = data; Cost = cost; Failure = failure; }
+            : this(action, data, cost, failure, null) { }
+
+        internal BuildingInteractionOffer(BuildingInteractionAction action, BuildingData data,
+            BuildingInteractionCost cost, BuildingInteractionFailure failure, int? requiredCoreLevel)
+        {
+            Action = action; Data = data; Cost = cost; Failure = failure;
+            RequiredCoreLevel = requiredCoreLevel;
+        }
     }
 
     public sealed class BuildingInteractionState
@@ -89,10 +103,13 @@ namespace OZGL.KDH
     public readonly struct BuildingInteractionResult
     {
         public BuildingInteractionFailure Failure { get; }
+        public int? RequiredCoreLevel { get; }
         public bool Succeeded => Failure == BuildingInteractionFailure.None;
         // 기존 Try API의 실패는 부분 차감이 없었다는 보장이 아니다. 자동 재시도하지 않는다.
         public bool MayHaveChangedState => Succeeded || Failure == BuildingInteractionFailure.ExecutionFailed ||
             Failure == BuildingInteractionFailure.UnexpectedError;
-        internal BuildingInteractionResult(BuildingInteractionFailure failure) { Failure = failure; }
+        internal BuildingInteractionResult(BuildingInteractionFailure failure) : this(failure, null) { }
+        internal BuildingInteractionResult(BuildingInteractionFailure failure, int? requiredCoreLevel)
+        { Failure = failure; RequiredCoreLevel = requiredCoreLevel; }
     }
 }

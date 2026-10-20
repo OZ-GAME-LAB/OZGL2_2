@@ -80,6 +80,12 @@ public static class OutGameSetupTestBuilder
         Set(bootstrap, "_wallet", wallet);
         Set(bootstrap, "_saveManager", saveManager);
         Set(bootstrap, "_persistentSaveCoordinator", persistentSaveCoordinator);
+        Set(bootstrap, "_archiveController", systems.AddComponent<Game.Archive.ArchiveController>());
+        Game.Core.Editor.ProgressSetup.Connect(root, new[] {
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Abundance.asset"),
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Conquest.asset"),
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Arcane.asset"),
+            AssetDatabase.LoadAssetAtPath<Game.Core.UnlockData>("Assets/Data/Progress/Unlock_Guardian.asset") });
         Set(bootstrap, "_altarSelector", altar);
         Set(bootstrap, "_traitSelector", trait);
         Set(bootstrap, "_totemSelector", totem);

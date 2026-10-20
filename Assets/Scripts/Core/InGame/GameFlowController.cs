@@ -99,7 +99,7 @@ namespace Game.Core
         private TestWaitingScript _testScript;
         private WaveController _waveController; //인게임 전투 담당
         private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
-        private ArchiveManager _archiveManager;
+        private RunRecordManager _runRecordManager;
         private IRunSettlementRewards _settlementRewards;
         private IContinueUI _continueUI;
         private IRunDecisionUI _decisionUI;
@@ -135,7 +135,7 @@ namespace Game.Core
             WaveController waveController, 
             TestWaitingScript testScript, 
             ArtifactManager artifactManager, 
-            ArchiveManager archiveManager = null,
+            RunRecordManager runRecordManager = null,
             IRunSettlementRewards settlementRewards = null,
             InGameCameraController cameraController = null,
             IShopFlow shopFlow = null)
@@ -143,7 +143,7 @@ namespace Game.Core
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
-            _archiveManager = archiveManager;
+            _runRecordManager = runRecordManager;
             _settlementRewards = settlementRewards;
             _cameraController = cameraController;
             _shopFlow = shopFlow;
@@ -640,14 +640,14 @@ namespace Game.Core
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
             token.ThrowIfCancellationRequested();
-            if (_archiveManager == null || _settlementRewards == null)
+            if (_runRecordManager == null || _settlementRewards == null)
                 throw new InvalidOperationException("게임 종료 기록과 정산 매니저를 먼저 연결해주세요.");
 
             // 재시도에도 같은 확정 기록을 사용해야 이미 저장한 보상을 다시 지급하지 않는다.
-            if (!_archiveManager.TryGetRunSummary(out RunSummary summary))
+            if (!_runRecordManager.TryGetRunSummary(out RunSummary summary))
             {
-                _archiveManager.CompleteRun();
-                if (!_archiveManager.TryGetRunSummary(out summary))
+                _runRecordManager.CompleteRun();
+                if (!_runRecordManager.TryGetRunSummary(out summary))
                     throw new InvalidOperationException("게임 결산 기록을 불러올 수 없습니다.");
             }
 

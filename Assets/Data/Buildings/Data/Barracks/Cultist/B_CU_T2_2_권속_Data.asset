@@ -14,8 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_CU_T2_2_\uAD8C\uC18D"
   buildingFamilyId: cultist_barracks
-  displayName: "\uad8c\uc18d\uc758 \uac70\ucc98"
-  description: "\ub9c8\uc655\uc744 \ub530\ub974\ub294 \ud558\uc704 \uc545\ub9c8\ub4e4\uc774 \uba38\ubb34\ub294 \uad8c\uc18d\uc758 \uac70\ucc98\uc785\ub2c8\ub2e4."
+  displayName: "\uAD8C\uC18D\uC758 \uAC70\uCC98"
+  description: "\uB9C8\uC655\uC744 \uB530\uB974\uB294 \uD558\uC704 \uC545\uB9C8\uB4E4\uC774
+    \uBA38\uBB34\uB294 \uAD8C\uC18D\uC758 \uAC70\uCC98\uC785\uB2C8\uB2E4."
   buildingType: 2
   icon: {fileID: 21300000, guid: 890600ff4660f6a4ea28c0a5aeda7132, type: 3}
   worldSprite: {fileID: 21300000, guid: 890600ff4660f6a4ea28c0a5aeda7132, type: 3}
@@ -49,9 +50,9 @@ MonoBehaviour:
     cost:
     - type: 0
       amount: 50
-    requiredCoreLevel: 2
+    requiredCoreLevel: 3
   - nextBuilding: {fileID: 11400000, guid: fb37c1cee8124ecc8a643f0945f4dc1d, type: 2}
     cost:
     - type: 0
       amount: 50
-    requiredCoreLevel: 2
+    requiredCoreLevel: 3

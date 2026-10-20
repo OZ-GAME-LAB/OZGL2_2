@@ -14,8 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_WA_T2_2_\uB9C8\uACC4\uC804\uC0AC"
   buildingFamilyId: warrior_barracks
-  displayName: "\ub9c8\uacc4\uc804\uc0ac\uc758 \ubcd1\uc601"
-  description: "\ub2e8\ub2e8\ud55c \ubc29\uc5b4\ub85c \uc804\uc120\uc744 \uc9c0\ud0a4\ub294 \ub9c8\uacc4\uc804\uc0ac\uc758 \ubcd1\uc601\uc785\ub2c8\ub2e4."
+  displayName: "\uB9C8\uACC4\uC804\uC0AC\uC758 \uBCD1\uC601"
+  description: "\uB2E8\uB2E8\uD55C \uBC29\uC5B4\uB85C \uC804\uC120\uC744 \uC9C0\uD0A4\uB294
+    \uB9C8\uACC4\uC804\uC0AC\uC758 \uBCD1\uC601\uC785\uB2C8\uB2E4."
   buildingType: 2
   icon: {fileID: 21300000, guid: 7bce7e53803bdf540a62884a9e4c18fb, type: 3}
   worldSprite: {fileID: 21300000, guid: 7bce7e53803bdf540a62884a9e4c18fb, type: 3}
@@ -49,9 +50,9 @@ MonoBehaviour:
     cost:
     - type: 0
       amount: 50
-    requiredCoreLevel: 2
+    requiredCoreLevel: 3
   - nextBuilding: {fileID: 11400000, guid: 4cf25c52ae9a40c38d3f53aa7096e7f7, type: 2}
     cost:
     - type: 0
       amount: 50
-    requiredCoreLevel: 2
+    requiredCoreLevel: 3

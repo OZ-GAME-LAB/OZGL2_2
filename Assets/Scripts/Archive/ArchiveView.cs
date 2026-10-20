@@ -120,7 +120,7 @@ namespace Game.Archive
             if (_controller != null)
             {
                 _controller.Changed -= HandleChanged;
-                _controller.Flush();
+                _controller.RequestSave();
             }
         }
 

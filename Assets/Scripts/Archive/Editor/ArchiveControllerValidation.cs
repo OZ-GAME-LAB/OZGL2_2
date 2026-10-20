@@ -87,7 +87,8 @@ namespace Game.Archive.Editor
                 reader.Owned.Add(Artifact("seed_artifact"));
                 var save = Save("main");
                 var archive = Controller();
-                archive.Initialize(save, reader, new[] { slot }, flow, units);
+                archive.Initialize(reader, new[] { slot }, flow, units);
+                archive.RegisterOwnedEntries();
                 Check(archive.IsDiscovered(ArchiveCategory.Artifact, "seed_artifact") &&
                     !archive.IsNew(ArchiveCategory.Artifact, "seed_artifact"), "existing artifact seeded read");
                 Check(archive.IsDiscovered(ArchiveCategory.Building, "seed_building") &&
@@ -132,58 +133,39 @@ namespace Game.Archive.Editor
                 Call(flow, "ChangePhase", GamePhase.Battle);
                 Check(!archive.IsNew(ArchiveCategory.Unit, "actual_enemy"), "repeat encounter remains read");
 
-                Check(save.TryLoad(ArchiveController.SaveKey, out ArchiveProgressSaveData saved, out string error),
-                    "real save JSON loads: " + error);
+                var saved = archive.CaptureSaveData();
                 Check(saved.UnreadKeys.Contains("1:shared_id") && !saved.UnreadKeys.Contains("0:shared_id"),
-                    "read state persisted independently");
+                    "capture includes current read state");
                 saved.DiscoveredKeys.Add("2:removed_definition");
-                Check(save.TrySave(ArchiveController.SaveKey, saved, out error), "unknown definition fixture saved: " + error);
-                archive.Initialize(save, reader, new[] { slot }, flow, units);
+                Check(!archive.IsDiscovered(ArchiveCategory.Unit, "removed_definition"), "capture is independent");
+                archive.RestoreSaveData(saved);
+                archive.Initialize(reader, new[] { slot }, flow, units);
+                archive.RegisterOwnedEntries();
                 Check(reader.SubscriberCount == 1, "reinitialization does not duplicate subscriptions");
                 Check(archive.IsNew(ArchiveCategory.Building, "shared_id"), "seed preserves NEW from prior save");
                 Check(archive.IsDiscovered(ArchiveCategory.Unit, "removed_definition"), "missing catalog IDs retained");
+                int requests = 0;
+                archive.SaveRequested += () => requests++;
                 archive.MarkRead(ArchiveCategory.Building, "shared_id");
+                Check(archive.IsDirty && requests == 0, "reading marks dirty without save request");
+                reader.Emit(relic, 1, 2);
+                Check(requests == 0, "duplicate discovery does not flush pending reads");
+                archive.RequestSave();
+                Check(requests == 1 && archive.IsDirty, "close requests save without claiming success");
+                archive.MarkSaved();
+                archive.RequestSave();
+                Check(requests == 1 && !archive.IsDirty, "unchanged close does not request save");
                 var reloaded = Controller();
-                reloaded.Initialize(save, new ArtifactReader(), Array.Empty<BuildingSlot>(), flow, units);
+                reloaded.RestoreSaveData(archive.CaptureSaveData());
                 Check(reloaded.IsDiscovered(ArchiveCategory.Building, "shared_id") &&
                     !reloaded.IsNew(ArchiveCategory.Building, "shared_id"), "fresh controller restores discovered and read");
-
-                var corruptSave = Save("corrupt");
-                Directory.CreateDirectory(corruptSave.DirectoryPath);
-                string corruptPath = corruptSave.GetFilePath(ArchiveController.SaveKey);
-                const string corrupt = "{ invalid archive file";
-                File.WriteAllText(corruptPath, corrupt);
-                var corruptReader = new ArtifactReader();
-                var corruptArchive = Controller();
-                ExpectedFailure(() => corruptArchive.Initialize(corruptSave, corruptReader,
-                    Array.Empty<BuildingSlot>(), flow, units));
-                corruptReader.Emit(Artifact("after_corrupt"), 0, 1);
-                corruptArchive.Flush();
-                Check(File.ReadAllText(corruptPath) == corrupt, "corrupt existing file never overwritten");
-
-                var invalidSave = Save("invalid");
-                var invalid = new ArchiveProgressSaveData { UnreadKeys = new List<string> { "0:undiscovered" } };
-                Check(invalidSave.TrySave(ArchiveController.SaveKey, invalid, out error), "invalid fixture envelope saved");
-                string invalidPath = invalidSave.GetFilePath(ArchiveController.SaveKey);
-                string invalidJson = File.ReadAllText(invalidPath);
-                var invalidArchive = Controller();
-                ExpectedFailure(() => invalidArchive.Initialize(invalidSave, new ArtifactReader(),
-                    new[] { slot }, flow, units));
-                invalidArchive.Flush();
-                Check(File.ReadAllText(invalidPath) == invalidJson, "invalid unread state never overwritten by seeds");
-
-                var retrySave = Save("retry");
-                File.WriteAllText(retrySave.DirectoryPath, "temporary directory blocker");
-                var retryReader = new ArtifactReader();
-                var retryArchive = Controller();
-                retryArchive.Initialize(retrySave, retryReader, Array.Empty<BuildingSlot>(), flow, units);
-                ExpectedFailure(() => retryReader.Emit(Artifact("retry_artifact"), 0, 1));
-                Check(retryArchive.IsNew(ArchiveCategory.Artifact, "retry_artifact"), "failed write retains in-memory discovery");
-                File.Delete(retrySave.DirectoryPath);
-                retryArchive.Flush();
-                Check(retrySave.TryLoad(ArchiveController.SaveKey, out ArchiveProgressSaveData retried, out error) &&
-                    retried.UnreadKeys.Contains("0:retry_artifact"), "dirty state retries successfully without another discovery");
-                return $"PASS: {_checks} archive checks (isolated temporary saves; discovery, NEW/read, corruption preservation, dirty retry).";
+                bool rejected = false;
+                try { reloaded.RestoreSaveData(new ArchiveProgressSaveData {
+                    DiscoveredKeys = new List<string>(), UnreadKeys = new List<string> { "0:missing" } }); }
+                catch (ArgumentException) { rejected = true; }
+                Check(rejected && reloaded.IsDiscovered(ArchiveCategory.Building, "shared_id"), "invalid restore preserves memory");
+                Check(Directory.GetFiles(directory, "*", SearchOption.AllDirectories).Length == 0, "controller performs no file IO");
+                return $"PASS: {_checks} archive controller checks (discovery, NEW/read, snapshots, requests, subscriptions).";
             }
             finally
             {

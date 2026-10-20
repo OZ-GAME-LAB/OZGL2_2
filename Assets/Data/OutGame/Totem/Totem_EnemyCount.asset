@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TotemData
   _id: 10001
   _category: 2
-  _isAvailable: 1
+  _isAvailable: 0
   _displayName: "\uAD70\uC138\uC758 \uD1A0\uD15C"
   _description: "\uC6E8\uC774\uBE0C\uC5D0 \uB4F1\uC7A5\uD558\uB294 \uC77C\uBC18 \uC801\uC758
     \uC218\uAC00 \uC99D\uAC00\uD569\uB2C8\uB2E4."
@@ -26,4 +26,8 @@ MonoBehaviour:
   _valueUnit: '%'
   _maxLevel: 3
   _rewardBonusPerLevel: 10
-  _currencyEffects: []
+  _currencyEffects:
+  - _currencyType: 0
+    _rewardType: 0
+    _modifierType: 0
+    _value: 0
