@@ -58,7 +58,7 @@ namespace Game.UI.InGame
             if (totalWaves < 1) throw new ArgumentOutOfRangeException(nameof(totalWaves));
             if (currentWave < 1 || currentWave > totalWaves)
                 throw new ArgumentOutOfRangeException(nameof(currentWave));
-            SetTextIfAssigned(_waveText, $"{currentWave} / {totalWaves}");
+            SetTextIfAssigned(_waveText, $"{currentWave} / {totalWaves} WAVE");
         }
 
         public void SetWaveStartInteractable(bool canStart)
