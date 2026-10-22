@@ -23,7 +23,7 @@ MonoBehaviour:
   prefab: {fileID: 5306625822625157732, guid: 430200256e184a209c80d7cd2bc56466, type: 3}
   buildCost:
   - type: 0
-    amount: 9999
+    amount: 60
   buildFromEmptySlot: 0
   requiredCoreLevel: 2
   requiredFamilyIds: []
@@ -45,10 +45,10 @@ MonoBehaviour:
     effects:
     - statType: 100
       modifierType: 1
-      value: 0.2
+      value: 0.1
     - statType: 0
       modifierType: 1
-      value: 0.2
+      value: 0.1
     targetUnitType: 0
     uniquePassive: {fileID: 0}
   upgrades:
@@ -56,14 +56,20 @@ MonoBehaviour:
     cost:
     - type: 0
       amount: 100
+    - type: 1
+      amount: 1
     requiredCoreLevel: 3
   - nextBuilding: {fileID: 11400000, guid: a1c29d9693cd45a1b2074dca81ccbad0, type: 2}
     cost:
     - type: 0
       amount: 100
+    - type: 1
+      amount: 1
     requiredCoreLevel: 3
   - nextBuilding: {fileID: 11400000, guid: 74490194922a426ba76483c25d472f64, type: 2}
     cost:
     - type: 0
       amount: 100
+    - type: 1
+      amount: 1
     requiredCoreLevel: 3

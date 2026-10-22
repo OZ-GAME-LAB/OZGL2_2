@@ -11,7 +11,7 @@ namespace Units
 
         public const float DeathDisappearDelay = 2f;
 
-        private const float ShieldLimitMultiplier = 2f;
+        private const float ShieldLimitMultiplier = 1f;
 
 
         // ============================================================

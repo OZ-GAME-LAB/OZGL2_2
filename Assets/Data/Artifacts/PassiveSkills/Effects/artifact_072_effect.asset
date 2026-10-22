@@ -18,7 +18,7 @@ MonoBehaviour:
   _durationType: 0
   _duration: 4
   _stackType: 3
-  _maxStack: 4
+  _maxStack: 10
   _actions:
   - rid: 4617381810361335905
   _categories: []
@@ -29,5 +29,5 @@ MonoBehaviour:
       type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
         _statType: 10
-        _modifierType: 1
-        _value: 0.03
+        _modifierType: 0
+        _value: 1

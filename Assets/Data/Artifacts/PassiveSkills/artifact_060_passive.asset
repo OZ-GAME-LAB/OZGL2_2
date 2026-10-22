@@ -17,10 +17,10 @@ MonoBehaviour:
     _icon: {fileID: 0}
     _description: 
   _skillSchemaVersion: 1
-  _triggerType: 1
+  _triggerType: 10
   _tickInterval: 1
   _conditions:
-  - rid: 1967714963517342026
+  - rid: 4617381994425221215
   _effectMode: 2
   _actions:
   - rid: 1967714963517342027
@@ -28,12 +28,6 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 1967714963517342026
-      type: {class: PassiveHealthConditionData, ns: Units.Skills, asm: Assembly-CSharp}
-      data:
-        _subjectType: 0
-        _comparisonType: 1
-        _healthRatio: 0.4
     - rid: 1967714963517342027
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -44,10 +38,12 @@ MonoBehaviour:
         _areaRadius: 1
         _areaAngle: 360
         _effects:
-        - rid: 1967714963517342028
-    - rid: 1967714963517342028
-      type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+        - rid: 4617381994425221216
+    - rid: 4617381994425221215
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4617381994425221216
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
-        _scalingStatType: 0
-        _shieldRatio: 0.25
+        _effectData: {fileID: 11400000, guid: cfb2ce73b3bcadb40a7c0e73b192b6a1, type: 2}
