@@ -8,14 +8,14 @@ public struct CurrencyModifier
     public CurrencyModifierType ModifierType { get; }
 
     // 중첩을 반영한 수치입니다. Percent는 0.2 = +20%이며 음수도 허용합니다.
-    public float Value { get; }
+    public decimal Value { get; } // 10.22 부동소수점 버그 수정
 
     public CurrencyModifier(
         object source,
         CurrencyType currencyType,
         CurrencyRewardType rewardType,
         CurrencyModifierType modifierType,
-        float value)
+        decimal value) // 10.22 부동소수점 버그 수정
     {
         Source = source;
         CurrencyType = currencyType;

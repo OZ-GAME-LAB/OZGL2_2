@@ -36,19 +36,20 @@ public sealed class RunRewardCalculator
                 bonusPercent += totem.Data.GetRewardBonusPercent(totem.Level);
             }
 
-            double multiplier = 1d + bonusPercent / 100d;
-            double converted = (double)baseScore / settings.PointsPerBloodstone;
+            decimal multiplier = 1m + bonusPercent / 100m; // 10.22 부동소수점 버그 수정
+            decimal converted = (decimal)baseScore / settings.PointsPerBloodstone; // 10.22 부동소수점 버그 수정
             if (!CurrencyRewardCalculator.TryCalculateModifiedAmount(CurrencyType.Bloodstone, converted,
-                    CurrencyRewardType.RunSettlement, modifiers, out double modified,
-                    out double flat, out double percent))
+                    CurrencyRewardType.RunSettlement, modifiers, out decimal modified, // 10.22 부동소수점 버그 수정
+                    out decimal flat, out decimal percent)) // 10.22 부동소수점 버그 수정
                 throw new ArgumentException("혈석 정산 보정값이 올바르지 않습니다.");
 
             // 환산·보정·토템 배율 사이에는 버리지 않고 최종 지급액에서 한 번만 버립니다.
-            double final = Math.Floor(modified * multiplier);
-            if (double.IsNaN(final) || double.IsInfinity(final) || final < 0 || final > int.MaxValue)
+            decimal final = Math.Floor(modified * multiplier); // 10.22 부동소수점 버그 수정
+            if (final < 0 || final > int.MaxValue) // 10.22 부동소수점 버그 수정
                 throw new OverflowException("정산 혈석이 지급 가능한 범위를 초과했습니다.");
             return new RunResult(progress, artifactScores, artifactTotal, baseScore,
-                bonusPercent, multiplier, baseScore * multiplier, converted, flat, percent, modified, (int)final);
+                bonusPercent, (double)multiplier, (double)(baseScore * multiplier), (double)converted, // 10.22 부동소수점 버그 수정
+                (double)flat, (double)percent, (double)modified, (int)final); // 10.22 부동소수점 버그 수정
         }
     }
 }
