@@ -13,22 +13,20 @@ MonoBehaviour:
   m_Name: Trait_KillGold
   m_EditorClassIdentifier: Assembly-CSharp::TraitData
   _id: 12003
-  _displayName: "\uC0AC\uB0E5\uAFBC\uC758 \uBAAB"
-  _description: "\uC801\uC744 \uCC98\uCE58\uD560 \uB54C \uB354 \uB9CE\uC740 \uACE8\uB4DC\uB97C
-    \uD68D\uB4DD\uD569\uB2C8\uB2E4."
+  _displayName: "\uB354 \uB9CE\uC740 \uB3C8"
+  _description: "\uC0C8\uB85C\uC6B4 \uB3C4\uC804\uC744 \uB354\uC6B1 \uB354 \uB9CE\uC740
+    \uACE8\uB4DC\uC640 \uD568\uAED8 \uC2DC\uC791\uD569\uB2C8\uB2E4."
   _icon: {fileID: 0}
-  _effectLabel: "\uCC98\uCE58 \uACE8\uB4DC \uC99D\uAC00"
-  _valuePerLevel: 5
-  _valueUnit: '%'
-  _maxLevel: 5
-  _upgradeCost: 150
-  _upgradeCosts: 
+  _effectLabel: "\uC2DC\uC791 \uACE8\uB4DC \uC99D\uAC00"
+  _valuePerLevel: 10
+  _valueUnit: 
+  _maxLevel: 3
+  _upgradeCost: 0
+  _upgradeCosts: c80000002c01000090010000
   _prerequisite: {fileID: 11400000, guid: 295f616c0c9858741964bdf328685ec3, type: 2}
   _prerequisiteLevel: 1
   _statEffects: []
-  _currencyEffects:
+  _currencyEffects: []
+  _startingCurrencies:
   - _currencyType: 1
-    _rewardType: 1
-    _modifierType: 1
-    _value: 0.05
-  _startingCurrencies: []
+    _amountPerLevel: 10

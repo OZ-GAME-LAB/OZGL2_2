@@ -854,6 +854,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 4207534559104598044}
     m_Modifications:
+    - target: {fileID: 994463858877207006, guid: 24eca71c04031374b9bd32dbf601e95b, type: 3}
+      propertyPath: _initialBloodstone
+      value: 50000
+      objectReference: {fileID: 0}
     - target: {fileID: 2858060826966532452, guid: 24eca71c04031374b9bd32dbf601e95b, type: 3}
       propertyPath: m_LocalPosition.x
       value: -21.95687
@@ -896,7 +900,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3706177782749707654, guid: 24eca71c04031374b9bd32dbf601e95b, type: 3}
       propertyPath: _baseStartingCurrencies.Array.data[0]._amount
-      value: 10000
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 4812609768817619824, guid: 24eca71c04031374b9bd32dbf601e95b, type: 3}
       propertyPath: _settings
