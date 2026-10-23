@@ -42,7 +42,7 @@ public class CurrencyRewardCalculator
         if (waveReward.Amount < 0 || baseCampLevel < 0)
             return new CurrencyAmount(waveReward.Currency, -1);
 
-        decimal baseReward = (decimal)waveReward.Amount * baseCampLevel; // 10.22 부동소수점 버그 수정
+        decimal baseReward = (decimal)waveReward.Amount; // 10.22 부동소수점 버그 수정
         return CalculateModifiedReward(waveReward.Currency, baseReward, CurrencyRewardType.WaveReward, modifiers);
     }
 
