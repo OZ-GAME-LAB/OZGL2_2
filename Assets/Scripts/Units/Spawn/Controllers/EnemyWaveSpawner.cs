@@ -131,15 +131,23 @@ namespace Units
             }
         }
 
-        internal async UniTask<bool> SpawnWaveAsync(int cost, SpawnContext context,
-            CancellationToken cancellationToken, bool isInfiniteWave = false)
+        internal async UniTask<bool> SpawnWaveAsync(
+            int cost,
+            SpawnContext context,
+            CancellationToken cancellationToken)
         {
             _waveData.Clear();
             _spawnedGroups.Clear();
+
             bool succeeded = false;
+
             try
             {
-                succeeded = await SpawnWaveCoreAsync(cost, context, cancellationToken, isInfiniteWave);
+                succeeded = await SpawnWaveCoreAsync(
+                    cost,
+                    context,
+                    cancellationToken);
+
                 cancellationToken.ThrowIfCancellationRequested();
                 return succeeded;
             }
@@ -149,12 +157,16 @@ namespace Units
                 {
                     foreach (var group in _spawnedGroups)
                     {
-                        if (group == null) continue;
+                        if (group == null)
+                            continue;
+
                         _runtimeUnitManager.UnregisterGroup(group);
                         DestroyGroup(group);
                     }
+
                     _rallyGridAllocator.Clear();
                 }
+
                 _spawnedGroups.Clear();
                 _waveData.Clear();
             }
@@ -163,7 +175,7 @@ namespace Units
         private async UniTask<bool> SpawnWaveCoreAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken, bool isInfiniteWave)
+            CancellationToken cancellationToken)
         {
             if (!ValidateWaveRequest(
                 cost,
@@ -184,10 +196,13 @@ namespace Units
             if (cost > 0 && context.MonsterIDs != null && context.MonsterIDs.Count > 0)
                 groupSpawnDataList.AddRange(BuildGroupSpawnData(cost, context));
 
-            if (isInfiniteWave)
+            if (context.QuarterType == QuarterType.Infinity)
             {
                 var appearances = new List<EnemyUnitType>();
-                foreach (var group in groupSpawnDataList) appearances.Add(group.UnitType);
+
+                foreach (var group in groupSpawnDataList)
+                    appearances.Add(group.UnitType);
+
                 BuildInfiniteData(appearances);
             }
 

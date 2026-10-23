@@ -21,7 +21,7 @@ public static class TotemBuiltinEffects
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.MaxHp, UnitStatModifierType.Percent, 0.15f)
+            UnitStatType.MaxHp, UnitStatModifierType.Percent, 0.5f)
     };
 
     private static readonly TotemStatEffect[] EnemyDefense =
@@ -35,7 +35,7 @@ public static class TotemBuiltinEffects
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.AttackSpeed, UnitStatModifierType.Percent, 0.08f)
+            UnitStatType.AttackSpeed, UnitStatModifierType.Percent, 0.3f)
     };
 
     private static readonly TotemStatEffect[] EnemyMoveSpeed =
@@ -50,7 +50,7 @@ public static class TotemBuiltinEffects
     {
         new TotemStatEffect(
             UnitTeam.Ally, UnitModifierApplyType.All,
-            UnitStatType.DamageTakenMultiplier, UnitStatModifierType.Percent, 0.10f)
+            UnitStatType.DamageTakenMultiplier, UnitStatModifierType.Percent, 0.30f)
     };
 
     private static readonly TotemStatEffect[] Empty = Array.Empty<TotemStatEffect>();

@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_AR_T2_2_\uC800\uACA9\uC218"
   buildingFamilyId: archer_barracks
-  displayName: "\uc800\uaca9\uc218\uc758 \ucd08\uc18c"
-  description: "\uba3c \uac70\ub9ac\uc758 \uc801\uc5d0\uac8c \uac15\ub825\ud55c \uc77c\uaca9\uc744 \uac00\ud558\ub294 \uc800\uaca9\uc218\uc758 \ucd08\uc18c\uc785\ub2c8\ub2e4."
+  displayName: "\uC800\uACA9\uC218\uC758 \uCD08\uC18C"
+  description: "\uBA3C \uAC70\uB9AC\uC758 \uC801\uC5D0\uAC8C \uAC15\uB825\uD55C \uC77C\uACA9\uC744
+    \uAC00\uD558\uB294 \uC800\uACA9\uC218\uC758 \uCD08\uC18C\uC785\uB2C8\uB2E4."
   buildingType: 2
   icon: {fileID: 21300000, guid: 9af57572197ad1b43bce6b499a884bb9, type: 3}
   worldSprite: {fileID: 21300000, guid: 9af57572197ad1b43bce6b499a884bb9, type: 3}
   prefab: {fileID: 3056388575363415643, guid: 084cf57e08ec4d15a0c82223943e46e7, type: 3}
   buildCost:
   - type: 0
-    amount: 10
+    amount: 75
   buildFromEmptySlot: 0
   requiredCoreLevel: 0
   requiredFamilyIds: []
@@ -48,5 +49,5 @@ MonoBehaviour:
   - nextBuilding: {fileID: 11400000, guid: 5d084188ac0a4f2ba8a27fc8cadef2ab, type: 2}
     cost:
     - type: 0
-      amount: 50
-    requiredCoreLevel: 2
+      amount: 90
+    requiredCoreLevel: 3

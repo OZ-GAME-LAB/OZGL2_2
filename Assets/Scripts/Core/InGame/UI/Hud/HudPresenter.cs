@@ -55,8 +55,15 @@ namespace Game.UI.InGame
                 return;
             }
 
-            SetText(_quarterText, _flow.CurPhase != GamePhase.None && _waves.CurQuarter >= 1
-                ? $"분기 {_waves.CurQuarter} · 웨이브" : "분기 -- · 웨이브");
+            string quarterLabel = _waves.CurQuarter > WaveController.MAIN_QUARTERS
+                ? $"무한 {_waves.CurQuarter - WaveController.MAIN_QUARTERS} 분기"
+                : $"{_waves.CurQuarter} 분기 ";
+
+            string battleLabel = _flow.CurrentNode?.BattleType == WaveBattleType.Boss
+                ? "보스 전투"
+                : _flow.CurrentNode?.IsElite == true ? "정예 전투" : "일반 전투";
+
+            SetText(_quarterText, $"{quarterLabel} · {battleLabel}");
             if (_flow.CurPhase != GamePhase.None && _waves.CurWave >= 1 &&
                 _waves.CurWave <= WaveController.MAX_WAVE)
                 _ui.SetWaveProgress(_waves.CurWave, WaveController.MAX_WAVE);

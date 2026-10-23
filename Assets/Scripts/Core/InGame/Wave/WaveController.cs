@@ -10,20 +10,34 @@ namespace Game.Core
     public struct SpawnContext
     {
         public ClassWeights Weights;
+
         // General-unit candidates; their counts are determined by cost and weights.
         public List<EnemyUnitType> MonsterIDs;
+
         // One boss per entry. Duplicates are intentional; null/empty means no bosses.
         public List<EnemyUnitType> BossIDs;
 
-        public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs)
-            : this(weights, monsterIDs, null) { }
+        // 현재 스폰이 일반 모드인지 무한 모드인지 구분
+        public QuarterType QuarterType;
 
-        public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs,
-            List<EnemyUnitType> bossIDs)
+        public SpawnContext(
+            ClassWeights weights,
+            List<EnemyUnitType> monsterIDs,
+            QuarterType quarterType)
+            : this(weights, monsterIDs, null, quarterType)
+        {
+        }
+
+        public SpawnContext(
+            ClassWeights weights,
+            List<EnemyUnitType> monsterIDs,
+            List<EnemyUnitType> bossIDs,
+            QuarterType quarterType)
         {
             Weights = weights;
             MonsterIDs = monsterIDs;
             BossIDs = bossIDs;
+            QuarterType = quarterType;
         }
     }
 
@@ -42,9 +56,10 @@ namespace Game.Core
         public const int MAIN_QUARTERS = NodeController.MainQuarters;
         private const int InitialSpawnCost = 5;
         private const int SpawnCostPerWave = 2;
-        private const float InfinityBonusPerWave = 0.02f;
-        private const float InfinityBonusPerQuarter = 0.15f;
-        private const float EliteBonus = 0.20f;
+        private const float InfinityBonusPerWave = 0.03f;
+        private const float InfinityBonusPerQuarter = 0.3f;
+        private const float EliteAttackBonus = 0.20f;
+        private const float EliteHealthBonus = 0.20f;
         private readonly object _eliteModifierSource = new();
         
         [SerializeField] private WaveSODictionary _waveCatalog;
@@ -56,6 +71,7 @@ namespace Game.Core
         public bool IsLastWave => _controller != null && _controller.IsLastNode;
         public event Action<WaveInfo> WaveChanged;
         public event Action<WaveInfo> WaveCleared;
+        public event Action BattleStarted;
 
         
         private ISpawnManager _spawner;
@@ -113,16 +129,35 @@ namespace Game.Core
         {
             runToken.ThrowIfCancellationRequested();
             spawnToken.ThrowIfCancellationRequested();
+
             _preparationToken = runToken;
             _isWaitingForPreparation = true;
+
+            QuarterType quarterType = CurQuarter > MAIN_QUARTERS
+                ? QuarterType.Infinity
+                : QuarterType.Regular;
+
+            List<EnemyUnitType> bossIDs = null;
+
+            if (CurrentPreset.BattleType == WaveBattleType.Boss)
+            {
+                bossIDs = quarterType == QuarterType.Infinity
+                    ? new List<EnemyUnitType> { EnemyUnitType.Boss_용사 }
+                    : CurrentPreset.BossIDs;
+            }
+
             SpawnContext context = new(
-                weights:CurrentPreset.Weights, 
-                monsterIDs:CurrentPreset.MonsterIDs,
-                bossIDs:CurrentPreset.BattleType == WaveBattleType.Boss ? CurrentPreset.BossIDs : null);
+                weights: CurrentPreset.Weights,
+                monsterIDs: CurrentPreset.MonsterIDs,
+                bossIDs: bossIDs,
+                quarterType: quarterType);
+
             RefreshInfinityModifiers();
             RefreshEliteModifiers();
+
             int cost = CalculateSpawnCost(CurQuarter, CurWave);
             int enemyCount = _totemFlowEffects.CalculateEnemyCount(cost);
+
             return _spawner.SpawnEnemyWaveAsync(enemyCount, context, spawnToken);
         }
 
@@ -145,7 +180,7 @@ namespace Game.Core
             int infinityQuarter = quarter - MAIN_QUARTERS;
             if (infinityQuarter <= 0) return 0f;
 
-            // 첫 무한 분기는 2~10%, 이후 분기 시작값은 15%, 30%, 45%...이다.
+            // 첫 무한 분기는 2~10%, 이후 분기 시작값은 20%, 40%, 60%...이다.
             float quarterStartBonus = infinityQuarter == 1
                 ? InfinityBonusPerWave
                 : (infinityQuarter - 1) * InfinityBonusPerQuarter;
@@ -154,11 +189,11 @@ namespace Game.Core
         /// <summary> 현재 전투가 엘리트전투면 배율 적용, 아니면 미적용</summary>
         private void RefreshEliteModifiers()
         {
-            float bonus = _controller.CurrentNode.IsElite
-                ? EliteBonus
-                : 0f;
+            _unitStatModifiers.RemoveModifiersBySource(_eliteModifierSource);
+            if (!_controller.CurrentNode.IsElite) return;
 
-            RefreshCombatModifiers(_eliteModifierSource, bonus);
+            AddCombatModifier(_eliteModifierSource, UnitStatType.MaxHp, EliteHealthBonus);
+            AddCombatModifier(_eliteModifierSource, UnitStatType.AttackPower, EliteAttackBonus);
         }
         
         private void RefreshCombatModifiers(object source, float bonus)
@@ -206,6 +241,7 @@ namespace Game.Core
 
         public void BattleStart()
         {
+            BattleStarted?.Invoke();
             _runtimeUnitManager.StartBattlePhase();
         }
 

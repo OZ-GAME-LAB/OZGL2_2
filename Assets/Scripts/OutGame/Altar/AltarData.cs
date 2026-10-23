@@ -11,6 +11,8 @@ using UnityEngine;
 public class AltarData : ScriptableObject
 {
     public AltarId Id => _id;
+    [SerializeField] private Game.Core.UnlockData _unlock;
+    public Game.Core.UnlockData Unlock => _unlock;
     public string DisplayName => _displayName;
     public string Description => _description;
     public Sprite Icon => _icon;

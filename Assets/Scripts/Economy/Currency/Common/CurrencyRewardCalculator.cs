@@ -37,11 +37,12 @@ public class CurrencyRewardCalculator
     public CurrencyAmount CalculateWaveReward(CurrencyAmount waveReward, int baseCampLevel,
         IReadOnlyList<CurrencyModifier> modifiers)
     {
-        // 웨이브 자체 보상 = 웨이브 기본 보상 * 베이스 캠프 레벨
+        // 보상표는 최종 기본 지급량입니다. 코어 레벨로 다시 배수 적용하지 않습니다.
+        // baseCampLevel 인자는 기존 호출부 호환성을 위해 유지합니다.
         if (waveReward.Amount < 0 || baseCampLevel < 0)
             return new CurrencyAmount(waveReward.Currency, -1);
 
-        double baseReward = (double)waveReward.Amount * baseCampLevel;
+        decimal baseReward = (decimal)waveReward.Amount * baseCampLevel; // 10.22 부동소수점 버그 수정
         return CalculateModifiedReward(waveReward.Currency, baseReward, CurrencyRewardType.WaveReward, modifiers);
     }
 
@@ -58,33 +59,30 @@ public class CurrencyRewardCalculator
         return dropReward;
     }
 
-    private CurrencyAmount CalculateModifiedReward(CurrencyData currency, double baseAmount,
+    private CurrencyAmount CalculateModifiedReward(CurrencyData currency, decimal baseAmount, // 10.22 부동소수점 버그 수정
         CurrencyRewardType rewardType, IReadOnlyList<CurrencyModifier> modifiers)
     {
         if (currency == null || !TryCalculateModifiedAmount(currency.Type, baseAmount, rewardType,
-                modifiers, out double finalAmount, out _, out _) || finalAmount > int.MaxValue)
+                modifiers, out decimal finalAmount, out _, out _) || finalAmount > int.MaxValue) // 10.22 부동소수점 버그 수정
             return new CurrencyAmount(currency, -1);
         // 기존 웨이브/생산 보상은 여기서 정수화합니다. 런 정산은 토템 적용 후 정수화합니다.
         return new CurrencyAmount(currency, (int)finalAmount);
     }
 
-    public static bool TryCalculateModifiedAmount(CurrencyType currencyType, double baseAmount,
+    public static bool TryCalculateModifiedAmount(CurrencyType currencyType, decimal baseAmount, // 10.22 부동소수점 버그 수정
         CurrencyRewardType rewardType, IReadOnlyList<CurrencyModifier> modifiers,
-        out double finalAmount, out double totalFlat, out double totalPercent)
+        out decimal finalAmount, out decimal totalFlat, out decimal totalPercent) // 10.22 부동소수점 버그 수정
     {
         finalAmount = 0;
         totalFlat = 0;
         totalPercent = 0;
-        if (baseAmount < 0 || double.IsNaN(baseAmount) || double.IsInfinity(baseAmount)) return false;
+        if (baseAmount < 0) return false; // 10.22 부동소수점 버그 수정
         if (modifiers != null)
         {
             foreach (CurrencyModifier modifier in modifiers)
             {
                 if (modifier.CurrencyType != currencyType || modifier.RewardType != rewardType)
                     continue;
-
-                if (float.IsNaN(modifier.Value) || float.IsInfinity(modifier.Value))
-                    return false;
 
                 if (modifier.ModifierType == CurrencyModifierType.Flat)
                     totalFlat += modifier.Value;
@@ -94,9 +92,9 @@ public class CurrencyRewardCalculator
         }
 
         // 감소 효과는 0까지만 적용하여 음수끼리 곱해 보상이 늘어나는 것을 방지합니다.
-        double adjustedBase = System.Math.Max(0, baseAmount + totalFlat);
-        double multiplier = System.Math.Max(0, 1 + totalPercent);
+        decimal adjustedBase = System.Math.Max(0m, baseAmount + totalFlat); // 10.22 부동소수점 버그 수정
+        decimal multiplier = System.Math.Max(0m, 1m + totalPercent); // 10.22 부동소수점 버그 수정
         finalAmount = adjustedBase * multiplier;
-        return !double.IsNaN(finalAmount) && !double.IsInfinity(finalAmount);
+        return true; // 10.22 부동소수점 버그 수정
     }
 }

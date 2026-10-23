@@ -545,6 +545,9 @@ namespace Units
         // Life
         // ============================================================
 
+        public CombatDeathResult LastDeath => _life?.LastDeath;
+        internal void NotifyDamageApplied(CombatApplicationResult result) => _gateway?.NotifyDamageApplied(result);
+
         public CombatApplicationResult TakeDamageWithResult(DamageResult result)
         {
             return _life != null ? _life.TakeDamageWithResult(result) : CombatApplicationResult.Invalid(

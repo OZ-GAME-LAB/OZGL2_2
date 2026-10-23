@@ -99,15 +99,18 @@ namespace Game.Core
         private TestWaitingScript _testScript;
         private WaveController _waveController; //인게임 전투 담당
         private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
-        private ArchiveManager _archiveManager;
+        private RunRecordManager _runRecordManager;
         private IRunSettlementRewards _settlementRewards;
         private IContinueUI _continueUI;
         private IRunDecisionUI _decisionUI;
         private IShopFlow _shopFlow;
         private IEventFlow _eventFlow;
+        private ISceneTransition _sceneTransition;
+        private IRunCheckpointWriter _checkpointWriter;
+        
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
-        private IRunCheckpointWriter _checkpointWriter;
+        
         private bool _hasBegun;
         private bool _restoredStep;
         private bool _startupBlocked;
@@ -132,7 +135,7 @@ namespace Game.Core
             WaveController waveController, 
             TestWaitingScript testScript, 
             ArtifactManager artifactManager, 
-            ArchiveManager archiveManager = null,
+            RunRecordManager runRecordManager = null,
             IRunSettlementRewards settlementRewards = null,
             InGameCameraController cameraController = null,
             IShopFlow shopFlow = null)
@@ -140,7 +143,7 @@ namespace Game.Core
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
-            _archiveManager = archiveManager;
+            _runRecordManager = runRecordManager;
             _settlementRewards = settlementRewards;
             _cameraController = cameraController;
             _shopFlow = shopFlow;
@@ -174,7 +177,6 @@ namespace Game.Core
             HandleBuildingsChanged();
         }
 
-        private void HandleBuildingsChanged() => BattleAvailabilityChanged?.Invoke();
 
         public void InitializeSave(IRunCheckpointWriter checkpointWriter)
         {
@@ -184,6 +186,11 @@ namespace Game.Core
         public void InitializeEventFlow(IEventFlow eventFlow)
         {
             _eventFlow = eventFlow ?? throw new ArgumentNullException(nameof(eventFlow));
+        }
+
+        public void InitializeSceneTransition(ISceneTransition sceneTransition)
+        {
+            _sceneTransition = sceneTransition;
         }
 
         public void BlockStartup()
@@ -210,10 +217,26 @@ namespace Game.Core
             _cts?.Cancel();
             _cts?.Dispose();
         }
-        
+        /// <summary>
+        /// 현재 건물 건설이 가능한 페이즈인지 반환하는 메서드
+        /// 사용처 : 건설시스템
+        /// </summary>
+        public bool CanEnterBuildMode()
+        {
+            return !_isTransitioning && _curPhase == GamePhase.Preparation;
+        }
+
+        /// <summary>
+        /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
+        /// 사용처 : 유닛시스템
+        /// </summary>
+        public bool CanBattle()
+        {
+            return !_isTransitioning && _curPhase == GamePhase.Battle;
+        }
+
         // 기존 버튼/샘플의 연결은 유지하되 준비된 런을 다시 초기화하지 않는다.
         public void BeginRun() => BeginRunAsync().Forget();
-
         public async UniTask BeginRunAsync()
         {
             if (_hasBegun || _startupBlocked || _curPhase != GamePhase.None) return;
@@ -336,31 +359,18 @@ namespace Game.Core
                 // 스포너의 배치 공간 정리까지 끝난 후 런타임을 비운다.
                 await pendingSpawn;
                 token.ThrowIfCancellationRequested();
-                await SceneManager.LoadSceneAsync(MainMenuScene);
+                if (_sceneTransition != null)
+                    await _sceneTransition.LoadAsync(MainMenuScene);
+                else
+                    await SceneManager.LoadSceneAsync(MainMenuScene);
             }
             finally
             {
                 _isResetting = false;
             }
         }
+        private void HandleBuildingsChanged() => BattleAvailabilityChanged?.Invoke();
 
-        /// <summary>
-        /// 현재 건물 건설이 가능한 페이즈인지 반환하는 메서드
-        /// 사용처 : 건설시스템
-        /// </summary>
-        public bool CanEnterBuildMode()
-        {
-            return !_isTransitioning && _curPhase == GamePhase.Preparation;
-        }
-
-        /// <summary>
-        /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
-        /// 사용처 : 유닛시스템
-        /// </summary>
-        public bool CanBattle()
-        {
-            return !_isTransitioning && _curPhase == GamePhase.Battle;
-        }
 
         // 전투준비 페이즈를 담당.
         // 실제 유닛 실행까지만 요청하고 실제 전투페이즈는 TryStartWave 메서드에서 실행
@@ -630,14 +640,14 @@ namespace Game.Core
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
             token.ThrowIfCancellationRequested();
-            if (_archiveManager == null || _settlementRewards == null)
+            if (_runRecordManager == null || _settlementRewards == null)
                 throw new InvalidOperationException("게임 종료 기록과 정산 매니저를 먼저 연결해주세요.");
 
             // 재시도에도 같은 확정 기록을 사용해야 이미 저장한 보상을 다시 지급하지 않는다.
-            if (!_archiveManager.TryGetRunSummary(out RunSummary summary))
+            if (!_runRecordManager.TryGetRunSummary(out RunSummary summary))
             {
-                _archiveManager.CompleteRun();
-                if (!_archiveManager.TryGetRunSummary(out summary))
+                _runRecordManager.CompleteRun();
+                if (!_runRecordManager.TryGetRunSummary(out summary))
                     throw new InvalidOperationException("게임 결산 기록을 불러올 수 없습니다.");
             }
 

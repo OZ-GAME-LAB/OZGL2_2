@@ -111,7 +111,7 @@ public class EffectConverter
                 effect.CurrencyType,
                 effect.RewardType,
                 effect.ModifierType,
-                value);
+                (decimal)effect.Value * stackCount); // 10.22 부동소수점 버그 수정
             currencyModifiers.Add(modifier);
         }
 

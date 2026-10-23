@@ -62,13 +62,15 @@ namespace Game.UI.InGame
             IsReady = false;
             if (_uiManager == null || _hudView == null || _hudPresenter == null ||
                 _artifactSelectionUI == null || _eventUI == null || _continueUI == null || _runDecisionUI == null ||
-                _settlementUI == null || _shopView == null || _buildingUI == null || _buildingUIConnection == null || consumableItems == null)
+                _settlementUI == null || _shopView == null || _artifactInventoryView == null ||
+                _buildingUI == null || _buildingUIConnection == null || consumableItems == null)
             {
                 Debug.LogError("[InGameUIStartup] UI 연결 참조를 확인해주세요.", this);
                 return false;
             }
             if (!_uiManager.InitializeScreens()) return false;
             _shopView.Initialize(wallet);
+            _shopView.InitializeExchangeUI(_artifactInventoryView);
             _hudView.Initialize(cameraController);
             _hudPresenter.Initialize(_hudView, wallet, flow, waves);
             _consumableItemView.Initialize(consumableItems, consumableItems, consumableItems, _consumableUsePopup);

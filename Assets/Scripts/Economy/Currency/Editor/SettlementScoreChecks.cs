@@ -37,7 +37,7 @@ public static class SettlementScoreChecks
     }
     private static CurrencyModifier Mod(float value, CurrencyModifierType type,
         CurrencyType currency = CurrencyType.Bloodstone, CurrencyRewardType reward = CurrencyRewardType.RunSettlement)
-        => new CurrencyModifier(null, currency, reward, type, value);
+        => new CurrencyModifier(null, currency, reward, type, (decimal)value); // 10.22 부동소수점 버그 수정
 
     public static async UniTask Run()
     {
