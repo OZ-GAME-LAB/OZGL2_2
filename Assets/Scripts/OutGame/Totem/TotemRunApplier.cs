@@ -533,9 +533,9 @@ public class TotemRunApplier : MonoBehaviour, ISaveDataProvider<TotemRunSaveData
         object source = GetSource(id, totem);
         _goldReductionModifiers.Clear();
         _goldReductionModifiers.Add(new CurrencyModifier(
-            source, CurrencyType.Gold, CurrencyRewardType.WaveReward, CurrencyModifierType.Percent, value));
+            source, CurrencyType.Gold, CurrencyRewardType.WaveReward, CurrencyModifierType.Percent, (decimal)GoldReductionPercentPerLevel * level)); // 10.22 부동소수점 버그 수정
         _goldReductionModifiers.Add(new CurrencyModifier(
-            source, CurrencyType.Gold, CurrencyRewardType.Production, CurrencyModifierType.Percent, value));
+            source, CurrencyType.Gold, CurrencyRewardType.Production, CurrencyModifierType.Percent, (decimal)GoldReductionPercentPerLevel * level)); // 10.22 부동소수점 버그 수정
         _effectManager.RegisterEffects(source, new ConvertedEffects(null, null, _goldReductionModifiers));
         _appliedSources.Add(source);
         Debug.Log($"[OutGame/TotemRunApplier] 궁핍을 적용했습니다. 골드 감소: {-value * 100f}%", this);
