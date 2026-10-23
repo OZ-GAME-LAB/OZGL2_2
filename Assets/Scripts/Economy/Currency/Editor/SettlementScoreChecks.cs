@@ -99,7 +99,7 @@ public static class SettlementScoreChecks
             var currency = AssetDatabase.LoadAssetAtPath<CurrencyData>("Assets/Data/Economy/S.O/Currency_Bloodstone.asset");
             var oldCalculator = new CurrencyRewardCalculator();
             Check(oldCalculator.CalculateProductionReward(new CurrencyAmount(currency, 10), new[]{Mod(.25f, CurrencyModifierType.Percent, reward:CurrencyRewardType.Production)}).Amount == 12, "기존 생산 보상 버림 유지");
-            Check(oldCalculator.CalculateWaveReward(new CurrencyAmount(currency, 5), 3, new[]{Mod(2, CurrencyModifierType.Flat, reward:CurrencyRewardType.WaveReward)}).Amount == 17, "기존 웨이브 보정 유지");
+            Check(oldCalculator.CalculateWaveReward(new CurrencyAmount(currency, 5), 3, new[]{Mod(2, CurrencyModifierType.Flat, reward:CurrencyRewardType.WaveReward)}).Amount == 7, "웨이브 보상은 사령부 레벨 배수 없이 고정 보정만 적용");
 
             var wallet = host.AddComponent<PersistentCurrencyManager>(); wallet.Initialize();
             var manager = host.AddComponent<RunRewardManager>();
