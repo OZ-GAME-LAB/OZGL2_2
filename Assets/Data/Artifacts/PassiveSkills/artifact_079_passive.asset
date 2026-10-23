@@ -37,10 +37,9 @@ MonoBehaviour:
         _areaRadius: 1
         _areaAngle: 360
         _effects:
-        - rid: 1967714963517342067
-    - rid: 1967714963517342067
-      type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+        - rid: 4617381994425221209
+    - rid: 4617381994425221209
+      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
-        _scalingStatType: 0
-        _shieldRatio: 0.15
+        _effectData: {fileID: 11400000, guid: 60f83506cb29fd84a80a2f5476f47d6b, type: 2}

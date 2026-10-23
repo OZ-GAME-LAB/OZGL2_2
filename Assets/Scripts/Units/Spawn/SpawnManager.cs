@@ -482,8 +482,7 @@ namespace Units
         public async UniTask SpawnEnemyWaveAsync(
             int cost,
             SpawnContext context,
-            CancellationToken cancellationToken,
-            bool isInfiniteWave = false)
+            CancellationToken cancellationToken)
         {
             if (_enemyWaveSpawner == null)
             {
@@ -531,7 +530,7 @@ namespace Units
                 await WaitForSpawnStartAsync(enemySpawnStartsAt, cancellationToken);
                 _enemyRallyGridAllocator.Clear();
                 _enemyWaveSpawner.ResetSpawnResult();
-                succeeded = await _enemyWaveSpawner.SpawnWaveAsync(cost, context, cancellationToken, isInfiniteWave);
+                succeeded = await _enemyWaveSpawner.SpawnWaveAsync(cost, context, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
             }
             catch

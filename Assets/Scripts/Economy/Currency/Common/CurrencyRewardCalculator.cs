@@ -37,7 +37,8 @@ public class CurrencyRewardCalculator
     public CurrencyAmount CalculateWaveReward(CurrencyAmount waveReward, int baseCampLevel,
         IReadOnlyList<CurrencyModifier> modifiers)
     {
-        // 웨이브 자체 보상 = 웨이브 기본 보상 * 베이스 캠프 레벨
+        // 보상표는 최종 기본 지급량입니다. 코어 레벨로 다시 배수 적용하지 않습니다.
+        // baseCampLevel 인자는 기존 호출부 호환성을 위해 유지합니다.
         if (waveReward.Amount < 0 || baseCampLevel < 0)
             return new CurrencyAmount(waveReward.Currency, -1);
 

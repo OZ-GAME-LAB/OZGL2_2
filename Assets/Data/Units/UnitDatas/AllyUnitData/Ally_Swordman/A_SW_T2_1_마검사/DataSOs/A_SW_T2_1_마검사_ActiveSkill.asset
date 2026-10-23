@@ -15,9 +15,7 @@ MonoBehaviour:
   _display:
     _name: "\uB9C8\uAC80 \uB09C\uBB34"
     _icon: {fileID: 21300000, guid: fe6b777b421343a499fc54ae63431557, type: 3}
-    _description: "\uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758 150%,
-      \uC774\uC5B4\uC11C \uC804\uBC29\uC758 \uC801\uC5D0\uAC8C 200% \uB9C8\uBC95
-      \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 6\uCD08]"
+    _description: "\uc8fc\ubcc0 \uc801\uc5d0\uac8c \uacf5\uaca9\ub825\uc758 80%, \uc774\uc5b4\uc11c \uc804\ubc29\uc758 \uc801\uc5d0\uac8c 100% \ub9c8\ubc95 \ud53c\ud574\ub97c \uc90d\ub2c8\ub2e4. [\ucfe8\ud0c0\uc784 6\ucd08]"
   _skillRange: 3
   _skillCooldown: 6
   _targetSide: 0
@@ -131,7 +129,7 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 1
-        _damageMultiplier: 2
+        _damageMultiplier: 1
     - rid: 4844432381217865729
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -218,4 +216,4 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 1
-        _damageMultiplier: 1.5
+        _damageMultiplier: 0.8
