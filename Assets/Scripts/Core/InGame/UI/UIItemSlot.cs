@@ -13,6 +13,7 @@ namespace Game.UI.InGame
         [SerializeField] private TMP_Text _title;
         [SerializeField] private TMP_Text _value;
         [SerializeField] private GameObject _selection; //클릭시 열리는 팝업창
+        [SerializeField] private bool _hideIconWhenEmpty;
         private Action _onClick;
 
         private void OnEnable() { if (_button != null) _button.onClick.AddListener(HandleClick); }
@@ -46,6 +47,16 @@ namespace Game.UI.InGame
         {
             if (_button != null && _button.IsInteractable()) 
                 _onClick?.Invoke();
+        }
+
+        private void SetIcon(Sprite icon)
+        {
+            if (_icon == null) return;
+
+            _icon.sprite = icon;
+
+            if (_hideIconWhenEmpty)
+                _icon.enabled = icon != null;
         }
     }
 }

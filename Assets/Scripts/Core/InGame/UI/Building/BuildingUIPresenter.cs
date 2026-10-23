@@ -92,7 +92,7 @@ namespace Game.UI.InGame
         {
             bool sameSelection = _selectionId == selectionId;
             _selectionId = selectionId;
-            if (_panelWindow != null) _panelWindow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 840);
+            // if (_panelWindow != null) _panelWindow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 840);
             _titleText.text = "건물 건설";
             _managementRoot.SetActive(false);
             _catalogRoot.SetActive(true);
@@ -114,7 +114,7 @@ namespace Game.UI.InGame
             int? requiredUpgradeCoreLevel)
         {
             _selectionId = info.SelectionId;
-            if (_panelWindow != null) _panelWindow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 550);
+            // if (_panelWindow != null) _panelWindow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 550);
             _titleText.text = "건물 관리";
             _catalogRoot.SetActive(false);
             _managementRoot.SetActive(true);
