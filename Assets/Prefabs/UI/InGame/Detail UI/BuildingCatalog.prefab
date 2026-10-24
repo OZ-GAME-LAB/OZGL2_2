@@ -643,8 +643,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 03153309d5d49e440a612bec42a11869, type: 3}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: 57722a9c787a48e49acacebfa77be99f, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -652,7 +652,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 2
 --- !u!114 &2113100028276596391
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2347,8 +2347,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 03153309d5d49e440a612bec42a11869, type: 3}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: 57722a9c787a48e49acacebfa77be99f, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -2356,7 +2356,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 2
 --- !u!1 &1517803059546730185
 GameObject:
   m_ObjectHideFlags: 0
@@ -5298,6 +5298,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.UIItemSlot
   _button: {fileID: 7411730217147380068}
   _icon: {fileID: 7791980501703378419}
+  _hideIconWhenEmpty: 0
   _title: {fileID: 7717044104933103290}
   _value: {fileID: 3148101397059717820}
   _selection: {fileID: 6358216676382927642}
@@ -8142,6 +8143,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Game.UI.InGame.UIItemSlot
   _button: {fileID: 3519597885497782413}
   _icon: {fileID: 5805336022409415088}
+  _hideIconWhenEmpty: 0
   _title: {fileID: 7486438395604091575}
   _value: {fileID: 5012576599796515851}
   _selection: {fileID: 5624603169190494362}

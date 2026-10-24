@@ -328,7 +328,7 @@ namespace Game.UI.InGame
         }
 
         private static string FormatPrice(CurrencyType currency, int price) =>
-            $"{price:N0} {(currency == CurrencyType.Gold ? "골드" : "보석")}";
+            $"{price:N0} {(currency == CurrencyType.Gold ? "" : "보석")}";
 
         private bool CanInteract() => isActiveAndEnabled && IsPending &&
             _pending.Task.Status == UniTaskStatus.Pending && !_isTrading &&
