@@ -283,6 +283,34 @@ namespace Game.Core
             _restoredStep = true;
         }
 
+        /// <summary>일시정지를 유지한 채 진행 상태를 저장합니다. 실패하면 종료하지 않습니다.</summary>
+        public bool TrySaveBeforeExit(out string error)
+        {
+            if (_checkpointWriter == null)
+            {
+                error = "저장 시스템이 아직 준비되지 않았습니다.";
+                return false;
+            }
+            if (_startupBlocked || _isResetting || _isEndingRun ||
+                _curPhase == GamePhase.None || _curPhase == GamePhase.Finished ||
+                _curPhase == GamePhase.BattleResolving)
+            {
+                error = "진행 상태를 처리 중입니다. 처리가 끝난 뒤 다시 시도해주세요.";
+                return false;
+            }
+
+            try
+            {
+                // 기존 체크포인트 형식을 사용하므로 전투 중 저장은 준비 단계에서 재개합니다.
+                return _checkpointWriter.TrySave(out error);
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
         //게임을 종료하고 메인으로 이동
         public void QuitRun()
         {

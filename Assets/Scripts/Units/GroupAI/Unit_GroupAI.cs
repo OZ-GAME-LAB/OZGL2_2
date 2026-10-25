@@ -150,6 +150,20 @@ namespace Units
         public Unit_GroupAI AdvanceReference
             => _advanceReference;
 
+        public bool HasOpeningAdvance { get; private set; }
+
+        public void SetOpeningAdvance(Vector2 point)
+        {
+            HasOpeningAdvance = true;
+            _advanceController.SetOpeningAdvance(point);
+        }
+
+        public void ClearOpeningAdvance()
+        {
+            HasOpeningAdvance = false;
+            _advanceController.ClearOpeningAdvance();
+        }
+
         private IReadOnlyList<Unit_GroupAI> _engagementAllies;
         internal IReadOnlyList<Unit_GroupAI> EngagementAllies => _engagementAllies;
         internal void SetEngagementAllies(IReadOnlyList<Unit_GroupAI> groups)
@@ -269,6 +283,7 @@ namespace Units
         public void Initialize(
             UnitTeam team)
         {
+            HasOpeningAdvance = false;
             _team =
                 team;
 
@@ -823,6 +838,8 @@ namespace Units
                 0f;
 
 
+            // 첫 교전 이후에는 위/아래 집단을 고정하지 않고 기존 합류/타겟 선택을 따른다.
+            ClearOpeningAdvance();
             _advanceController.StopAdvance();
 
 

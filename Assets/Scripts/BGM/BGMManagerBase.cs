@@ -122,7 +122,7 @@ namespace Game.Audio
             voice.Source.volume = 0f;
             voice.Source.Play();
             Fade(voice, context.Volume, context.FadeInDuration);
-            // 백그라운드에서 새 요청이 들어와도 복귀 전까지 재생 위치를 진행하지 않는다.
+            // 앱이 일시정지된 동안의 새 요청은 복귀 전까지 재생 위치를 진행하지 않는다.
             if (_suspended || _resumePending) PauseVoice(voice);
         }
 
@@ -212,8 +212,9 @@ namespace Game.Audio
 
         private void RefreshApplicationPause()
         {
-            // 포커스와 앱 정지 알림은 순서가 다를 수 있으므로 두 사유가 모두 해제되어야 복귀한다.
-            bool suspended = _focusLost || _applicationPaused;
+            // 백그라운드 실행 중에는 포커스 이탈만으로 음악을 멈추지 않는다.
+            // 실제 앱 정지는 백그라운드 실행 설정과 무관하게 보존/복귀한다.
+            bool suspended = _applicationPaused || (_focusLost && !Application.runInBackground);
             if (_suspended == suspended) return;
             _suspended = suspended;
             _resumePending = !suspended;

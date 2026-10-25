@@ -4,53 +4,53 @@ using System.Collections.Generic;
 using Units;
 
 /// <summary>
-/// 카탈로그에 따로 적지 않아도 적용되는 토템 스탯입니다.
+/// 토템별 기본 적용 대상과 스탯 종류입니다. 수치는 TotemData만 관리합니다.
 /// 배열은 한 번만 만들어 두고, 런마다 새로 만들지 않습니다.
 /// </summary>
 public static class TotemBuiltinEffects
 {
-    // 격노: 적 공격력 +15%/레벨. 유닛이 가진 공격력에 퍼센트가 곱해집니다.
+    // 격노: 적 전체 공격력 보정입니다.
     private static readonly TotemStatEffect[] EnemyDamage =
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.AttackPower, UnitStatModifierType.Percent, 0.15f)
+            UnitStatType.AttackPower, UnitStatModifierType.Percent)
     };
 
     private static readonly TotemStatEffect[] EnemyHealth =
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.MaxHp, UnitStatModifierType.Percent, 0.5f)
+            UnitStatType.MaxHp, UnitStatModifierType.Percent)
     };
 
     private static readonly TotemStatEffect[] EnemyDefense =
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.Defense, UnitStatModifierType.Flat, 2f)
+            UnitStatType.Defense, UnitStatModifierType.Flat)
     };
 
     private static readonly TotemStatEffect[] EnemyAttackSpeed =
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.AttackSpeed, UnitStatModifierType.Percent, 0.3f)
+            UnitStatType.AttackSpeed, UnitStatModifierType.Percent)
     };
 
     private static readonly TotemStatEffect[] EnemyMoveSpeed =
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.MoveSpeed, UnitStatModifierType.Percent, 0.10f)
+            UnitStatType.MoveSpeed, UnitStatModifierType.Percent)
     };
 
-    // 취약: 아군이 받는 피해 +10%/레벨. 기본 배율이 1이라 0.10은 +10%입니다.
+    // 취약: 아군 전체가 받는 피해 보정입니다.
     private static readonly TotemStatEffect[] DamageTaken =
     {
         new TotemStatEffect(
             UnitTeam.Ally, UnitModifierApplyType.All,
-            UnitStatType.DamageTakenMultiplier, UnitStatModifierType.Percent, 0.30f)
+            UnitStatType.DamageTakenMultiplier, UnitStatModifierType.Percent)
     };
 
     private static readonly TotemStatEffect[] Empty = Array.Empty<TotemStatEffect>();
@@ -76,16 +76,4 @@ public static class TotemBuiltinEffects
         }
     }
 
-    public static TotemEffectCategory GetCategory(TotemId id)
-    {
-        switch (id)
-        {
-            case TotemId.GoldReduction:
-                return TotemEffectCategory.Currency;
-            case TotemId.EnemyCount:
-                return TotemEffectCategory.Flow;
-            default:
-                return TotemEffectCategory.Stat;
-        }
-    }
 }

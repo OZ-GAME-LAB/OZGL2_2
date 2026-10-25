@@ -1055,6 +1055,9 @@ namespace Units
             // 전투 시작 중복 방어를 통과한 뒤에만 VFX 보관 세대를 진행한다.
             Units.FX.VFXManager.Instance?.BeginGeneration();
 
+            // 모든 랠리가 끝난 배치로 양 팀의 첫 약진 지점을 함께 계산한다.
+            _advanceReferenceController.PrepareOpeningAdvance();
+
 
             _battleStarted =
                 true;
@@ -1226,6 +1229,7 @@ namespace Units
 
         public void ClearRuntime()
         {
+            _advanceReferenceController.ClearOpeningAdvance();
             _clearingRuntime =
                 true;
 
