@@ -47,6 +47,23 @@ namespace Units
 
         private readonly Dictionary<Unit_Gateway, Vector2> _moveDestinations = new();
 
+        private Vector2? _openingPoint;
+        private float _openingCenterY;
+        private readonly HashSet<Unit_Gateway> _openingArrivals = new();
+
+        public void SetOpeningAdvance(Vector2 point)
+        {
+            _openingPoint = point;
+            _openingCenterY = CalculateCenterPosition().y;
+            _openingArrivals.Clear();
+        }
+
+        public void ClearOpeningAdvance()
+        {
+            _openingPoint = null;
+            _openingArrivals.Clear();
+        }
+
 
         // =========================
         // Events
@@ -391,6 +408,29 @@ namespace Units
                 unit.StopMovement();
 
                 return;
+            }
+
+            // 첫 접촉 전에는 개별 높이가 아닌 두 집단의 공통 지점으로 약진한다.
+            // 이미 공격할 수 있으면 위에서 멈추므로 집결을 위해 적을 지나치지 않는다.
+            if (_openingPoint.HasValue && !_openingArrivals.Contains(unit))
+            {
+                Vector2 point = _openingPoint.Value;
+                // 소규모 편성 내부 간격은 조금 남겨 동일 좌표에 겹치는 것을 줄인다.
+                point.y += Mathf.Clamp(row - _openingCenterY, -0.75f, 0.75f);
+                Vector2 approach = point - origin;
+                if (approach.magnitude > Mathf.Max(1f, sourceRadius * 2f))
+                {
+                    float step = Mathf.Min(_advanceDistance,
+                        Mathf.Min(approach.magnitude, nearestDistance - stopRange));
+                    Vector2 openingDestination = origin + approach.normalized * step;
+                    _moveDestinations[unit] = openingDestination;
+                    unit.MoveTo(openingDestination);
+                    return;
+                }
+                _openingArrivals.Add(unit);
+                // 집단 약진을 마쳤으면 새 높이를 유지한다. 최초 랠리 높이로 되돌아가지 않는다.
+                row = point.y;
+                _advanceRows[unit] = row;
             }
 
             float centerRange = stopRange

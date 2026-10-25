@@ -611,57 +611,9 @@ public class OutGameTotemView : MonoBehaviour
     }
 
 
-    private string BuildActiveDescription(
-        TotemData data,
-        int level)
+    private string BuildActiveDescription(TotemData data, int level)
     {
-        string text =
-            data.ActiveDescription;
-
-
-        if (string.IsNullOrWhiteSpace(
-            text))
-        {
-            text =
-                data.Description;
-        }
-
-
-        float totalValue =
-            data.ValuePerLevel *
-            level;
-
-
-        text =
-            text.Replace(
-                "{level}",
-                level.ToString()
-            );
-
-
-        text =
-            text.Replace(
-                "{max}",
-                data.MaxLevel.ToString()
-            );
-
-
-        text =
-            text.Replace(
-                "{value}",
-                totalValue.ToString("0.##")
-            );
-
-
-        text =
-            text.Replace(
-                "{unit}",
-                data.ValueUnit ??
-                string.Empty
-            );
-
-
-        return text;
+        return data.GetActiveDescription(level);
     }
 
 

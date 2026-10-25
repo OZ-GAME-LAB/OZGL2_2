@@ -17,7 +17,7 @@ MonoBehaviour:
   _isAvailable: 1
   _displayName: "\uD749\uC791\uC758 \uD1A0\uD15C"
   _description: "\uC0DD\uC0B0\uC73C\uB85C \uD68D\uB4DD\uD558\uB294 \uACE8\uB4DC\uAC00
-    \uB808\uBCA8\uB2F9 10% \uAC10\uC18C\uD569\uB2C8\uB2E4."
+    \uB808\uBCA8\uB2F9 {value}{unit} \uAC10\uC18C\uD569\uB2C8\uB2E4."
   _activeDescription: 
   _icon: {fileID: 0}
   _selectionMode: 0
@@ -30,4 +30,4 @@ MonoBehaviour:
   - _currencyType: 1
     _rewardType: 2
     _modifierType: 1
-    _value: -0.15
+    _isReduction: 1

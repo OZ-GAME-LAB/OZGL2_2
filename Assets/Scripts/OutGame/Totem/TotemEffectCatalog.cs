@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// 토템 ID로 표시용 TotemData와 인게임 스탯 효과를 찾습니다.
-/// 스탯을 비워 두면 TotemBuiltinEffects의 기본값이 사용됩니다.
+/// 스탯을 비워 두면 TotemBuiltinEffects의 기본 대상과 스탯 종류가 사용됩니다. 수치는 TotemData에서 가져옵니다.
 /// </summary>
 [CreateAssetMenu(fileName = "TotemEffectCatalog", menuName = "OutGame/Totem Effect Catalog")]
 public class TotemEffectCatalog : ScriptableObject
@@ -118,10 +118,6 @@ public class TotemEffectCatalog : ScriptableObject
                     this);
             }
 
-            if (float.IsNaN(effect.ValuePerLevel) || float.IsInfinity(effect.ValuePerLevel))
-            {
-                Debug.LogError($"[OutGame/TotemEffectCatalog] 스탯 수치는 유한한 값이어야 합니다. ID: {entry.Id}, Index: {i}", this);
-            }
         }
     }
 }

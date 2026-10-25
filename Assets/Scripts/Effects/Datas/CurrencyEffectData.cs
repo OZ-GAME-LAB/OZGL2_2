@@ -9,6 +9,14 @@ public struct CurrencyEffectData
     public CurrencyModifierType ModifierType => _modifierType;
     public float Value => _value;
 
+    public CurrencyEffectData(CurrencyType currencyType, CurrencyRewardType rewardType, CurrencyModifierType modifierType, float value)
+    {
+        _currencyType = currencyType;
+        _rewardType = rewardType;
+        _modifierType = modifierType;
+        _value = value;
+    }
+
     [SerializeField] private CurrencyType _currencyType;
     [SerializeField] private CurrencyRewardType _rewardType;
     [SerializeField] private CurrencyModifierType _modifierType;

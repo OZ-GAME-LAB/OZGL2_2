@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// 토템이 인게임에 넣는 유닛 스탯 효과입니다.
-/// 수치는 1레벨당 값이고, 적용할 때 선택한 레벨을 곱합니다.
+/// 수치는 TotemData.ValuePerLevel에서 가져오며 적용할 때 선택한 레벨을 곱합니다.
 /// </summary>
 [Serializable]
 public struct TotemStatEffect
@@ -20,7 +20,7 @@ public struct TotemStatEffect
     public EnemyUnitFaction EnemyFaction => _enemyFaction;
     public UnitStatType StatType => _statType;
     public UnitStatModifierType ModifierType => _modifierType;
-    public float ValuePerLevel => _valuePerLevel;
+    public bool IsReduction => _isReduction;
 
     [SerializeField] private UnitTeam _targetTeam;
 
@@ -44,8 +44,8 @@ public struct TotemStatEffect
     [SerializeField] private UnitStatType _statType;
     [SerializeField] private UnitStatModifierType _modifierType;
 
-    [Tooltip("1레벨당 값입니다. Flat은 고정 수치, Percent는 0.15 = +15%입니다.")]
-    [SerializeField] private float _valuePerLevel;
+    [Tooltip("감소 효과이면 선택합니다. 크기는 소유한 데이터의 Value Per Level을 사용합니다.")]
+    [SerializeField] private bool _isReduction;
 
     // 코드에 적어 둔 기본 효과(격노, 취약)를 만들 때 사용합니다. 인스펙터 값은 직렬화 필드를 그대로 씁니다.
     public TotemStatEffect(
@@ -53,7 +53,7 @@ public struct TotemStatEffect
         UnitModifierApplyType applyType,
         UnitStatType statType,
         UnitStatModifierType modifierType,
-        float valuePerLevel)
+        bool isReduction = false)
     {
         _targetTeam = targetTeam;
         _applyType = applyType;
@@ -65,7 +65,7 @@ public struct TotemStatEffect
         _enemyFaction = default;
         _statType = statType;
         _modifierType = modifierType;
-        _valuePerLevel = valuePerLevel;
+        _isReduction = isReduction;
     }
 
     // StatModifierOrganizer는 잘못된 조합을 경고 없이 버리므로 여기서 먼저 걸러냅니다.
