@@ -8,9 +8,11 @@ public class MainSceneManager : MonoBehaviour
     [SerializeField] private Button StartGame;
     [SerializeField] private Button OptionButton;
     [SerializeField] private Button ExitButton;
+    [SerializeField] private Button CreditsButton;
 
     [Header("UI")]
     [SerializeField] private GameObject OptionPanel;
+    [SerializeField] private GameObject CreditsPanel;
 
     [Header("Managers")]
     [SerializeField] private SaveManager SaveManager;
@@ -34,6 +36,9 @@ public class MainSceneManager : MonoBehaviour
 
         ExitButton.onClick.RemoveListener(HandleExit);
         ExitButton.onClick.AddListener(HandleExit);
+
+        CreditsButton.onClick.RemoveListener(HandleCredits);
+        CreditsButton.onClick.AddListener(HandleCredits);
     }
 
     private void HandleNewGame() => HandleNewGameAsync().Forget();
@@ -73,11 +78,20 @@ public class MainSceneManager : MonoBehaviour
         Application.Quit();
     }
 
+    private void HandleCredits()
+    {
+        if (CreditsPanel != null)
+        {
+            CreditsPanel.SetActive(!CreditsPanel.activeSelf);
+        }
+    }
+
     private void OnDestroy()
     {
         if (StartGame != null) StartGame.onClick.RemoveListener(HandleNewGame);
         if (OptionButton != null) OptionButton.onClick.RemoveListener(HandleOption);
         if (ExitButton != null) ExitButton.onClick.RemoveListener(HandleExit);
+        if (CreditsButton != null) CreditsButton.onClick.RemoveListener(HandleCredits);
     }
 
 }

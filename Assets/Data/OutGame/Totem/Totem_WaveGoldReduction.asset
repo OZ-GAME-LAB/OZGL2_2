@@ -17,12 +17,12 @@ MonoBehaviour:
   _isAvailable: 1
   _displayName: "\uACF5\uB0A9\uC758 \uD1A0\uD15C"
   _description: "\uC6E8\uC774\uBE0C \uBCF4\uC0C1\uC73C\uB85C \uD68D\uB4DD\uD558\uB294
-    \uACE8\uB4DC\uAC00 30% \uAC10\uC18C\uD569\uB2C8\uB2E4."
+    \uACE8\uB4DC\uAC00 {value}{unit} \uAC10\uC18C\uD569\uB2C8\uB2E4."
   _activeDescription: 
   _icon: {fileID: 0}
   _selectionMode: 1
   _effectLabel: "\uC6E8\uC774\uBE0C \uBCF4\uC0C1 \uACE8\uB4DC \uAC10\uC18C"
-  _valuePerLevel: 30
+  _valuePerLevel: 20
   _valueUnit: '%'
   _maxLevel: 1
   _rewardBonusPerLevel: 30
@@ -30,4 +30,4 @@ MonoBehaviour:
   - _currencyType: 1
     _rewardType: 1
     _modifierType: 1
-    _value: -0.4
+    _isReduction: 1

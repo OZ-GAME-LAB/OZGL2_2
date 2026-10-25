@@ -119,78 +119,6 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
         ApplyStartEffect();
     }
 
-    // Current date KDH 2026-09-29
-    // RestoreSaveData와 지속/시작 효과 분리로 대체된 dev 경로는 중복 적용을 막기 위해 주석으로 보존합니다.
-    /*
-    // 새 게임은 효과와 시작 재화를 함께 넣습니다.
-    private void ApplyAll()
-    {
-        TryApplyEffects(true);
-    }
-
-    // Current date KDH 2026-10-08
-    // 이어하기는 시작 재화가 세이브 잔액에 이미 있으므로 효과만 등록합니다.
-    // 여기서 _isApplied를 올려 두면 다음 Preparation이 시작 재화를 다시 넣지 않습니다.
-    public bool TryApplyOngoingEffects()
-    {
-        return TryApplyEffects(false);
-    }
-
-    // 효과 목록은 로드·준비 때 한 번만 순회합니다. Update에서 레벨을 다시 읽지 않습니다.
-    private bool TryApplyEffects(bool grantStartingCurrencies)
-    {
-        if (_isApplied) return true;
-        if (_catalog == null || _effectManager == null)
-        {
-            Debug.LogError("[OutGame/TraitRunApplier] 특성 효과를 적용하려면 초기화가 필요합니다.", this);
-            return false;
-        }
-
-        _isApplied = true;
-        List<TraitLevelEntry> levels = _hasLevels ? _levels : _testLevels;
-        if (levels == null)
-        {
-            return true;
-        }
-
-        bool restored = true;
-        for (int i = 0; i < levels.Count; i++)
-        {
-            TraitLevelEntry entry = levels[i];
-            if (entry == null || entry.Level <= 0)
-            {
-                continue;
-            }
-
-            if (!_catalog.TryGetById(entry.Id, out TraitData trait))
-            {
-                Debug.LogWarning($"[OutGame/TraitRunApplier] 카탈로그에 없는 특성은 건너뜁니다. ID: {entry.Id}", this);
-                continue;
-            }
-
-            // 같은 ID가 두 번 들어와도 효과·시작 재화가 중복 적용되지 않도록 막습니다.
-            if (_appliedTraits.Contains(trait))
-            {
-                continue;
-            }
-
-            int level = Mathf.Min(entry.Level, trait.MaxLevel);
-            if (!RegisterTraitEffects(trait, level))
-            {
-                restored = false;
-                continue;
-            }
-
-            // 기존 AddCurrencyEffects / AddStatModifiers는 보존하되 직접 적용 경로는 사용하지 않습니다.
-            if (grantStartingCurrencies) GrantStartingCurrencies(trait, level);
-            _appliedTraits.Add(trait);
-        }
-
-        Debug.Log($"[OutGame/TraitRunApplier] 특성 효과를 적용했습니다. 적용 수: {_appliedTraits.Count}", this);
-        return restored;
-    }
-    */
-
     // 이번 Run 동안 유지할 재화·스탯 효과를 등록합니다.
     // 10.9 / 문규성 / ApplyAll에서 지속 효과 적용을 분리했습니다.
     // 기존 출처 목록으로 중복 등록을 막고 런 종료 시 해제하며, 시작 지급 여부와 별도로 적용 상태를 관리합니다.
@@ -234,8 +162,6 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
                 continue;
             }
 
-            // 통합 등록 후 재화만 다시 등록하면 같은 Source의 스탯이 지워지므로 중복 호출을 보존만 합니다.
-            // AddCurrencyEffects(trait, level);
             // 공통 스폰 수집은 ArtifactInstance만 읽으므로 특성 스탯은 직접 전달합니다.
             if (trait.StatEffects != null && trait.StatEffects.Count > 0 && !AddStatModifiers(trait, level))
             {
@@ -274,7 +200,7 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
             for (int i = 0; i < effects.Count; i++)
             {
                 TraitStatEffect effect = effects[i];
-                float value = effect.ValuePerLevel * level;
+                float value = trait.GetStatValuePerLevel(effect) * level;
                 if (!effect.IsValidTarget() || float.IsNaN(value) || float.IsInfinity(value))
                 {
                     Debug.LogError($"[OutGame/TraitRunApplier] 잘못된 스탯 효과를 건너뜁니다. ID: {trait.Id}, Index: {i}", trait);
@@ -365,28 +291,6 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
         _hasLevels = true;
     }
 
-    // RegisterTraitEffects가 재화와 스탯을 함께 등록하므로 재화 단독 등록은 주석으로 보존합니다.
-    /*
-    private bool AddCurrencyEffects(TraitData trait, int level)
-    {
-        IReadOnlyList<CurrencyEffectData> currencyEffects = trait.CurrencyEffects;
-        if (currencyEffects == null || currencyEffects.Count == 0)
-        {
-            return false;
-        }
-
-        // 레벨을 stackCount로 넘겨 "1레벨당 수치 × 레벨"로 변환합니다.
-        if (!_effectManager.TryConvertEffects(
-            trait, new EffectDataGroup { CurrencyEffects = currencyEffects }, level, out ConvertedEffects converted))
-        {
-            Debug.LogError($"[OutGame/TraitRunApplier] 특성 재화 효과 변환 실패. ID: {trait.Id}", trait);
-            return false;
-        }
-
-        _effectManager.RegisterEffects(trait, converted);
-        return true;
-    }
-    */
 
     // 공통 스폰 수집은 ArtifactInstance만 읽으므로 특성 스탯을 직접 전달합니다.
     // Tier/Faction 값을 생성자에 넘기지 않으면 default(Tier1)로 들어가므로 반드시 전달합니다.
@@ -408,7 +312,7 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
         for (int i = 0; i < effects.Count; i++)
         {
             TraitStatEffect effect = effects[i];
-            float value = effect.ValuePerLevel * level;
+            float value = trait.GetStatValuePerLevel(effect) * level;
 
             if (!effect.IsValidTarget() || float.IsNaN(value) || float.IsInfinity(value))
             {
@@ -452,14 +356,14 @@ public class TraitRunApplier : MonoBehaviour, ISaveDataProvider<TraitRunSaveData
 
         for (int i = 0; i < grants.Count; i++)
         {
-            // long으로 곱해 int 범위를 넘는 오버플로를 막습니다.
-            long amount = (long)grants[i].AmountPerLevel * level;
+            // 공통 표시 수치로 총 지급량을 계산하며 정수 범위로 제한합니다.
+            int amount = trait.GetStartingCurrencyAmount(level);
             if (amount <= 0)
             {
                 continue;
             }
 
-            if (!_runCurrency.TryAdd(grants[i].CurrencyType, (int)Math.Min(amount, int.MaxValue)))
+            if (!_runCurrency.TryAdd(grants[i].CurrencyType, amount))
             {
                 Debug.LogError($"[OutGame/TraitRunApplier] 시작 재화 지급 실패. ID: {trait.Id}, Currency: {grants[i].CurrencyType}", trait);
             }

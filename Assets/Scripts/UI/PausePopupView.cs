@@ -1,6 +1,7 @@
 using System;
 using Game.Core;
 using Game.UI.InGame;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,7 +24,10 @@ public class PausePopupView : MonoBehaviour
     {
         OptionButton.onClick.AddListener(OpenOptionPanel);
         AbandonButton.onClick.AddListener(AbandonRun);
-        ReturnToMainButton.onClick.AddListener(ReturnToMain);
+        // 기존 프리팹의 버튼 참조를 유지하면서 표시와 동작을 변경합니다.
+        var label = ReturnToMainButton.GetComponentInChildren<TMP_Text>(true);
+        if (label != null) label.text = "저장 후 게임 종료";
+        ReturnToMainButton.onClick.AddListener(ConfirmSaveAndQuit);
     }
 
     private void OnEnable()
@@ -41,7 +45,7 @@ public class PausePopupView : MonoBehaviour
     {
         OptionButton.onClick.RemoveListener(OpenOptionPanel);
         AbandonButton.onClick.RemoveListener(AbandonRun);
-        ReturnToMainButton.onClick.RemoveListener(ReturnToMain);
+        ReturnToMainButton.onClick.RemoveListener(ConfirmSaveAndQuit);
     }
 
     public void Initialize(GameFlowController controller, InGameUIManager uiManager, ConfirmPopupView confirmPopup)
@@ -56,9 +60,26 @@ public class PausePopupView : MonoBehaviour
         OptionUIPanel.SetActive(true);
     }
 
-    private void ReturnToMain()
+    private void ConfirmSaveAndQuit()
     {
-        ShowConfirmation("메인화면으로 이동하시겠습니까?\n전투 진행사항은 저장되지 않습니다", _gameFlowController.QuitRun);
+        // 저장 실패 시에도 일시정지를 유지하도록 공통 확인 처리와 달리 Pause를 닫지 않습니다.
+        _confirmPopup.Show("현재 진행을 저장하고 게임을 종료하시겠습니까?\n전투 중이라면 해당 전투의 준비 단계부터 이어집니다.", SaveAndQuit);
+    }
+
+    private void SaveAndQuit()
+    {
+        if (!_gameFlowController.TrySaveBeforeExit(out string error))
+        {
+            Debug.LogError("[PausePopup] 종료 전 저장 실패: " + error, this);
+            _confirmPopup.Show("저장하지 못해 게임을 종료하지 않았습니다.\n" + error + "\n잠시 후 다시 시도해주세요.", null);
+            return;
+        }
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     private void AbandonRun()

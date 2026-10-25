@@ -23,7 +23,9 @@ public class TraitData : ScriptableObject
     // Current date KDH 2026-09-29
     public int PrerequisiteLevel => Mathf.Max(1, _prerequisiteLevel);
     public IReadOnlyList<TraitStatEffect> StatEffects => _statEffects;
-    public IReadOnlyList<CurrencyEffectData> CurrencyEffects => _currencyEffects;
+    public IReadOnlyList<CurrencyEffectData> CurrencyEffects => OutGameCurrencyEffect.ResolveAll(_currencyEffects, ValuePerLevel);
+    public float GetStatValuePerLevel(TraitStatEffect effect) => OutGameEffectValue.Stat(ValuePerLevel, ValueUnit, effect.ModifierType, effect.IsReduction);
+    public int GetStartingCurrencyAmount(int level) => OutGameEffectValue.StartingCurrency(ValuePerLevel, level);
     public IReadOnlyList<TraitStartingCurrency> StartingCurrencies => _startingCurrencies;
 
     [SerializeField] private TraitId _id;
@@ -31,9 +33,9 @@ public class TraitData : ScriptableObject
     [SerializeField, TextArea] private string _description;
     [SerializeField] private Sprite _icon;
 
-    [Header("UI 표시")]
+    [Header("표시 · 실제 효과 공통 수치")]
     [SerializeField] private string _effectLabel;
-    [Tooltip("UI 표시 단위입니다. 5와 %를 조합하면 5%이며, 누적 표시는 이 값에 현재 레벨을 곱합니다. 실제 적용 수치는 아래 효과 목록입니다.")]
+    [Tooltip("표시와 실제 효과가 함께 사용하는 레벨당 수치입니다. 5와 %는 +5%입니다. 효과 목록에는 대상과 증감 방향만 설정합니다.")]
     [SerializeField, Min(0f)] private float _valuePerLevel;
     [Tooltip("수치 뒤에 표시할 단위입니다. 예: %, 골드. 단위가 없으면 비워둡니다.")]
     [SerializeField] private string _valueUnit;
@@ -58,12 +60,12 @@ public class TraitData : ScriptableObject
     [SerializeField, Min(1)] private int _prerequisiteLevel = 1;
 
     // Current date KDH 2026-09-29
-    [Header("인게임 효과 (1레벨당 수치)")]
-    // 유닛 스탯 효과입니다. 예: Ally / Tier / Hero / MaxHp / Percent / 0.05 → 영웅 체력 레벨당 +5%
+    [Header("인게임 효과 대상 · 증감 방향")]
+    // 유닛 스탯 효과입니다. 예: Ally / Tier / Hero / MaxHp / Percent → 위 공통 수치가 5이면 영웅 체력 레벨당 +5%
     [SerializeField] private List<TraitStatEffect> _statEffects = new List<TraitStatEffect>();
 
     // 웨이브 보상·생산·정산 등 기존 재화 보상 경로 보정입니다. EffectManager가 변환합니다.
-    [SerializeField] private List<CurrencyEffectData> _currencyEffects = new List<CurrencyEffectData>();
+    [SerializeField] private List<OutGameCurrencyEffect> _currencyEffects = new List<OutGameCurrencyEffect>();
 
     // 시작 골드처럼 CurrencyRewardType에 없는 타이밍 효과입니다.
     [SerializeField] private List<TraitStartingCurrency> _startingCurrencies = new List<TraitStartingCurrency>();
@@ -159,7 +161,7 @@ public class TraitData : ScriptableObject
                     this);
             }
 
-            if (float.IsNaN(effect.ValuePerLevel) || float.IsInfinity(effect.ValuePerLevel))
+            if (float.IsNaN(ValuePerLevel) || float.IsInfinity(ValuePerLevel))
             {
                 Debug.LogError($"[OutGame/TraitData] 스탯 수치는 유한한 값이어야 합니다. Asset: {name}, Index: {i}", this);
             }
@@ -171,7 +173,7 @@ public class TraitData : ScriptableObject
                 && Mathf.Approximately(definition.DefaultValue, 0f))
             {
                 Debug.LogWarning(
-                    $"[OutGame/TraitData] {effect.StatType}는 기본값이 0이라 Percent가 효과 없습니다. Flat을 쓰세요 (예: +5% → Flat 0.05). Asset: {name}, Index: {i}",
+                    $"[OutGame/TraitData] {effect.StatType}는 기본값이 0이라 Percent가 효과 없습니다. Flat을 쓰세요 (예: +5% → Flat, 공통 수치 5 / 단위 %). Asset: {name}, Index: {i}",
                     this);
             }
         }
