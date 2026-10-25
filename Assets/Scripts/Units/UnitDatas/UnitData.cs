@@ -24,6 +24,9 @@ namespace Units.UnitDatas
         [SerializeField]
         private string _unitName;
 
+        [SerializeField]
+        private Sprite _unitIcon;
+
 
         // ============================================================
         // Team
@@ -97,6 +100,8 @@ namespace Units.UnitDatas
 
         public string UnitName =>
             _unitName;
+
+        public Sprite UnitIcon => _unitIcon;
 
         public UnitTeam Team =>
             _team;

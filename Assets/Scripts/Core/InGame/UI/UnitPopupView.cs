@@ -11,6 +11,8 @@ namespace Game.UI.InGame
     public sealed class UnitPopupView : MonoBehaviour
     {
         [SerializeField] private UIScreen _screen;
+        [SerializeField, Tooltip("유닛 초상화를 표시할 Image. UnitData의 UnitIcon을 사용합니다.")]
+        private UnityEngine.UI.Image _unitIcon;
         [SerializeField] private TMP_Text _nameText;
         [SerializeField] private TMP_Text _subtitleText;
         [SerializeField] private TMP_Text _healthText;
@@ -37,6 +39,12 @@ namespace Game.UI.InGame
         public void Bind(UnitData unit)
         {
             if (unit == null) return;
+            if (_unitIcon != null)
+            {
+                _unitIcon.sprite = unit.UnitIcon;
+                _unitIcon.preserveAspect = true;
+                _unitIcon.enabled = unit.UnitIcon != null;
+            }
             _nameText.text = string.IsNullOrWhiteSpace(unit.UnitName) ? unit.name : unit.UnitName;
             _subtitleText.text = "1마리 기본 정보 · 전투 중 강화 효과 미포함";
             _healthText.text = $"기본 체력 {unit.GetStat(UnitStatType.MaxHp):0.##}";
