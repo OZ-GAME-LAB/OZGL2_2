@@ -80,11 +80,11 @@ namespace Game.UI.InGame
             if (_wallet == null || !_wallet.IsInitialized)
             {
                 _ui.ClearGold();
-                SetText(_gemText, "보석 --");
+                SetText(_gemText, "--");
                 return;
             }
             _ui.SetGold(_wallet.GetBalance(CurrencyType.Gold));
-            SetText(_gemText, $"보석 {_wallet.GetBalance(CurrencyType.Gem):N0}");
+            SetText(_gemText, $"{_wallet.GetBalance(CurrencyType.Gem):N0}");
         }
 
         private void HandleBalanceChanged(CurrencyData currency, int previous, int current)
@@ -92,7 +92,7 @@ namespace Game.UI.InGame
             if (currency == null || _ui == null) return;
             // 재화 갱신은 현재 팝업의 키보드 포커스를 바꾸지 않는다.
             if (currency.Type == CurrencyType.Gold) _ui.SetGold(current);
-            else if (currency.Type == CurrencyType.Gem) SetText(_gemText, $"보석 {current:N0}");
+            else if (currency.Type == CurrencyType.Gem) SetText(_gemText, $"{current:N0}");
         }
 
         private void HandlePhaseChanged(GamePhase phase)

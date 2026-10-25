@@ -20,22 +20,22 @@ MonoBehaviour:
   _triggerType: 5
   _tickInterval: 0.5
   _conditions:
-  - rid: 1967714963517342048
+  - rid: 2552732099008528545
   _effectMode: 1
   _actions:
-  - rid: 1967714963517342049
+  - rid: 2552732099008528546
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 1967714963517342048
+    - rid: 2552732099008528545
       type: {class: PassiveUnitCountConditionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetRelation: 0
         _range: 5
         _comparisonType: 1
         _count: 0
-    - rid: 1967714963517342049
+    - rid: 2552732099008528546
       type: {class: PassiveStatModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _statType: 100

@@ -36,7 +36,7 @@ namespace Game.UI.InGame
                 string amount = offer == null ? null : BuildingCurrencyText.Format(offer.GoldAmount, offer.GemAmount);
                 _quote.text = fixedManagement
                     ? offer == null ? unavailableText : offer.Action == BuildingUiAction.Dismantle
-                        ? $"+{amount} 환급" : $"{offer.DisplayName}\n{amount}"
+                        ? $"+{amount} 환급" : $"{offer.DisplayName} : {amount}"
                     : offer == null ? "해당 없음" : compact ? amount :
                         $"{offer.DisplayName} · {(offer.Action == BuildingUiAction.Dismantle ? "환급" : "비용")} {amount}";
                 _reason.text = offer == null ? "현재 선택에서는 사용할 수 없습니다." :
