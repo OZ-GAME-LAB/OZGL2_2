@@ -56,8 +56,7 @@ namespace Game.Core
         public const int MAIN_QUARTERS = NodeController.MainQuarters;
         private const int InitialSpawnCost = 5;
         private const int SpawnCostPerWave = 2;
-        private const float InfinityBonusPerWave = 0.03f;
-        private const float InfinityBonusPerQuarter = 0.3f;
+        private const float InfinityBonusFactor = 0.1f;
         private const float EliteAttackBonus = 0.20f;
         private const float EliteHealthBonus = 0.20f;
         private readonly object _eliteModifierSource = new();
@@ -175,16 +174,15 @@ namespace Game.Core
             RefreshCombatModifiers(_infinityModifierSource,
                 CalculateInfinityBonus(CurQuarter, CurWave));
         }
-        private static float CalculateInfinityBonus(int quarter, int wave)
+        internal static float CalculateInfinityBonus(int quarter, int wave)
         {
             int infinityQuarter = quarter - MAIN_QUARTERS;
             if (infinityQuarter <= 0) return 0f;
 
-            // 첫 무한 분기는 2~10%, 이후 분기 시작값은 20%, 40%, 60%...이다.
-            float quarterStartBonus = infinityQuarter == 1
-                ? InfinityBonusPerWave
-                : (infinityQuarter - 1) * InfinityBonusPerQuarter;
-            return quarterStartBonus + (wave - 1) * InfinityBonusPerWave;
+            // 분기별 증가분 10%, 30%, 50%, ...의 합 = 10% * n².
+            // 첫 무한 분기의 첫 웨이브부터 적용하며 분기 내에서는 동일하다.
+            float n = infinityQuarter;
+            return InfinityBonusFactor * n * n;
         }
         /// <summary> 현재 전투가 엘리트전투면 배율 적용, 아니면 미적용</summary>
         private void RefreshEliteModifiers()
