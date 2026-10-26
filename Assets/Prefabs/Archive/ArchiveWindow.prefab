@@ -874,7 +874,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1759353927986773983
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3080,8 +3080,8 @@ MonoBehaviour:
     m_Bottom: 0
   m_ChildAlignment: 0
   m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 1
+  m_ChildForceExpandWidth: 0
+  m_ChildForceExpandHeight: 0
   m_ChildControlWidth: 1
   m_ChildControlHeight: 1
   m_ChildScaleWidth: 0
@@ -4612,8 +4612,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -6, y: 0}
-  m_SizeDelta: {x: -12, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: -80, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3818298172625716268
 CanvasRenderer:
@@ -5278,7 +5278,7 @@ MonoBehaviour:
   m_IgnoreLayout: 0
   m_MinWidth: -1
   m_MinHeight: 460
-  m_PreferredWidth: -1
+  m_PreferredWidth: 520
   m_PreferredHeight: 480
   m_FlexibleWidth: -1
   m_FlexibleHeight: 1
@@ -5993,9 +5993,9 @@ MonoBehaviour:
   m_MinWidth: -1
   m_MinHeight: -1
   m_PreferredWidth: 520
-  m_PreferredHeight: 480
+  m_PreferredHeight: 500
   m_FlexibleWidth: -1
-  m_FlexibleHeight: 1
+  m_FlexibleHeight: -1
   m_LayoutPriority: 1
 --- !u!114 &2554152251509806291 stripped
 MonoBehaviour:
@@ -6444,7 +6444,7 @@ MonoBehaviour:
   m_IgnoreLayout: 0
   m_MinWidth: -1
   m_MinHeight: 460
-  m_PreferredWidth: -1
+  m_PreferredWidth: 520
   m_PreferredHeight: 480
   m_FlexibleWidth: -1
   m_FlexibleHeight: 1
@@ -6457,6 +6457,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7736677103434370177}
     m_Modifications:
+    - target: {fileID: 2931502214238459377, guid: d1ea9035af1511549abb9939503e5eb1, type: 3}
+      propertyPath: m_PreferredHeight
+      value: 90
+      objectReference: {fileID: 0}
     - target: {fileID: 6598601806941811622, guid: d1ea9035af1511549abb9939503e5eb1, type: 3}
       propertyPath: m_Name
       value: ArchiveRelationSlot
