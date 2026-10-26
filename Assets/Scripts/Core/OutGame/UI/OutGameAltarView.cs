@@ -263,6 +263,8 @@ public class OutGameAltarView : MonoBehaviour
                 slot.Id;
 
 
+            slot.Button.SetUnlocked(_selection.IsUnlocked(slot.Id));
+
             slot.Button.SetSelected(
                 selected
             );
