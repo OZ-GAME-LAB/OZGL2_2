@@ -15,9 +15,9 @@ MonoBehaviour:
   _display:
     _name: "\uACB0\uC804\uC758 \uC77C\uACA9"
     _icon: {fileID: 21300000, guid: f4c4cb213aa31f543bc71fe10bf38358, type: 3}
-    _description: "5\uCD08\uAC04 \uD798\uC744 \uBAA8\uC73C\uB294 \uB3D9\uC548 \uBC1B\uB294
-      \uD53C\uD574\uAC00 50% \uC99D\uAC00\uD569\uB2C8\uB2E4. '\uCD95\uBCF5' 10\uC911\uCCA9\uC744
-      \uC18C\uBE44\uD558\uBA74 \uC804\uBC29\uC5D0 \uACF5\uACA9\uB825\uC758 1500%
+    _description: "3\uCD08\uAC04 \uD798\uC744 \uBAA8\uC73C\uB294 \uB3D9\uC548 \uBC1B\uB294
+      \uD53C\uD574\uAC00 20% \uC99D\uAC00\uD569\uB2C8\uB2E4. '\uCD95\uBCF5' 10\uC911\uCCA9\uC744
+      \uC18C\uBE44\uD558\uBA74 \uC804\uBC29\uC5D0 \uACF5\uACA9\uB825\uC758 1200%
       \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 30\uCD08]"
   _skillRange: 20
   _skillCooldown: 30
@@ -98,7 +98,7 @@ MonoBehaviour:
           _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
-        _duration: 5
+        _duration: 3
     - rid: 4617381741844758681
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -139,7 +139,7 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 15
+        _damageMultiplier: 12
     - rid: 4844432386322333701
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:

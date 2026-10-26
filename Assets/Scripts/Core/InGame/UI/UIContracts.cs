@@ -5,7 +5,7 @@ namespace Game.UI.InGame
         None, Hud, BuildingCatalog, BuildingInfo, WaveReward,
         ArtifactReward, RunDecision, RunResult, Message, Detail, Shop,
         ArtifactDetail, UnitDetail, SkillDetail, ArtifactInventory, Event, ConsumablePopUp, Archive, Pause, Confirm,
-        RunAltar, RunTraits, RunTotems
+        RunAltar, RunTraits, RunTotems, RunInfo
     }
 
     public enum UICloseReason { UserCancel, Replaced, Completed, ContextLost }

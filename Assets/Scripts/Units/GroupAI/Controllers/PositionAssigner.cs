@@ -158,8 +158,34 @@ namespace Units
                 return true;
             }
 
+            if (context.TryReusePosition(unit)) return true;
+
             if (_combatQueries == null)
                 GatherReservations(unit);
+
+            // Retain a lateral waypoint across frequent waiting-position retries.
+            if (context.IsRecovering && context.DetourWaypoint.HasValue)
+            {
+                Vector2 waypoint = context.DetourWaypoint.Value;
+                if (((Vector2)unit.Transform.position - waypoint).sqrMagnitude > 0.0625f
+                    && IsPositionAvailable(unit, waypoint) && IsApproachClear(unit, waypoint))
+                {
+                    context.SetPosition(waypoint, DefaultPositionTolerance, true);
+                    context.CachePosition(unit, 0.15f);
+                    return true;
+                }
+                context.DetourWaypoint = null;
+            }
+
+            // Failed searches and recovery searches share a cooldown even when the
+            // target changes or an event requests a full reassignment.
+            if (Time.time < context.NextPositionSearchTime)
+            {
+                context.SetPosition(unit.Transform.position, DefaultPositionTolerance, true);
+                context.CachePosition(unit, 0f);
+                return true;
+            }
+            if (context.IsRecovering) context.DelayPositionSearch();
 
             GatherPositions(unit, target, range);
 
@@ -195,7 +221,9 @@ namespace Units
 
                 pathQueries++;
 
-                float cost = candidate.Distance + PathCongestion(unit, candidate.Position);
+                float congestion = PathCongestion(unit, candidate.Position);
+                if (context.IsRecovering && congestion > 0f) continue;
+                float cost = candidate.Distance + congestion;
 
                 if (cost >= bestCost)
                     continue;
@@ -207,13 +235,20 @@ namespace Units
             // 공격 반원이 차 있어도 멀리서 멈추지 않고 빈 접근 지점까지 이동한다.
             // 접근 경로까지 막혔으면 현재 위치에서 기다린다.
             if (float.IsPositiveInfinity(bestCost))
-                TryFindApproachPosition(unit, target, range, out bestPosition);
+            {
+                if (!context.IsRecovering || !TryFindDetourPosition(unit, target, context, out bestPosition))
+                    TryFindApproachPosition(unit, target, range, out bestPosition);
+            }
 
             context.SetPosition(
                 bestPosition,
                 DefaultPositionTolerance,
                 float.IsPositiveInfinity(bestCost)
             );
+
+            if (float.IsPositiveInfinity(bestCost)) context.DelayPositionSearch();
+            context.CachePosition(unit, context.DetourWaypoint.HasValue ? 0.15f
+                : float.IsPositiveInfinity(bestCost) || context.IsRecovering ? 0.5f : 0f);
 
             return true;
         }
@@ -260,6 +295,35 @@ namespace Units
         }
 
 
+        private bool TryFindDetourPosition(Unit_Gateway unit, ICombatTarget target,
+            UnitAssignmentContext context, out Vector2 position)
+        {
+            Vector2 origin = unit.Transform.position;
+            Vector2 direction = ((Vector2)target.Transform.position - origin).normalized;
+            position = origin;
+            int side = context.DetourSide != 0 ? context.DetourSide
+                : (unit.GetInstanceID() & 1) == 0 ? 1 : -1;
+            // Try the established side first, including a short backward step around a crowd.
+            // Each leg must be physically clear; a far target alone does not supply a path.
+            for (int pass = 0; pass < 2; pass++)
+            {
+                int sign = pass == 0 ? side : -side;
+                for (int i = 0; i < 6; i++)
+                {
+                    float angle = (i % 3 == 0 ? 60f : i % 3 == 1 ? 90f : 120f) * sign;
+                    float step = i < 3 ? 2.5f : 1.25f;
+                    Vector2 candidate = origin + Rotate(direction, angle) * step;
+                    if (!IsPositionAvailable(unit, candidate) || !IsApproachClear(unit, candidate))
+                        continue;
+                    context.DetourSide = sign;
+                    context.DetourWaypoint = candidate;
+                    position = candidate;
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private bool IsApproachClear(Unit_Gateway unit, Vector2 position)
         {
             Vector2 origin = unit.Transform.position;
@@ -279,6 +343,13 @@ namespace Units
                 Unit_Gateway occupant = _pathHits[i].collider.GetComponentInParent<Unit_Gateway>();
 
                 if (occupant == unit || (occupant != null && !occupant.IsTargetable))
+                    continue;
+
+                // A touching body behind us must not prevent escaping away from it.
+                if (occupant != null && _pathHits[i].distance <= 0.01f
+                    && Vector2.Dot((Vector2)occupant.Transform.position - origin, delta) <= 0f
+                    && (position - (Vector2)occupant.Transform.position).sqrMagnitude
+                        > (origin - (Vector2)occupant.Transform.position).sqrMagnitude)
                     continue;
 
                 return false;

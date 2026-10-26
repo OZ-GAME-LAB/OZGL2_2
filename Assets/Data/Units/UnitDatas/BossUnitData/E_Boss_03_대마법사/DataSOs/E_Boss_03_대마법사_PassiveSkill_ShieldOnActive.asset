@@ -10,17 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1955a89d0aa8c0940b8b688acfc6af58, type: 3}
-  m_Name: "E_Boss_03_\uB300\uB9C8\uBC95\uC0AC_PassiveSkill_AtkUpOnShieldOut"
+  m_Name: "E_Boss_03_\uB300\uB9C8\uBC95\uC0AC_PassiveSkill_ShieldOnActive"
   m_EditorClassIdentifier: Assembly-CSharp::Units.Skills.PassiveSkillData
   _display:
-    _name: "\uD30C\uAD34\uB41C \uC7A5\uBCBD"
+    _name: "\uB9C8\uB825 \uC7AC\uD65C\uC6A9"
     _icon: {fileID: 21300000, guid: ef795767c6d026442b03bc8fd2c3782c, type: 3}
-    _description: "\ubcf4\ud638\ub9c9\uc744 \uc783\uc73c\uba74 \uacf5\uaca9\ub825\uc774 3% \uc99d\uac00\ud558\uba70 \uc601\uad6c\uc801\uc73c\ub85c \uc720\uc9c0\ub429\ub2c8\ub2e4. [\ucd5c\ub300 10\uc911\ucca9]"
+    _description: "\uC2A4\uD0AC\uC744 \uC0AC\uC6A9\uD560 \uB54C\uB9C8\uB2E4 \uCD5C\uB300
+      \uCCB4\uB825\uC758 3%\uB9CC\uD07C\uC758 \uBCF4\uD638\uB9C9\uC744 \uC5BB\uC2B5\uB2C8\uB2E4."
   _skillSchemaVersion: 1
-  _triggerType: 2
+  _triggerType: 6
   _tickInterval: 0.25
   _conditions:
-  - rid: 4617381741844758658
+  - rid: 4617382081287422039
   _effectMode: 0
   _actions:
   - rid: 4844432381217865731
@@ -28,17 +29,15 @@ MonoBehaviour:
   references:
     version: 2
     RefIds:
-    - rid: 4617381741844758658
-      type: {class: PassiveShieldConditionData, ns: Units.Skills, asm: Assembly-CSharp}
-      data:
-        _subjectType: 0
-        _comparisonType: 1
-        _shieldValue: 0
-    - rid: 4617381741844758669
-      type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+    - rid: 4617382081287422039
+      type: {class: PassiveAlwaysConditionData, ns: Units.Skills, asm: Assembly-CSharp}
+      data: 
+    - rid: 4617382081287422040
+      type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
-        _effectData: {fileID: 11400000, guid: 5214b52de3089bd44bbed7a872d67b1d, type: 2}
+        _scalingStatType: 0
+        _shieldRatio: 0.03
     - rid: 4844432381217865731
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -49,4 +48,4 @@ MonoBehaviour:
         _areaRadius: 4
         _areaAngle: 360
         _effects:
-        - rid: 4617381741844758669
+        - rid: 4617382081287422040

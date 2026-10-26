@@ -41,6 +41,8 @@ namespace Units
             public float ApproachDistance;
 
             public float Cost;
+
+            public float CachedApproachCost;
         }
 
 
@@ -106,6 +108,8 @@ namespace Units
 
         private float _localAreaRadiusSqr;
 
+        private bool _recovering;
+
 
         // =========================
         // Constructor
@@ -157,7 +161,7 @@ namespace Units
                 return false;
             }
 
-            ICombatTarget target = SelectTarget(unit, null);
+            ICombatTarget target = SelectTarget(unit, context.AssignedTarget);
 
             if (target == null)
             {
@@ -226,6 +230,13 @@ namespace Units
                 ? basicRange
                 : unit.PreferredCombatRange;
 
+            _assignmentContexts.TryGetValue(unit, out UnitAssignmentContext recovery);
+            recovery?.ObserveApproach(unit, range);
+            _recovering = recovery != null && recovery.IsRecovering;
+            // Commit to a reachable replacement while it makes progress.
+            if (_recovering && IsValidTarget(currentTarget)
+                && !recovery.IsTemporarilyBlocked(currentTarget)) return currentTarget;
+
             float nearestDistance = GatherCandidates(unit, range);
 
             RestrictLocalCandidates(range, nearestDistance);
@@ -247,6 +258,8 @@ namespace Units
                 nearestDistance + LocalDistanceAllowance
             );
 
+            if (_recovering) distanceLimit = range + 12f;
+
             bool waiting =
                 _assignmentContexts.TryGetValue(unit, out UnitAssignmentContext context)
                 && context.WaitingForPosition;
@@ -259,6 +272,13 @@ namespace Units
                 TargetCandidate candidate = _candidates[i];
 
                 candidate.Cost = CalculateBaseCost(candidate, expectedPressure, unit);
+                // Include obstruction before shortlisting so clear flank targets survive.
+                if (_recovering)
+                {
+                    candidate.CachedApproachCost = EstimateApproachCost(unit, candidate);
+                    candidate.Cost += candidate.CachedApproachCost
+                        + (recovery.IsTemporarilyBlocked(candidate.Target) ? 100f : 0f);
+                }
 
                 if (ReferenceEquals(candidate.Target, currentTarget))
                 {
@@ -289,7 +309,7 @@ namespace Units
             ICombatTarget bestTarget = hasCurrent ? currentTarget : null;
 
             float currentCost = hasCurrent
-                ? current.Cost + EstimateApproachCost(unit, current)
+                ? current.Cost + (_recovering ? current.CachedApproachCost : EstimateApproachCost(unit, current))
                 : float.PositiveInfinity;
 
             if (hasCurrent && waiting)
@@ -301,7 +321,7 @@ namespace Units
             {
                 TargetCandidate candidate = _shortlist[i];
 
-                float cost = candidate.Cost + EstimateApproachCost(unit, candidate);
+                float cost = candidate.Cost + (_recovering ? candidate.CachedApproachCost : EstimateApproachCost(unit, candidate));
 
                 if (cost >= bestCost)
                     continue;
@@ -379,7 +399,7 @@ namespace Units
             if (_allowedGroups.Count == 0)
                 return float.PositiveInfinity;
 
-            _combatQueries.CollectNearby(_origin, range + LocalCombatDepth, _bodyRadius, _nearby);
+            _combatQueries.CollectNearby(_origin, range + (_recovering ? 12f : LocalCombatDepth), _bodyRadius, _nearby);
 
             float nearestDistance = AddNearbyCandidates(unit, range);
 
@@ -452,7 +472,7 @@ namespace Units
             // Engagement는 참여 관계를 나타낸다. 합류로 멀리 있는 그룹이 늘어도
             // 개별 유닛의 후보와 분산 비율은 현재 전선 주변에서 계산한다.
             float radius = Mathf.Max(
-                range + LocalCombatDepth,
+                range + (_recovering ? 12f : LocalCombatDepth),
                 nearestDistance + LocalDistanceAllowance
             );
 
