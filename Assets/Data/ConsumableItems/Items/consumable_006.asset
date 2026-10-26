@@ -15,21 +15,21 @@ MonoBehaviour:
   _id: consumable_006
   _displayName: "\uC0DD\uBA85\uC758 \uC885"
   _description: "\uBAA8\uB4E0 \uC544\uAD70\uC758 \uCCB4\uB825\uC744 \uAC01\uAC01
-    40 \uD68C\uBCF5\uD569\uB2C8\uB2E4."
+    500 \uD68C\uBCF5"
   _icon: {fileID: 21300000, guid: 5b4af11df43b4100aba2b9896a269cbb, type: 3}
-  _targetVFX: {fileID: 1002, guid: 56734674d1df4e0389a92b47b528c792, type: 3}
   _useVFX: {fileID: 0}
+  _targetVFX: {fileID: 1002, guid: 56734674d1df4e0389a92b47b528c792, type: 3}
   _targetTeam: 0
   _targetMode: 2
   _radius: 0
   _effects:
-  - rid: 1967714645891350695
+  - rid: 1967714963517341967
   references:
     version: 2
     RefIds:
-    - rid: 1967714645891350695
+    - rid: 1967714963517341967
       type: {class: SkillHealEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
         _scalingStatType: 1
-        _healRatio: 40
+        _healRatio: 500

@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_P_T1_\uBC2D"
   buildingFamilyId: Producer
-  displayName: "\uBC2D"
-  description: "10\uCF54\uC778 \uD68D\uB4DD \uC2DC\uC124"
+  displayName: "\uB9C8\uACC4 \uB18D\uC7A5"
+  description: "\uAD70\uB2E8\uC5D0 \uD544\uC694\uD55C \uC790\uAE08\uC744 \uAFB8\uC900\uD788
+    \uC0DD\uC0B0\uD558\uB294 \uB18D\uC7A5\uC785\uB2C8\uB2E4."
   buildingType: 1
-  icon: {fileID: 21300000, guid: dcc3b30f38a13ac40940ce818a7549e1, type: 3}
-  worldSprite: {fileID: 21300000, guid: dcc3b30f38a13ac40940ce818a7549e1, type: 3}
+  icon: {fileID: 21300000, guid: 2871a353a5c4a384d9e613f869e2c5d6, type: 3}
+  worldSprite: {fileID: 21300000, guid: 2871a353a5c4a384d9e613f869e2c5d6, type: 3}
   prefab: {fileID: 8803612685413627836, guid: 5ae2762e941afbf41845a522ce4b54c5, type: 3}
   buildCost:
   - type: 0
-    amount: 10
+    amount: 40
   buildFromEmptySlot: 1
   requiredCoreLevel: 0
   requiredFamilyIds: []
@@ -38,4 +39,10 @@ MonoBehaviour:
     unitType: 1
     countPerWave: 1
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades: []

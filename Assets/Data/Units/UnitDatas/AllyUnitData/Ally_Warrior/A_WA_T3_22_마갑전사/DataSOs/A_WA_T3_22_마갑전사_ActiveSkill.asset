@@ -15,9 +15,7 @@ MonoBehaviour:
   _display:
     _name: "\uB9C8\uAC11 \uAC15\uC2B5"
     _icon: {fileID: 21300000, guid: e5579d06f38307f4d82e6e83e7926fdb, type: 3}
-    _description: "\uB3CC\uC9C4\uD574 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
-      300% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC8FC\uACE0 3\uCD08\uAC04 \uAE30\uC808\uC2DC\uD0B5\uB2C8\uB2E4.
-      [\uCFE8\uD0C0\uC784 8\uCD08]"
+    _description: "\ub3cc\uc9c4\ud574 \uc8fc\ubcc0 \uc801\uc5d0\uac8c \uacf5\uaca9\ub825\uc758 200% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc8fc\uace0 1.5\ucd08\uac04 \uae30\uc808\uc2dc\ud0b5\ub2c8\ub2e4. [\ucfe8\ud0c0\uc784 8\ucd08]"
   _skillRange: 10
   _skillCooldown: 8
   _targetSide: 0
@@ -51,7 +49,7 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 3
+        _damageMultiplier: 2
     - rid: 4844432359097368580
       type: {class: SkillDashActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -85,7 +83,7 @@ MonoBehaviour:
           _clusterRadius: 1.5
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -128,7 +126,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Dash_OnHit
@@ -137,7 +135,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Ally_ActiveOnHit_Melee

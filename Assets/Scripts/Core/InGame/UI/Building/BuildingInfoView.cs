@@ -33,6 +33,12 @@ namespace Game.UI.InGame
         [SerializeField] private TMP_Text _unitText;
         [SerializeField] private bool _resetScrollOnSelection = true;
 
+        [Header("Compact Management")]
+        [SerializeField] private bool _compactManagement;
+        [SerializeField] private GameObject _spawnRoot;
+        [SerializeField] private TMP_Text _spawnTimingText;
+        [SerializeField] private TMP_Text _spawnValueText;
+
         [SerializeField] private string _missingDescription = "설명이 아직 없습니다.";
         [SerializeField] private UIScreen _playerPopup;
         private UnitData _unit;
@@ -54,15 +60,25 @@ namespace Game.UI.InGame
             _levelText.gameObject.SetActive(false);
             _descriptionText.text = string.IsNullOrWhiteSpace(data.Description)
                 ? _missingDescription : data.Description;
+            bool hasSpawn = data.SpawnCount.HasValue && data.SpawnCount.Value > 0;
+            bool compactSpawn = _compactManagement && hasSpawn && _spawnRoot != null && _spawnValueText != null;
+            string spawnValue = hasSpawn
+                ? $"{(string.IsNullOrWhiteSpace(data.SpawnUnitName) ? "유닛" : data.SpawnUnitName)} × {data.SpawnCount.Value}"
+                : string.Empty;
+            _descriptionText.gameObject.SetActive(!compactSpawn);
             _productionText.text = data.ProductionSummary;
-            _productionText.gameObject.SetActive(!string.IsNullOrWhiteSpace(data.ProductionSummary));
+            _productionText.gameObject.SetActive(!compactSpawn && !string.IsNullOrWhiteSpace(data.ProductionSummary));
             _effectText.text = data.EffectSummary;
             _effectText.gameObject.SetActive(!string.IsNullOrWhiteSpace(data.EffectSummary));
             _costText.text = data.CostSummary;
-            _costText.gameObject.SetActive(!string.IsNullOrWhiteSpace(data.CostSummary));
+            _costText.gameObject.SetActive(!_compactManagement && !string.IsNullOrWhiteSpace(data.CostSummary));
             _unit = data.Unit;
-            _unitButton.gameObject.SetActive(_unit != null);
-            _unitText.text = _unit != null ? _unit.UnitName + "  정보 보기" : string.Empty;
+            _unitButton.gameObject.SetActive(_unit != null && (!_compactManagement || hasSpawn));
+            _unitText.text = compactSpawn ? spawnValue : _unit != null ? _unit.UnitName + "  정보 보기" : string.Empty;
+            _unitText.gameObject.SetActive(!_compactManagement);
+            if (_spawnRoot != null) _spawnRoot.SetActive(compactSpawn);
+            if (_spawnTimingText != null) _spawnTimingText.text = "웨이브 시작 시";
+            if (_spawnValueText != null) _spawnValueText.text = spawnValue;
             _icon.sprite = data.Icon;
             _icon.gameObject.SetActive(data.Icon != null);
             _iconPlaceholder.SetActive(data.Icon == null);

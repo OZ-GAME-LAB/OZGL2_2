@@ -21,11 +21,22 @@ namespace Game.UI
         public Sprite Icon { get; }
         public UnitData Unit { get; }
         public string CostSummary { get; }
+        public string SpawnUnitName { get; }
+        public int? SpawnCount { get; }
 
         public BuildingInfoData(string selectionId, string displayName, string categoryLabel,
             int level, string description = null, string productionSummary = null,
             string effectSummary = null, Sprite icon = null, UnitData unit = null, string costSummary = null,
             string buildingId = null)
+            : this(selectionId, displayName, categoryLabel, level, description, productionSummary,
+                effectSummary, icon, unit, costSummary, buildingId, null, null)
+        {
+        }
+
+        public BuildingInfoData(string selectionId, string displayName, string categoryLabel,
+            int level, string description, string productionSummary, string effectSummary,
+            Sprite icon, UnitData unit, string costSummary, string buildingId,
+            string spawnUnitName, int? spawnCount)
         {
             if (string.IsNullOrWhiteSpace(selectionId))
                 throw new ArgumentException("A selection instance/slot ID is required.", nameof(selectionId));
@@ -46,6 +57,8 @@ namespace Game.UI
             Icon = icon;
             Unit = unit;
             CostSummary = costSummary;
+            SpawnUnitName = spawnUnitName;
+            SpawnCount = spawnCount;
         }
     }
 }

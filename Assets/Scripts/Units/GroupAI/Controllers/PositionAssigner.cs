@@ -11,30 +11,79 @@ namespace Units
         // Constants
         // =========================
 
-        private const float DefaultPositionTolerance =
-            0.25f;
+        private const float DefaultPositionTolerance = 0.25f;
 
-        private const float PositionCheckRadius =
-            0.5f;
+        private const int MaxPathQueries = 4;
 
-        private const float AngleStep =
-            30f;
+        private const int MaxAttackPositionQueries = 24;
 
-        private const int MaxPositionAttempts =
-            12;
+        private const int MaxApproachPositionQueries = 3;
 
-        private const float PreferredRangeRatio =
-            0.9f;
+        private const int PhysicsBufferSize = 32;
+
+        private static readonly float[] SearchAngles =
+        {
+            0f, 15f, -15f, 30f, -30f, 60f, -60f, 90f, -90f
+        };
+
+        private static readonly float[] RangeRatios =
+        {
+            0.9f, 0.75f, 0.6f
+        };
+
+
+        // =========================
+        // Position State
+        // =========================
+
+        private struct PositionCandidate
+        {
+            public Vector2 Position;
+
+            public float Distance;
+        }
+
+
+        private struct PositionReservation
+        {
+            public Vector2 Position;
+
+            public float Spacing;
+        }
 
 
         // =========================
         // References
         // =========================
 
-        private readonly Dictionary<
-            Unit_Gateway,
-            UnitAssignmentContext>
+        private CombatQueryContext _combatQueries;
+
+
+
+        private readonly Dictionary<Unit_Gateway, UnitAssignmentContext>
             _assignmentContexts;
+
+
+        // =========================
+        // Runtime Buffer
+        // =========================
+
+        private readonly PositionCandidate[] _positions =
+            new PositionCandidate[SearchAngles.Length * RangeRatios.Length];
+
+        private readonly List<PositionReservation> _reservations = new();
+
+        private readonly Collider2D[] _occupants =
+            new Collider2D[PhysicsBufferSize];
+
+        private readonly RaycastHit2D[] _pathHits =
+            new RaycastHit2D[PhysicsBufferSize];
+
+        private ContactFilter2D _contactFilter;
+
+        private int _positionCount;
+
+        private float _bodyRadius;
 
 
         // =========================
@@ -42,26 +91,37 @@ namespace Units
         // =========================
 
         public PositionAssigner(
-            Dictionary<
-                Unit_Gateway,
-                UnitAssignmentContext>
-                assignmentContexts)
+            Dictionary<Unit_Gateway, UnitAssignmentContext> assignmentContexts)
         {
-            _assignmentContexts =
-                assignmentContexts;
+            _assignmentContexts = assignmentContexts;
+
+            _contactFilter.SetLayerMask(
+                LayerMask.GetMask("Unit", "Building")
+            );
+
+            _contactFilter.useTriggers = false;
         }
+
+
+        // =========================
+        // Shared Combat Queries
+        // =========================
+
+        public void SetCombatQueries(CombatQueryContext queries)
+        {
+            _combatQueries = queries;
+        }
+
 
 
         // =========================
         // Position Assignment
         // =========================
 
-        public bool TryAssignPosition(
-            Unit_Gateway unit)
+        public bool TryAssignPosition(Unit_Gateway unit)
         {
             if (unit == null)
                 return false;
-
 
             if (!_assignmentContexts.TryGetValue(
                 unit,
@@ -70,199 +130,365 @@ namespace Units
                 return false;
             }
 
-
-            if (!context.HasTarget)
+            if (!context.HasTarget || context.AssignedTarget.Transform == null)
             {
                 context.ClearPosition();
 
                 return false;
             }
 
+            ICombatTarget target = context.AssignedTarget;
 
-            ICombatTarget target =
-                context.AssignedTarget;
+            _bodyRadius = unit.BodyRadius;
 
+            float basicRange =
+                unit.RuntimeStatus?.BasicAttackData?.BasicAttackRange ?? 0f;
 
-            if (target.Transform == null)
-            {
-                context.ClearPosition();
+            float range = basicRange > 0f
+                ? basicRange
+                : unit.PreferredCombatRange;
 
-                return false;
-            }
-
-
-            if (IsCurrentPositionValid(
-                unit,
-                target))
+            if (CombatRangeUtility.Distance(unit, target) <= range)
             {
                 context.SetPosition(
                     unit.transform.position,
                     DefaultPositionTolerance
                 );
 
-
                 return true;
             }
 
+            if (context.TryReusePosition(unit)) return true;
 
-            float preferredRange =
-                CalculatePreferredRange(
-                    unit, target
-                );
+            if (_combatQueries == null)
+                GatherReservations(unit);
 
+            // Retain a lateral waypoint across frequent waiting-position retries.
+            if (context.IsRecovering && context.DetourWaypoint.HasValue)
+            {
+                Vector2 waypoint = context.DetourWaypoint.Value;
+                if (((Vector2)unit.Transform.position - waypoint).sqrMagnitude > 0.0625f
+                    && IsPositionAvailable(unit, waypoint) && IsApproachClear(unit, waypoint))
+                {
+                    context.SetPosition(waypoint, DefaultPositionTolerance, true);
+                    context.CachePosition(unit, 0.15f);
+                    return true;
+                }
+                context.DetourWaypoint = null;
+            }
 
-            Vector2 position =
-                FindPreferredPosition(
-                    unit,
-                    target,
-                    preferredRange
-                );
+            // Failed searches and recovery searches share a cooldown even when the
+            // target changes or an event requests a full reassignment.
+            if (Time.time < context.NextPositionSearchTime)
+            {
+                context.SetPosition(unit.Transform.position, DefaultPositionTolerance, true);
+                context.CachePosition(unit, 0f);
+                return true;
+            }
+            if (context.IsRecovering) context.DelayPositionSearch();
 
+            GatherPositions(unit, target, range);
+
+            Vector2 bestPosition = unit.transform.position;
+
+            float bestCost = float.PositiveInfinity;
+
+            int pathQueries = 0;
+
+            int skippedTailStart = _positionCount - MaxApproachPositionQueries;
+
+            if (((int)(Time.time * 4f) & 1) != 0)
+                skippedTailStart -= MaxApproachPositionQueries;
+
+            for (int i = 0; i < _positionCount; i++)
+            {
+                // 접근 검사 예산을 남기되 같은 끝자리 후보를 영구히 누락하지 않는다.
+                if (_positionCount > MaxAttackPositionQueries
+                    && i >= skippedTailStart && i < skippedTailStart + MaxApproachPositionQueries)
+                {
+                    continue;
+                }
+
+                PositionCandidate candidate = _positions[i];
+
+                // 혼잡 비용은 음수가 아니다. 거리만으로 이미 불리하면
+                // 해당 후보와 그보다 먼 후보의 물리 검사를 생략한다.
+                if (candidate.Distance >= bestCost || pathQueries >= MaxPathQueries)
+                    break;
+
+                if (!IsPositionAvailable(unit, candidate.Position))
+                    continue;
+
+                pathQueries++;
+
+                float congestion = PathCongestion(unit, candidate.Position);
+                if (context.IsRecovering && congestion > 0f) continue;
+                float cost = candidate.Distance + congestion;
+
+                if (cost >= bestCost)
+                    continue;
+
+                bestCost = cost;
+                bestPosition = candidate.Position;
+            }
+
+            // 공격 반원이 차 있어도 멀리서 멈추지 않고 빈 접근 지점까지 이동한다.
+            // 접근 경로까지 막혔으면 현재 위치에서 기다린다.
+            if (float.IsPositiveInfinity(bestCost))
+            {
+                if (!context.IsRecovering || !TryFindDetourPosition(unit, target, context, out bestPosition))
+                    TryFindApproachPosition(unit, target, range, out bestPosition);
+            }
 
             context.SetPosition(
-                position,
-                DefaultPositionTolerance
+                bestPosition,
+                DefaultPositionTolerance,
+                float.IsPositiveInfinity(bestCost)
             );
 
+            if (float.IsPositiveInfinity(bestCost)) context.DelayPositionSearch();
+            context.CachePosition(unit, context.DetourWaypoint.HasValue ? 0.15f
+                : float.IsPositiveInfinity(bestCost) || context.IsRecovering ? 0.5f : 0f);
 
             return true;
         }
 
 
         // =========================
-        // Preferred Range
+        // Waiting Approach
         // =========================
 
-        private float CalculatePreferredRange(Unit_Gateway unit, ICombatTarget target)
-            => CombatRangeUtility.PreferredCenterDistance(unit, target, unit.PreferredCombatRange);
-
-        private bool IsCurrentPositionValid(Unit_Gateway unit, ICombatTarget target)
+        private bool TryFindApproachPosition(
+            Unit_Gateway unit,
+            ICombatTarget target,
+            float range,
+            out Vector2 position)
         {
-            float distance = Vector2.Distance(unit.transform.position, target.Transform.position);
-            return distance >= unit.BodyRadius + target.BodyRadius - 0.01f
-                && distance <= CalculatePreferredRange(unit, target);
+            Vector2 origin = unit.Transform.position;
+
+            position = origin;
+
+            float remaining = CombatRangeUtility.Distance(unit, target) - range;
+
+            float step = Mathf.Min(2f, remaining * 0.5f);
+
+            if (step <= DefaultPositionTolerance)
+                return false;
+
+            Vector2 direction = ((Vector2)target.Transform.position - origin).normalized;
+
+            for (int i = 0; i < MaxApproachPositionQueries; i++)
+            {
+                float angle = i == 0 ? 0f : i == 1 ? 30f : -30f;
+
+                Vector2 candidate = origin + Rotate(direction, angle) * step;
+
+                if (!IsPositionAvailable(unit, candidate) || !IsApproachClear(unit, candidate))
+                    continue;
+
+                position = candidate;
+
+                return true;
+            }
+
+            return false;
         }
+
+
+        private bool TryFindDetourPosition(Unit_Gateway unit, ICombatTarget target,
+            UnitAssignmentContext context, out Vector2 position)
+        {
+            Vector2 origin = unit.Transform.position;
+            Vector2 direction = ((Vector2)target.Transform.position - origin).normalized;
+            position = origin;
+            int side = context.DetourSide != 0 ? context.DetourSide
+                : (unit.GetInstanceID() & 1) == 0 ? 1 : -1;
+            // Try the established side first, including a short backward step around a crowd.
+            // Each leg must be physically clear; a far target alone does not supply a path.
+            for (int pass = 0; pass < 2; pass++)
+            {
+                int sign = pass == 0 ? side : -side;
+                for (int i = 0; i < 6; i++)
+                {
+                    float angle = (i % 3 == 0 ? 60f : i % 3 == 1 ? 90f : 120f) * sign;
+                    float step = i < 3 ? 2.5f : 1.25f;
+                    Vector2 candidate = origin + Rotate(direction, angle) * step;
+                    if (!IsPositionAvailable(unit, candidate) || !IsApproachClear(unit, candidate))
+                        continue;
+                    context.DetourSide = sign;
+                    context.DetourWaypoint = candidate;
+                    position = candidate;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool IsApproachClear(Unit_Gateway unit, Vector2 position)
+        {
+            Vector2 origin = unit.Transform.position;
+
+            Vector2 delta = position - origin;
+
+            int count = Physics2D.CircleCast(
+                origin, _bodyRadius * 0.9f, delta.normalized,
+                _contactFilter, _pathHits, delta.magnitude
+            );
+
+            if (count == _pathHits.Length)
+                return false;
+
+            for (int i = 0; i < count; i++)
+            {
+                Unit_Gateway occupant = _pathHits[i].collider.GetComponentInParent<Unit_Gateway>();
+
+                if (occupant == unit || (occupant != null && !occupant.IsTargetable))
+                    continue;
+
+                // A touching body behind us must not prevent escaping away from it.
+                if (occupant != null && _pathHits[i].distance <= 0.01f
+                    && Vector2.Dot((Vector2)occupant.Transform.position - origin, delta) <= 0f
+                    && (position - (Vector2)occupant.Transform.position).sqrMagnitude
+                        > (origin - (Vector2)occupant.Transform.position).sqrMagnitude)
+                    continue;
+
+                return false;
+            }
+
+            return true;
+        }
+
 
         // =========================
         // Position Selection
         // =========================
 
-        private Vector2 FindPreferredPosition(
+        private void GatherPositions(
             Unit_Gateway unit,
             ICombatTarget target,
-            float preferredRange)
+            float range)
         {
-            Vector2 unitPosition =
-                unit.transform.position;
+            _positionCount = 0;
 
-            Vector2 targetPosition =
-                target.Transform.position;
+            Vector2 origin = unit.transform.position;
 
+            Vector2 center = target.Transform.position;
 
-            Vector2 direction =
-                unitPosition
-                - targetPosition;
+            Vector2 direction = (origin - center).normalized;
 
+            if (direction == Vector2.zero)
+                direction = Vector2.left;
 
-            if (direction.sqrMagnitude
-                <= Mathf.Epsilon)
+            float targetRadius = target.BodyRadius;
+
+            float bodyDistance = _bodyRadius + targetRadius;
+
+            float correction = CombatRangeUtility.Correction(_bodyRadius, targetRadius);
+
+            // 대상의 가까운 반원에서 각도와 깊이를 함께 탐색한다.
+            // 실제 위치 탐색은 타겟 선정 후 선택된 한 대상에게만 수행한다.
+            for (int i = 0; i < RangeRatios.Length; i++)
             {
-                direction =
-                    Vector2.left;
-            }
-            else
-            {
-                direction.Normalize();
-            }
+                float radius = Mathf.Max(
+                    bodyDistance,
+                    range * RangeRatios[i] + correction
+                );
 
-
-            Vector2 preferredPosition =
-                targetPosition
-                + direction
-                * preferredRange;
-
-
-            if (IsPositionAvailable(
-                unit,
-                preferredPosition))
-            {
-                return preferredPosition;
-            }
-
-
-            return FindAlternativePosition(
-                unit,
-                targetPosition,
-                direction,
-                preferredRange,
-                preferredPosition
-            );
-        }
-
-
-        // =========================
-        // Alternative Position
-        // =========================
-
-        private Vector2 FindAlternativePosition(
-            Unit_Gateway unit,
-            Vector2 targetPosition,
-            Vector2 baseDirection,
-            float preferredRange,
-            Vector2 fallbackPosition)
-        {
-            for (int i = 1;
-                 i <= MaxPositionAttempts;
-                 i++)
-            {
-                float angle =
-                    GetSearchAngle(
-                        i
-                    );
-
-
-                Vector2 direction =
-                    Rotate(
-                        baseDirection,
-                        angle
-                    );
-
-
-                Vector2 candidatePosition =
-                    targetPosition
-                    + direction
-                    * preferredRange;
-
-
-                if (IsPositionAvailable(
-                    unit,
-                    candidatePosition))
+                for (int j = 0; j < SearchAngles.Length; j++)
                 {
-                    return candidatePosition;
+                    Vector2 position = center + Rotate(direction, SearchAngles[j]) * radius;
+
+                    AddPosition(position, Vector2.Distance(origin, position));
                 }
             }
-
-
-            return fallbackPosition;
         }
 
 
-        private float GetSearchAngle(
-            int attempt)
+        private void AddPosition(
+            Vector2 position,
+            float distance)
         {
-            int step =
-                (attempt + 1) / 2;
+            // 큰 몸체는 여러 사거리 비율이 같은 반지름으로 보정될 수 있다.
+            // 같은 위치가 물리 검사 예산을 중복 소비하지 않게 한다.
+            for (int i = 0; i < _positionCount; i++)
+            {
+                if ((_positions[i].Position - position).sqrMagnitude < 0.0001f)
+                    return;
+            }
+
+            int index = _positionCount++;
+
+            while (index > 0 && distance < _positions[index - 1].Distance)
+            {
+                _positions[index] = _positions[index - 1];
+                index--;
+            }
+
+            _positions[index] = new PositionCandidate
+            {
+                Position = position,
+                Distance = distance
+            };
+        }
 
 
-            float direction =
-                attempt % 2 == 1
-                    ? 1f
-                    : -1f;
+        // =========================
+        // Position Reservation
+        // =========================
+
+        private void GatherReservations(Unit_Gateway requester)
+        {
+            _reservations.Clear();
+
+            IReadOnlyList<Unit_GroupAI> groups = requester.GroupAI?.EngagementAllies;
+
+            if (groups == null)
+            {
+                AddReservations(requester, _assignmentContexts);
+
+                return;
+            }
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (groups[i] == null)
+                    continue;
+
+                AddReservations(requester, groups[i].AssignmentContexts);
+            }
+        }
 
 
-            return AngleStep
-                * step
-                * direction;
+        private void AddReservations(
+            Unit_Gateway requester,
+            IReadOnlyDictionary<Unit_Gateway, UnitAssignmentContext> assignments)
+        {
+            if (assignments is Dictionary<Unit_Gateway, UnitAssignmentContext> dictionary)
+            {
+                foreach (KeyValuePair<Unit_Gateway, UnitAssignmentContext> pair in dictionary)
+                    AddReservation(requester, pair.Key, pair.Value);
+
+                return;
+            }
+
+            foreach (KeyValuePair<Unit_Gateway, UnitAssignmentContext> pair in assignments)
+                AddReservation(requester, pair.Key, pair.Value);
+        }
+
+
+        private void AddReservation(
+            Unit_Gateway requester,
+            Unit_Gateway unit,
+            UnitAssignmentContext context)
+        {
+            if (unit == null || unit == requester || !unit.IsTargetable || !context.HasPosition)
+                return;
+
+            _reservations.Add(new PositionReservation
+            {
+                Position = context.AssignedPosition.Value,
+                Spacing = _bodyRadius + unit.BodyRadius
+            });
         }
 
 
@@ -274,48 +500,87 @@ namespace Units
             Unit_Gateway requester,
             Vector2 position)
         {
+            if (_combatQueries != null && _combatQueries.IsReserved(requester, position))
+                return false;
 
-
-
-            foreach (
-                KeyValuePair<
-                    Unit_Gateway,
-                    UnitAssignmentContext> pair
-                in _assignmentContexts)
+            for (int i = 0; _combatQueries == null && i < _reservations.Count; i++)
             {
-                if (pair.Key == requester)
-                    continue;
+                PositionReservation reservation = _reservations[i];
 
-
-                UnitAssignmentContext context =
-                    pair.Value;
-
-
-                if (!context.HasPosition)
-                    continue;
-
-
-                Vector2 assignedPosition =
-                    context.AssignedPosition.Value;
-
-
-                float sqrDistance =
-                    (
-                        assignedPosition
-                        - position
-                    ).sqrMagnitude;
-
-
-                float spacing = Mathf.Max(requester.BodyRadius + pair.Key.BodyRadius,
-                    PositionCheckRadius + CombatRangeUtility.Correction(requester, pair.Key));
-                if (sqrDistance < spacing * spacing)
+                if ((position - reservation.Position).sqrMagnitude
+                    < reservation.Spacing * reservation.Spacing)
                 {
                     return false;
                 }
             }
 
+            int count = Physics2D.OverlapCircle(
+                position,
+                Mathf.Max(0.01f, _bodyRadius - 0.02f),
+                _contactFilter,
+                _occupants
+            );
+
+            // 버퍼가 가득 찼다면 누락된 몸체가 있을 수 있으므로 빈자리로 보지 않는다.
+            if (count == _occupants.Length)
+                return false;
+
+            for (int i = 0; i < count; i++)
+            {
+                Unit_Gateway unit = _occupants[i].GetComponentInParent<Unit_Gateway>();
+
+                if (unit == requester || (unit != null && !unit.IsTargetable))
+                    continue;
+
+                return false;
+            }
 
             return true;
+        }
+
+
+        // =========================
+        // Path Evaluation
+        // =========================
+
+        private float PathCongestion(
+            Unit_Gateway requester,
+            Vector2 destination)
+        {
+            Vector2 origin = requester.transform.position;
+
+            Vector2 delta = destination - origin;
+
+            if (delta.sqrMagnitude < 0.0001f)
+                return 0f;
+
+            int count = Physics2D.CircleCast(
+                origin,
+                _bodyRadius * 0.9f,
+                delta.normalized,
+                _contactFilter,
+                _pathHits,
+                delta.magnitude
+            );
+
+            float cost = count == _pathHits.Length ? 6f : 0f;
+
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit2D hit = _pathHits[i];
+
+                Unit_Gateway unit = hit.collider.GetComponentInParent<Unit_Gateway>();
+
+                if (unit == requester || (unit != null && !unit.IsTargetable))
+                    continue;
+
+                if (hit.distance <= 0.01f)
+                    continue;
+
+                cost += unit != null ? 2f : 6f;
+            }
+
+            return cost;
         }
 
 
@@ -327,28 +592,15 @@ namespace Units
             Vector2 direction,
             float angle)
         {
-            float radian =
-                angle
-                * Mathf.Deg2Rad;
+            float radian = angle * Mathf.Deg2Rad;
 
+            float cos = Mathf.Cos(radian);
 
-            float cos =
-                Mathf.Cos(
-                    radian
-                );
-
-            float sin =
-                Mathf.Sin(
-                    radian
-                );
-
+            float sin = Mathf.Sin(radian);
 
             return new Vector2(
-                direction.x * cos
-                - direction.y * sin,
-
-                direction.x * sin
-                + direction.y * cos
+                direction.x * cos - direction.y * sin,
+                direction.x * sin + direction.y * cos
             );
         }
     }

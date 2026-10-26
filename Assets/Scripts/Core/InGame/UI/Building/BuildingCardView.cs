@@ -32,9 +32,10 @@ namespace Game.UI.InGame
             string price = item.GoldCost.HasValue
                 ? BuildingCurrencyText.Format(item.GoldCost.Value, item.GemCost.Value)
                 : "가격 미정";
-            _summary.text = item.Offer != null && !item.Offer.CanExecute
-                ? item.Offer.DisabledReason : item.Summary;
-            _slot.Bind(item.Icon, item.Name, price, selected, interactable,
+            bool coreLocked = item.RequiredCoreLevel.HasValue;
+            _summary.text = coreLocked ? $"<color=#FF5C5C>사령부 {item.RequiredCoreLevel.Value}레벨 필요</color>" :
+                item.Offer != null && !item.Offer.CanExecute ? item.Offer.DisabledReason : item.Summary;
+            _slot.Bind(item.Icon, item.Name, price, selected && !coreLocked, interactable && !coreLocked,
                 () => _onSelected?.Invoke(_itemId));
         }
 

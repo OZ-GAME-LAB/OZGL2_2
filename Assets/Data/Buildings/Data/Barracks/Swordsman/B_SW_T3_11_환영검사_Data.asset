@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_SW_T3_11_\uD658\uC601\uAC80\uC0AC"
   buildingFamilyId: swordsman_barracks
-  displayName: "\uD658\uC601\uAC80\uC0AC"
-  description: "\uD658\uC601\uAC80\uC0AC \uC18C\uD658 \uBCD1\uC601"
+  displayName: "\uD658\uC601\uAC80\uC0AC\uC758 \uB3C4\uC7A5"
+  description: "\uC5F0\uC18D\uB41C \uB9C8\uBC95 \uAC80\uACA9\uC73C\uB85C \uC801\uC744
+    \uBAB0\uC544\uBD99\uC774\uB294 \uD658\uC601\uAC80\uC0AC\uC758 \uB3C4\uC7A5\uC785\uB2C8\uB2E4."
   buildingType: 2
-  icon: {fileID: 21300000, guid: f976b967613649cf9306ed5b3e74aa7b, type: 3}
-  worldSprite: {fileID: 21300000, guid: f976b967613649cf9306ed5b3e74aa7b, type: 3}
+  icon: {fileID: 21300000, guid: 1fe93766accb6bd40914e998a76f23a3, type: 3}
+  worldSprite: {fileID: 21300000, guid: 1fe93766accb6bd40914e998a76f23a3, type: 3}
   prefab: {fileID: 1225663041858023058, guid: f9b49dcf8a1e4ddab7fff6f398008eb8, type: 3}
   buildCost:
   - type: 0
-    amount: 10
+    amount: 165
   buildFromEmptySlot: 0
   requiredCoreLevel: 0
   requiredFamilyIds: []
@@ -38,4 +39,10 @@ MonoBehaviour:
     unitType: 14
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades: []

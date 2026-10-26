@@ -17,7 +17,7 @@ MonoBehaviour:
     _icon: {fileID: 21300000, guid: ebf5e7557cc897f45b9e949ebf12ea7d, type: 3}
     _description: "\uB300\uC0C1 \uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
       300% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. '\uC804\uD22C \uACE0\uC591'
-      25\uC911\uCCA9\uC744 \uC18C\uBE44\uD558\uBA74 700% \uCD94\uAC00 \uBB3C\uB9AC
+      25\uC911\uCCA9\uC744 \uC18C\uBE44\uD558\uBA74 500% \uCD94\uAC00 \uBB3C\uB9AC
       \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 15\uCD08]"
   _skillRange: 7
   _skillCooldown: 15
@@ -62,7 +62,7 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 7
+        _damageMultiplier: 5
     - rid: 4844432386322333701
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -123,7 +123,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Circle
@@ -132,7 +132,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee

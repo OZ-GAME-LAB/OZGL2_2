@@ -120,7 +120,7 @@ namespace Game.Archive
             if (_controller != null)
             {
                 _controller.Changed -= HandleChanged;
-                _controller.Flush();
+                _controller.RequestSave();
             }
         }
 
@@ -337,11 +337,8 @@ namespace Game.Archive
             Sprite icon = entry.Data is ArtifactData artifact ? artifact.Icon :
                 entry.Data is BuildingData building ? building.Icon : null;
             if (icon != null) return icon;
-            if (entry.Data is UnitData unit && entry.IsAlly)
-                foreach (Entry candidate in _entries)
-                    if (candidate.Data is BuildingData producer && producer.HasSpawn &&
-                        producer.Spawn.unitType == unit.GetAllyType() && producer.Icon != null && IsDiscovered(candidate))
-                        return producer.Icon;
+            if (entry.Data is UnitData unit && unit.UnitIcon != null)
+                return unit.UnitIcon;
             return _placeholderIcon;
         }
 

@@ -20,15 +20,15 @@ MonoBehaviour:
   _triggerType: 3
   _tickInterval: 1
   _conditions:
-  - rid: 4617381810361335971
+  - rid: 2552732099008528547
   _effectMode: 0
   _actions:
-  - rid: 4617381810361335972
+  - rid: 2552732099008528548
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4617381810361335971
+    - rid: 2552732099008528547
       type: {class: PassiveRuntimeEffectConditionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _subjectType: 1
@@ -36,9 +36,9 @@ MonoBehaviour:
         _effectId: 
         _statusType: 3
         _shouldExist: 1
-    - rid: 4617381810361335972
+    - rid: 2552732099008528548
       type: {class: PassiveDamageValueModifierActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _ownerType: 0
         _modifierType: 1
-        _value: 0.2
+        _value: 0.12

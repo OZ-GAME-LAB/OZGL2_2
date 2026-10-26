@@ -5,6 +5,7 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using Game.Cameras;
 using Game.UI;
+using OZGL.KDH;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -33,7 +34,8 @@ namespace Game.Core
         Event = 2, //이벤트 진입
         Store = 3, //상점 진입
         QuarterDecision = 4, //분기 보상 마무리 후 다음분기 진행여부 결정상황
-        Finished = 5 //결산창
+        Finished = 5, //결산창
+        InfinityNotice = 6 //계속 도전 선택 완료 후 무한 분기 강화 안내
     }
     public enum ResultType { Victory, Defeat }
     public enum RunDecision { Finish, Continue }
@@ -76,6 +78,13 @@ namespace Game.Core
         public bool IsLastNode => _nodeController != null && _nodeController.IsLastNode;
 
         public event Action<GamePhase> PhaseChanged;
+        public event Action<ResultType> BattleResultConfirmed;
+        public ResultType? LastBattleResult { get; private set; }
+        public event Action BattleAvailabilityChanged;
+        public bool HasBarracks => _buildingCensus != null &&
+            _buildingCensus.CountType(BuildingType.Barracks) > 0;
+        private BuildingCensus _buildingCensus;
+
         public event Action QuarterDecisionRequested;
         public event Action ArtifactSelectionRequested;
         public GamePhase CurPhase => _curPhase;
@@ -91,15 +100,18 @@ namespace Game.Core
         private TestWaitingScript _testScript;
         private WaveController _waveController; //인게임 전투 담당
         private ArtifactManager _artifactManager; //게임 진행 중 아티팩트 클리어 담당
-        private ArchiveManager _archiveManager;
+        private RunRecordManager _runRecordManager;
         private IRunSettlementRewards _settlementRewards;
         private IContinueUI _continueUI;
         private IRunDecisionUI _decisionUI;
         private IShopFlow _shopFlow;
         private IEventFlow _eventFlow;
+        private ISceneTransition _sceneTransition;
+        private IRunCheckpointWriter _checkpointWriter;
+        
         private GamePhase _curPhase;
         private RunResumeStep _resumeStep;
-        private IRunCheckpointWriter _checkpointWriter;
+        
         private bool _hasBegun;
         private bool _restoredStep;
         private bool _startupBlocked;
@@ -124,7 +136,7 @@ namespace Game.Core
             WaveController waveController, 
             TestWaitingScript testScript, 
             ArtifactManager artifactManager, 
-            ArchiveManager archiveManager = null,
+            RunRecordManager runRecordManager = null,
             IRunSettlementRewards settlementRewards = null,
             InGameCameraController cameraController = null,
             IShopFlow shopFlow = null)
@@ -132,7 +144,7 @@ namespace Game.Core
             _testScript = testScript;
             _waveController = waveController;
             _artifactManager = artifactManager;
-            _archiveManager = archiveManager;
+            _runRecordManager = runRecordManager;
             _settlementRewards = settlementRewards;
             _cameraController = cameraController;
             _shopFlow = shopFlow;
@@ -156,6 +168,17 @@ namespace Game.Core
                 throw new InvalidOperationException("기본 런 준비 실패: " + error);
         }
 
+        public void InitializeBuildings(BuildingCensus census)
+        {
+            if (census == null) throw new ArgumentNullException(nameof(census));
+            if (_buildingCensus != null)
+                _buildingCensus.Changed -= HandleBuildingsChanged;
+            _buildingCensus = census;
+            _buildingCensus.Changed += HandleBuildingsChanged;
+            HandleBuildingsChanged();
+        }
+
+
         public void InitializeSave(IRunCheckpointWriter checkpointWriter)
         {
             _checkpointWriter = checkpointWriter ?? throw new ArgumentNullException(nameof(checkpointWriter));
@@ -164,6 +187,11 @@ namespace Game.Core
         public void InitializeEventFlow(IEventFlow eventFlow)
         {
             _eventFlow = eventFlow ?? throw new ArgumentNullException(nameof(eventFlow));
+        }
+
+        public void InitializeSceneTransition(ISceneTransition sceneTransition)
+        {
+            _sceneTransition = sceneTransition;
         }
 
         public void BlockStartup()
@@ -185,13 +213,31 @@ namespace Game.Core
 
         private void OnDestroy()
         {
+            if (_buildingCensus != null)
+                _buildingCensus.Changed -= HandleBuildingsChanged;
             _cts?.Cancel();
             _cts?.Dispose();
         }
-        
+        /// <summary>
+        /// 현재 건물 건설이 가능한 페이즈인지 반환하는 메서드
+        /// 사용처 : 건설시스템
+        /// </summary>
+        public bool CanEnterBuildMode()
+        {
+            return !_isTransitioning && _curPhase == GamePhase.Preparation;
+        }
+
+        /// <summary>
+        /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
+        /// 사용처 : 유닛시스템
+        /// </summary>
+        public bool CanBattle()
+        {
+            return !_isTransitioning && _curPhase == GamePhase.Battle;
+        }
+
         // 기존 버튼/샘플의 연결은 유지하되 준비된 런을 다시 초기화하지 않는다.
         public void BeginRun() => BeginRunAsync().Forget();
-
         public async UniTask BeginRunAsync()
         {
             if (_hasBegun || _startupBlocked || _curPhase != GamePhase.None) return;
@@ -238,6 +284,34 @@ namespace Game.Core
             _restoredStep = true;
         }
 
+        /// <summary>일시정지를 유지한 채 진행 상태를 저장합니다. 실패하면 종료하지 않습니다.</summary>
+        public bool TrySaveBeforeExit(out string error)
+        {
+            if (_checkpointWriter == null)
+            {
+                error = "저장 시스템이 아직 준비되지 않았습니다.";
+                return false;
+            }
+            if (_startupBlocked || _isResetting || _isEndingRun ||
+                _curPhase == GamePhase.None || _curPhase == GamePhase.Finished ||
+                _curPhase == GamePhase.BattleResolving)
+            {
+                error = "진행 상태를 처리 중입니다. 처리가 끝난 뒤 다시 시도해주세요.";
+                return false;
+            }
+
+            try
+            {
+                // 기존 체크포인트 형식을 사용하므로 전투 중 저장은 준비 단계에서 재개합니다.
+                return _checkpointWriter.TrySave(out error);
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
         //게임을 종료하고 메인으로 이동
         public void QuitRun()
         {
@@ -259,7 +333,9 @@ namespace Game.Core
             _waveController.BattlePause();
             ClearToken();
             var token = _cts.Token;
+            LastBattleResult = ResultType.Defeat;
             ChangePhase(GamePhase.BattleResolving);
+            BattleResultConfirmed?.Invoke(ResultType.Defeat);
 
             // 취소된 UI의 finally와 스폰 정리가 끝난 뒤 정산 UI를 연다.
             await pendingFlow;
@@ -288,7 +364,9 @@ namespace Game.Core
             if ((data.ResumeStep == RunResumeStep.Event && CurrentNode.PostBattleEvent != PostBattleEventType.Event &&
                  CurrentNode.PostBattleEvent != PostBattleEventType.Curse) ||
                 (data.ResumeStep == RunResumeStep.Store && CurrentNode.PostBattleEvent != PostBattleEventType.Shop) ||
-                (data.ResumeStep == RunResumeStep.QuarterDecision && (!IsLastNode || !data.HasClearedMainGame)))
+                (data.ResumeStep == RunResumeStep.QuarterDecision && (!IsLastNode || !data.HasClearedMainGame)) ||
+                (data.ResumeStep == RunResumeStep.InfinityNotice &&
+                    (!IsLastNode || !data.HasClearedMainGame || CurrentQuarter < NodeController.MainQuarters)))
             {
                 throw new ArgumentException("저장된 재개 단계와 현재 노드가 일치하지 않습니다.");
             }
@@ -312,38 +390,25 @@ namespace Game.Core
                 // 스포너의 배치 공간 정리까지 끝난 후 런타임을 비운다.
                 await pendingSpawn;
                 token.ThrowIfCancellationRequested();
-                await SceneManager.LoadSceneAsync(MainMenuScene);
+                if (_sceneTransition != null)
+                    await _sceneTransition.LoadAsync(MainMenuScene);
+                else
+                    await SceneManager.LoadSceneAsync(MainMenuScene);
             }
             finally
             {
                 _isResetting = false;
             }
         }
+        private void HandleBuildingsChanged() => BattleAvailabilityChanged?.Invoke();
 
-        /// <summary>
-        /// 현재 건물 건설이 가능한 페이즈인지 반환하는 메서드
-        /// 사용처 : 건설시스템
-        /// </summary>
-        public bool CanEnterBuildMode()
-        {
-            return !_isTransitioning && _curPhase == GamePhase.Preparation;
-        }
-
-        /// <summary>
-        /// 유닛이 서로 전투가능한 상태인지 반환하는 메서드
-        /// 사용처 : 유닛시스템
-        /// </summary>
-        public bool CanBattle()
-        {
-            return !_isTransitioning && _curPhase == GamePhase.Battle;
-        }
 
         // 전투준비 페이즈를 담당.
         // 실제 유닛 실행까지만 요청하고 실제 전투페이즈는 TryStartWave 메서드에서 실행
         public async UniTask<bool> TrySpawnUnits()
         {
             if (_isTransitioning || _curPhase != GamePhase.Preparation) return false;
-            if (_waveController.CurrentPreset == null) return false;
+            if (!HasBarracks || _waveController.CurrentPreset == null) return false;
             _isTransitioning = true;
             var token = _cts.Token;
             var completion = new UniTaskCompletionSource();
@@ -407,7 +472,9 @@ namespace Game.Core
         private async UniTask ResolveBattleCoreAsync(ResultType result, CancellationToken token)
         {
             Node completedNode = CurrentNode;
+            LastBattleResult = result;
             ChangePhase(GamePhase.BattleResolving);
+            BattleResultConfirmed?.Invoke(result);
             // 실제 유닛 파트는 이 페이즈 진입 시 공격·이동·피해 처리를 중단해야 한다.
             await PlayBattleResultAsync(result, token);
             token.ThrowIfCancellationRequested(); //token이 들어간 작업이 중단되면 취소 예외 발생
@@ -439,7 +506,12 @@ namespace Game.Core
                 await WaitArtifactSelection(completedNode.BattleType, token);
                 await CleanupBattleAsync(token);
             }
-            if (startStep != RunResumeStep.QuarterDecision)
+            // 무한 분기 말의 저주 안내는 계속 도전 선택 후에 표시한다.
+            // 기존 Curse/Event 저장도 이 경로로 옮겨 안내가 먼저 재생되지 않게 한다.
+            bool deferredInfinityNotice = IsLastNode && CurrentQuarter >= NodeController.MainQuarters
+                && completedNode.PostBattleEvent == PostBattleEventType.Curse;
+            if (startStep != RunResumeStep.QuarterDecision && startStep != RunResumeStep.InfinityNotice
+                && !deferredInfinityNotice)
                 await ProcessEventAsync(completedNode, token);
             token.ThrowIfCancellationRequested();
 
@@ -447,7 +519,8 @@ namespace Game.Core
                 AdvanceNode();
             else
             {
-                if (startStep == RunResumeStep.QuarterDecision || (HasClearedMainGame && !AutoContinue))
+                if (startStep != RunResumeStep.InfinityNotice &&
+                    (startStep == RunResumeStep.QuarterDecision || (HasClearedMainGame && !AutoContinue)))
                 {
                     RunDecision decision = await ChooseQuarterDecisionAsync(token);
                     if (decision == RunDecision.Finish)
@@ -456,6 +529,9 @@ namespace Game.Core
                         return;
                     }
                 }
+                if (CurrentQuarter >= NodeController.MainQuarters)
+                    await ShowInfinityNoticeAsync(CurrentQuarter + 1, token);
+                token.ThrowIfCancellationRequested();
                 if (!StartQuarter(CurrentQuarter + 1))
                     throw new InvalidOperationException("다음 분기 생성에 실패했습니다.");
             }
@@ -469,6 +545,22 @@ namespace Game.Core
             ChangePhase(GamePhase.Preparation);
             await SaveCheckpointAsync(token);
             IsResumingStep = false;
+        }
+
+        private async UniTask ShowInfinityNoticeAsync(int nextQuarter, CancellationToken token)
+        {
+            _resumeStep = RunResumeStep.InfinityNotice;
+            ChangePhase(GamePhase.Event);
+            await SaveCheckpointAsync(token);
+            IsResumingStep = false;
+            token.ThrowIfCancellationRequested();
+            if (_continueUI == null) return; // UI 없는 테스트 호출자는 안내를 생략한다.
+
+            int infinityQuarter = nextQuarter - NodeController.MainQuarters;
+            float bonusPercent = WaveController.CalculateInfinityBonus(nextQuarter, 1) * 100f;
+            await _continueUI.ShowAsync(
+                $"무한 {infinityQuarter}분기 진입\n적 최대 체력·공격력 +{bonusPercent:0}%", token);
+            token.ThrowIfCancellationRequested();
         }
 
         /// <summary> 정규 스토리 분기(5분기) 클리어 후 계속 진행할지 결정하는 메서드</summary>
@@ -604,14 +696,14 @@ namespace Game.Core
             Debug.Log($"[Core/GameFlowController] 게임 종료 : {type}");
             ResetDecisionState();
             token.ThrowIfCancellationRequested();
-            if (_archiveManager == null || _settlementRewards == null)
+            if (_runRecordManager == null || _settlementRewards == null)
                 throw new InvalidOperationException("게임 종료 기록과 정산 매니저를 먼저 연결해주세요.");
 
             // 재시도에도 같은 확정 기록을 사용해야 이미 저장한 보상을 다시 지급하지 않는다.
-            if (!_archiveManager.TryGetRunSummary(out RunSummary summary))
+            if (!_runRecordManager.TryGetRunSummary(out RunSummary summary))
             {
-                _archiveManager.CompleteRun();
-                if (!_archiveManager.TryGetRunSummary(out summary))
+                _runRecordManager.CompleteRun();
+                if (!_runRecordManager.TryGetRunSummary(out summary))
                     throw new InvalidOperationException("게임 결산 기록을 불러올 수 없습니다.");
             }
 
@@ -678,6 +770,7 @@ namespace Game.Core
 
         private void ChangePhase(GamePhase phase)
         {
+            if (phase == GamePhase.None || phase == GamePhase.Preparation) LastBattleResult = null;
             _curPhase = phase;
             PhaseChanged?.Invoke(phase);
         }

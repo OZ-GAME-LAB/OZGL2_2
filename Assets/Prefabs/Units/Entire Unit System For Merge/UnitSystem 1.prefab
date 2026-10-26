@@ -591,6 +591,8 @@ MonoBehaviour:
     _maxJoinDistance: 6
     _maxCombinedExtent: 15
     _maxCombinedGroups: 10
+    _closeContactGap: 1
+    _combatContactMargin: 1
 --- !u!1 &3867662651635427887
 GameObject:
   m_ObjectHideFlags: 0
@@ -835,6 +837,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.FX.SFXManager
   _catalog: {fileID: 11400000, guid: fbb172202b5c768418f141e557405860, type: 2}
+  _mixerGroup: {fileID: -7381466782621960711, guid: 9f09f4f764d14954cb6d42e0b6c893f0, type: 2}
   _maxStored: 32
   _maxActive: 64
 --- !u!1 &6158351459864469375
@@ -1046,7 +1049,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Units.ProjectileManager
   _projectilePrefab: {fileID: 7783028690776527434, guid: 995832b803b81d040a95763c035bc1c6, type: 3}
-  _collisionRadius: 0.2
+  _collisionRadius: 0.5
   _maxLifetime: 4
 --- !u!1 &7860712746808762194
 GameObject:

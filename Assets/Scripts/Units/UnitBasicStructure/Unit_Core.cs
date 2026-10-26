@@ -82,6 +82,8 @@ namespace Units
 
         public float PreferredCombatRange => _combat != null ? _combat.PreferredCombatRange : 0f;
 
+        public float EngagementEntryRange => _combat != null ? _combat.EngagementEntryRange : 0f;
+
         public float CurrentHp => _life != null ? _life.CurrentHp : 0f;
 
         public float CurrentShield => _life != null ? _life.CurrentShield : 0f;
@@ -542,6 +544,9 @@ namespace Units
         // ============================================================
         // Life
         // ============================================================
+
+        public CombatDeathResult LastDeath => _life?.LastDeath;
+        internal void NotifyDamageApplied(CombatApplicationResult result) => _gateway?.NotifyDamageApplied(result);
 
         public CombatApplicationResult TakeDamageWithResult(DamageResult result)
         {

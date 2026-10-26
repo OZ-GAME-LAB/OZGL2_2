@@ -22,7 +22,7 @@ MonoBehaviour:
       15%\uC624\uB974\uB294 '\uC9D1\uC911' \uC0C1\uD0DC\uAC00 \uB429\uB2C8\uB2E4.
       [\uCFE8\uD0C0\uC784 8\uCD08]"
   _skillRange: 10
-  _skillCooldown: 8
+  _skillCooldown: 5
   _targetSide: 2
   _targetPolicy: 3
   _actionType: 0
@@ -73,7 +73,7 @@ MonoBehaviour:
           _endPolicy: 0
           _kind: 0
           _attachment: 1
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_OnApply_Buff
@@ -82,10 +82,10 @@ MonoBehaviour:
           _endPolicy: 0
           _kind: 1
           _attachment: 1
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
-        _duration: 1
+        _duration: 0.5
     - rid: 4617381741844758639
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -147,7 +147,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_OnApply_Buff
@@ -156,7 +156,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         _delivery: 0

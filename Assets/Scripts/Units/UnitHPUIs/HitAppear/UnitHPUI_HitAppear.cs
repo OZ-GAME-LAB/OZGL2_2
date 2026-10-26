@@ -29,7 +29,7 @@ namespace Units.UI
             0.001f;
 
         private const float MaxShieldHpMultiplier =
-            2f;
+            1f;
 
 
         // ============================================================

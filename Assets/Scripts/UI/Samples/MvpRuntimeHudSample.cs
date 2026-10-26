@@ -250,8 +250,8 @@ namespace Game.UI.Samples
                 _currencyManager.Initialize(_waves, null, _effectManager, _buildingCoreProgress);
             if (_buildingController == null)
                 _buildingController = FindFirstObjectByType<BuildingBuildController>();
-            if (_buildingController != null)
-                _buildingController.Initialize(_currencyManager, _flow, _buildingCoreProgress);
+            //if (_buildingController != null)
+                //_buildingController.Initialize(_currencyManager, _flow, _buildingCoreProgress);
 
             bool artifactsReady = _artifactManager != null && _effectManager != null;
             if (artifactsReady && !_artifactManager.IsInitialized)

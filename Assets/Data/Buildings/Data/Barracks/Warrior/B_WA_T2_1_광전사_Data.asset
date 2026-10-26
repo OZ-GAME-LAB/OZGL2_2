@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_WA_T2_1_\uAD11\uC804\uC0AC"
   buildingFamilyId: warrior_barracks
-  displayName: "\uAD11\uC804\uC0AC"
-  description: "\uAD11\uC804\uC0AC \uC18C\uD658 \uBCD1\uC601"
+  displayName: "\uAD11\uC804\uC0AC\uC758 \uBCD1\uC601"
+  description: "\uAC70\uCE68\uC5C6\uB294 \uACF5\uACA9\uC73C\uB85C \uC801\uC744 \uBAB0\uC544\uBD99\uC774\uB294
+    \uAD11\uC804\uC0AC\uC758 \uBCD1\uC601\uC785\uB2C8\uB2E4."
   buildingType: 2
-  icon: {fileID: 21300000, guid: c16730d9daba4ebda955f3319db874c1, type: 3}
-  worldSprite: {fileID: 21300000, guid: c16730d9daba4ebda955f3319db874c1, type: 3}
+  icon: {fileID: 21300000, guid: 979e8e7cf8821e2428edceeb4be36b97, type: 3}
+  worldSprite: {fileID: 21300000, guid: 979e8e7cf8821e2428edceeb4be36b97, type: 3}
   prefab: {fileID: 6034148869325694894, guid: e37283f34091413d826cb87f516407f3, type: 3}
   buildCost:
   - type: 0
-    amount: 10
+    amount: 75
   buildFromEmptySlot: 0
   requiredCoreLevel: 0
   requiredFamilyIds: []
@@ -38,9 +39,15 @@ MonoBehaviour:
     unitType: 2
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 35fa4d2d933a4922a3b3b55a3a014de1, type: 2}
     cost:
     - type: 0
-      amount: 50
-    requiredCoreLevel: 2
+      amount: 90
+    requiredCoreLevel: 3

@@ -15,7 +15,6 @@ namespace Game.UI.InGame
         [SerializeField] private GameHudView _ui;
         [SerializeField] private TMP_Text _quarterText;
         [SerializeField] private TMP_Text _gemText;
-        [SerializeField] private TMP_Text _hint;
         [SerializeField] private MessageView _messages;
 
         private RunCurrencyManager _wallet;
@@ -50,29 +49,30 @@ namespace Game.UI.InGame
             RefreshCurrency();
             if (_flow == null || _waves == null)
             {
-                _ui.SetPhaseLabel("연결 대기");
                 _ui.ClearWaveProgress();
                 SetText(_quarterText, "분기 -- · 웨이브");
-                SetText(_hint, string.Empty);
                 _ui.SetWaveStartInteractable(false);
                 return;
             }
 
-            _ui.SetPhaseLabel(GetPhaseLabel(_flow.CurPhase));
-            SetText(_quarterText, _flow.CurPhase != GamePhase.None && _waves.CurQuarter >= 1
-                ? $"분기 {_waves.CurQuarter} · 웨이브" : "분기 -- · 웨이브");
+            string quarterLabel = _waves.CurQuarter > WaveController.MAIN_QUARTERS
+                ? $"무한 {_waves.CurQuarter - WaveController.MAIN_QUARTERS} 분기"
+                : $"{_waves.CurQuarter} 분기 ";
+
+            string battleLabel = _flow.CurrentNode?.BattleType == WaveBattleType.Boss
+                ? "보스 전투"
+                : _flow.CurrentNode?.IsElite == true ? "정예 전투" : "일반 전투";
+
+            SetText(_quarterText, $"{quarterLabel} · {battleLabel}");
             if (_flow.CurPhase != GamePhase.None && _waves.CurWave >= 1 &&
                 _waves.CurWave <= WaveController.MAX_WAVE)
                 _ui.SetWaveProgress(_waves.CurWave, WaveController.MAX_WAVE);
             else
                 _ui.ClearWaveProgress();
 
-            SetText(_hint, _flow.CurPhase == GamePhase.Preparation ? "건설할 위치를 선택하세요" :
-                _flow.CurPhase == GamePhase.Battle || _flow.CurPhase == GamePhase.BattlePreparing
-                    ? "전투 중에는 건설할 수 없습니다" : string.Empty);
             // PhaseChanged는 전환 잠금 해제 전에 발생한다. 실행 조건은 Core가 다시 확인한다.
             _ui.SetWaveStartInteractable(_isSubscribed && !_isStartPending &&
-                _flow.CurPhase == GamePhase.Preparation && _waves.CurrentPreset != null);
+                _flow.CurPhase == GamePhase.Preparation && _waves.CurrentPreset != null && _flow.HasBarracks);
         }
 
         private void RefreshCurrency()
@@ -80,11 +80,11 @@ namespace Game.UI.InGame
             if (_wallet == null || !_wallet.IsInitialized)
             {
                 _ui.ClearGold();
-                SetText(_gemText, "보석 --");
+                SetText(_gemText, "--");
                 return;
             }
             _ui.SetGold(_wallet.GetBalance(CurrencyType.Gold));
-            SetText(_gemText, $"보석 {_wallet.GetBalance(CurrencyType.Gem):N0}");
+            SetText(_gemText, $"{_wallet.GetBalance(CurrencyType.Gem):N0}");
         }
 
         private void HandleBalanceChanged(CurrencyData currency, int previous, int current)
@@ -92,7 +92,7 @@ namespace Game.UI.InGame
             if (currency == null || _ui == null) return;
             // 재화 갱신은 현재 팝업의 키보드 포커스를 바꾸지 않는다.
             if (currency.Type == CurrencyType.Gold) _ui.SetGold(current);
-            else if (currency.Type == CurrencyType.Gem) SetText(_gemText, $"보석 {current:N0}");
+            else if (currency.Type == CurrencyType.Gem) SetText(_gemText, $"{current:N0}");
         }
 
         private void HandlePhaseChanged(GamePhase phase)
@@ -131,7 +131,7 @@ namespace Game.UI.InGame
             {
                 bool started = await _flow.TrySpawnUnits().AttachExternalCancellation(token);
                 if (IsCurrentRequest(requestVersion) && !started)
-                    _messages?.Show("웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요.");
+                    _messages?.Show(_flow.HasBarracks ? "웨이브를 시작하지 못했습니다. 현재 상태를 확인해주세요." : "병영을 먼저 건설해주세요.");
             }
             catch (OperationCanceledException)
             {
@@ -164,6 +164,7 @@ namespace Game.UI.InGame
             _bindingLifetime = new CancellationTokenSource();
             _wallet.BalanceChanged += HandleBalanceChanged;
             _flow.PhaseChanged += HandlePhaseChanged;
+            _flow.BattleAvailabilityChanged += Refresh;
             _waves.WaveChanged += HandleWaveChanged;
             _ui.WaveStartRequested += HandleWaveStartRequested;
             _isSubscribed = true;
@@ -177,7 +178,11 @@ namespace Game.UI.InGame
             if (_isSubscribed)
             {
                 if (_wallet != null) _wallet.BalanceChanged -= HandleBalanceChanged;
-                if (_flow != null) _flow.PhaseChanged -= HandlePhaseChanged;
+                if (_flow != null)
+                {
+                    _flow.PhaseChanged -= HandlePhaseChanged;
+                    _flow.BattleAvailabilityChanged -= Refresh;
+                }
                 if (_waves != null) _waves.WaveChanged -= HandleWaveChanged;
                 if (_ui != null)
                 {
@@ -189,23 +194,6 @@ namespace Game.UI.InGame
             _bindingLifetime?.Cancel();
             _bindingLifetime?.Dispose();
             _bindingLifetime = null;
-        }
-
-        private static string GetPhaseLabel(GamePhase phase)
-        {
-            switch (phase)
-            {
-                case GamePhase.Preparation: return "건설";
-                case GamePhase.BattlePreparing: return "전투 준비";
-                case GamePhase.Battle: return "전투";
-                case GamePhase.BattleResolving: return "전투 정산";
-                case GamePhase.QuarterComplete: return "분기 완료";
-                case GamePhase.Reward: return "보상";
-                case GamePhase.Event: return "이벤트";
-                case GamePhase.Store: return "상점";
-                case GamePhase.Finished: return "결과";
-                default: return "연결 대기";
-            }
         }
 
         private static void SetText(TMP_Text target, string value)

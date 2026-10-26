@@ -13,13 +13,15 @@ namespace Game.Core
         public EnemyUnitFaction Faction => Preset.Faction;
         public PostBattleEventType PostBattleEvent { get; }
         public WaveBattleType BattleType => Preset.BattleType;
+        public bool IsElite { get; }
 
         public Node(int waveNumber, WaveSO preset,
-            PostBattleEventType postBattleEvent)
+            PostBattleEventType postBattleEvent, bool isElite)
         {
             WaveNumber = waveNumber;
             Preset = preset ?? throw new ArgumentNullException(nameof(preset));
             PostBattleEvent = postBattleEvent;
+            IsElite = isElite;
         }
     }
     [Serializable]
@@ -28,6 +30,7 @@ namespace Game.Core
         public int waveNumber;
         public int presetId;
         public PostBattleEventType postBattleEvent;
+        public bool isElite;
     }
     [Serializable]
     public class NodeSaveData //노드 저장 데이터
@@ -77,6 +80,7 @@ namespace Game.Core
                 entry.waveNumber = node.WaveNumber;
                 entry.presetId = node.Preset.WaveID;
                 entry.postBattleEvent = node.PostBattleEvent;
+                entry.isElite = node.IsElite;
 
                 data.nodes.Add(entry);
             }
@@ -101,7 +105,7 @@ namespace Game.Core
                         $"저장된 웨이브 SO를 찾을 수 없습니다: {entry.presetId}");
                 }
 
-                Node node = new Node(entry.waveNumber, preset, entry.postBattleEvent);
+                Node node = new Node(entry.waveNumber, preset, entry.postBattleEvent, entry.isElite);
                 nodes.Add(node);
             }
 
@@ -137,12 +141,13 @@ namespace Game.Core
             //노드별 전투종류를 설정하며, 마지막 5번째에는 보스가 확정적으로 등장한다
             var types = new WaveBattleType[WavesPerQuarter];
             types[4] = WaveBattleType.Boss;
+            var isElite = new bool[WavesPerQuarter];
             int eliteCount = _random.NextDouble() < twoEliteChance ? 2 : 1;
             var middle = new List<int> { 1, 2, 3 };
             for (int i = 0; i < eliteCount; i++)
             {
                 int pick = _random.Next(middle.Count);
-                types[middle[pick]] = WaveBattleType.Elite;
+                isElite[middle[pick]] = true;
                 middle.RemoveAt(pick);
             }
             
@@ -172,7 +177,7 @@ namespace Game.Core
                     error = $"프리셋 후보 누락: 분기 {quarter}, 웨이브 {i + 1}, 타입 {types[i]}";
                     return false;
                 }
-                nodes[i] = new Node(i + 1, preset, events[i]);
+                nodes[i] = new Node(i + 1, preset, events[i], isElite[i]);
             }
             Nodes = Array.AsReadOnly(nodes);
             CurrentQuarter = quarter;

@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_AR_T1_\uAD81\uC218"
   buildingFamilyId: archer_barracks
-  displayName: "\uAD81\uC218"
-  description: "\uAD81\uC218 \uC18C\uD658 \uBCD1\uC601"
+  displayName: "\uAD81\uC218\uC758 \uC0AC\uACA9\uC7A5"
+  description: "\uD6C4\uBC29\uC5D0\uC11C \uAFB8\uC900\uD788 \uD654\uC0B4\uC744 \uD37C\uBD93\uB294
+    \uAD81\uC218\uC758 \uC0AC\uACA9\uC7A5\uC785\uB2C8\uB2E4."
   buildingType: 2
-  icon: {fileID: 21300000, guid: e9e4661fd3ed4ea5938ad2f455bc207d, type: 3}
-  worldSprite: {fileID: 21300000, guid: e9e4661fd3ed4ea5938ad2f455bc207d, type: 3}
+  icon: {fileID: 21300000, guid: ec6cbf5d42f77f54296f3017238caa1b, type: 3}
+  worldSprite: {fileID: 21300000, guid: ec6cbf5d42f77f54296f3017238caa1b, type: 3}
   prefab: {fileID: 5622343327400181454, guid: 6de4bb6cdaa14d94b4101ce25335145e, type: 3}
   buildCost:
   - type: 0
-    amount: 10
+    amount: 30
   buildFromEmptySlot: 1
   requiredCoreLevel: 0
   requiredFamilyIds: []
@@ -38,14 +39,20 @@ MonoBehaviour:
     unitType: 21
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 352013810b69455ca4e8756f753b4d1e, type: 2}
     cost:
     - type: 0
-      amount: 50
+      amount: 45
     requiredCoreLevel: 2
   - nextBuilding: {fileID: 11400000, guid: 69c9b26a32754fb69b5d0dd4341313b9, type: 2}
     cost:
     - type: 0
-      amount: 50
+      amount: 45
     requiredCoreLevel: 2

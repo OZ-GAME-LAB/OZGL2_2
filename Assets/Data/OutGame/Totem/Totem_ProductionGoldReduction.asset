@@ -17,11 +17,12 @@ MonoBehaviour:
   _isAvailable: 1
   _displayName: "\uD749\uC791\uC758 \uD1A0\uD15C"
   _description: "\uC0DD\uC0B0\uC73C\uB85C \uD68D\uB4DD\uD558\uB294 \uACE8\uB4DC\uAC00
-    \uAC10\uC18C\uD569\uB2C8\uB2E4."
-  _icon: {fileID: 0}
+    \uB808\uBCA8\uB2F9 {value}{unit} \uAC10\uC18C\uD569\uB2C8\uB2E4."
+  _activeDescription: 
+  _icon: {fileID: 21300000, guid: 430e988e960729e4395366437fae111b, type: 3}
   _selectionMode: 0
   _effectLabel: "\uC0DD\uC0B0 \uACE8\uB4DC \uD68D\uB4DD\uB7C9 \uAC10\uC18C"
-  _valuePerLevel: 15
+  _valuePerLevel: 10
   _valueUnit: '%'
   _maxLevel: 3
   _rewardBonusPerLevel: 10
@@ -29,4 +30,4 @@ MonoBehaviour:
   - _currencyType: 1
     _rewardType: 2
     _modifierType: 1
-    _value: -0.15
+    _isReduction: 1

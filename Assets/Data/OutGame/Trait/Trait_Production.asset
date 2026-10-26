@@ -16,13 +16,13 @@ MonoBehaviour:
   _displayName: "\uD48D\uC694\uB85C\uC6B4 \uC0DD\uC0B0"
   _description: "\uC0DD\uC0B0 \uAC74\uBB3C\uC5D0\uC11C \uB354 \uB9CE\uC740 \uACE8\uB4DC\uB97C
     \uD68D\uB4DD\uD569\uB2C8\uB2E4."
-  _icon: {fileID: 0}
+  _icon: {fileID: 21300000, guid: b6f8c223ae7bec44a9e44fba6811aa5b, type: 3}
   _effectLabel: "\uC0DD\uC0B0 \uACE8\uB4DC \uC99D\uAC00"
   _valuePerLevel: 5
   _valueUnit: '%'
   _maxLevel: 5
-  _upgradeCost: 150
-  _upgradeCosts: 
+  _upgradeCost: 0
+  _upgradeCosts: 5000000064000000780000008c000000a0000000
   _prerequisite: {fileID: 11400000, guid: ad3d97b9d1519f24a9ba46eeb2ecf94b, type: 2}
   _prerequisiteLevel: 1
   _statEffects: []
@@ -30,5 +30,5 @@ MonoBehaviour:
   - _currencyType: 1
     _rewardType: 2
     _modifierType: 1
-    _value: 0.05
+    _isReduction: 0
   _startingCurrencies: []

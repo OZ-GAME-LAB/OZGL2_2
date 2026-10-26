@@ -22,23 +22,23 @@ MonoBehaviour:
   _conditions: []
   _effectMode: 0
   _actions:
-  - rid: 4617381810361335975
+  - rid: 2552732099008528551
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4617381810361335975
+    - rid: 2552732099008528551
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 2
         _targetRelation: 0
-        _maxEffectTargetCount: 3
+        _maxEffectTargetCount: 4
         _areaType: 1
-        _areaRadius: 2.5
+        _areaRadius: 3
         _areaAngle: 360
         _effects:
-        - rid: 4617381810361335976
-    - rid: 4617381810361335976
+        - rid: 2552732099008528552
+    - rid: 2552732099008528552
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []

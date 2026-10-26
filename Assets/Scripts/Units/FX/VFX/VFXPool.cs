@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Units.FX
 {
-    // 사전 생성 없이 프리팹별 반환 인스턴스를 보관하고 전투 세대별로 미사용분을 정리한다.
+    // 프리팹별 사전 생성 / 반환 인스턴스를 보관하고 전투 세대별로 미사용분을 정리한다.
     internal sealed class VFXPool
     {
         // ============================================================
@@ -11,6 +11,8 @@ namespace Units.FX
         // ============================================================
 
         private readonly Dictionary<GameObject, List<VFXInstance>> _stored = new();
+        private readonly Dictionary<GameObject, Transform> _activeFolders = new();
+        private readonly Dictionary<GameObject, Transform> _storedFolders = new();
         private readonly Transform _root;
         private readonly Transform _inactiveRoot;
         private readonly int _limit;
@@ -44,19 +46,41 @@ namespace Units.FX
                     stored.RemoveAt(index);
                     if (item == null) continue;
                     item.LastUsedGeneration = _generation;
-                    item.transform.SetParent(_root, false);
+                    item.transform.SetParent(GetPrefabFolder(prefab, false), false);
                     return item;
                 }
             }
 
-            var go = Object.Instantiate(prefab, _inactiveRoot);
+            var instance = CreateInstance(prefab);
+            instance.transform.SetParent(GetPrefabFolder(prefab, false), false);
+            return instance;
+        }
+
+        // 대여 / 반환을 반복하면 같은 인스턴스만 재사용되므로 부족한 수량을 직접 생성한다.
+        internal void PrewarmOne(GameObject prefab, int targetCount, int activeCount)
+        {
+            if (prefab == null)
+                return;
+
+            if (!_stored.TryGetValue(prefab, out var stored))
+                _stored.Add(prefab, stored = new());
+
+            stored.RemoveAll(item => item == null);
+            if (stored.Count + activeCount >= Mathf.Min(targetCount, _limit))
+                return;
+
+            stored.Add(CreateInstance(prefab));
+        }
+
+        private VFXInstance CreateInstance(GameObject prefab)
+        {
+            var go = Object.Instantiate(prefab, GetPrefabFolder(prefab, true));
             go.SetActive(false);
             var instance = go.GetComponent<VFXInstance>() ?? go.AddComponent<VFXInstance>();
             instance.Configure(prefab);
             // 최초 생성에서만 교체한다. 풀 재대여 시 머티리얼을 다시 만들지 않는다.
             _materials.Apply(instance.gameObject);
             instance.LastUsedGeneration = _generation;
-            go.transform.SetParent(_root, false);
             return instance;
         }
 
@@ -73,10 +97,27 @@ namespace Units.FX
                 DestroyInstance(instance);
             else
             {
-                instance.transform.SetParent(_inactiveRoot, false);
+                instance.transform.SetParent(GetPrefabFolder(prefab, true), false);
                 stored.Add(instance);
                 RemoveUnused(stored);
             }
+        }
+
+        // ============================================================
+        // Hierarchy
+        // ============================================================
+
+        private Transform GetPrefabFolder(GameObject prefab, bool stored)
+        {
+            var folders = stored ? _storedFolders : _activeFolders;
+            if (folders.TryGetValue(prefab, out var folder) && folder != null)
+                return folder;
+
+            // 이름이 같더라도 다른 프리팹은 별도의 폴더와 풀을 사용한다.
+            folder = new GameObject(prefab.name).transform;
+            folder.SetParent(stored ? _inactiveRoot : _root, false);
+            folders[prefab] = folder;
+            return folder;
         }
 
         // ============================================================

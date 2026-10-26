@@ -10,20 +10,34 @@ namespace Game.Core
     public struct SpawnContext
     {
         public ClassWeights Weights;
+
         // General-unit candidates; their counts are determined by cost and weights.
         public List<EnemyUnitType> MonsterIDs;
+
         // One boss per entry. Duplicates are intentional; null/empty means no bosses.
         public List<EnemyUnitType> BossIDs;
 
-        public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs)
-            : this(weights, monsterIDs, null) { }
+        // 현재 스폰이 일반 모드인지 무한 모드인지 구분
+        public QuarterType QuarterType;
 
-        public SpawnContext(ClassWeights weights, List<EnemyUnitType> monsterIDs,
-            List<EnemyUnitType> bossIDs)
+        public SpawnContext(
+            ClassWeights weights,
+            List<EnemyUnitType> monsterIDs,
+            QuarterType quarterType)
+            : this(weights, monsterIDs, null, quarterType)
+        {
+        }
+
+        public SpawnContext(
+            ClassWeights weights,
+            List<EnemyUnitType> monsterIDs,
+            List<EnemyUnitType> bossIDs,
+            QuarterType quarterType)
         {
             Weights = weights;
             MonsterIDs = monsterIDs;
             BossIDs = bossIDs;
+            QuarterType = quarterType;
         }
     }
 
@@ -42,8 +56,11 @@ namespace Game.Core
         public const int MAIN_QUARTERS = NodeController.MainQuarters;
         private const int InitialSpawnCost = 5;
         private const int SpawnCostPerWave = 2;
-        private const float InfinityBonusPerWave = 0.02f;
-        private const float InfinityBonusPerQuarter = 0.15f;
+        private const float InfinityBonusFactor = 0.1f;
+        private const float EliteAttackBonus = 0.20f;
+        private const float EliteHealthBonus = 0.20f;
+        private readonly object _eliteModifierSource = new();
+        
         [SerializeField] private WaveSODictionary _waveCatalog;
         public WaveSODictionary WaveCatalog => _waveCatalog;
         public WaveSO CurrentPreset => _controller?.CurrentNode?.Preset;
@@ -53,6 +70,7 @@ namespace Game.Core
         public bool IsLastWave => _controller != null && _controller.IsLastNode;
         public event Action<WaveInfo> WaveChanged;
         public event Action<WaveInfo> WaveCleared;
+        public event Action BattleStarted;
 
         
         private ISpawnManager _spawner;
@@ -71,6 +89,7 @@ namespace Game.Core
         {
             _isWaitingForPreparation = false;
             _unitStatModifiers?.RemoveModifiersBySource(_infinityModifierSource);
+            _unitStatModifiers?.RemoveModifiersBySource(_eliteModifierSource);
             if (_runtimeUnitManager != null)
             {
                 _runtimeUnitManager.UnitDied -= HandleMonsterDead;
@@ -89,6 +108,7 @@ namespace Game.Core
             if (unitStatModifiers == null) throw new ArgumentNullException(nameof(unitStatModifiers));
             _isWaitingForPreparation = false;
             _unitStatModifiers?.RemoveModifiersBySource(_infinityModifierSource);
+            _unitStatModifiers?.RemoveModifiersBySource(_eliteModifierSource);
             if (_runtimeUnitManager != null)
             {
                 _runtimeUnitManager.UnitDied -= HandleMonsterDead;
@@ -108,14 +128,35 @@ namespace Game.Core
         {
             runToken.ThrowIfCancellationRequested();
             spawnToken.ThrowIfCancellationRequested();
+
             _preparationToken = runToken;
             _isWaitingForPreparation = true;
+
+            QuarterType quarterType = CurQuarter > MAIN_QUARTERS
+                ? QuarterType.Infinity
+                : QuarterType.Regular;
+
+            List<EnemyUnitType> bossIDs = null;
+
+            if (CurrentPreset.BattleType == WaveBattleType.Boss)
+            {
+                bossIDs = quarterType == QuarterType.Infinity
+                    ? new List<EnemyUnitType> { EnemyUnitType.Boss_용사 }
+                    : CurrentPreset.BossIDs;
+            }
+
             SpawnContext context = new(
-                weights:CurrentPreset.Weights, 
-                monsterIDs:CurrentPreset.MonsterIDs);
+                weights: CurrentPreset.Weights,
+                monsterIDs: CurrentPreset.MonsterIDs,
+                bossIDs: bossIDs,
+                quarterType: quarterType);
+
             RefreshInfinityModifiers();
+            RefreshEliteModifiers();
+
             int cost = CalculateSpawnCost(CurQuarter, CurWave);
             int enemyCount = _totemFlowEffects.CalculateEnemyCount(cost);
+
             return _spawner.SpawnEnemyWaveAsync(enemyCount, context, spawnToken);
         }
 
@@ -127,34 +168,45 @@ namespace Game.Core
                 : (quarter - 1) * MAX_WAVE + wave - 1;
             return InitialSpawnCost + waveIndex * SpawnCostPerWave;
         }
-
-        private static float CalculateInfinityBonus(int quarter, int wave)
+        
+        private void RefreshInfinityModifiers()
+        {
+            RefreshCombatModifiers(_infinityModifierSource,
+                CalculateInfinityBonus(CurQuarter, CurWave));
+        }
+        internal static float CalculateInfinityBonus(int quarter, int wave)
         {
             int infinityQuarter = quarter - MAIN_QUARTERS;
             if (infinityQuarter <= 0) return 0f;
 
-            // 첫 무한 분기는 2~10%, 이후 분기 시작값은 15%, 30%, 45%...이다.
-            float quarterStartBonus = infinityQuarter == 1
-                ? InfinityBonusPerWave
-                : (infinityQuarter - 1) * InfinityBonusPerQuarter;
-            return quarterStartBonus + (wave - 1) * InfinityBonusPerWave;
+            // 분기별 증가분 10%, 30%, 50%, ...의 합 = 10% * n².
+            // 첫 무한 분기의 첫 웨이브부터 적용하며 분기 내에서는 동일하다.
+            float n = infinityQuarter;
+            return InfinityBonusFactor * n * n;
         }
-
-        private void RefreshInfinityModifiers()
+        /// <summary> 현재 전투가 엘리트전투면 배율 적용, 아니면 미적용</summary>
+        private void RefreshEliteModifiers()
         {
-            // 재준비·불러오기에도 중복되지 않도록 현재 위치의 총 강화율로 교체한다.
-            _unitStatModifiers.RemoveModifiersBySource(_infinityModifierSource);
-            float bonus = CalculateInfinityBonus(CurQuarter, CurWave);
+            _unitStatModifiers.RemoveModifiersBySource(_eliteModifierSource);
+            if (!_controller.CurrentNode.IsElite) return;
+
+            AddCombatModifier(_eliteModifierSource, UnitStatType.MaxHp, EliteHealthBonus);
+            AddCombatModifier(_eliteModifierSource, UnitStatType.AttackPower, EliteAttackBonus);
+        }
+        
+        private void RefreshCombatModifiers(object source, float bonus)
+        {
+            _unitStatModifiers.RemoveModifiersBySource(source);
             if (bonus <= 0f) return;
 
-            AddInfinityModifier(UnitStatType.MaxHp, bonus);
-            AddInfinityModifier(UnitStatType.AttackPower, bonus);
+            AddCombatModifier(source, UnitStatType.MaxHp, bonus);
+            AddCombatModifier(source, UnitStatType.AttackPower, bonus);
         }
 
-        private void AddInfinityModifier(UnitStatType statType, float bonus)
+        private void AddCombatModifier(object source, UnitStatType statType, float bonus)
         {
             _unitStatModifiers.AddEnemyModifier(new EnemyStatModifier(
-                source: _infinityModifierSource,
+                source: source,
                 applyType: UnitModifierApplyType.All,
                 targetClass: default,
                 targetUnitType: default,
@@ -187,6 +239,7 @@ namespace Game.Core
 
         public void BattleStart()
         {
+            BattleStarted?.Invoke();
             _runtimeUnitManager.StartBattlePhase();
         }
 

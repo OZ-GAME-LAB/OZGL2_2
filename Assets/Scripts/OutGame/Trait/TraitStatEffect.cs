@@ -20,7 +20,7 @@ public struct TraitStatEffect
     public EnemyUnitFaction EnemyFaction => _enemyFaction;
     public UnitStatType StatType => _statType;
     public UnitStatModifierType ModifierType => _modifierType;
-    public float ValuePerLevel => _valuePerLevel;
+    public bool IsReduction => _isReduction;
 
     [SerializeField] private UnitTeam _targetTeam;
 
@@ -44,8 +44,8 @@ public struct TraitStatEffect
     [SerializeField] private UnitStatType _statType;
     [SerializeField] private UnitStatModifierType _modifierType;
 
-    [Tooltip("1레벨당 값입니다. Flat은 고정 수치, Percent는 0.05 = +5%. 음수는 감소 효과입니다.")]
-    [SerializeField] private float _valuePerLevel;
+    [Tooltip("감소 효과이면 선택합니다. 크기는 소유한 데이터의 Value Per Level을 사용합니다.")]
+    [SerializeField] private bool _isReduction;
 
     // StatModifierOrganizer는 잘못된 조합을 경고 없이 버리므로 여기서 먼저 걸러냅니다.
     public bool IsValidTarget()

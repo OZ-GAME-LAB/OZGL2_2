@@ -73,7 +73,7 @@ MonoBehaviour:
           _endPolicy: 0
           _kind: 0
           _attachment: 1
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveOnHit_Electric
@@ -82,10 +82,10 @@ MonoBehaviour:
           _endPolicy: 0
           _kind: 1
           _attachment: 1
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
-        _duration: 3
+        _duration: 1.5
     - rid: 4617381741844758654
       type: {class: SkillRuntimeEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -162,7 +162,7 @@ MonoBehaviour:
           _clusterRadius: 1
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -212,7 +212,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_ActiveExplosion_Electric
@@ -221,7 +221,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_ActiveOnHit_Electric

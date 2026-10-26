@@ -85,6 +85,7 @@ namespace Game.UI.InGame
         private Vector2 _defaultConfirmSize;
         private UnityEngine.UI.ColorBlock _defaultConfirmColors;
         private bool _actionPresentationCached;
+        private bool _resetDescriptionScroll;
 
         private void OnEnable()
         {
@@ -148,6 +149,7 @@ namespace Game.UI.InGame
             {
                 _selectedIndex = -1;
                 _pageIndex = 0;
+                _resetDescriptionScroll = true;
             }
             _candidates = Array.AsReadOnly(snapshot);
             _isRequestPending = false;
@@ -237,6 +239,7 @@ namespace Game.UI.InGame
         {
             if (!CanInteract() || pageIndex < 0 || pageIndex >= PageCount || pageIndex == _pageIndex) return;
             _pageIndex = pageIndex;
+            _resetDescriptionScroll = true;
             Refresh(); // 선택은 전체 후보 기준으로 유지하며 페이지 변경은 요청을 전송하지 않는다.
         }
 
@@ -343,15 +346,86 @@ namespace Game.UI.InGame
             }
             if (!IsVisible) return;
             int focusIndex = _selectedIndex >= offset && _selectedIndex < offset + visibleCount ? _selectedIndex - offset : 0;
-            if (opening && EventSystem.current != null)
-                EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
-            else if (unlocked && EventSystem.current != null)
+            //if (opening && EventSystem.current != null)
+            //    EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
+            //else if (unlocked && EventSystem.current != null)
+            //{
+            //    var current = EventSystem.current.currentSelectedGameObject;
+            //    var selectable = current != null ? current.GetComponent<UnityEngine.UI.Selectable>() : null;
+            //    if (current == null || (current.transform.IsChildOf(_panelRoot.transform) &&
+            //        (selectable == null || !selectable.isActiveAndEnabled || !selectable.IsInteractable())))
+            //        EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
+            //}
+
+            if (!IsVisible) return;
+
+            if (opening)
             {
-                var current = EventSystem.current.currentSelectedGameObject;
-                var selectable = current != null ? current.GetComponent<UnityEngine.UI.Selectable>() : null;
-                if (current == null || (current.transform.IsChildOf(_panelRoot.transform) &&
-                    (selectable == null || !selectable.isActiveAndEnabled || !selectable.IsInteractable())))
-                    EventSystem.current.SetSelectedGameObject(_cards[focusIndex].Button.gameObject);
+                if (EventSystem.current != null)
+                {
+                    var selected =
+                        EventSystem.current.currentSelectedGameObject;
+
+                    if (selected != null &&
+                        selected.transform.IsChildOf(_panelRoot.transform))
+                    {
+                        EventSystem.current.SetSelectedGameObject(null);
+                    }
+                }
+
+                ResetCandidateAnimations();
+            }
+
+            if (opening || _resetDescriptionScroll)
+            {
+                _resetDescriptionScroll = false;
+                ResetDescriptionScrollPositions(visibleCount);
+            }
+        }
+
+        private void ResetDescriptionScrollPositions(int visibleCount)
+        {
+            // Text and newly opened panels must finish layout before ScrollRect
+            // calculates its top position. Selection-only refreshes preserve reading position.
+            Canvas.ForceUpdateCanvases();
+            for (int i = 0; i < visibleCount; i++)
+            {
+                ScrollRect scroll = _cards[i].Effect.GetComponentInParent<ScrollRect>(true);
+                if (scroll == null || scroll.content == null) continue;
+                scroll.StopMovement();
+                scroll.verticalNormalizedPosition = 1f;
+            }
+        }
+
+        private void ResetCandidateAnimations()
+        {
+            if (_cards == null) return;
+
+            foreach (var card in _cards)
+            {
+                if (card == null || card.Button == null)
+                    continue;
+
+                var animator = card.Button.GetComponent<Animator>();
+
+                if (animator == null ||
+                    !animator.isActiveAndEnabled ||
+                    !animator.isInitialized)
+                    continue;
+
+                // 이전에 남아 있는 전환 Trigger 초기화
+                foreach (var parameter in animator.parameters)
+                {
+                    if (parameter.type ==
+                        AnimatorControllerParameterType.Trigger)
+                    {
+                        animator.ResetTrigger(parameter.name);
+                    }
+                }
+
+                // Normal 상태를 첫 프레임부터 즉시 적용
+                animator.Play("Base Layer.Normal", 0, 0f);
+                animator.Update(0f);
             }
         }
 
@@ -426,17 +500,17 @@ namespace Game.UI.InGame
             Vector2 size = _defaultConfirmSize;
             Vector2 position = _defaultConfirmPosition;
             ColorBlock colors = _defaultConfirmColors;
-            if (!hasSelection)
-            {
-                size.x = Mathf.Min(240, _defaultConfirmSize.x);
-                position.x += (.5f - rect.pivot.x) * (_defaultConfirmSize.x - size.x);
-                colors.normalColor = Color.Lerp(colors.normalColor, new Color32(55, 42, 53, 255), .82f);
-                colors.highlightedColor = Color.Lerp(colors.highlightedColor, new Color32(82, 58, 72, 255), .72f);
-                colors.selectedColor = colors.highlightedColor;
-                colors.pressedColor = Color.Lerp(colors.pressedColor, new Color32(43, 32, 43, 255), .75f);
-            }
-            rect.sizeDelta = size;
-            rect.anchoredPosition = position;
+            //if (!hasSelection)
+            //{
+            //    size.x = Mathf.Min(240, _defaultConfirmSize.x);
+            //    position.x += (.5f - rect.pivot.x) * (_defaultConfirmSize.x - size.x);
+            //    colors.normalColor = Color.Lerp(colors.normalColor, new Color32(55, 42, 53, 255), .82f);
+            //    colors.highlightedColor = Color.Lerp(colors.highlightedColor, new Color32(82, 58, 72, 255), .72f);
+            //    colors.selectedColor = colors.highlightedColor;
+            //    colors.pressedColor = Color.Lerp(colors.pressedColor, new Color32(43, 32, 43, 255), .75f);
+            //}
+            //rect.sizeDelta = size;
+            //rect.anchoredPosition = position;
             _confirmButton.colors = colors;
             _confirmText.fontSize = hasSelection ? 24 : 18;
             _confirmText.fontSizeMax = _confirmText.fontSize;

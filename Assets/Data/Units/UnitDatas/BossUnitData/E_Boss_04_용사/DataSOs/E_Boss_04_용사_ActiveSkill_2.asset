@@ -15,10 +15,7 @@ MonoBehaviour:
   _display:
     _name: "\uCD94\uACA9\uC758 \uAC80"
     _icon: {fileID: 21300000, guid: 4711dd1011d35ec4cb5eaa2c89437bcd, type: 3}
-    _description: "\uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758 200%
-      \uBB3C\uB9AC \uD53C\uD574\uB97C \uC900 \uB4A4 \uCCB4\uB825\uC774 \uAC00\uC7A5
-      \uB0AE\uC740 \uC801\uC5D0\uAC8C \uB3CC\uC9C4\uD574 300% \uBB3C\uB9AC \uD53C\uD574\uB97C
-      \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 12\uCD08]"
+    _description: "\uc8fc\ubcc0 \uc801\uc5d0\uac8c \uacf5\uaca9\ub825\uc758 400% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc900 \ub4a4 \uccb4\ub825\uc774 \uac00\uc7a5 \ub0ae\uc740 \uc801\uc5d0\uac8c \ub3cc\uc9c4\ud574 500% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc90d\ub2c8\ub2e4. [\ucfe8\ud0c0\uc784 12\ucd08]"
   _skillRange: 4
   _skillCooldown: 12
   _targetSide: 0
@@ -87,7 +84,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Circle
@@ -96,7 +93,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee
@@ -132,7 +129,7 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 2
+        _damageMultiplier: 4
     - rid: 4844432386322333700
       type: {class: SkillDashActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -185,7 +182,7 @@ MonoBehaviour:
           _clusterRadius: 1
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -213,7 +210,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Single
@@ -222,7 +219,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 0
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee
@@ -258,4 +255,4 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 3
+        _damageMultiplier: 5

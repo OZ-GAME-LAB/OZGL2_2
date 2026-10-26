@@ -10,6 +10,7 @@ namespace Game.UI.InGame
     public sealed class BuildingUIPresenter : MonoBehaviour
     {
         [SerializeField] private UIScreen _panel;
+        [SerializeField] private RectTransform _panelWindow;
         [SerializeField] private GameObject _catalogRoot;
         [SerializeField] private GameObject _managementRoot;
         [SerializeField] private TMP_Text _titleText;
@@ -91,9 +92,11 @@ namespace Game.UI.InGame
         {
             bool sameSelection = _selectionId == selectionId;
             _selectionId = selectionId;
+            // if (_panelWindow != null) _panelWindow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 840);
             _titleText.text = "건물 건설";
             _managementRoot.SetActive(false);
             _catalogRoot.SetActive(true);
+            _feedbackText.gameObject.SetActive(true);
             _catalogItems.Clear();
             _catalogItems.AddRange(items);
             _catalog.SetItems(items, sameSelection);
@@ -103,15 +106,27 @@ namespace Game.UI.InGame
         public void ShowManagement(BuildingInfoData info, BuildingActionViewData actions,
             IReadOnlyList<BuildingCatalogItem> upgrades, BuildingInfoData comparison, bool allowed, string reason)
         {
+            ShowManagement(info, actions, upgrades, comparison, allowed, reason, null);
+        }
+
+        public void ShowManagement(BuildingInfoData info, BuildingActionViewData actions,
+            IReadOnlyList<BuildingCatalogItem> upgrades, BuildingInfoData comparison, bool allowed, string reason,
+            int? requiredUpgradeCoreLevel)
+        {
             _selectionId = info.SelectionId;
+            // if (_panelWindow != null) _panelWindow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 550);
             _titleText.text = "건물 관리";
             _catalogRoot.SetActive(false);
             _managementRoot.SetActive(true);
+            _feedbackText.text = string.Empty;
+            _feedbackText.gameObject.SetActive(false);
             _info.ShowBuildingInfo(info);
             _currentBuildingId = info.BuildingId;
-            _comparisonRoot.SetActive(comparison != null);
-            if (comparison != null) _comparison.ShowBuildingInfo(comparison);
-            _upgradeHint.text = upgrades.Count == 0 ? "현재 가능한 업그레이드가 없습니다." : "업그레이드할 건물을 선택하세요.";
+            _comparisonRoot.SetActive(false);
+            _currentInfoButton.gameObject.SetActive(false);
+            _upgradeHint.gameObject.SetActive(upgrades.Count == 0);
+            _upgradeHint.text = requiredUpgradeCoreLevel.HasValue ? $"코어 {requiredUpgradeCoreLevel.Value}레벨 필요" :
+                "현재 가능한 업그레이드가 없습니다.";
             RenderCards(_upgradeCards, _upgradeTemplate, _upgradeContent, upgrades,
                 actions.Upgrade?.OptionId, HandleCandidate);
             _actions.SetActionsAllowed(allowed, reason);
@@ -155,7 +170,13 @@ namespace Game.UI.InGame
 
         public void ShowFeedback(string message)
         {
-            _feedbackText.text = message ?? string.Empty;
+            if (_managementRoot.activeSelf)
+            {
+                _feedbackText.text = string.Empty;
+                _feedbackText.gameObject.SetActive(false);
+                _actions.ShowFeedback(message);
+            }
+            else _feedbackText.text = message ?? string.Empty;
         }
 
         public void Hide()

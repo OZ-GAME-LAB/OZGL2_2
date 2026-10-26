@@ -327,6 +327,15 @@ public class TotemButtonUI : MonoBehaviour,
             enableState.SetActive(false);
 
 
+        bool showLevelHover = IsHovered && currentLevel == 0;
+        int hoverLevelIndex = levelMouseOverOverlay == null
+            ? -1
+            : Array.IndexOf(levelStates, levelMouseOverOverlay);
+        // 단계 이미지를 Hover 이미지로 함께 사용해도 선택된 단계를 끄지 않습니다.
+        int displayLevel = showLevelHover && hoverLevelIndex >= 0
+            ? hoverLevelIndex
+            : currentLevel;
+
         for (int i = 0;
             i < levelStates.Length;
             i++)
@@ -335,16 +344,16 @@ public class TotemButtonUI : MonoBehaviour,
                 continue;
 
             levelStates[i].SetActive(
-                i == currentLevel
+                i == displayLevel
             );
         }
 
 
-        // 별도의 Hover 테두리 등이 있다면 사용
-        if (levelMouseOverOverlay != null)
+        // 단계 이미지와 별개의 오버레이만 따로 제어합니다.
+        if (levelMouseOverOverlay != null && hoverLevelIndex < 0)
         {
             levelMouseOverOverlay.SetActive(
-                IsHovered
+                showLevelHover
             );
         }
 
@@ -381,7 +390,9 @@ public class TotemButtonUI : MonoBehaviour,
                 j++)
             {
                 images[j].color =
-                    levelTint;
+                    IsHovered && currentLevel == 0
+                        ? Color.white
+                        : levelTint;
             }
         }
     }

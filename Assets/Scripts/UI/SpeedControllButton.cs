@@ -29,6 +29,6 @@ public class SpeedControllButton : MonoBehaviour
 
     public void Refresh()
     {
-        SpeedText.text = $"X{Time.timeScale}";
+        SpeedText.text = $"× {Time.timeScale}";
     }
 }

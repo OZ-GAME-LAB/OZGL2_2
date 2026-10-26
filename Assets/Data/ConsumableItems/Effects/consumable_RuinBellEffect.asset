@@ -16,18 +16,18 @@ MonoBehaviour:
   _effectId: consumable_RuinBellEffect
   _alignment: 1
   _durationType: 0
-  _duration: 5
+  _duration: 10
   _stackType: 1
   _maxStack: 1
   _actions:
-  - rid: 1967714645891350685
+  - rid: 1967714963517341957
   _categories: []
   references:
     version: 2
     RefIds:
-    - rid: 1967714645891350685
+    - rid: 1967714963517341957
       type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
         _statType: 10
         _modifierType: 1
-        _value: -0.1
+        _value: -0.5

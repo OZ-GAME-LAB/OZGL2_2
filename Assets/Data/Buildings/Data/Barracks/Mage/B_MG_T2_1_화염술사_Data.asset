@@ -14,15 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::OZGL.KDH.BuildingData
   buildingId: "B_MG_T2_1_\uD654\uC5FC\uC220\uC0AC"
   buildingFamilyId: mage_barracks
-  displayName: "\uD654\uC5FC\uC220\uC0AC"
-  description: "\uD654\uC5FC\uC220\uC0AC \uC18C\uD658 \uBCD1\uC601"
+  displayName: "\uD654\uC5FC\uC220\uC0AC\uC758 \uD0D1"
+  description: "\uBD88\uAE38\uB85C \uC801\uC744 \uD0DC\uC6B0\uBA70 \uC9C0\uC18D\uC801\uC73C\uB85C
+    \uD53C\uD574\uB97C \uC8FC\uB294 \uD654\uC5FC\uC220\uC0AC\uC758 \uD0D1\uC785\uB2C8\uB2E4."
   buildingType: 2
-  icon: {fileID: 21300000, guid: 1b220d6b1be94dd3a5e237415eb150fa, type: 3}
-  worldSprite: {fileID: 21300000, guid: 1b220d6b1be94dd3a5e237415eb150fa, type: 3}
+  icon: {fileID: 21300000, guid: 99f8aa5c9d14ecb4689aabfff23daca7, type: 3}
+  worldSprite: {fileID: 21300000, guid: 99f8aa5c9d14ecb4689aabfff23daca7, type: 3}
   prefab: {fileID: 5850666654234025199, guid: 2b455255d53d40f1b39f686881728c94, type: 3}
   buildCost:
   - type: 0
-    amount: 10
+    amount: 75
   buildFromEmptySlot: 0
   requiredCoreLevel: 0
   requiredFamilyIds: []
@@ -38,9 +39,15 @@ MonoBehaviour:
     unitType: 32
     countPerWave: 3
     maxAlive: 3
+  support:
+    enabled: 0
+    targetClass: 0
+    effects: []
+    targetUnitType: 0
+    uniquePassive: {fileID: 0}
   upgrades:
   - nextBuilding: {fileID: 11400000, guid: 2f5a2e10c3b7455fb9fb6a2361eee947, type: 2}
     cost:
     - type: 0
-      amount: 50
-    requiredCoreLevel: 2
+      amount: 90
+    requiredCoreLevel: 3

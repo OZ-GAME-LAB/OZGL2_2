@@ -18,6 +18,7 @@ namespace Game.UI.InGame
         private bool _closingPopups;
 
         public bool IsReady { get; private set; }
+        public bool ExternalInputBlocked { get; set; }
         public UIScreen TopPopup => _openedPopups.Count == 0 ? null : _openedPopups[_openedPopups.Count - 1];
         public int OpenPopupCount => _openedPopups.Count;
         public bool HasBlockingPopup => _openedPopups.Exists(screen => screen.BlocksHudInput);
@@ -124,7 +125,7 @@ namespace Game.UI.InGame
 
         public void HandleEscape()
         {
-            if (!IsReady) return;
+            if (!IsReady || ExternalInputBlocked) return;
 
             // 하나를 닫았다면 이번 ESC 처리는 끝낸다.
             if (CloseTopPopup()) return;

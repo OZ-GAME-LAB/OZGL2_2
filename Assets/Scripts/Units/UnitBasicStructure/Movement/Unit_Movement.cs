@@ -118,6 +118,8 @@ namespace Units
         private const float PredictionTime = 0.35f;
 
         private const float VelocityResponseTime = 0.2f;
+        private const float ArrivalTolerance = 0.01f;
+        private const float RallyAcceleration = 75f;
 
 
         private static readonly float[] SteeringAngles =
@@ -493,7 +495,7 @@ namespace Units
                     _isRallyViaMovement
                         ? Mathf.Max(_arrivalDistance, _rallyViaArrivalDistance)
                         : _isRallyMovement ? _rallyArrivalDistance : _arrivalDistance
-                ))
+                ) + ArrivalTolerance)
             {
                 Stop();
 
@@ -640,7 +642,7 @@ namespace Units
 
 
             // 충분히 원래 위치에 접근하면 복귀 상태를 종료한다.
-            if (distance <= stop)
+            if (distance <= stop + ArrivalTolerance)
             {
                 _isReturningToHold =
                     false;
@@ -777,25 +779,26 @@ namespace Units
             else
                 _core?.PlayAnimation_Idle();
 
-            Vector2 acceleration =
-                Vector2.ClampMagnitude(
-                    (
-                        targetVelocity
-                        - _rigidbody.linearVelocity
-                    )
-                    / VelocityResponseTime,
-                    Mathf.Max(
-                        0.01f,
-                        _holdAcceleration
-                    )
-                );
+            float deltaTime = Time.fixedDeltaTime;
+            if (deltaTime <= 0f)
+                return;
 
+            // Rally 가속도를 자리 유지의 밀기 힘과 분리한다.
+            float maxAcceleration = _isRallyMovement
+                ? RallyAcceleration
+                : Mathf.Max(0.01f, _holdAcceleration);
+            Vector2 acceleration = Vector2.ClampMagnitude(
+                (targetVelocity - _rigidbody.linearVelocity)
+                    / Mathf.Max(deltaTime, VelocityResponseTime),
+                maxAcceleration);
 
+            // 물리 적분의 감쇠까지 보정하여 목표 속도보다 낮은 속도에 고착되지 않게 한다.
+            // 가속도 제한은 유지하므로 접촉 중 상대를 무제한으로 밀지 않는다.
+            Vector2 nextVelocity = _rigidbody.linearVelocity + acceleration * deltaTime;
+            Vector2 dampingCompensation = nextVelocity * Mathf.Max(0f, _rigidbody.linearDamping);
             _rigidbody.AddForce(
-                acceleration
-                * _rigidbody.mass,
-                ForceMode2D.Force
-            );
+                (acceleration + dampingCompensation) * _rigidbody.mass,
+                ForceMode2D.Force);
         }
 
 

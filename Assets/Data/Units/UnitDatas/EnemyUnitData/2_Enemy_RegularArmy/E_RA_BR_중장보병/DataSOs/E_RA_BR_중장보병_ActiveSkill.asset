@@ -15,8 +15,7 @@ MonoBehaviour:
   _display:
     _name: "\uAC15\uCCA0 \uD718\uB450\uB974\uAE30"
     _icon: {fileID: 21300000, guid: a36f50ac6f2873d4ba4a91d7652214af, type: 3}
-    _description: "\uC8FC\uBCC0 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758 200%
-      \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 5\uCD08]"
+    _description: "\uc8fc\ubcc0 \uc801\uc5d0\uac8c \uacf5\uaca9\ub825\uc758 110% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc90d\ub2c8\ub2e4. [\ucfe8\ud0c0\uc784 5\ucd08]"
   _skillRange: 3
   _skillCooldown: 5
   _targetSide: 0
@@ -84,7 +83,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Circle
@@ -93,7 +92,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee
@@ -129,4 +128,4 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 2
+        _damageMultiplier: 1.1

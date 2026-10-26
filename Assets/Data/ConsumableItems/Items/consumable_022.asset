@@ -15,20 +15,21 @@ MonoBehaviour:
   _id: consumable_022
   _displayName: "\uB099\uB8B0\uC758 \uB450\uB8E8\uB9C8\uB9AC"
   _description: "\uBAA8\uB4E0 \uC801\uC5D0\uAC8C \uAE30\uBCF8 \uB9C8\uBC95 \uD53C\uD574
-    40\uC744 \uC90D\uB2C8\uB2E4."
+    400"
   _icon: {fileID: 21300000, guid: 17873bf1185f24b99aee714bc5d69385, type: 3}
-  _targetVFX: {fileID: 1002, guid: 6421e1f15de443b7b366c2e2a3127aa0, type: 3}
   _useVFX: {fileID: 0}
+  _targetVFX: {fileID: 1002, guid: 6421e1f15de443b7b366c2e2a3127aa0, type: 3}
   _targetTeam: 1
   _targetMode: 2
   _radius: 0
   _effects:
-  - rid: 1967714645891350711
+  - rid: 1967714963517341982
   references:
     version: 2
     RefIds:
-    - rid: 1967714645891350711
+    - rid: 1967714963517341982
       type: {class: SkillDamageEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
+        _applicationFX: []
         _damageType: 1
-        _damageMultiplier: 40
+        _damageMultiplier: 400

@@ -28,16 +28,21 @@ namespace Game.UI.InGame
 
             public Button Button => _button;
 
-            public void Render(BuildingActionOffer offer, string blockReason, bool compact)
+            public void Render(BuildingActionOffer offer, string blockReason, bool compact,
+                bool fixedManagement = false, string unavailableText = "해당 없음", bool showReason = true)
             {
-                if (compact && _rowRoot != null) _rowRoot.SetActive(offer != null);
+                if (compact && _rowRoot != null) _rowRoot.SetActive(fixedManagement || offer != null);
                 _button.interactable = offer != null && offer.CanExecute && blockReason == null;
                 string amount = offer == null ? null : BuildingCurrencyText.Format(offer.GoldAmount, offer.GemAmount);
-                _quote.text = offer == null ? "해당 없음" : compact ? amount :
-                    $"{offer.DisplayName} · {(offer.Action == BuildingUiAction.Dismantle ? "환급" : "비용")} {amount}";
+                _quote.text = fixedManagement
+                    ? offer == null ? unavailableText : offer.Action == BuildingUiAction.Dismantle
+                        ? $"+{amount} 환급" : $"{offer.DisplayName} : {amount}"
+                    : offer == null ? "해당 없음" : compact ? amount :
+                        $"{offer.DisplayName} · {(offer.Action == BuildingUiAction.Dismantle ? "환급" : "비용")} {amount}";
                 _reason.text = offer == null ? "현재 선택에서는 사용할 수 없습니다." :
                     blockReason ?? (offer.CanExecute ? (compact ? "" : "실행 가능") : offer.DisabledReason);
-                if (compact) _reason.gameObject.SetActive(offer != null && !string.IsNullOrWhiteSpace(_reason.text));
+                if (compact) _reason.gameObject.SetActive(showReason && offer != null &&
+                    !(fixedManagement && blockReason != null) && !string.IsNullOrWhiteSpace(_reason.text));
             }
         }
 
@@ -48,6 +53,7 @@ namespace Game.UI.InGame
         [SerializeField] private ActionRow _dismantle = new ActionRow();
 
         [SerializeField] private bool _compactPresentation;
+        [SerializeField] private bool _fixedManagementActions;
 
         private Action<BuildingActionRequest> _actionRequested;
         private BuildingActionViewData _data;
@@ -109,6 +115,12 @@ namespace Game.UI.InGame
             Refresh();
         }
 
+        public void ShowFeedback(string message)
+        {
+            _resultMessage = string.IsNullOrWhiteSpace(message) ? null : message;
+            Refresh();
+        }
+
         /// <summary>요청 결과 접수. 성공 후 ShowActions로 최신 견적을 전달해야 다시 실행할 수 있다.</summary>
         public bool TryResolveRequest(Guid requestId, bool succeeded, string message = null)
         {
@@ -152,8 +164,9 @@ namespace Game.UI.InGame
                 !_actionsAllowed ? _phaseReason : _actionRequested == null ? "담당 시스템이 연결되지 않았습니다." :
                 _awaitingRefresh ? "최신 건물 정보를 기다립니다." : null;
             _build.Render(_data?.Build, blocked, _compactPresentation);
-            _upgrade.Render(_data?.Upgrade, blocked, _compactPresentation);
-            _dismantle.Render(_data?.Dismantle, blocked, _compactPresentation);
+            bool showRowReasons = !_fixedManagementActions || string.IsNullOrWhiteSpace(_resultMessage);
+            _upgrade.Render(_data?.Upgrade, blocked, _compactPresentation, _fixedManagementActions, "선택 없음", showRowReasons);
+            _dismantle.Render(_data?.Dismantle, blocked, _compactPresentation, _fixedManagementActions, "철거 불가", showRowReasons);
             _status.text = _resultMessage ?? (_compactPresentation &&
                 (_data == null || (_data.Build == null && _data.Upgrade == null && _data.Dismantle == null)) ? "" : blocked) ?? (_compactPresentation ? "" :
                 _data == null ? "선택 대기" : "표시된 비용과 조건을 확인한 뒤 선택하세요.");

@@ -22,12 +22,12 @@ MonoBehaviour:
   _conditions: []
   _effectMode: 2
   _actions:
-  - rid: 4617381810361335935
+  - rid: 2552732099008528511
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4617381810361335935
+    - rid: 2552732099008528511
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 0
@@ -37,10 +37,10 @@ MonoBehaviour:
         _areaRadius: 1
         _areaAngle: 360
         _effects:
-        - rid: 4617381810361335936
-    - rid: 4617381810361335936
+        - rid: 2552732099008528512
+    - rid: 2552732099008528512
       type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
         _scalingStatType: 0
-        _shieldRatio: 0.1
+        _shieldRatio: 0.07

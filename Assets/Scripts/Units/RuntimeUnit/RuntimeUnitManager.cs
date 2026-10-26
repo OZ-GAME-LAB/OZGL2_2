@@ -98,6 +98,8 @@ namespace Units
         // Controllers
         // =========================
 
+        private readonly CombatQueryContext _combatQueries = new();
+
         private RuntimeUnitRegistrator _unitRegistrator;
 
         private EngagementController _engagementController;
@@ -132,6 +134,8 @@ namespace Units
 
         public event Action
             RuntimeCleared;
+        public event Action<CombatApplicationResult> DamageApplied;
+        private void HandleDamageApplied(CombatApplicationResult result) => DamageApplied?.Invoke(result);
 
 
         // =========================
@@ -188,8 +192,24 @@ namespace Units
         }
 
 
+        private void Update()
+        {
+            if (_battleStarted && !_battlePaused && !_battleEnded)
+                _combatQueries.RefreshSpatial();
+        }
+
+
         private void OnDestroy()
         {
+            foreach (var unit in _allyUnits) UnsubscribeUnitEvents(unit);
+            foreach (var unit in _enemyUnits) UnsubscribeUnitEvents(unit);
+            for (int i = 0; i < _allyGroups.Count; i++)
+                UnsubscribeGroupEvents(_allyGroups[i]);
+
+            for (int i = 0; i < _enemyGroups.Count; i++)
+                UnsubscribeGroupEvents(_enemyGroups[i]);
+
+            _combatQueries.Clear();
             _preparationLifetime.Cancel();
             _preparationLifetime.Dispose();
         }
@@ -241,6 +261,8 @@ namespace Units
             }
 
 
+            _combatQueries.Register(unit);
+
             SubscribeUnitEvents(
                 unit
             );
@@ -278,6 +300,8 @@ namespace Units
                 return false;
             }
 
+
+            _combatQueries.Unregister(unit);
 
             UnsubscribeUnitEvents(
                 unit
@@ -489,6 +513,7 @@ namespace Units
 
             unit.Died +=
                 HandleUnitDied;
+            unit.DamageApplied += HandleDamageApplied;
         }
 
 
@@ -501,6 +526,7 @@ namespace Units
 
             unit.Died -=
                 HandleUnitDied;
+            unit.DamageApplied -= HandleDamageApplied;
         }
 
 
@@ -545,6 +571,20 @@ namespace Units
                 return;
 
 
+            group.AssignmentChanged += HandleAssignmentChanged;
+            group.MemberAdded += HandleQueryMemberAdded;
+            group.MemberRemoved += HandleQueryMemberRemoved;
+
+            foreach (Unit_Gateway unit in group.Members)
+            {
+                _combatQueries.Register(unit);
+
+                if (group.AssignmentContexts.TryGetValue(unit, out UnitAssignmentContext context))
+                    _combatQueries.UpdateAssignment(unit, context);
+            }
+
+            group.SetCombatQueries(_combatQueries);
+
             group.SetSkillEngagementHandler(
                 HandleSkillEngagementRequested
             );
@@ -570,6 +610,14 @@ namespace Units
                 return;
 
 
+            group.AssignmentChanged -= HandleAssignmentChanged;
+            group.MemberAdded -= HandleQueryMemberAdded;
+            group.MemberRemoved -= HandleQueryMemberRemoved;
+            group.SetCombatQueries(null);
+
+            foreach (Unit_Gateway unit in group.Members)
+                _combatQueries.Unregister(unit);
+
             group.SetSkillEngagementHandler(
                 null
             );
@@ -591,6 +639,27 @@ namespace Units
         // =========================
         // Event Handlers
         // =========================
+
+        private void HandleAssignmentChanged(Unit_Gateway unit, UnitAssignmentContext context)
+        {
+            _combatQueries.UpdateAssignment(unit, context);
+        }
+
+
+        private void HandleQueryMemberAdded(Unit_Gateway unit)
+        {
+            if (!_allyUnits.Contains(unit) && !_enemyUnits.Contains(unit))
+                RegisterUnit(unit);
+
+            _combatQueries.Register(unit);
+        }
+
+
+        private void HandleQueryMemberRemoved(Unit_Gateway unit)
+        {
+            _combatQueries.Unregister(unit);
+        }
+
 
         private void HandleUnitDied(
             Unit_Gateway unit)
@@ -986,6 +1055,9 @@ namespace Units
             // 전투 시작 중복 방어를 통과한 뒤에만 VFX 보관 세대를 진행한다.
             Units.FX.VFXManager.Instance?.BeginGeneration();
 
+            // 모든 랠리가 끝난 배치로 양 팀의 첫 약진 지점을 함께 계산한다.
+            _advanceReferenceController.PrepareOpeningAdvance();
+
 
             _battleStarted =
                 true;
@@ -1157,6 +1229,7 @@ namespace Units
 
         public void ClearRuntime()
         {
+            _advanceReferenceController.ClearOpeningAdvance();
             _clearingRuntime =
                 true;
 
@@ -1251,6 +1324,8 @@ namespace Units
             );
 
             Units.FX.SFXManager.Instance?.Clear();
+
+            _combatQueries.Clear();
 
             RuntimeCleared?.Invoke();
         }

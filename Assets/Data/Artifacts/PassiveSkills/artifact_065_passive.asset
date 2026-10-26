@@ -18,29 +18,29 @@ MonoBehaviour:
     _description: 
   _skillSchemaVersion: 1
   _triggerType: 5
-  _tickInterval: 6
+  _tickInterval: 5
   _conditions: []
   _effectMode: 0
   _actions:
-  - rid: 4617381810361335958
+  - rid: 1967714963517342037
   _conditionCheckInterval: 0.2
   references:
     version: 2
     RefIds:
-    - rid: 4617381810361335958
+    - rid: 1967714963517342037
       type: {class: PassiveEffectActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _targetType: 2
         _targetRelation: 1
-        _maxEffectTargetCount: 3
+        _maxEffectTargetCount: 5
         _areaType: 1
-        _areaRadius: 3
+        _areaRadius: 7
         _areaAngle: 360
         _effects:
-        - rid: 4617381810361335959
-    - rid: 4617381810361335959
-      type: {class: SkillHealEffectData, ns: Units.Skills, asm: Assembly-CSharp}
+        - rid: 4617381994425221210
+    - rid: 4617381994425221210
+      type: {class: SkillShieldEffectData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
         _applicationFX: []
         _scalingStatType: 0
-        _healRatio: 0.15
+        _shieldRatio: 0.02

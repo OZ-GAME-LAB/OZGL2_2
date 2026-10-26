@@ -47,6 +47,9 @@ namespace Units
         internal void NotifyCombatStateChanged(CombatStateChange change) => CombatStateChanged?.Invoke(change);
 
         public event Action<CombatDeathResult> DeathConfirmed;
+        public event Action<CombatApplicationResult> DamageApplied;
+        public CombatDeathResult LastDeath => _core?.LastDeath;
+        internal void NotifyDamageApplied(CombatApplicationResult result) => DamageApplied?.Invoke(result);
 
         public event Action<Unit_Gateway> RequestFullAssignmentEvent;
 
@@ -90,6 +93,8 @@ namespace Units
         public bool CanUseActiveSkill => _core != null && _core.CanUseActiveSkill;
 
         public float PreferredCombatRange => _core != null ? _core.PreferredCombatRange : 0f;
+
+        public float EngagementEntryRange => _core != null ? _core.EngagementEntryRange : 0f;
 
         public float CurrentHp => _core != null ? _core.CurrentHp : 0f;
 

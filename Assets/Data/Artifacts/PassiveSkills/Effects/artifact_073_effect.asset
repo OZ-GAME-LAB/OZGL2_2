@@ -16,16 +16,18 @@ MonoBehaviour:
   _effectId: artifact_073_effect
   _alignment: 1
   _durationType: 0
-  _duration: 0.4
+  _duration: 3
   _stackType: 1
   _maxStack: 1
   _actions:
-  - rid: 4617381810361335906
+  - rid: 4617381994425221207
   _categories: []
   references:
     version: 2
     RefIds:
-    - rid: 4617381810361335906
-      type: {class: StatusEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
+    - rid: 4617381994425221207
+      type: {class: StatEffectActionData, ns: Units.Effects, asm: Assembly-CSharp}
       data:
-        _statusType: 0
+        _statType: 170
+        _modifierType: 1
+        _value: -0.4

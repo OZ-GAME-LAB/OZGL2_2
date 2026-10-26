@@ -15,11 +15,7 @@ MonoBehaviour:
   _display:
     _name: "\uD30C\uC0C1 \uB3CC\uACA9"
     _icon: {fileID: 21300000, guid: c4aa832da151bb244ace5a3c00760f9d, type: 3}
-    _description: "\uB3CC\uC9C4\uD574 \uC804\uBC29 \uC801\uC5D0\uAC8C \uACF5\uACA9\uB825\uC758
-      300% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC8FC\uACE0 \uACF5\uACA9\uC18D\uB3C4\uAC00
-      3\uCD08\uAC04 50% \uC99D\uAC00\uD55C \uB4A4 \uC801 \uD558\uB098\uC5D0\uAC8C
-      200% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784
-      6\uCD08]"
+    _description: "\ub3cc\uc9c4 \ud6c4 \uc804\ubc29 \uc801\uc5d0\uac8c \uacf5\uaca9\ub825\uc758 300% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc8fc\uace0, \uc774\uc5b4\uc11c \uc801 \ud558\ub098\uc5d0\uac8c 200% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc90d\ub2c8\ub2e4. \ubc94\uc704 \ud0c0\uaca9 \uc2dc 3\ucd08\uac04 \uacf5\uaca9\uc18d\ub3c4\uac00 50% \uc99d\uac00\ud569\ub2c8\ub2e4. [\ucfe8\ud0c0\uc784 6\ucd08]"
   _skillRange: 6
   _skillCooldown: 6
   _targetSide: 0
@@ -60,7 +56,7 @@ MonoBehaviour:
           _clusterRadius: 1
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -97,7 +93,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee
@@ -181,7 +177,7 @@ MonoBehaviour:
           _clusterRadius: 1
           _filters: []
           _priorities: []
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -224,7 +220,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Cone
@@ -233,7 +229,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee

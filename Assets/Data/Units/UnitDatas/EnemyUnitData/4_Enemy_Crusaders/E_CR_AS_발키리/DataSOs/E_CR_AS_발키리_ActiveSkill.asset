@@ -15,11 +15,7 @@ MonoBehaviour:
   _display:
     _name: "\uC2EC\uD310\uC758 \uAE09\uC2B5"
     _icon: {fileID: 21300000, guid: 6b5fbb524736bec4ead8f77fd387ca53, type: 3}
-    _description: "\uB300\uC0C1\uC5D0\uAC8C \uB3CC\uC9C4\uD574 \uACF5\uACA9\uB825\uC758
-      100% \uBB3C\uB9AC \uD53C\uD574\uB97C \uC8FC\uACE0 5\uCD08\uAC04 \uBC1B\uB294
-      \uD53C\uD574\uB97C 17% \uC99D\uAC00\uC2DC\uD0B5\uB2C8\uB2E4. \uC911\uB3C5 3\uC911\uCCA9\uC744
-      \uC18C\uBE44\uD558\uBA74 500% \uCD94\uAC00 \uBB3C\uB9AC \uD53C\uD574\uB97C
-      \uC90D\uB2C8\uB2E4. [\uCFE8\uD0C0\uC784 4\uCD08 / \uCD5C\uB300 3\uC911\uCCA9]"
+    _description: "\ub300\uc0c1\uc5d0\uac8c \ub3cc\uc9c4\ud574 \uacf5\uaca9\ub825\uc758 100% \ubb3c\ub9ac \ud53c\ud574\ub97c \uc8fc\uace0 5\ucd08\uac04 \ubc1b\ub294 \ud53c\ud574\ub97c 17% \uc99d\uac00\uc2dc\ud0b5\ub2c8\ub2e4. \uc911\ub3c5 3\uc911\ucca9\uc744 \uc18c\ube44\ud558\uba74 350% \ucd94\uac00 \ubb3c\ub9ac \ud53c\ud574\ub97c \uc90d\ub2c8\ub2e4. [\ucfe8\ud0c0\uc784 4\ucd08 / \ucd5c\ub300 3\uc911\ucca9]"
   _skillRange: 15
   _skillCooldown: 4
   _targetSide: 0
@@ -99,7 +95,7 @@ MonoBehaviour:
       data:
         _applicationFX: []
         _damageType: 0
-        _damageMultiplier: 5
+        _damageMultiplier: 3.5
     - rid: 4844432381217865734
       type: {class: SkillAttackActionData, ns: Units.Skills, asm: Assembly-CSharp}
       data:
@@ -113,7 +109,7 @@ MonoBehaviour:
           _filters: []
           _priorities:
           - _policy: 2
-        _targetLostPolicy: 0
+        _targetLostPolicy: 2
         _failurePolicy: 0
         _origin: 0
         _conditions: []
@@ -162,7 +158,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 0
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: SFX_Enemy_ActiveAttack_Single
@@ -171,7 +167,7 @@ MonoBehaviour:
           _endPolicy: 2
           _kind: 1
           _attachment: 0
-          _followDirection: 0
+          _followDirection: 1
           _scaleMode: 2
           _scaleMultiplier: {x: 1, y: 1}
         - _key: VFX_Enemy_ActiveOnHit_Melee
