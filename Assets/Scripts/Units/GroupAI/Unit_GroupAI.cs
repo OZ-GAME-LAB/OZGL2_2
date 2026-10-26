@@ -901,7 +901,8 @@ namespace Units
             }
 
 
-            context.Clear();
+            // Keep approach failure memory across movement-failure reassignment.
+            context.ClearPosition();
 
 
             if (!_targetSelector.TryAssignTarget(
@@ -954,7 +955,7 @@ namespace Units
 
 
             bool changed = _targetSelector.TryReevaluateTarget(unit);
-            if (!changed && context.HasAssignment && !context.WaitingForPosition)
+            if (!changed && context.HasAssignment && !context.WaitingForPosition && !context.IsRecovering)
                 return;
             if (changed) context.ClearPosition();
 
