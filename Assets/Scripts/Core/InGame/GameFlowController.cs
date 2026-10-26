@@ -34,7 +34,8 @@ namespace Game.Core
         Event = 2, //이벤트 진입
         Store = 3, //상점 진입
         QuarterDecision = 4, //분기 보상 마무리 후 다음분기 진행여부 결정상황
-        Finished = 5 //결산창
+        Finished = 5, //결산창
+        InfinityNotice = 6 //계속 도전 선택 완료 후 무한 분기 강화 안내
     }
     public enum ResultType { Victory, Defeat }
     public enum RunDecision { Finish, Continue }
@@ -363,7 +364,9 @@ namespace Game.Core
             if ((data.ResumeStep == RunResumeStep.Event && CurrentNode.PostBattleEvent != PostBattleEventType.Event &&
                  CurrentNode.PostBattleEvent != PostBattleEventType.Curse) ||
                 (data.ResumeStep == RunResumeStep.Store && CurrentNode.PostBattleEvent != PostBattleEventType.Shop) ||
-                (data.ResumeStep == RunResumeStep.QuarterDecision && (!IsLastNode || !data.HasClearedMainGame)))
+                (data.ResumeStep == RunResumeStep.QuarterDecision && (!IsLastNode || !data.HasClearedMainGame)) ||
+                (data.ResumeStep == RunResumeStep.InfinityNotice &&
+                    (!IsLastNode || !data.HasClearedMainGame || CurrentQuarter < NodeController.MainQuarters)))
             {
                 throw new ArgumentException("저장된 재개 단계와 현재 노드가 일치하지 않습니다.");
             }
@@ -503,7 +506,12 @@ namespace Game.Core
                 await WaitArtifactSelection(completedNode.BattleType, token);
                 await CleanupBattleAsync(token);
             }
-            if (startStep != RunResumeStep.QuarterDecision)
+            // 무한 분기 말의 저주 안내는 계속 도전 선택 후에 표시한다.
+            // 기존 Curse/Event 저장도 이 경로로 옮겨 안내가 먼저 재생되지 않게 한다.
+            bool deferredInfinityNotice = IsLastNode && CurrentQuarter >= NodeController.MainQuarters
+                && completedNode.PostBattleEvent == PostBattleEventType.Curse;
+            if (startStep != RunResumeStep.QuarterDecision && startStep != RunResumeStep.InfinityNotice
+                && !deferredInfinityNotice)
                 await ProcessEventAsync(completedNode, token);
             token.ThrowIfCancellationRequested();
 
@@ -511,7 +519,8 @@ namespace Game.Core
                 AdvanceNode();
             else
             {
-                if (startStep == RunResumeStep.QuarterDecision || (HasClearedMainGame && !AutoContinue))
+                if (startStep != RunResumeStep.InfinityNotice &&
+                    (startStep == RunResumeStep.QuarterDecision || (HasClearedMainGame && !AutoContinue)))
                 {
                     RunDecision decision = await ChooseQuarterDecisionAsync(token);
                     if (decision == RunDecision.Finish)
@@ -520,6 +529,9 @@ namespace Game.Core
                         return;
                     }
                 }
+                if (CurrentQuarter >= NodeController.MainQuarters)
+                    await ShowInfinityNoticeAsync(CurrentQuarter + 1, token);
+                token.ThrowIfCancellationRequested();
                 if (!StartQuarter(CurrentQuarter + 1))
                     throw new InvalidOperationException("다음 분기 생성에 실패했습니다.");
             }
@@ -533,6 +545,22 @@ namespace Game.Core
             ChangePhase(GamePhase.Preparation);
             await SaveCheckpointAsync(token);
             IsResumingStep = false;
+        }
+
+        private async UniTask ShowInfinityNoticeAsync(int nextQuarter, CancellationToken token)
+        {
+            _resumeStep = RunResumeStep.InfinityNotice;
+            ChangePhase(GamePhase.Event);
+            await SaveCheckpointAsync(token);
+            IsResumingStep = false;
+            token.ThrowIfCancellationRequested();
+            if (_continueUI == null) return; // UI 없는 테스트 호출자는 안내를 생략한다.
+
+            int infinityQuarter = nextQuarter - NodeController.MainQuarters;
+            float bonusPercent = WaveController.CalculateInfinityBonus(nextQuarter, 1) * 100f;
+            await _continueUI.ShowAsync(
+                $"무한 {infinityQuarter}분기 진입\n적 최대 체력·공격력 +{bonusPercent:0}%", token);
+            token.ThrowIfCancellationRequested();
         }
 
         /// <summary> 정규 스토리 분기(5분기) 클리어 후 계속 진행할지 결정하는 메서드</summary>

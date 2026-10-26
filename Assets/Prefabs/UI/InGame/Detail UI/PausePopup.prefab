@@ -2130,6 +2130,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 3369731275537139807}
     m_Modifications:
+    - target: {fileID: 1292558833677700696, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1292558833677700696, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2597703368415156378, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -2210,13 +2218,13 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 4383693669699765735, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
-      propertyPath: m_SizeDelta.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4923370453717238119, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
       propertyPath: m_Name
       value: GameSettingsUI
+      objectReference: {fileID: 0}
+    - target: {fileID: 4923370453717238119, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8924440218577873915, guid: ec8d1ff172f702442b8d8bbcb8562187, type: 3}
       propertyPath: m_IsActive

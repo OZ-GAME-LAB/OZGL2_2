@@ -85,6 +85,7 @@ namespace Game.UI.InGame
         private Vector2 _defaultConfirmSize;
         private UnityEngine.UI.ColorBlock _defaultConfirmColors;
         private bool _actionPresentationCached;
+        private bool _resetDescriptionScroll;
 
         private void OnEnable()
         {
@@ -148,6 +149,7 @@ namespace Game.UI.InGame
             {
                 _selectedIndex = -1;
                 _pageIndex = 0;
+                _resetDescriptionScroll = true;
             }
             _candidates = Array.AsReadOnly(snapshot);
             _isRequestPending = false;
@@ -237,6 +239,7 @@ namespace Game.UI.InGame
         {
             if (!CanInteract() || pageIndex < 0 || pageIndex >= PageCount || pageIndex == _pageIndex) return;
             _pageIndex = pageIndex;
+            _resetDescriptionScroll = true;
             Refresh(); // 선택은 전체 후보 기준으로 유지하며 페이지 변경은 요청을 전송하지 않는다.
         }
 
@@ -371,6 +374,26 @@ namespace Game.UI.InGame
                 }
 
                 ResetCandidateAnimations();
+            }
+
+            if (opening || _resetDescriptionScroll)
+            {
+                _resetDescriptionScroll = false;
+                ResetDescriptionScrollPositions(visibleCount);
+            }
+        }
+
+        private void ResetDescriptionScrollPositions(int visibleCount)
+        {
+            // Text and newly opened panels must finish layout before ScrollRect
+            // calculates its top position. Selection-only refreshes preserve reading position.
+            Canvas.ForceUpdateCanvases();
+            for (int i = 0; i < visibleCount; i++)
+            {
+                ScrollRect scroll = _cards[i].Effect.GetComponentInParent<ScrollRect>(true);
+                if (scroll == null || scroll.content == null) continue;
+                scroll.StopMovement();
+                scroll.verticalNormalizedPosition = 1f;
             }
         }
 
