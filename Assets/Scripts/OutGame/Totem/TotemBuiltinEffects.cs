@@ -42,7 +42,7 @@ public static class TotemBuiltinEffects
     {
         new TotemStatEffect(
             UnitTeam.Enemy, UnitModifierApplyType.All,
-            UnitStatType.MoveSpeed, UnitStatModifierType.Percent)
+            UnitStatType.MoveSpeed, UnitStatModifierType.Percent, 0.10f) 
     };
 
     // 취약: 아군 전체가 받는 피해 보정입니다.
